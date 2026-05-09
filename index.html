@@ -1112,13 +1112,23 @@ const SHIFTS={
 };
 const EMAIL_MAP={
   'aldrin.elnar@domain.com.au':     'Aldrin',
+  'aidrin.enar@domain.com.au':      'Aldrin',
+  'aldrin.enar@domain.com.au':      'Aldrin',
   'astrid.cortes@domain.com.au':    'Astrid',
   'hans.montes@domain.com.au':      'Hans',
   'jasmine.rasuman@domain.com.au':  'Jas',
+  'jasmine.rasuman@domain.com.au':  'Jas',
+  'jelie.barit@domain.com.au':      'Jelie',
+  'jeje.barit@domain.com.au':       'Jelie',
   'jelie.barit@domain.com.au':      'Jelie',
   'michell.gulmatico@domain.com.au':'Mich',
+  'michell.guimatico@domain.com.au':'Mich',
+  'michell.gulmatico@domain.com.au':'Mich',
+  'sheena.castillo@domain.com.au':  'Sheen',
   'sheena.castillo@domain.com.au':  'Sheen',
   'tricia.bass@domain.com.au':      'Trish',
+  'tricia.bass@domain.com.au':      'Trish',
+  'shebel.camata@domain.com.au':    'Belle',
   'shebel.camata@domain.com.au':    'Belle',
   'paul.sibayan@domain.com.au':     'Paul',
 };
@@ -4215,13 +4225,21 @@ async function mwDetailHandle(file){
       if(!r.email)return;
       var emailClean=r.email.toLowerCase().trim();
       var nick=EMAIL_MAP[emailClean];
-      /* Fallback: try matching by username part only */
-      if(!nick){
-        var userPart=emailClean.split('@')[0];
-        Object.keys(EMAIL_MAP).forEach(function(k){
-          if(k.split('@')[0]===userPart)nick=EMAIL_MAP[k];
-        });
-      }
+    /* Fallback: try matching by username part only */
+    if(!nick){
+      var userPart=emailClean.split('@')[0];
+      var bestMatch=null,bestScore=0;
+      Object.keys(EMAIL_MAP).forEach(function(k){
+        var kUser=k.split('@')[0];
+        /* Count matching characters */
+        var score=0;
+        var minLen=Math.min(userPart.length,kUser.length);
+        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
+        score=score/Math.max(userPart.length,kUser.length);
+        if(score>0.8&&score>bestScore){bestScore=score;bestMatch=EMAIL_MAP[k];}
+      });
+      nick=bestMatch;
+    }
       if(!nick||uploaderNicks.indexOf(nick)<0)return;
       var sh=SHIFTS[nick]||{start:9,end:18};
       var earliest=dlParseTime(r.earliest),latest=dlParseTime(r.latest);
@@ -4453,7 +4471,15 @@ function dlProcessExtracted(rows){
     var nick=EMAIL_MAP[emailClean];
     if(!nick){
       var userPart=emailClean.split('@')[0];
-      Object.keys(EMAIL_MAP).forEach(function(k){if(k.split('@')[0]===userPart)nick=EMAIL_MAP[k];});
+      var bestMatch=null,bestScore=0;
+      Object.keys(EMAIL_MAP).forEach(function(k){
+        var kUser=k.split('@')[0];
+        var score=0,minLen=Math.min(userPart.length,kUser.length);
+        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
+        score=score/Math.max(userPart.length,kUser.length);
+        if(score>0.8&&score>bestScore){bestScore=score;bestMatch=EMAIL_MAP[k];}
+      });
+      nick=bestMatch;
     }
     if(!nick)return;
     if(!uploaderNicks.includes(nick))return;
