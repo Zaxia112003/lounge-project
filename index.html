@@ -4786,7 +4786,7 @@ function mwDetailReset(){
 function mwDetailParse(){
   var raw=G('mw-detail-paste').value.trim();
   if(!raw){G('mw-detail-status').textContent='Please paste data first.';return;}
-  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';}).map(function(m){return m.nickname;});
+  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return m.nickname;});
   var mapped=[];
   var lines=raw.split('\n').filter(function(l){return l.trim();});
   lines.forEach(function(line){
@@ -5045,7 +5045,7 @@ async function dlHandleFile(file){
 
 function dlProcessExtracted(rows){
   /* Map emails to nicknames, skip unknowns and non-uploaders */
-  var uploaderNicks=TEAM.filter(function(m){return m.role==='uploader';}).map(function(m){return m.nickname;});
+  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return m.nickname;});
   var mapped=[];
   rows.forEach(function(r){
     if(!r.email)return;
