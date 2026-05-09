@@ -1430,11 +1430,9 @@ function fsSaveTeamMember(m){
 
 function fsDeleteTeamMember(nick){
   if(!fsDb())return;
+  /* Only delete the team membership document — preserve ALL data collections */
   window._fsDeleteDoc(window._fsDoc(fsDb(),'team',nick));
-  window._fsDeleteDoc(window._fsDoc(fsDb(),'perfData',nick));
-  /* Delete callouts by this member */
-  callouts.filter(function(c){return c.uploader===nick||c.escalationMember===nick||c.loggedBy===nick;})
-    .forEach(function(c){if(c._fsId)fsDeleteDoc('callouts',c._fsId);});
+  /* perfData, callouts, attendanceLog, awardHistory intentionally preserved */
 }
 
 function fsSaveAwardHistory(entry){
@@ -2508,7 +2506,8 @@ function pwRenderSlideshow(){
   pwSlideIdx=Math.min(pwSlideIdx,pinned.length-1);
   var cur=pinned[pwSlideIdx];
   var imgs=pinned.map(function(p,i){
-    return '<img class="pw-img'+(i===pwSlideIdx?' active':'')+'" src="'+p.src+'" alt="'+p.uploaderFull+'"/>';
+    return '<img class="pw-img'+(i===pwSlideIdx?' active':'')+'" src="'+p.src+'" alt="'+p.uploaderFull
+      +'" style="cursor:zoom-in" onclick="pwOpenFullPhoto(\''+(p._fsId||p.id)+'\')"/>';
   }).join('');
   var arrows=pinned.length>1
     ?'<div class="pw-arrow pw-prev" onclick="pwSlide(-1)">&#8249;</div>'
@@ -2538,11 +2537,13 @@ function pwRenderDots(){
 
 /* ── PHOTO FULL VIEW ── */
 function pwOpenFullPhoto(id){
-  var p=pwPhotos.find(function(x){return x._fsId===id;});
-  if(!p)return;
-  G('full-photo-img').src=p.src;
-  G('full-photo-caption').textContent=p.uploaderFull+(p.caption?' — '+p.caption:'');
-  G('modal-full-photo').classList.add('open');
+  /* Support both _fsId (string) and legacy numeric id */
+  var p=pwPhotos.find(function(x){return x._fsId===id||String(x.id)===String(id);});
+  if(!p){console.warn('pwOpenFullPhoto: photo not found',id,pwPhotos.length);return;}
+  var img=G('full-photo-img');var cap=G('full-photo-caption');
+  if(img)img.src=p.src;
+  if(cap)cap.textContent=p.uploaderFull+(p.caption?' \u2014 '+p.caption:'');
+  var mo=G('modal-full-photo');if(mo)mo.classList.add('open');
 }
 
 /* ── GALLERY MODAL ── */
@@ -2601,42 +2602,8 @@ function pwRenderPendingModal(){
   }).join('');
 }
 
-/* ── GALLERY PANEL ── */
-function pwOpenGallery(){
-  var panel=G('gallery-panel');if(!panel)return;
-  document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
-  panel.classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(function(b){b.classList.remove('active');});
-  pwRenderGallery();
-}
-function pwRenderGallery(){
-  var el=G('pw-gallery-grid');if(!el)return;
-  if(!pwPhotos.length){
-    el.innerHTML='<div class="empty" style="padding:40px"><div class="empty-ico">&#128247;</div><div class="empty-txt">No approved photos yet.</div></div>';
-    return;
-  }
-  var sorted=pwPhotos.slice().sort(function(a,b){return b.uploadedAt-a.uploadedAt;});
-  el.innerHTML=sorted.map(function(p){
-    var pinBtn=cu.role==='manager'
-      ?(p.pinned
-        ?'<button class="gallery-btn pin-active" data-id="'+p._fsId+'" onclick="pwUnpin(this.dataset.id)">&#128204; Pinned</button>'
-        :'<button class="gallery-btn" data-id="'+p.id+'" onclick="pwPin(+this.dataset.id)">Pin to Wall</button>')
-      :(p.pinned?'<span class="gallery-btn pin-active" style="cursor:default">&#128204; Pinned</span>':'');
-    var delBtn=(cu.nickname===p.uploader||cu.role==='manager')
-      ?'<button class="gallery-btn del" data-id="'+p.id+'" onclick="pwDelete(+this.dataset.id)">&#128465; Delete</button>'
-      :'';
-    var dlBtn='<button class="gallery-btn" data-id="'+p.id+'" onclick="pwDownload(+this.dataset.id)">&#8681; Save</button>';
-    return '<div class="gallery-item'+(p.pinned?' pinned':'')+'">'
-      +(p.pinned?'<div class="pin-badge">&#128204; Wall</div>':'')
-      +'<img class="gallery-thumb" src="'+p.src+'"/>'
-      +'<div class="gallery-info">'
-      +'<div class="gallery-name">'+p.uploaderFull+'</div>'
-      +'<div class="gallery-cap">'+(p.caption||'No caption')+'</div>'
-      +'</div>'
-      +'<div class="gallery-actions">'+pinBtn+dlBtn+delBtn+'</div>'
-      +'</div>';
-  }).join('');
-}
+/* ── GALLERY PANEL (legacy — redirects to modal) ── */
+function pwRenderGallery(){pwRenderGalleryModal();}
 
 
 function renderMyDay(){
@@ -3480,25 +3447,48 @@ function renderMgrHubPerformance(){
 
   /* ── UPLOADERS ── */
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
-  var uplRows=uploaders.map(function(m){
+  var uplData=uploaders.map(function(m){
     var nick=m.nickname;
     var days=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
     var totalUploads=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
     var inShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
     var offShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
-    var avgDaily=days.length?((totalUploads/days.length).toFixed(1)):'—';
+    var avgDaily=days.length?(totalUploads/days.length):null;
     var qualEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
     var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&mgrHubInRange(c.date);}).length;
-    var qScore=totalUploads>0?(((totalUploads-errors)/totalUploads)*100).toFixed(1)+'%':'—';
-    var qScoreColor=totalUploads>0?(parseFloat(qScore)>=95?'var(--green)':parseFloat(qScore)>=80?'var(--amber)':'var(--red)'):'var(--muted)';
+    var qScore=totalUploads>0?((totalUploads-errors)/totalUploads*100):null;
+    return {m:m,nick:nick,totalUploads:totalUploads,inShift:inShift,offShift:offShift,avgDaily:avgDaily,qualEsc:qualEsc,errors:errors,qScore:qScore};
+  });
+
+  var uplRows=uplData.map(function(r){
+    var avgStr=r.avgDaily!==null?r.avgDaily.toFixed(1):'—';
+    var qStr=r.qScore!==null?r.qScore.toFixed(1)+'%':'—';
+    var qColor=r.qScore!==null?(r.qScore>=95?'var(--green)':r.qScore>=80?'var(--amber)':'var(--red)'):'var(--muted)';
     return '<div style="display:grid;grid-template-columns:140px repeat(4,1fr);align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px">'
-      +'<div style="display:flex;align-items:center;gap:8px">'+avEl(nick,28)+'<span style="font-weight:600;color:var(--text)">'+m.fullName+'</span></div>'
-      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+totalUploads+'</div><div style="font-size:10px;color:var(--muted)">In: '+inShift+' / Off: '+offShift+'</div></div>'
-      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgDaily+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
-      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+qualEsc+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
-      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+qScoreColor+'">'+qScore+'</div><div style="font-size:10px;color:var(--muted)">quality score</div></div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div>'
+      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.totalUploads+'</div><div style="font-size:10px;color:var(--muted)">In: '+r.inShift+' / Off: '+r.offShift+'</div></div>'
+      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
+      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.qualEsc+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
+      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+qColor+'">'+qStr+'</div><div style="font-size:10px;color:var(--muted)">quality score</div></div>'
       +'</div>';
   }).join('');
+
+  /* Uploader grand total row */
+  var gtUplTotal=uplData.reduce(function(s,r){return s+r.totalUploads;},0);
+  var gtUplAvgArr=uplData.filter(function(r){return r.avgDaily!==null;});
+  var gtUplAvg=gtUplAvgArr.length?(gtUplAvgArr.reduce(function(s,r){return s+r.avgDaily;},0)/gtUplAvgArr.length).toFixed(1):'—';
+  var gtUplEsc=uplData.reduce(function(s,r){return s+r.qualEsc;},0);
+  var gtUplQArr=uplData.filter(function(r){return r.qScore!==null;});
+  var gtUplQ=gtUplQArr.length?(gtUplQArr.reduce(function(s,r){return s+r.qScore;},0)/gtUplQArr.length).toFixed(1)+'%':'—';
+  var gtUplQColor=gtUplQArr.length?(parseFloat(gtUplQ)>=95?'var(--green)':parseFloat(gtUplQ)>=80?'var(--amber)':'var(--red)'):'var(--muted)';
+
+  var uplGrandTotal='<div style="display:grid;grid-template-columns:140px repeat(4,1fr);align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);font-size:12px;border-top:2px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplAvg+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+gtUplQColor+'">'+gtUplQ+'</div><div style="font-size:10px;color:var(--muted)">avg quality score</div></div>'
+    +'</div>';
 
   var uplSection='<div class="sect" style="margin-bottom:20px">'
     +'<div class="sect-head"><span class="sect-title">&#128188; Uploaders</span></div>'
@@ -3510,53 +3500,75 @@ function renderMgrHubPerformance(){
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Score</div>'
     +'</div>'
     +uplRows
+    +uplGrandTotal
     +'</div>';
 
   /* ── ESCALATION ── */
   var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
 
-  /* Shared SLA — average across ALL escalation slaLog entries in range */
+  /* Shared SLA */
   var allSlaEntries=slaLog.filter(function(e){return mgrHubInRange(e.date);});
   var sharedSLA=allSlaEntries.length?(allSlaEntries.reduce(function(s,e){return s+e.pct;},0)/allSlaEntries.length).toFixed(1)+'%':'—';
   var sharedSlaBadge=allSlaEntries.length
     ?('<span class="esc-metric-badge '+(parseFloat(sharedSLA)>=75?'good':'bad')+'">'+sharedSLA+'</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>')
     :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
 
-  var escRows=escMembers.map(function(m,i){
+  var filteredSecs=(timerSessions||[]).filter(function(s){return mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
+  var filteredHrs=filteredSecs/3600;
+
+  var escData=escMembers.map(function(m){
     var nick=m.nickname;
-    var filteredSecs=(timerSessions||[]).filter(function(s){return mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
-    var filteredHrs=filteredSecs/3600;
     var uplDays=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
-    var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
-    var rate=filteredHrs>0?(uplTotal/filteredHrs).toFixed(1):'0.0';
+    var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+    var rate=filteredHrs>0?(uplTotal/filteredHrs):null;
     var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
-    var qualBadge=qualEsc===0
+    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,qualEsc:qualEsc};
+  });
+
+  var escRows=escData.map(function(r,i){
+    var rateStr=r.rate!==null?r.rate.toFixed(1):'0.0';
+    var qualBadge=r.qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
-      :qualEsc<=3
-      ?'<span class="esc-metric-badge warn">'+qualEsc+'</span>'
-      :'<span class="esc-metric-badge bad">'+qualEsc+'</span>';
-    /* SLA cell only on first row, spanning all members */
+      :r.qualEsc<=3
+      ?'<span class="esc-metric-badge warn">'+r.qualEsc+'</span>'
+      :'<span class="esc-metric-badge bad">'+r.qualEsc+'</span>';
     var slaCell=i===0
       ?'<td rowspan="'+escMembers.length+'" style="text-align:center;vertical-align:middle;padding:10px 12px;border-bottom:1px solid var(--border)">'+sharedSlaBadge+'</td>'
       :'';
     return '<tr style="border-bottom:1px solid var(--border)">'
-      +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(nick,28)+'<span style="font-weight:600;color:var(--text)">'+m.fullName+'</span></div></td>'
+      +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
       +slaCell
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rate+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
   }).join('');
+
+  /* Escalation grand total row */
+  var gtEscTotal=escData.reduce(function(s,r){return s+r.uplTotal;},0);
+  var gtEscRateArr=escData.filter(function(r){return r.rate!==null;});
+  var gtEscRate=gtEscRateArr.length?(gtEscRateArr.reduce(function(s,r){return s+r.rate;},0)/gtEscRateArr.length).toFixed(1):'—';
+  var gtEscEsc=escData.reduce(function(s,r){return s+r.qualEsc;},0);
+
+  var escGrandTotal='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">'
+    +'<td style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</td>'
+    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
+    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscRate+'</div><div style="font-size:10px;color:var(--muted)">avg upload rate</div></td>'
+    +'<td style="text-align:center;padding:10px 12px"><span class="esc-metric-badge warn">Shared</span></td>'
+    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></td>'
+    +'</tr>';
 
   var escSection='<div class="sect">'
     +'<div class="sect-head"><span class="sect-title">&#9889; Escalation</span></div>'
     +'<table style="width:100%;border-collapse:collapse">'
     +'<thead><tr style="border-bottom:1px solid var(--border2)">'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:left">Member</th>'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Escalation SLA</th>'
+    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Upload Rate</th>'
+    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Escalation SLA</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</th>'
     +'</tr></thead>'
-    +'<tbody>'+escRows+'</tbody>'
+    +'<tbody>'+escRows+escGrandTotal+'</tbody>'
     +'</table></div>';
 
   el.innerHTML=filterBar+uplSection+escSection;
@@ -4573,7 +4585,30 @@ function submitAddMember(){
   var errEl=G('add-member-err');errEl.textContent='';
 
   if(!nick||!fullName||!email||!role){errEl.textContent='Nickname, full name, email and role are required.';return;}
-  if(TEAM_DIR[nick]){errEl.textContent='A member with that nickname already exists.';return;}
+
+  /* Check if nickname already exists as active member */
+  if(TEAM.find(function(m){return m.nickname.toLowerCase()===nick.toLowerCase();})){
+    errEl.textContent='A member with that nickname is already active.';return;
+  }
+
+  /* Check for existing data — perfData, callouts, attendanceLog */
+  var hasPerf=perfData[nick]&&Object.keys(perfData[nick]).length>0;
+  var hasCallouts=callouts.some(function(c){return c.uploader===nick||c.loggedBy===nick;});
+  var hasAtt=attendanceLog.some(function(e){return e.nick===nick;});
+  var hasHistory=hasPerf||hasCallouts||hasAtt;
+
+  if(hasHistory&&!G('modal-add-member').dataset.readdConfirmed){
+    /* Show re-add warning */
+    errEl.style.color='var(--amber)';
+    errEl.innerHTML='&#9888; Existing data found for <strong>'+nick+'</strong> (performance logs, errors, or attendance). '
+      +'Re-adding this nickname will reconnect all historical data automatically. '
+      +'<br><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="confirmReadd()">&#10003; Confirm Re-add</button>';
+    return;
+  }
+
+  /* Clear re-add flag */
+  delete G('modal-add-member').dataset.readdConfirmed;
+  errEl.style.color='';errEl.textContent='';
 
   /* Add to TEAM_DIR */
   TEAM_DIR[nick]={email:email,fullName:fullName,birthday:birthday||'TBC',hireDate:hireDate||'TBC',role:role};
@@ -4582,25 +4617,35 @@ function submitAddMember(){
   TEAM.push({nickname:nick,fullName:fullName,role:role.toLowerCase()});
 
   /* Add to login store */
-  store[nick.toLowerCase()]={firstLogin:true,fullName:fullName,role:role.toLowerCase()};
+  store[nick.toLowerCase()]={firstLogin:false,fullName:fullName,role:role.toLowerCase()};
 
   /* Add to EMAIL_MAP */
   if(email)EMAIL_MAP[email]=nick;
 
   /* Add to SHIFTS */
   if(shiftStart&&shiftEnd)SHIFTS[nick]={start:shiftStart,end:shiftEnd};
-  else SHIFTS[nick]=null;
+  else if(role.toLowerCase()==='escalation')SHIFTS[nick]={start:8.5,end:17.5};
+  else if(role.toLowerCase()==='manager')SHIFTS[nick]=null;
+  else SHIFTS[nick]={start:9,end:18};
 
-  /* Add to perfData */
+  /* Add to perfData if not exists */
   if(!perfData[nick])perfData[nick]={};
 
-  /* Persist to localStorage */
+  /* Persist */
   saveTeamData();
-  /* Sync new member to Firestore */
-  fsSaveTeamMember({nickname:nick,fullName:fullName,role:role.toLowerCase()});
+  fsSaveTeamMember({nickname:nick,fullName:fullName,role:role.toLowerCase(),email:email,birthday:birthday||'TBC',hireDate:hireDate||'TBC',shiftStart:shiftStart,shiftEnd:shiftEnd});
 
   G('modal-add-member').classList.remove('open');
+  delete G('modal-add-member').dataset.readdConfirmed;
   renderMyTeam();
+  pushNotif('👥',(hasHistory?'Member re-added: ':'New member added: ')+fullName+' ('+nick+')','team');
+}
+
+function confirmReadd(){
+  G('modal-add-member').dataset.readdConfirmed='1';
+  var errEl=G('add-member-err');
+  errEl.style.color='';errEl.textContent='';
+  submitAddMember();
 }
 
 function openConfirmRemove(nick,fullName){
@@ -4635,40 +4680,16 @@ function removeMember(nick){
   /* Remove from SHIFTS */
   delete SHIFTS[nick];
 
-  /* Remove from perfData */
-  delete perfData[nick];
+  /* NOTE: perfData, callouts, attendanceLog, awardHistory intentionally preserved
+     so data reconnects automatically if member is re-added with same nickname */
 
-  /* Remove from callouts (as uploader, escalation member, or logger) */
-  for(var i=callouts.length-1;i>=0;i--){
-    var c=callouts[i];
-    if(c.uploader===nick||c.escalationMember===nick||c.loggedBy===nick)callouts.splice(i,1);
-  }
-
-  /* Remove from awardHistory */
-  for(var i=awardHistory.length-1;i>=0;i--){
-    if(awardHistory[i].nick===nick)awardHistory.splice(i,1);
-  }
-
-  /* Remove from attendanceLog */
-  for(var i=attendanceLog.length-1;i>=0;i--){
-    if(attendanceLog[i].nick===nick)attendanceLog.splice(i,1);
-  }
-
-  /* Remove from timerSessions if any linked (best effort) */
-  /* timerSessions are not nick-keyed so leave as-is */
-
-  /* Remove from mdAwards (hero/quarter top lists) */
+  /* Remove from mdAwards display only */
   ['hero','quarter','quality','uploads'].forEach(function(key){
     if(mdAwards[key]&&mdAwards[key].top){
       mdAwards[key].top=mdAwards[key].top.filter(function(p){return p.nick!==nick;});
       if(!mdAwards[key].top.length)mdAwards[key]=null;
     }
   });
-
-  /* Remove from slaLog entries logged by this nick */
-  for(var i=slaLog.length-1;i>=0;i--){
-    if(slaLog[i].loggedBy===nick)slaLog.splice(i,1);
-  }
 
   /* Persist updated team data */
   saveTeamData();
