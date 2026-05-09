@@ -316,14 +316,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .modal-overlay.open{display:flex;}
-.modal{background:#0f1023;border:1px solid var(--border2);border-radius:16px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative;animation:fadeUp .3s ease both;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative;animation:fadeUp .3s ease both;}
 .modal-title{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:.3px;color:var(--text);margin-bottom:4px;}
 .modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
-.modal-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.07);border:none;color:var(--muted);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.modal-close{position:absolute;top:16px;right:16px;background:var(--bg3);border:none;color:var(--muted);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
 .modal-close:hover{background:rgba(255,255,255,.14);color:var(--text);}
 .form-group{margin-bottom:16px;}
 .form-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;display:block;}
-.form-input{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);font-family:var(--font-b);outline:none;transition:all .2s;}
+.form-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);font-family:var(--font-b);outline:none;transition:all .2s;}
 .form-input:focus{border-color:rgba(139,45,255,.6);background:rgba(139,45,255,.07);}
 .form-input::placeholder{color:var(--muted2);}
 textarea.form-input{resize:vertical;min-height:80px;}
@@ -333,8 +333,8 @@ textarea.form-input{resize:vertical;min-height:80px;}
 .file-prev-rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;}
 
 /* DROP ZONE */
-.drop-zone{border:2px dashed rgba(139,45,255,.35);border-radius:14px;padding:44px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(139,45,255,.03);}
-.drop-zone:hover,.drop-zone.dov{border-color:rgba(139,45,255,.7);background:rgba(139,45,255,.08);}
+.drop-zone{border:2px dashed rgba(139,45,255,.35);border-radius:14px;padding:44px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3);}
+.drop-zone:hover,.drop-zone.dov{border-color:rgba(139,45,255,.7);background:var(--bg3);}
 .drop-icon{font-size:32px;margin-bottom:10px;}
 .drop-txt{font-size:13px;color:var(--muted);line-height:1.7;}
 
@@ -361,6 +361,11 @@ textarea.form-input{resize:vertical;min-height:80px;}
 body.theme-dark{--bg:#07080f;--bg2:#0e1020;--bg3:#13152a;}
 body.theme-light{--bg:#f0f2ff;--bg2:#ffffff;--bg3:#e8eaf6;--text:#1a1b2e;--muted:rgba(26,27,46,0.5);--muted2:rgba(26,27,46,0.25);--border:rgba(26,27,46,0.12);--border2:rgba(26,27,46,0.22);}
 body.theme-midnight{--bg:#02030a;--bg2:#07080f;--bg3:#0d0e1a;}
+/* ── THEME SKINS ── */
+body.theme-ocean{--bg:#0a1628;--bg2:#0d2040;--bg3:#112a52;--text:#e0f0ff;--muted:rgba(180,210,255,0.55);--muted2:rgba(180,210,255,0.25);--border:rgba(100,160,255,0.18);--border2:rgba(100,160,255,0.32);--accent:#38b2ff;}
+body.theme-forest{--bg:#0a1a0f;--bg2:#0f2416;--bg3:#142e1c;--text:#d4edda;--muted:rgba(180,230,190,0.55);--muted2:rgba(180,230,190,0.25);--border:rgba(80,180,100,0.18);--border2:rgba(80,180,100,0.32);--accent:#2ecc71;}
+body.theme-sunset{--bg:#1a0a0a;--bg2:#2a1010;--bg3:#341515;--text:#ffe8e0;--muted:rgba(255,200,180,0.55);--muted2:rgba(255,200,180,0.25);--border:rgba(255,100,60,0.18);--border2:rgba(255,100,60,0.32);--accent:#ff6b35;}
+body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--muted:rgba(80,40,160,0.5);--muted2:rgba(80,40,160,0.25);--border:rgba(130,80,230,0.15);--border2:rgba(130,80,230,0.28);--accent:#7c3aed;}
 
 .sub-tabs{display:flex;gap:4px;margin-bottom:20px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:4px;}
 .sub-tab{flex:1;padding:7px 10px;border-radius:7px;font-family:var(--font-d);font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;text-align:center;transition:all .18s;border:none;background:none;position:relative;}
@@ -729,6 +734,27 @@ body.theme-midnight{--bg:#02030a;--bg2:#07080f;--bg3:#0d0e1a;}
 .team-org-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:4px;}
 .team-org-row{display:flex;flex-wrap:wrap;gap:14px;}
 .team-card-wrap{position:relative;display:inline-flex;}
+/* ── RANGE CALENDAR PICKER ── */
+.range-cal{position:relative;display:inline-flex;align-items:center;}
+.range-cal-trigger{display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);cursor:pointer;font-size:11px;color:var(--text);min-width:160px;white-space:nowrap;}
+.range-cal-trigger:hover{border-color:var(--accent);}
+.range-cal-popup{position:absolute;top:calc(100% + 6px);left:0;z-index:300;background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);min-width:260px;display:none;}
+.range-cal-popup.open{display:block;}
+.rcal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.rcal-title{font-family:var(--font-d);font-size:13px;font-weight:700;color:var(--text);}
+.rcal-nav{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:2px 8px;font-size:13px;}
+.rcal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-top:4px;}
+.rcal-day-hdr{font-size:9px;font-weight:700;color:var(--muted);text-align:center;padding:2px 0;}
+.rcal-day{font-size:11px;text-align:center;padding:5px 2px;border-radius:6px;cursor:pointer;color:var(--text);transition:background .1s;}
+.rcal-day:hover:not(.empty){background:var(--bg3);}
+.rcal-day.today{font-weight:700;color:var(--accent);}
+.rcal-day.in-range{background:rgba(139,45,255,.1);}
+.rcal-day.range-start,.rcal-day.range-end{background:var(--accent)!important;color:#fff!important;font-weight:700;}
+.rcal-day.empty{cursor:default;color:transparent;}
+.rcal-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:8px;}
+/* ── ATTENDANCE CALENDAR GRID ── */
+#mgr-hub-pane-attendance table{border-collapse:collapse;}
+#mgr-hub-pane-attendance td,#mgr-hub-pane-attendance th{border:1px solid var(--border);}
 .team-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;cursor:pointer;transition:all .2s;min-width:90px;}
 .team-card:hover{border-color:var(--accent);background:rgba(139,45,255,.08);transform:translateY(-2px);}
 .team-card-name{font-size:11px;font-weight:700;font-family:var(--font-d);color:var(--text);text-align:center;}
@@ -866,7 +892,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">Contracts Processing</div>
-        <div class="main-brand-sub" style="color:var(--accent)">RTA LOUNGE <span style="opacity:.7;font-size:9px">v.30ae</span></div>
+        <div class="main-brand-sub" style="color:var(--accent)">RTA LOUNGE <span style="opacity:.7;font-size:9px">v.32ae</span></div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -896,17 +922,33 @@ window.dispatchEvent(new Event('firebase-ready'));
           <div class="s-section">
             <div class="s-section-title">Theme</div>
             <div class="theme-previews">
-              <div class="theme-prev active" id="theme-dark" onclick="setTheme('dark',this)">
+              <div class="theme-prev" id="theme-dark" onclick="setTheme('dark',this)">
                 <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#07080f,#0e1020)"></div>
                 <div class="theme-prev-label">Dark</div>
               </div>
-              <div class="theme-prev" id="theme-light" onclick="setTheme('light',this)">
+              <div class="theme-prev active" id="theme-light" onclick="setTheme('light',this)">
                 <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#f0f2ff,#ffffff)"></div>
                 <div class="theme-prev-label" style="color:#333">Light</div>
               </div>
               <div class="theme-prev" id="theme-midnight" onclick="setTheme('midnight',this)">
                 <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#02030a,#07080f)"></div>
                 <div class="theme-prev-label">Midnight</div>
+              </div>
+              <div class="theme-prev" id="theme-ocean" onclick="setTheme('ocean',this)">
+                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#0a1628,#38b2ff)"></div>
+                <div class="theme-prev-label">Ocean</div>
+              </div>
+              <div class="theme-prev" id="theme-forest" onclick="setTheme('forest',this)">
+                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#0a1a0f,#2ecc71)"></div>
+                <div class="theme-prev-label">Forest</div>
+              </div>
+              <div class="theme-prev" id="theme-sunset" onclick="setTheme('sunset',this)">
+                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#1a0a0a,#ff6b35)"></div>
+                <div class="theme-prev-label">Sunset</div>
+              </div>
+              <div class="theme-prev" id="theme-lavender" onclick="setTheme('lavender',this)">
+                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#ede8ff,#7c3aed)"></div>
+                <div class="theme-prev-label" style="color:#2d1b6e">Lavender</div>
               </div>
             </div>
           </div>
@@ -1404,7 +1446,7 @@ let nextId=1;
 let activeDateFilter='month';
 let customRange={from:'',to:''};
 let attCalNick=null,attCalYear=null,attCalMonth=null,attPending=null;
-let settings={theme:'dark',accent:'#8b2dff',compact:true,noMotion:false,use24h:false};
+let settings={theme:'light',accent:'#8b2dff',compact:true,noMotion:false,use24h:false};
 let qpDateFilter='all';
 var mdAnnouncements=[];
 var mdAwards={quality:null,uploads:null,hero:null,quarter:null};
@@ -1540,6 +1582,8 @@ function handleLogin(){
 function goDash(){
   G('pg-login').classList.remove('active');
   G('pg-dash').classList.add('active');
+  /* Apply saved theme */
+  if(settings.theme)setTheme(settings.theme,null);
   /* Show mailbox for all roles */
   var mw=G('mailbox-wrap');if(mw)mw.style.display='flex';
   updateMailboxBadge();
@@ -1550,6 +1594,10 @@ function goDash(){
   }catch(e){}
   buildSidebar();buildMain();
   var li=G('main-loggedin');if(li&&cu)li.innerHTML='Logged in as <span style="color:var(--accent);font-weight:700">'+cu.fullName+'</span>';
+  /* Init range calendars */
+  setTimeout(function(){
+    if(G('rcal-upl-perf-trigger'))rcalCreate('rcal-upl-perf',function(from,to){customRange={from:from,to:to};activeDateFilter='custom';document.querySelectorAll('.filter-pill').forEach(function(p){p.classList.remove('active');});renderDashboard();});
+  },100);
 }
 
 /* ── RECOVERED FUNCTIONS ── */
@@ -1663,7 +1711,9 @@ function switchStab(id,btn){
 function setTheme(t,el){
   document.body.className=document.body.className.replace(/theme-\w+/g,'').trim()+' theme-'+t;
   document.querySelectorAll('.theme-prev').forEach(p=>p.classList.remove('active'));
-  el.classList.add('active');settings.theme=t;
+  if(el)el.classList.add('active');
+  else{var btn=G('theme-'+t);if(btn)btn.classList.add('active');}
+  settings.theme=t;
 }
 function setAccent(color,el){
   document.documentElement.style.setProperty('--accent',color);
@@ -1783,6 +1833,10 @@ function buildUploaderDOM(){
         <button class="filter-pill" onclick="setF('quarter',this)">This Quarter</button>
         <button class="filter-pill" onclick="setF('year',this)">This Year</button>
         <button class="filter-pill" style="color:var(--muted)" onclick="setF('all',this)">&#10005; Clear</button>
+        <div class="range-cal" id="rcal-upl-perf">
+          <div class="range-cal-trigger" id="rcal-upl-perf-trigger">&#128197; Custom range</div>
+          <div class="range-cal-popup" id="rcal-upl-perf-popup"></div>
+        </div>
         <div class="filter-sep"></div>
         <input class="filter-di" type="date" id="cust-from" onchange="setCust()"/>
         <span style="color:var(--muted);font-size:11px">to</span>
@@ -2204,6 +2258,45 @@ function pwRenderDots(){
   }).join('');
 }
 
+/* ── PHOTO FULL VIEW ── */
+function pwOpenFullPhoto(id){
+  var p=pwPhotos.find(function(x){return x.id===id;});
+  if(!p)return;
+  G('full-photo-img').src=p.src;
+  G('full-photo-caption').textContent=p.uploaderFull+(p.caption?' — '+p.caption:'');
+  G('modal-full-photo').classList.add('open');
+}
+
+/* ── GALLERY MODAL ── */
+function pwOpenGallery(){
+  pwRenderGalleryModal();
+  G('modal-gallery').classList.add('open');
+}
+function pwRenderGalleryModal(){
+  var el=G('modal-gallery-grid');if(!el)return;
+  if(!pwPhotos.length){
+    el.innerHTML='<div class="empty" style="padding:40px;text-align:center"><div style="font-size:32px">📷</div><div style="color:var(--muted);margin-top:8px">No approved photos yet.</div></div>';
+    return;
+  }
+  var sorted=pwPhotos.slice().sort(function(a,b){return b.uploadedAt-a.uploadedAt;});
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:4px">'
+    +sorted.map(function(p){
+      var pinBtn=cu.role==='manager'
+        ?(p.pinned
+          ?'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(139,45,255,.2);color:var(--accent);border:none;cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwUnpin(+this.dataset.id);pwRenderGalleryModal()">📌 Pinned</button>'
+          :'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg3);color:var(--muted);border:1px solid var(--border);cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwPin(+this.dataset.id);pwRenderGalleryModal()">Pin to Wall</button>')
+        :(p.pinned?'<div style="font-size:9px;color:var(--accent);text-align:center">📌 On Wall</div>':'');
+      return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">'
+        +'<img src="'+p.src+'" style="width:100%;height:110px;object-fit:cover;cursor:pointer;display:block" onclick="pwOpenFullPhoto('+p.id+')" />'
+        +'<div style="padding:6px">'
+        +'<div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.uploaderFull+'</div>'
+        +(p.caption?'<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.caption+'</div>':'')
+        +pinBtn
+        +'</div></div>';
+    }).join('')
+    +'</div>';
+}
+
 /* ── PENDING MODAL ── */
 function pwOpenPendingModal(){
   pwRenderPendingModal();
@@ -2297,10 +2390,10 @@ function renderMyDay(){
     +'</div>'
     +'<div class="ann-list" id="ann-list"></div>'
     +'</div>'
-    +'<div style="display:flex;gap:16px;align-items:flex-start;margin-top:0">'
+    +'<div style="display:flex;gap:16px;align-items:stretch;margin-top:0">'
     /* LEFT — Team Photos (50%) */
-    +'<div style="flex:1;min-width:0">'
-    +'<div class="sect pw-wrap">'
+    +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'
+    +'<div class="sect pw-wrap" style="flex:1">'
     +'<div class="sect-head">'
     +'<span class="sect-title">&#128247; Team Photos</span>'
     +'<div style="display:flex;gap:8px;align-items:center">'
@@ -2316,8 +2409,8 @@ function renderMyDay(){
     +'</div>'
     /* RIGHT — Awards carousel (50%), non-escalation only */
     +(cu&&cu.role!=='escalation'
-      ?'<div style="flex:1;min-width:0">'
-        +'<div class="sect" style="padding:0">'
+      ?'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'
+        +'<div class="sect" style="padding:0;flex:1">'
         +'<div class="sect-head" style="padding:14px 16px 10px">'
         +'<span class="sect-title">&#127942; Awards</span>'
         +'<div style="display:flex;align-items:center;gap:6px">'
@@ -2442,6 +2535,12 @@ function awardAvatar(nick, size, isYou){
   return '<div class="'+cls+'" style="width:'+sz+';height:'+sz+';background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:'+(size/2.4|0)+'px;font-weight:700;color:#fff;font-family:var(--font-d)">'+initials+'</div>';
 }
 var _awardsIdx=0;
+var AWARD_CRITERIA={
+  quality:'Quality Score %',
+  uploads:'Avg. Daily Upload',
+  hero:'Avg. Daily Upload · Quality Score % · Quality Esc (Month)',
+  quarter:'Avg. Daily Upload · Quality Score % · Quality Esc (Quarter)'
+};
 
 function awardsCarouselPrev(){
   _awardsIdx=(_awardsIdx-1+AWARD_DEFS.length)%AWARD_DEFS.length;
@@ -2459,6 +2558,7 @@ function renderAwards(){
 
   var def=AWARD_DEFS[_awardsIdx];
   var data=mdAwards[def.key];
+  var criteria=AWARD_CRITERIA[def.key]||'';
   var body='';
   if(data&&data.top&&data.top.length){
     var top=data.top;
@@ -2472,9 +2572,14 @@ function renderAwards(){
       var isYou=cu&&p.nick===cu.nickname;
       var av=awardAvatar(p.nick,sizes[col],isYou);
       var nameCls='award-name'+(isYou?' you':'');
+      /* Build score line */
+      var scoreLine='';
+      if(p.score)scoreLine='<div style="font-size:9px;color:var(--muted);margin-top:2px">'+p.score+(def.key==='quality'?'%':''+(def.key==='uploads'?' avg/day':''))+'</div>';
+      else if(p.adu||p.qs)scoreLine='<div style="font-size:9px;color:var(--muted);margin-top:2px">'+(p.adu?p.adu+'/day':'')+( p.qs?' · '+p.qs+'%':'')+( p.esc?' · '+p.esc+' esc':'')+'</div>';
       return '<div class="award-col">'
         +av
         +'<div class="'+nameCls+'">'+(isYou?'&#10024; ':'')+p.nick+'</div>'
+        +scoreLine
         +'<div class="award-block '+blocks[col]+'">'+medals[col]+'</div>'
         +'</div>';
     }).join('');
@@ -2881,6 +2986,90 @@ function renderHubInLounge(){
   renderDashboard();
 }
 
+/* ── RANGE CALENDAR PICKER ENGINE ── */
+var _rcals={};
+
+function rcalCreate(id,onRange){
+  var now=getSydneyDate();
+  var state={year:now.getFullYear(),month:now.getMonth(),start:null,end:null,picking:'start'};
+  _rcals[id]=state;
+
+  function fmt(d){return d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'):null;}
+  function fmtLabel(d){return d?d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear():'...';}
+
+  function render(){
+    var popup=G(id+'-popup');if(!popup)return;
+    var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+    var today=getSydneyDate();today.setHours(0,0,0,0);
+    var firstDay=new Date(state.year,state.month,1).getDay();
+    var dim=new Date(state.year,state.month+1,0).getDate();
+    var dayHdrs=DAYS.map(function(d){return '<div class="rcal-day-hdr">'+d+'</div>';}).join('');
+    var blanks='';for(var i=0;i<firstDay;i++)blanks+='<div class="rcal-day empty"></div>';
+    var days='';
+    for(var d=1;d<=dim;d++){
+      var date=new Date(state.year,state.month,d);date.setHours(0,0,0,0);
+      var ds=fmt(date);
+      var cls='rcal-day';
+      if(ds===fmt(today))cls+=' today';
+      if(state.start&&state.end){
+        if(ds===fmt(state.start))cls+=' range-start';
+        else if(ds===fmt(state.end))cls+=' range-end';
+        else if(date>state.start&&date<state.end)cls+=' in-range';
+      } else if(state.start&&ds===fmt(state.start))cls+=' range-start';
+      days+='<div class="'+cls+'" data-ds="'+ds+'">'+d+'</div>';
+    }
+    var hint=state.picking==='start'?'Click to set start date':'Click to set end date';
+    popup.innerHTML='<div class="rcal-header">'
+      +'<button class="rcal-nav" onclick="_rcalNav(\''+id+'\',-1)">&#8249;</button>'
+      +'<span class="rcal-title">'+MONTHS[state.month]+' '+state.year+'</span>'
+      +'<button class="rcal-nav" onclick="_rcalNav(\''+id+'\',1)">&#8250;</button>'
+      +'</div>'
+      +'<div class="rcal-days">'+dayHdrs+blanks+days+'</div>'
+      +'<div class="rcal-hint">'+hint+'</div>'
+      +'<div class="rcal-hint" style="cursor:pointer;text-decoration:underline;color:var(--accent)" onclick="_rcalClear(\''+id+'\')">Clear</div>';
+
+    /* Attach day click listeners */
+    popup.querySelectorAll('.rcal-day:not(.empty)').forEach(function(el){
+      el.onclick=function(){
+        var ds=this.dataset.ds;var d=new Date(ds+'T00:00:00');
+        if(state.picking==='start'){state.start=d;state.end=null;state.picking='end';}
+        else{
+          if(d<state.start){state.end=state.start;state.start=d;}
+          else{state.end=d;}
+          state.picking='start';
+          /* Trigger callback */
+          if(state.start&&state.end)onRange(fmt(state.start),fmt(state.end));
+          G(id+'-popup').classList.remove('open');
+        }
+        updateTrigger();render();
+      };
+    });
+  }
+
+  function updateTrigger(){
+    var trig=G(id+'-trigger');if(!trig)return;
+    var label=state.start?(fmtLabel(state.start)+' → '+(state.end?fmtLabel(state.end):'...')):' Custom range';
+    trig.innerHTML='&#128197; '+label;
+  }
+
+  window['_rcalNav']=function(rid,dir){var s=_rcals[rid];s.month+=dir;if(s.month<0){s.month=11;s.year--;}if(s.month>11){s.month=0;s.year++;}if(_rcals[rid]===s)rcalRender(rid);};
+  window['_rcalClear']=function(rid){var s=_rcals[rid];s.start=null;s.end=null;s.picking='start';rcalRender(rid);var trig=G(rid+'-trigger');if(trig)trig.innerHTML='&#128197; Custom range';};
+
+  window['rcalRender']=function(rid){if(_rcals[rid])_rcals[rid].render&&_rcals[rid].render();};
+  state.render=render;
+
+  /* Toggle popup */
+  var trig=G(id+'-trigger');
+  if(trig)trig.onclick=function(e){e.stopPropagation();var pop=G(id+'-popup');pop.classList.toggle('open');if(pop.classList.contains('open'))render();};
+
+  /* Close on outside click */
+  document.addEventListener('click',function(e){
+    var pop=G(id+'-popup');
+    if(pop&&!pop.contains(e.target)&&e.target!==G(id+'-trigger'))pop.classList.remove('open');
+  });
+}
+
 /* ── FILTER CLEAR FUNCTIONS ── */
 function escPerfClearFilter(){
   escPerfDateFilter='month';
@@ -2987,8 +3176,7 @@ function renderMgrHubPerformance(){
     +'<input class="filter-di" type="date" id="mgr-hub-from" onchange="setMgrHubCustom()"/>'
     +'<span style="color:var(--muted);font-size:11px">to</span>'
     +'<input class="filter-di" type="date" id="mgr-hub-to" onchange="setMgrHubCustom()"/>'
-    +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrHubClearFilter()">&#10005; Clear</button>'
-    +'</div>';
+    +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrHubClearFilter()">&#10005; Clear</button>'    +'</div>';
 
   /* ── UPLOADERS ── */
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
@@ -2999,7 +3187,7 @@ function renderMgrHubPerformance(){
     var inShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
     var offShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
     var avgDaily=days.length?((totalUploads/days.length).toFixed(1)):'—';
-    var qualEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore';}).length;
+    var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc';}).length;
     var qsBadge=qualEsc===0
       ?'<span class="esc-metric-badge good">On Track</span>'
       :qualEsc<=3
@@ -3043,7 +3231,7 @@ function renderMgrHubPerformance(){
     var uplDays=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
     var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
     var rate=filteredHrs>0?(uplTotal/filteredHrs).toFixed(1):'0.0';
-    var qualEsc=callouts.filter(function(c){return c.loggedBy===nick&&c.type==='qscore';}).length;
+    var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc';}).length;
     var qualBadge=qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
       :qualEsc<=3
@@ -4237,7 +4425,12 @@ function openMgrWrite(){
   ['mw-err-upl','mw-qesc-upl'].forEach(function(id){var el=G(id);if(el)el.innerHTML=uplOpts;});
   var qescEsc=G('mw-qesc-esc');if(qescEsc)qescEsc.innerHTML=escOpts;
   var allOpts='<option value="">— None —</option>'+TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
-  ['mw-hero-1','mw-hero-2','mw-hero-3','mw-qm-1','mw-qm-2','mw-qm-3'].forEach(function(id){var el=G(id);if(el)el.innerHTML=allOpts;});
+  ['mw-hero-1','mw-hero-2','mw-hero-3','mw-qm-1','mw-qm-2','mw-qm-3','mw-qc-1','mw-qc-2','mw-qc-3','mw-um-1','mw-um-2','mw-um-3'].forEach(function(id){var el=G(id);if(el)el.innerHTML=allOpts;});
+  /* Clear score fields */
+  ['mw-qc-1-score','mw-qc-2-score','mw-qc-3-score','mw-um-1-score','mw-um-2-score','mw-um-3-score',
+   'mw-hero-1-adu','mw-hero-1-qs','mw-hero-1-esc','mw-hero-2-adu','mw-hero-2-qs','mw-hero-2-esc',
+   'mw-hero-3-adu','mw-hero-3-qs','mw-hero-3-esc','mw-qm-1-adu','mw-qm-1-qs','mw-qm-1-esc',
+   'mw-qm-2-adu','mw-qm-2-qs','mw-qm-2-esc','mw-qm-3-adu','mw-qm-3-qs','mw-qm-3-esc'].forEach(function(id){var el=G(id);if(el)el.value='';});
   ['mw-err-date','mw-qesc-date','mw-sla-date'].forEach(function(id){var el=G(id);if(el)el.value=today;});
   ['mw-err-addr','mw-err-desc','mw-qesc-addr','mw-qesc-desc'].forEach(function(id){var el=G(id);if(el)el.value='';});
   ['mw-err-msg','mw-qesc-msg','mw-err-prev','mw-qesc-prev'].forEach(function(id){var el=G(id);if(el)el.innerHTML='';});
@@ -4358,7 +4551,7 @@ function mwDetailConfirm(){
 async function mwSubmitQEsc(){
   var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
-  if(!upl||!esc||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
+  if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-qesc-file').files[0]?await toB64(G('mw-qesc-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
   var newQEsc={id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
@@ -4405,40 +4598,31 @@ function mwSLAConfirm(){
 }
 
 function mwSubmitAwards(){
-  var buildTop=function(n1,n2,n3){var top=[];[n1,n2,n3].forEach(function(n){if(n)top.push({nick:n});});return top.length?{top:top}:null;};
   var syd=getSydneyDate();
   var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var mon=months[syd.getMonth()];
-  var yr=syd.getFullYear();
-  /* Helper to get week of month */
-  var weekNum=Math.ceil(syd.getDate()/7);
-  var weekLabel='Week '+weekNum;
-  /* Current quarter */
+  var mon=months[syd.getMonth()];var yr=syd.getFullYear();
+  var weekNum=Math.ceil(syd.getDate()/7);var weekLabel='Week '+weekNum;
   var q='Q'+(Math.floor(syd.getMonth()/3)+1)+' '+yr;
-
-  var heroTop=buildTop(G('mw-hero-1').value,G('mw-hero-2').value,G('mw-hero-3').value);
-  var qmTop=buildTop(G('mw-qm-1').value,G('mw-qm-2').value,G('mw-qm-3').value);
-  mdAwards.hero=heroTop;
-  mdAwards.quarter=qmTop;
-
-  /* Append to awardHistory */
-  var medals=[{rank:0,suffix:'🥇'},{rank:1,suffix:'🥈'},{rank:2,suffix:'🥉'}];
-  if(heroTop&&heroTop.top){
-    heroTop.top.forEach(function(p,i){
-      var entry={nick:p.nick,award:'Hero of the Month',emoji:'🦸',label:mon+', '+weekLabel+' — '+yr+(medals[i]?' '+medals[i].suffix:''),date:syd.toISOString()};
-      awardHistory.push(entry);
-      fsSaveAwardHistory(entry);
-    });
+  var medals=['🥇','🥈','🥉'];
+  function gv(id){var el=G(id);return el?el.value:'';}
+  function buildTop(nicks,scores){var top=[];nicks.forEach(function(nick,i){if(nick)top.push({nick:nick,score:scores?scores[i]:null});});return top.length?{top:top}:null;}
+  function saveAward(key,topData,award,emoji,label){
+    mdAwards[key]=topData;
+    if(topData&&topData.top){topData.top.forEach(function(p,i){var entry={nick:p.nick,award:award,emoji:emoji,label:label+' '+medals[i],score:p.score,adu:p.adu,qs:p.qs,esc:p.esc,date:syd.toISOString()};awardHistory.push(entry);fsSaveAwardHistory(entry);});}
   }
-  if(qmTop&&qmTop.top){
-    qmTop.top.forEach(function(p,i){
-      var entry={nick:p.nick,award:'Quarter Master',emoji:'⭐',label:q+(medals[i]?' '+medals[i].suffix:''),date:syd.toISOString()};
-      awardHistory.push(entry);
-      fsSaveAwardHistory(entry);
-    });
-  }
+  var qcTop=buildTop([gv('mw-qc-1'),gv('mw-qc-2'),gv('mw-qc-3')],[gv('mw-qc-1-score'),gv('mw-qc-2-score'),gv('mw-qc-3-score')]);
+  var umTop=buildTop([gv('mw-um-1'),gv('mw-um-2'),gv('mw-um-3')],[gv('mw-um-1-score'),gv('mw-um-2-score'),gv('mw-um-3-score')]);
+  var heroNicks=[gv('mw-hero-1'),gv('mw-hero-2'),gv('mw-hero-3')];
+  var heroTop=buildTop(heroNicks,null);
+  if(heroTop&&heroTop.top){heroTop.top.forEach(function(p,i){var n=i+1;p.adu=gv('mw-hero-'+n+'-adu');p.qs=gv('mw-hero-'+n+'-qs');p.esc=gv('mw-hero-'+n+'-esc');});}
+  var qmNicks=[gv('mw-qm-1'),gv('mw-qm-2'),gv('mw-qm-3')];
+  var qmTop=buildTop(qmNicks,null);
+  if(qmTop&&qmTop.top){qmTop.top.forEach(function(p,i){var n=i+1;p.adu=gv('mw-qm-'+n+'-adu');p.qs=gv('mw-qm-'+n+'-qs');p.esc=gv('mw-qm-'+n+'-esc');});}
+  saveAward('quality',qcTop,'Quality Champion','🏆',mon+', '+weekLabel+' — '+yr);
+  saveAward('uploads',umTop,'Uploading Monster','👾',mon+', '+weekLabel+' — '+yr);
+  saveAward('hero',heroTop,'Hero of the Month','🦸',mon+', '+weekLabel+' — '+yr);
+  saveAward('quarter',qmTop,'Quarter Master','⭐',q);
   fsSaveAwards();
-
   pushNotif('🏆','Awards updated by '+cu.fullName+'.','awards');
   if(typeof renderAwards==='function')renderAwards();
   closeMgrWrite();
@@ -5222,9 +5406,9 @@ function getStats(nick,range){
     uploadsTotal+=d.uploadsTotal||0;uploadsInShift+=d.uploadsInShift||0;
     if((d.uploadsTotal||0)>0)weightedDays+=weight;
   });
-  const adu=weightedDays>0?(uploadsInShift/weightedDays):0;
-  const myQEsc=callouts.filter(c=>c.type==='qesc'&&c.uploader===nick&&inQ(c.date,q));
-  const myErr=callouts.filter(c=>c.type==='qscore'&&c.uploader===nick&&inQ(c.date,q));
+  const adu=weightedDays>0?(uploadsTotal/weightedDays):0;
+  const myQEsc=callouts.filter(c=>c.type==='qesc'&&(c.uploader===nick||c.escalationMember===nick)&&inRange(c.date,range));
+  const myErr=callouts.filter(c=>c.type==='qscore'&&c.uploader===nick&&inRange(c.date,range));
   const qScore=uploadsTotal>0?((uploadsTotal-myErr.length)/uploadsTotal*100):null;
   return{uploadsTotal,uploadsInShift,uploadsOffShift:uploadsTotal-uploadsInShift,adu:Math.round(adu*10)/10,weightedDays:Math.round(weightedDays*10)/10,qEsc:myQEsc.length,errors:myErr.length,qScore};
 }
@@ -5241,7 +5425,7 @@ function renderDashboard(){
     <div class="kpi-card">
       <div class="kpi-label">Total Uploads</div>
       <div class="kpi-value">${s.uploadsTotal}</div>
-      <div class="kpi-sub">In-shift: ${s.uploadsInShift} · Off-shift: ${s.uploadsOffShift}</div>
+      <div class="kpi-sub">Logged uploads for the period</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Avg Daily Upload</div>
@@ -5275,11 +5459,11 @@ function renderDailyTbl(nick,range){
   const rows=dates.map(d=>{
     const dd=data[d];const attRec=(attendance[nick]||{})[d];
     const status=attRec?attRec.status:'full';const wt=wtMap[status]||'x1.0';
-    const offTag=dd.uploadsOffShift>0?'<span class="chip-offshift">'+dd.uploadsOffShift+' off-shift</span>':'';
+    const offTag='';
     const note=attRec&&attRec.notes?' — '+attRec.notes:'';
-    return '<tr><td>'+fmtDate(d)+'</td><td>'+(dd.uploadsTotal||0)+' '+offTag+'</td><td>'+(dd.uploadsInShift||0)+'</td><td>'+(dd.uploadsOffShift||0)+'</td><td><span class="kpi-badge kb-blue" style="font-size:9px">'+wt+'</span>'+note+'</td></tr>';
+    return '<tr><td>'+fmtDate(d)+'</td><td>'+(dd.uploadsTotal||0)+'</td><td><span class="kpi-badge kb-blue" style="font-size:9px">'+wt+'</span>'+note+'</td></tr>';
   }).join('');
-  el.innerHTML='<table><thead><tr><th>Date (AEST)</th><th>Total</th><th>In-Shift</th><th>Off-Shift</th><th>Day Weight</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  el.innerHTML='<table><thead><tr><th>Date (AEST)</th><th>Total Uploads</th><th>Day Weight</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
 function renderTeamOverview(){
@@ -5421,12 +5605,20 @@ function renderQualityPortal(){
     if(canAck){ackSect='<div class="ack-wrap"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+c.id+'" placeholder="Describe your understanding..."></textarea></div><button class="btn btn-primary btn-sm" data-id="'+c.id+'" onclick="ackCo(+this.dataset.id)">&#10003; Acknowledge</button> ';}
     else if(c.insight){ackSect='<div class="insight-box"><div class="insight-lbl">&#10003; Uploader Insight</div><div class="insight-txt">'+c.insight+'</div></div>';}
     const completeBtn=canComplete?'<button class="btn btn-green btn-sm" data-id="'+c.id+'" onclick="completeCo(+this.dataset.id)">&#10003; Mark Completed</button>':'';
-    return '<div class="qp-card'+(isCrit?' critical':'')+'">'+critBadge
-      +'<div class="qp-header"><div>'+avEl(c.uploader,34)+'</div><div class="qp-meta"><div class="qp-address">'+c.address+'</div>'
-      +'<div class="qp-detail">'+(isCrit?'Quality Escalation':'Contract Error')+' · '+fmtDate(c.date)+' · Logged by '+logger+'</div></div>'+stBadge(c.status)+'</div>'
+    return '<div class="qp-card'+(isCrit?' critical':'')+'" style="padding:10px 14px;cursor:pointer" onclick="toggleCalloutDetail('+c.id+')">'+critBadge
+      +'<div class="qp-header" style="margin-bottom:0"><div>'+avEl(c.uploader,28)+'</div><div class="qp-meta"><div class="qp-address" style="font-size:12px">'+c.address+'</div>'
+      +'<div class="qp-detail">'+(isCrit?'Quality Escalation':'Contract Error')+' · '+fmtDate(c.date)+'</div></div>'+stBadge(c.status)+'</div>'
+      +'<div id="qp-detail-'+c.id+'" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
       +'<div class="qp-body">'+c.feedback+'</div>'+ss+ackSect
-      +'<div class="qp-footer"><span style="font-size:10px;color:var(--muted2)">For: '+c.uploader+'</span>'+completeBtn+'</div></div>';
+      +'<div class="qp-footer"><span style="font-size:10px;color:var(--muted2)">For: '+c.uploader+'</span>'+completeBtn+'</div>'
+      +'</div>'
+      +'</div>';
   }).join('');
+}
+
+function toggleCalloutDetail(id){
+  var el=G('qp-detail-'+id);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
 
 function ackCo(id){
@@ -5844,7 +6036,7 @@ document.addEventListener('DOMContentLoaded',function(){
           <div class="form-group"><label class="form-label">Uploader</label>
             <select class="form-input" id="mw-qesc-upl" style="background:var(--bg3);color:var(--text);border-color:var(--border)"></select></div>
           <div class="form-group"><label class="form-label">Escalation Member</label>
-            <select class="form-input" id="mw-qesc-esc" style="background:var(--bg3);color:var(--text);border-color:var(--border)"></select></div>
+            <select class="form-input" id="mw-qesc-esc" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— N/A (No escalation member involved) —</option></select></div>
           <div class="form-group"><label class="form-label">Property Address / Contract ID</label>
             <input class="form-input" id="mw-qesc-addr" placeholder="e.g. 45 Oak Ave Coburg 3058 VIC"/></div>
           <div class="form-group"><label class="form-label">Date</label>
@@ -5891,29 +6083,100 @@ document.addEventListener('DOMContentLoaded',function(){
         <!-- LOG AWARDS -->
         <div class="dl-section" id="dl-sec-mw-awards">
           <div class="s-section-title">Log Awards</div>
-          <div style="display:flex;flex-direction:column;gap:20px;margin-top:4px">
-            <div class="sect" style="padding:16px">
+          <div style="display:flex;flex-direction:column;gap:16px;margin-top:4px">
+
+            <!-- Quality Champion -->
+            <div class="sect" style="padding:14px">
+              <div class="sect-head"><span class="sect-title">&#127942; Quality Champion</span></div>
+              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Quality Score %</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+                  <div><label class="form-label">1st</label><select class="form-input" id="mw-qc-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><label class="form-label">Score %</label><input class="form-input" id="mw-qc-1-score" type="number" step="0.1" min="0" max="100" placeholder="0.0" style="width:80px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-qc-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-qc-2-score" type="number" step="0.1" min="0" max="100" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-qc-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-qc-3-score" type="number" step="0.1" min="0" max="100" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Uploading Monster -->
+            <div class="sect" style="padding:14px">
+              <div class="sect-head"><span class="sect-title">&#128126; Uploading Monster</span></div>
+              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Avg. Daily Upload</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+                  <div><label class="form-label">1st</label><select class="form-input" id="mw-um-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><label class="form-label">Avg/Day</label><input class="form-input" id="mw-um-1-score" type="number" step="0.1" min="0" placeholder="0.0" style="width:80px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-um-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-um-2-score" type="number" step="0.1" min="0" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-um-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-um-3-score" type="number" step="0.1" min="0" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Hero of the Month -->
+            <div class="sect" style="padding:14px">
               <div class="sect-head"><span class="sect-title">&#129464; Hero of the Month</span></div>
-              <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-                <div><label class="form-label">1st Place</label>
-                  <select class="form-input" id="mw-hero-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                <div><label class="form-label">2nd Place</label>
-                  <select class="form-input" id="mw-hero-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                <div><label class="form-label">3rd Place</label>
-                  <select class="form-input" id="mw-hero-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Avg. Daily, Quality Score %, Quality Esc</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
+                  <div><label class="form-label">1st</label><select class="form-input" id="mw-hero-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><label class="form-label">Avg/Day</label><input class="form-input" id="mw-hero-1-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px"/></div>
+                  <div><label class="form-label">Q%</label><input class="form-input" id="mw-hero-1-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px"/></div>
+                  <div><label class="form-label">Esc</label><input class="form-input" id="mw-hero-1-esc" type="number" min="0" placeholder="0" style="width:48px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
+                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-hero-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-hero-2-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-hero-2-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-hero-3-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
+                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-hero-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-hero-3-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-hero-3-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-hero-2-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
+                </div>
               </div>
             </div>
-            <div class="sect" style="padding:16px">
+
+            <!-- Quarter Master -->
+            <div class="sect" style="padding:14px">
               <div class="sect-head"><span class="sect-title">&#127775; Quarter Master</span></div>
-              <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
-                <div><label class="form-label">1st Place</label>
-                  <select class="form-input" id="mw-qm-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                <div><label class="form-label">2nd Place</label>
-                  <select class="form-input" id="mw-qm-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                <div><label class="form-label">3rd Place</label>
-                  <select class="form-input" id="mw-qm-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Avg. Daily, Quality Score %, Quality Esc</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
+                  <div><label class="form-label">1st</label><select class="form-input" id="mw-qm-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><label class="form-label">Avg/Day</label><input class="form-input" id="mw-qm-1-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px"/></div>
+                  <div><label class="form-label">Q%</label><input class="form-input" id="mw-qm-1-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px"/></div>
+                  <div><label class="form-label">Esc</label><input class="form-input" id="mw-qm-1-esc" type="number" min="0" placeholder="0" style="width:48px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
+                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-qm-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-qm-2-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-qm-2-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-qm-2-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
+                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-qm-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
+                  <div><input class="form-input" id="mw-qm-3-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-qm-3-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
+                  <div><input class="form-input" id="mw-qm-3-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
+                </div>
               </div>
             </div>
+
             <button class="btn btn-primary" style="width:100%" onclick="mwSubmitAwards()">&#127942; Save Awards</button>
           </div>
         </div>
@@ -6059,6 +6322,24 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="G('modal-member-profile').classList.remove('open')">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- FULL PHOTO MODAL -->
+<div class="modal-overlay" id="modal-full-photo" onclick="if(event.target===this)this.classList.remove('open')" style="z-index:700">
+  <div style="position:relative;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;align-items:center">
+    <button onclick="G('modal-full-photo').classList.remove('open')" style="position:absolute;top:-36px;right:0;background:rgba(0,0,0,.5);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px">&#x2715;</button>
+    <img id="full-photo-img" src="" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.5)"/>
+    <div id="full-photo-caption" style="color:#fff;font-size:13px;margin-top:10px;text-align:center;text-shadow:0 1px 4px rgba(0,0,0,.8)"></div>
+  </div>
+</div>
+
+<!-- GALLERY MODAL -->
+<div class="modal-overlay" id="modal-gallery" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:680px;max-height:85vh;display:flex;flex-direction:column">
+    <button class="modal-close" onclick="G('modal-gallery').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#128247; Photo Gallery</div>
+    <div id="modal-gallery-grid" style="flex:1;overflow-y:auto;margin-top:14px"></div>
   </div>
 </div>
 
