@@ -872,14 +872,15 @@ window.dispatchEvent(new Event('firebase-ready'));
       <span style="font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="adminSelectBack()">&#8592; Back</span>
     </div>
   </div>
-  <div class="scr" id="scr-setpin">
-    <div class="sdesc">Choose a 6-digit PIN you'll use going forward.</div>
-    <label class="flabel">New PIN</label>
-    <div class="pin-row" id="new-pins"></div>
-    <label class="flabel" style="margin-top:6px">Confirm PIN</label>
-    <div class="pin-row" id="confirm-pins"></div>
-    <div class="err-msg" id="setpin-err"></div>
-    <button class="btn-grad" onclick="handleSetPin()">Save PIN & Continue</button>
+  <div class="scr" id="scr-pin">
+    <div class="stitle" id="pin-screen-title">Enter PIN</div>
+    <div class="sdesc" id="pin-screen-desc">Enter your 6-digit PIN to continue.</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin:20px 0" id="pin-dots"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto" id="pin-pad"></div>
+    <div class="err-msg" id="pin-err" style="margin-top:12px;text-align:center"></div>
+    <div style="margin-top:14px;text-align:center">
+      <span style="font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="pinBack()">&#8592; Back</span>
+    </div>
   </div>
 </div>
 </div>
@@ -914,7 +915,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">Contracts Processing</div>
-        <div class="main-brand-sub" style="color:var(--accent)">RTA LOUNGE <span style="opacity:.7;font-size:9px">v.32ae</span></div>
+        <div class="main-brand-sub" style="color:var(--accent)">RTA LOUNGE <span style="opacity:.7;font-size:9px">v.33ae</span></div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -1037,19 +1038,23 @@ window.dispatchEvent(new Event('firebase-ready'));
         <!-- SECURITY -->
         <div class="spane" id="spane-security">
           <div class="s-section">
-            <div class="s-section-title">Change Nickname</div>
-            <div class="s-row-desc" style="margin-bottom:14px">Your nickname is used to log in. Changing it means you must use the new nickname next time.</div>
-            <div class="nick-change-wrap">
+            <div class="s-section-title">Change PIN</div>
+            <div class="s-row-desc" style="margin-bottom:14px">Your PIN is required to log in. Default PIN is 000000.</div>
+            <div>
               <div class="s-field-row">
-                <div class="s-row-label" style="margin-bottom:4px">Current nickname</div>
-                <div class="s-row-desc" id="s-cur-nick" style="font-family:var(--font-d);font-size:13px;font-weight:600;color:var(--text)"></div>
+                <div class="s-row-label" style="margin-bottom:4px">Current PIN</div>
+                <input class="finput" id="s-cur-pin" type="password" maxlength="6" placeholder="Current PIN" style="width:160px;letter-spacing:4px"/>
               </div>
-              <div class="s-field-row" style="margin-top:12px">
-                <div class="s-row-label" style="margin-bottom:4px">New nickname</div>
-                <input class="finput" id="s-new-nick" type="text" placeholder="Enter new nickname" autocomplete="off" style="width:100%;max-width:240px;margin-top:4px"/>
+              <div class="s-field-row" style="margin-top:10px">
+                <div class="s-row-label" style="margin-bottom:4px">New PIN</div>
+                <input class="finput" id="s-new-pin" type="password" maxlength="6" placeholder="New 6-digit PIN" style="width:160px;letter-spacing:4px"/>
               </div>
-              <div class="err-msg" id="s-nick-err" style="text-align:left;margin:10px 0 0"></div>
-              <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="changeNickname()">Save Nickname</button>
+              <div class="s-field-row" style="margin-top:10px">
+                <div class="s-row-label" style="margin-bottom:4px">Confirm New PIN</div>
+                <input class="finput" id="s-confirm-pin" type="password" maxlength="6" placeholder="Confirm PIN" style="width:160px;letter-spacing:4px"/>
+              </div>
+              <div class="err-msg" id="s-pin-err" style="text-align:left;margin:10px 0 0"></div>
+              <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="changePin()">Save PIN</button>
             </div>
           </div>
           <div class="s-section">
@@ -1589,15 +1594,8 @@ function handleLogin(){
       return;
     }
     cu={nickname:raw,fullName:cred.fullName,role:cred.role,firstLogin:false};
-    fsStartRealtimeListeners();
-    goDash();
-    setTimeout(function(){
-      if(cu&&cu.role==='manager'){
-        if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();
-        if(G('mgr-hub-pane-quality'))renderMgrHubQuality();
-      }
-    },1500);
     if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='Sign In';}
+    showPinScreen();
   };
   if(window._fsReady){
     fsLoadAll().then(doLogin).catch(function(e){
@@ -1776,6 +1774,171 @@ function adminSelectBack(){
   G('scr-admin-select').classList.remove('active');
   G('scr-login').classList.add('active');
   G('inp-nick').value='';
+}
+
+/* ══════════════════════════════════════════
+   UNIFIED ATTENDANCE CALENDAR
+   Manager = edit, Members = read-only, Tardy hidden from members
+   ══════════════════════════════════════════ */
+var _uniAtt={year:new Date().getFullYear(),month:new Date().getMonth(),mode:'month',weekStart:null};
+var ATT_STATUS_DEF={
+  SL:     {label:'SL', full:'Sick Leave',   color:'#ff7a30',bg:'rgba(255,122,48,.18)', memberVisible:true},
+  PL:     {label:'PL', full:'Annual Leave',  color:'#00d4b4',bg:'rgba(0,212,180,.18)',  memberVisible:true},
+  Holiday:{label:'HOL',full:'Holiday',       color:'#2d7fff',bg:'rgba(45,127,255,.18)', memberVisible:true},
+  Absent: {label:'ABS',full:'Absent',        color:'#ff3d3d',bg:'rgba(255,61,61,.18)',  memberVisible:true},
+  UDT:    {label:'UDT',full:'Undertime',     color:'#f59e0b',bg:'rgba(245,158,11,.18)', memberVisible:true},
+  Offline:{label:'OFF',full:'Offline',       color:'#8b9cf4',bg:'rgba(139,156,244,.18)',memberVisible:true},
+  Tardy:  {label:'TAR',full:'Tardy',         color:'#f43f5e',bg:'rgba(244,63,94,.18)',  memberVisible:false}
+};
+function _uap(n){return String(n).padStart(2,'0');}
+function _uas(d){return d.getFullYear()+'-'+_uap(d.getMonth()+1)+'-'+_uap(d.getDate());}
+function _uaDates(){
+  var s=_uniAtt;var dates=[];
+  if(s.mode==='week'){
+    var ref=s.weekStart?new Date(s.weekStart+'T00:00:00'):new Date();
+    var dw=ref.getDay();var mon=new Date(ref);
+    mon.setDate(ref.getDate()-(dw===0?6:dw-1));mon.setHours(0,0,0,0);
+    s.weekStart=_uas(mon);
+    for(var i=0;i<7;i++){var dd=new Date(mon);dd.setDate(mon.getDate()+i);dates.push(dd);}
+  } else {
+    s.weekStart=null;
+    var dim=new Date(s.year,s.month+1,0).getDate();
+    for(var i=1;i<=dim;i++)dates.push(new Date(s.year,s.month,i));
+  }
+  return dates;
+}
+function renderUnifiedAttendance(containerId,isManager){
+  var el=G(containerId);if(!el)return;
+  var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var s=_uniAtt;var today=new Date();today.setHours(0,0,0,0);
+  var todayStr=_uas(today);var dates=_uaDates();
+  var members=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var navTitle=s.mode==='week'
+    ?('Week of '+dates[0].getDate()+' '+MONTHS[dates[0].getMonth()]+' '+dates[0].getFullYear())
+    :(MONTHS[s.month]+' '+s.year);
+  var dateHeaders=dates.map(function(d){
+    var isToday=_uas(d)===todayStr;
+    var dayLabel=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':'';
+    return '<th style="padding:5px 2px;font-size:10px;font-weight:700;text-align:center;min-width:'
+      +(s.mode==='week'?'60px':'28px')+';border:1px solid var(--border2);color:'+(isToday?'var(--accent)':'var(--muted)')+'">'+dayLabel+d.getDate()+'</th>';
+  }).join('');
+  var rows=members.map(function(m){
+    var cells=dates.map(function(d){
+      var ds=_uas(d);
+      var entry=(attendance[m.nickname]||{})[ds];
+      if(!entry){var le=attendanceLog.find(function(e){return e.nick===m.nickname&&e.date===ds;});if(le)entry={status:le.status,notes:le.note||'',hours:le.hours,weight:le.weight};}
+      var isToday=ds===todayStr;
+      var cellStyle='text-align:center;padding:3px 1px;border:1px solid var(--border);'+(isToday?'background:rgba(139,45,255,.06);':'');
+      if(entry&&entry.status==='Tardy'&&!isManager)entry=null;
+      var badge='';
+      if(entry){
+        var def=ATT_STATUS_DEF[entry.status]||{label:entry.status,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:entry.status};
+        var tip=def.full+(entry.hours?' ('+entry.hours+'h lost)':(entry.notes?' \u2014 '+entry.notes:''));
+        badge='<span title="'+tip+'" style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:700;background:'+def.bg+';color:'+def.color+'">'+def.label+'</span>';
+      }
+      var clickAttr=isManager
+        ?'style="'+cellStyle+'cursor:pointer" onclick="openAttModal(\''+m.nickname+'\',\''+m.fullName+'\',\''+ds+'\')"'
+        :'style="'+cellStyle+'"';
+      return '<td '+clickAttr+'>'+badge+'</td>';
+    }).join('');
+    return '<tr><td style="padding:6px 10px;font-size:11px;font-weight:600;white-space:nowrap;border:1px solid var(--border);min-width:100px">'
+      +'<div style="display:flex;align-items:center;gap:6px">'+avEl(m.nickname,20)+m.fullName+'</div></td>'+cells+'</tr>';
+  }).join('');
+  var legendItems=Object.entries(ATT_STATUS_DEF)
+    .filter(function(kv){return isManager||kv[1].memberVisible;})
+    .map(function(kv){return '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:'+kv[1].bg+';color:'+kv[1].color+'">'+kv[1].label+' \u2014 '+kv[1].full+'</span>';}).join('');
+  el.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">'
+    +'<button class="btn btn-outline btn-sm" onclick="uniAttNav(-1)">&#8592;</button>'
+    +'<span style="font-family:var(--font-d);font-size:14px;font-weight:700;color:var(--text);min-width:200px;text-align:center">'+navTitle+'</span>'
+    +'<button class="btn btn-outline btn-sm" onclick="uniAttNav(1)">&#8594;</button>'
+    +'<div style="margin-left:auto;display:flex;gap:6px">'
+    +'<button class="filter-pill'+(s.mode==='week'?' active':'')+'" onclick="uniAttSetView(\'week\')">Week</button>'
+    +'<button class="filter-pill'+(s.mode==='month'?' active':'')+'" onclick="uniAttSetView(\'month\')">Month</button>'
+    +'</div></div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr><th style="padding:5px 10px;font-size:10px;font-weight:700;color:var(--muted);text-align:left;border:1px solid var(--border2)">Member</th>'
+    +dateHeaders+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+legendItems+'</div>'
+    +(isManager?'<div style="margin-top:6px;font-size:10px;color:var(--muted)">&#128274; Tardy is only visible to you.</div>':'');
+}
+function uniAttNav(dir){
+  var s=_uniAtt;
+  if(s.mode==='week'){var base=s.weekStart?new Date(s.weekStart+'T00:00:00'):new Date();base.setDate(base.getDate()+dir*7);s.weekStart=_uas(base);s.year=base.getFullYear();s.month=base.getMonth();}
+  else{s.month+=dir;if(s.month>11){s.month=0;s.year++;}else if(s.month<0){s.month=11;s.year--;}}
+  if(G('mgr-hub-pane-attendance')&&G('mgr-hub-pane-attendance').classList.contains('active'))renderUnifiedAttendance('mgr-hub-pane-attendance',true);
+  else if(G('att-cal-wrap'))renderUnifiedAttendance('att-cal-wrap',cu&&cu.role==='manager');
+  else if(G('esc-att-cal-wrap'))renderUnifiedAttendance('esc-att-cal-wrap',false);
+}
+function uniAttSetView(v){
+  _uniAtt.mode=v;_uniAtt.weekStart=null;
+  if(G('mgr-hub-pane-attendance')&&G('mgr-hub-pane-attendance').classList.contains('active'))renderUnifiedAttendance('mgr-hub-pane-attendance',true);
+  else if(G('att-cal-wrap'))renderUnifiedAttendance('att-cal-wrap',cu&&cu.role==='manager');
+  else if(G('esc-att-cal-wrap'))renderUnifiedAttendance('esc-att-cal-wrap',false);
+}
+
+/* ══════════════════════════════════════════
+   PIN SYSTEM
+   ══════════════════════════════════════════ */
+var _pinBuffer='';
+var _pinMode='verify';
+async function fsGetPin(nickname){
+  try{var snap=await window._fsGetDocs(window._fsColl(window._db,'pins'));var found='000000';snap.forEach(function(d){if(d.id===nickname)found=d.data().pin||'000000';});return found;}
+  catch(e){return '000000';}
+}
+async function fsSavePin(nickname,pin){
+  try{await window._fsSetDoc(window._fsDoc(window._db,'pins',nickname),{pin:pin},{merge:true});}
+  catch(e){console.warn('fsSavePin',e);}
+}
+function showPinScreen(){
+  _pinMode='verify';_pinBuffer='';renderPinPad();showScr('scr-pin');
+}
+function renderPinPad(){
+  var dotsEl=G('pin-dots');var padEl=G('pin-pad');var errEl=G('pin-err');
+  if(!dotsEl||!padEl)return;
+  if(errEl)errEl.textContent='';
+  dotsEl.innerHTML=Array(6).fill(0).map(function(_,i){
+    return '<div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);background:'+(i<_pinBuffer.length?'var(--accent)':'transparent')+';transition:background .15s"></div>';
+  }).join('');
+  var keys=['1','2','3','4','5','6','7','8','9','','0','\u232b'];
+  padEl.innerHTML=keys.map(function(k){
+    if(k==='')return '<div></div>';
+    return '<button onclick="pinKey(\''+k+'\')" style="padding:14px;font-size:18px;font-weight:600;background:var(--bg3);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--text);width:100%">'+k+'</button>';
+  }).join('');
+}
+function pinKey(k){
+  if(k==='\u232b'){_pinBuffer=_pinBuffer.slice(0,-1);}
+  else if(_pinBuffer.length<6){_pinBuffer+=k;}
+  renderPinPad();
+  if(_pinBuffer.length===6)setTimeout(pinSubmit,120);
+}
+function pinBack(){
+  _pinBuffer='';showScr('scr-login');G('inp-nick').value='';
+  var btn=G('login-btn');if(btn){btn.disabled=false;btn.textContent='Sign In';}
+}
+async function pinSubmit(){
+  var errEl=G('pin-err');
+  var stored=await fsGetPin(cu.nickname);
+  if(_pinBuffer===stored){
+    fsStartRealtimeListeners();goDash();
+    setTimeout(function(){if(cu&&cu.role==='manager'){if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();if(G('mgr-hub-pane-quality'))renderMgrHubQuality();}},1500);
+  } else {
+    if(errEl)errEl.textContent='Incorrect PIN. Please try again.';
+    _pinBuffer='';renderPinPad();
+  }
+}
+async function changePin(){
+  var cur=G('s-cur-pin').value.trim();var nw=G('s-new-pin').value.trim();var conf=G('s-confirm-pin').value.trim();
+  var errEl=G('s-pin-err');errEl.textContent='';
+  if(!cur||!nw||!conf){errEl.textContent='Please fill in all fields.';return;}
+  if(!/^\d{6}$/.test(nw)){errEl.textContent='New PIN must be exactly 6 digits.';return;}
+  if(nw!==conf){errEl.textContent='New PINs do not match.';return;}
+  var stored=await fsGetPin(cu.nickname);
+  if(cur!==stored){errEl.textContent='Current PIN is incorrect.';return;}
+  await fsSavePin(cu.nickname,nw);
+  errEl.style.color='var(--green)';errEl.textContent='PIN updated successfully.';
+  G('s-cur-pin').value='';G('s-new-pin').value='';G('s-confirm-pin').value='';
+  setTimeout(function(){errEl.textContent='';errEl.style.color='';},3000);
 }
 
 /* ── SETTINGS ── */
@@ -2513,6 +2676,7 @@ function renderMyDay(){
     +'<span class="sect-title">&#128247; Team Photos</span>'
     +'<div style="display:flex;gap:8px;align-items:center">'
     +'<span style="font-size:10px;color:var(--muted)">'+pwPinned().length+'/'+PW_MAX_PINNED+' on wall</span>'
+    +(isManager&&pendingCount>0?'<button class="btn btn-outline btn-sm" style="color:var(--accent)" onclick="pwOpenPendingModal()">&#128248; Review ('+pendingCount+')</button>':'')
     +'<button class="btn btn-outline btn-sm" onclick="pwOpenUploadModal()">+ Add Photo</button>'
     +'</div></div>'
     +pwRenderSlideshow()
@@ -3518,23 +3682,41 @@ function openQualityDetail(type,nick){
   G('modal-qdetail').classList.add('open');
 }
 
+function toggleQDetailExpand(row){
+  var exp=row.querySelector('.qdetail-expand');
+  if(exp)exp.style.display=exp.style.display==='none'?'block':'none';
+}
+
 function renderQDetailList(items){
   var el=G('qdetail-list');if(!el)return;
   if(!items.length){el.innerHTML='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No entries for this period.</div>';return;}
+  var statusColors={Pending:'var(--amber)',Acknowledged:'var(--green)',Resolved:'var(--accent)'};
   el.innerHTML=items.map(function(c){
-    var ss=c.screenshot?'<img src="'+c.screenshot+'" style="max-width:100%;border-radius:8px;margin-top:8px"/>':'';
+    var statusBadge='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg3);color:'+(statusColors[c.status]||'var(--amber)')+'">'+( c.status||'Pending')+'</span>';
     var escTag=c.escalationMember?'<span style="font-size:10px;color:var(--muted)"> · Esc: '+c.escalationMember+'</span>':'';
-    return '<div style="padding:12px 0;border-bottom:1px solid var(--border)" data-cid="'+c.id+'">'
-      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
-      +'<div style="flex:1">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--text)">'+c.address+'</div>'
+    var ss=c.screenshot?'<img src="'+c.screenshot+'" style="max-width:100%;border-radius:8px;margin-top:8px"/>'  :'';
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleQDetailExpand(this)">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.address+'</div>'
       +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+c.date+' · '+c.uploader+escTag+'</div>'
-      +'<div style="font-size:12px;color:var(--text);margin-top:6px">'+c.feedback+'</div>'
-      +ss
       +'</div>'
-      +'<button onclick="deleteQDetailEntry('+c.id+')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:4px" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
+      +statusBadge
+      +'<button onclick="event.stopPropagation();deleteQDetailEntry('+c.id+')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">'
       +'&#128465;</button>'
-      +'</div></div>';
+      +'</div>'
+      +'</div>'
+      +'<div class="qdetail-expand" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Error Description</div>'
+      +'<div style="font-size:12px;color:var(--text);line-height:1.6">'+c.feedback+'</div>'
+      +ss
+      +(c.insight
+        ?'<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Uploader Acknowledgement</div>'
+          +'<div style="font-size:12px;color:var(--text);line-height:1.6;padding:8px 12px;background:var(--bg3);border-radius:8px">'+c.insight+'</div></div>'
+        :'<div style="margin-top:8px;font-size:11px;color:var(--muted);font-style:italic">No acknowledgement yet.</div>')
+      +'</div>'
+      +'</div>';
   }).join('');
 }
 
@@ -3555,99 +3737,8 @@ function deleteQDetailEntry(id){
   renderMgrHubQuality();
 }
 
-function renderMgrHubAttendance(){
-  var el=G('mgr-hub-pane-attendance');if(!el)return;
-  var now=new Date();
-  if(!window._attState)window._attState={year:now.getFullYear(),month:now.getMonth(),mode:'month',weekStart:null};
-  var s=window._attState;
+function renderMgrHubAttendance(){renderUnifiedAttendance('mgr-hub-pane-attendance',true);}
 
-  function render(){
-    var today=new Date();today.setHours(0,0,0,0);
-    var members=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
-    var pad=function(n){return String(n).padStart(2,'0');};
-    var toStr=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
-    var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-    var dates=[];
-    if(s.mode==='week'){
-      var ref=s.weekStart?new Date(s.weekStart+'T00:00:00'):new Date(today);
-      var dw=ref.getDay();
-      var mon=new Date(ref);mon.setDate(ref.getDate()-(dw===0?6:dw-1));mon.setHours(0,0,0,0);
-      s.weekStart=toStr(mon);
-      for(var i=0;i<7;i++){var dd=new Date(mon);dd.setDate(mon.getDate()+i);dates.push(dd);}
-    } else {
-      s.weekStart=null;
-      var dim=new Date(s.year,s.month+1,0).getDate();
-      for(var i=1;i<=dim;i++)dates.push(new Date(s.year,s.month,i));
-    }
-    var navTitle=s.mode==='week'
-      ?('Week of '+dates[0].getDate()+' '+MONTHS[dates[0].getMonth()])
-      :(MONTHS[s.month]+' '+s.year);
-    var dateHeaders=dates.map(function(d){
-      var isToday=toStr(d)===toStr(today);
-      var dayName=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':'';
-      return '<th style="padding:6px 2px;font-size:10px;font-weight:700;text-align:center;color:'
-        +(isToday?'var(--accent)':'var(--muted)')+';min-width:'+(s.mode==='week'?'70px':'34px')+'">'
-        +dayName+d.getDate()+'</th>';
-    }).join('');
-    var rows=members.map(function(m){
-      var cells=dates.map(function(d){
-        var ds=toStr(d);
-        var entry=attendanceLog.find(function(e){return e.nick===m.nickname&&e.date===ds;});
-        var isToday=ds===toStr(today);
-        var cellBg=isToday?'rgba(139,45,255,.08)':'';
-        var badge='';
-        if(entry){
-          var st=ATT_STATUS[entry.status]||{label:entry.status,color:'var(--muted)',bg:'rgba(255,255,255,.1)',full:entry.status};
-          var tip=st.full+(entry.hours?' ('+entry.hours+'h lost, w:'+entry.weight+')':(entry.note?' \u2014 '+entry.note:''));
-          badge='<span title="'+tip+'" style="display:inline-block;padding:2px 4px;border-radius:4px;font-size:9px;font-weight:700;background:'+st.bg+';color:'+st.color+'">'+st.label+(entry.weight!==undefined&&entry.weight<1?' '+entry.weight:'')+'</span>';
-        }
-        return '<td style="text-align:center;padding:4px 2px;background:'+cellBg+';cursor:pointer;border-radius:4px" onclick="openAttModal(\''+m.nickname+'\',\''+m.fullName+'\',\''+ds+'\')">'+badge+'</td>';
-      }).join('');
-      return '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
-        +'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;min-width:140px">'
-        +'<div style="display:flex;align-items:center;gap:6px">'+avEl(m.nickname,24)+m.fullName+'</div></td>'
-        +cells+'</tr>';
-    }).join('');
-    el.innerHTML=
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">'
-      +'<button class="btn btn-outline btn-sm" onclick="window._attNav(-1)">&#8592;</button>'
-      +'<span style="font-family:var(--font-d);font-size:14px;font-weight:700;color:var(--text);min-width:180px;text-align:center">'+navTitle+'</span>'
-      +'<button class="btn btn-outline btn-sm" onclick="window._attNav(1)">&#8594;</button>'
-      +'<div style="margin-left:auto;display:flex;gap:6px">'
-      +'<button class="filter-pill'+(s.mode==='week'?' active':'')+'" onclick="window._attSetView(\'week\')">Week</button>'
-      +'<button class="filter-pill'+(s.mode==='month'?' active':'')+'" onclick="window._attSetView(\'month\')">Month</button>'
-      +'</div></div>'
-      +'<div style="overflow-x:auto">'
-      +'<table style="width:100%;border-collapse:collapse;min-width:400px">'
-      +'<thead><tr style="border-bottom:1px solid var(--border2)">'
-      +'<th style="padding:6px 10px;font-size:10px;font-weight:700;color:var(--muted);text-align:left;min-width:140px">Member</th>'
-      +dateHeaders+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
-      +'<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">'
-      +'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(29,209,122,.15);color:#1dd17a">Present \u2014 1.0 (default)</span>'
-      +Object.entries(ATT_STATUS).map(function(kv){return '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:'+kv[1].bg+';color:'+kv[1].color+'">'+kv[1].label+' \u2014 '+kv[1].full+'</span>';}).join('')
-      +'</div>';
-  }
-
-  window._attNav=function(dir){
-    var s=window._attState;
-    if(s.mode==='week'){
-      var base=s.weekStart?new Date(s.weekStart+'T00:00:00'):new Date();
-      base.setDate(base.getDate()+dir*7);
-      var pad=function(n){return String(n).padStart(2,'0');};
-      s.weekStart=base.getFullYear()+'-'+pad(base.getMonth()+1)+'-'+pad(base.getDate());
-      s.year=base.getFullYear();s.month=base.getMonth();
-    } else {
-      s.month+=dir;
-      if(s.month>11){s.month=0;s.year++;}
-      else if(s.month<0){s.month=11;s.year--;}
-    }
-    render();
-  };
-  window._attSetView=function(v){window._attState.mode=v;window._attState.weekStart=null;render();};
-  render();
-}
-
-/* ── ATTENDANCE LOG MODAL ── */
 function openAttModal(nick,fullName,date){
   var existing=attendanceLog.find(function(e){return e.nick===nick&&e.date===date;});
   G('att-modal-title').textContent=fullName+' \u2014 '+date;
@@ -4853,7 +4944,9 @@ async function submitQScoreFromOverlay(){
   if(!upl||!addr||!date||!err){errMsg.textContent='Please fill in all required fields.';return;}
   var ss=G('qscore-file2').files[0]?await toB64(G('qscore-file2').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
-  callouts.push({id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''});
+  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  callouts.push(newCo);
+  fsSaveCallout(newCo);
   pushNotif('📋','Contract error logged for '+(uplMem?uplMem.fullName:upl)+': "'+addr+'". Review required.','qscore');
   renderQualityPortal();
   closeDailyLog();
@@ -5833,60 +5926,18 @@ function completeCo(id){
 
 /* ── ATTENDANCE ── */
 function renderAttendance(){
-  const wrap=G('att-cal-wrap');if(!wrap)return;
-  const now=new Date();if(!attCalYear){attCalYear=now.getFullYear();attCalMonth=now.getMonth();}
-  const role=cu.role;const members=role==='manager'?TEAM.filter(m=>m.role&&m.role.toLowerCase()!=='manager'):[cu];
-  if(!attCalNick||!members.find(m=>m.nickname===attCalNick))attCalNick=members[0]?.nickname||null;
-  let tabsHTML='';
-  if(role==='manager'){
-    tabsHTML='<div class="mem-tabs">'+members.map(m=>{
-      const key=m.nickname.charAt(0).toUpperCase()+m.nickname.slice(1).toLowerCase();
-      const avH=AVATARS[key]?`<img class="mem-tab-av" src="${AVATARS[key]}" alt="${m.nickname}"/>`:`<div class="mem-tab-ai">${m.nickname.slice(0,2).toUpperCase()}</div>`;
-      return `<button class="mem-tab${attCalNick===m.nickname?' active':''}" onclick="setAttMem('${m.nickname}')">${avH}<span>${m.nickname}</span></button>`;
-    }).join('')+'</div>';
-  }
-  wrap.innerHTML=tabsHTML+
-    `<div class="cal-nav"><button class="cal-nav-btn" onclick="calNav(-1)">&#8249;</button><span class="cal-nav-title" id="cal-title"></span><button class="cal-nav-btn" onclick="calNav(1)">&#8250;</button></div>
-    <div class="cal-grid" id="cal-grid"></div>
-    <div class="cal-legend">
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(29,209,122,.5)"></div>Full Day</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(255,184,48,.5)"></div>Half-Day</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(45,127,255,.5)"></div>Non-Upload</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(255,61,61,.4)"></div>Absent (×0)</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(0,212,180,.5)"></div>Annual Leave</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(255,122,48,.5)"></div>Sick Leave</div>
-      <div class="leg-item"><div class="leg-dot" style="background:rgba(192,132,252,.5)"></div>RDO</div>
-    </div>
-    <div class="att-summary-row" id="att-summary"></div>`;
-  renderCal();
+  var wrap=G('att-cal-wrap');if(wrap)renderUnifiedAttendance('att-cal-wrap',cu&&cu.role==='manager');
+  var escWrap=G('esc-att-cal-wrap');if(escWrap)renderUnifiedAttendance('esc-att-cal-wrap',false);
 }
-function setAttMem(nick){attCalNick=nick;renderAttendance();}
-function calNav(dir){attCalMonth+=dir;if(attCalMonth<0){attCalMonth=11;attCalYear--;}if(attCalMonth>11){attCalMonth=0;attCalYear++;}renderCal();}
+function setAttMem(nick){attCalNick=nick;}
+function calNav(dir){uniAttNav(dir);}
 function renderCal(){
-  const te=G('cal-title'),ge=G('cal-grid');if(!te||!ge)return;
-  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  te.textContent=`${months[attCalMonth]} ${attCalYear}`;
-  const nick=attCalNick;const recs=attendance[nick]||{};const todayISO=todayStr();
-  const firstDay=new Date(attCalYear,attCalMonth,1).getDay();const offset=firstDay;
-  const dim=new Date(attCalYear,attCalMonth+1,0).getDate();
-  const canEdit=cu.role==='manager'||cu.nickname===nick;
-  const cdMap={full:'cd-full',half:'cd-half',nonupload:'cd-nonupload',absent:'cd-absent',al:'cd-al',sl:'cd-sl',rdo:'cd-rdo',other:'cd-other'};
-  const wtMap={full:'1.0',half:'0.5',nonupload:'0.4',absent:'0',al:'AL',sl:'SL',rdo:'RDO',other:'—'};
-  let h='<div class="cal-hdr">Sun</div><div class="cal-hdr">Mon</div><div class="cal-hdr">Tue</div><div class="cal-hdr">Wed</div><div class="cal-hdr">Thu</div><div class="cal-hdr">Fri</div><div class="cal-hdr">Sat</div>';
-  for(let i=0;i<offset;i++)h+=`<div class="cal-day cd-empty"></div>`;
-  for(let d=1;d<=dim;d++){
-    const ds=`${attCalYear}-${String(attCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const rec=recs[ds];const cls=rec?(cdMap[rec.status]||''):'';const isT=ds===todayISO?' cd-today':'';
-    const wt=rec?wtMap[rec.status]||'':'';
-    const cl=canEdit?`onclick="openAttModal('${ds}','${nick}')"`:'';
-    h+=`<div class="cal-day ${cls}${isT}" ${cl} title="${rec?rec.status+(rec.notes?' — '+rec.notes:''):'Click to mark'}"><div class="cal-day-num">${d}</div><div class="cal-day-wt">${wt}</div></div>`;
-  }
-  ge.innerHTML=h;
-  const sm=G('att-summary');if(!sm)return;
-  let totalW=0,fullC=0,halfC=0,nonC=0,leaveC=0,absentC=0;
-  Object.values(recs).forEach(r=>{const w=DAY_WEIGHTS[r.status]??0;if(IS_LEAVE[r.status])leaveC++;else if(r.status==='absent')absentC++;else if(r.status==='full')fullC++;else if(r.status==='half')halfC++;else if(r.status==='nonupload')nonC++;if(!IS_LEAVE[r.status])totalW+=w;});
-  sm.innerHTML=`<div class="att-sum-card"><div class="att-sum-val">${totalW.toFixed(1)}</div><div class="att-sum-lbl">Weighted Days</div></div><div class="att-sum-card"><div class="att-sum-val">${fullC}</div><div class="att-sum-lbl">Full Days</div></div><div class="att-sum-card"><div class="att-sum-val">${halfC}</div><div class="att-sum-lbl">Half-Days</div></div><div class="att-sum-card"><div class="att-sum-val">${nonC}</div><div class="att-sum-lbl">Non-Upload</div></div><div class="att-sum-card"><div class="att-sum-val">${leaveC}</div><div class="att-sum-lbl">On Leave</div></div><div class="att-sum-card"><div class="att-sum-val">${absentC}</div><div class="att-sum-lbl">Absent</div></div>`;
+  if(G('mgr-hub-pane-attendance')&&G('mgr-hub-pane-attendance').classList.contains('active'))
+    renderUnifiedAttendance('mgr-hub-pane-attendance',true);
+  else if(G('att-cal-wrap'))renderUnifiedAttendance('att-cal-wrap',cu&&cu.role==='manager');
+  else if(G('esc-att-cal-wrap'))renderUnifiedAttendance('esc-att-cal-wrap',false);
 }
+
 function attCalcWeight(){
   var hours=parseFloat(G('att-modal-hours').value)||0;
   var w=Math.max(0,parseFloat((1-(hours/8)).toFixed(2)));
