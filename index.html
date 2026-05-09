@@ -4205,7 +4205,7 @@ async function mwDetailHandle(file){
   G('mw-detail-status').innerHTML='&#128257; Reading screenshot with AI...';
   var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
   try{
-    var resp=await fetch('/.netlify/functions/ai-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract the upload report table. Return ONLY a JSON array, no markdown. Each row: {"email":"...","total":0,"earliest":"9:05 am","latest":"5:55 pm"}'}]}]})});
+    var resp=await fetch('/.netlify/functions/ai-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract ALL rows from the upload/sessions report table in this screenshot. Return ONLY a valid JSON array, no markdown, no explanation. Each element must have exactly these keys: email (full email address exactly as shown), total (integer), earliest (time string e.g. "9:05 a.m."), latest (time string). Example: [{"email":"hans.montes@domain.com.au","total":91,"earliest":"9:27 a.m.","latest":"5:58 p.m."}]'}]}]})});
     var data=await resp.json();
     var raw=(data.content&&data.content[0]&&data.content[0].text||'').replace(/```json|```/g,'').trim();
     var rows=JSON.parse(raw);
@@ -4213,7 +4213,15 @@ async function mwDetailHandle(file){
     var mapped=[];
     rows.forEach(function(r){
       if(!r.email)return;
-      var nick=EMAIL_MAP[r.email.toLowerCase().trim()];
+      var emailClean=r.email.toLowerCase().trim();
+      var nick=EMAIL_MAP[emailClean];
+      /* Fallback: try matching by username part only */
+      if(!nick){
+        var userPart=emailClean.split('@')[0];
+        Object.keys(EMAIL_MAP).forEach(function(k){
+          if(k.split('@')[0]===userPart)nick=EMAIL_MAP[k];
+        });
+      }
       if(!nick||uploaderNicks.indexOf(nick)<0)return;
       var sh=SHIFTS[nick]||{start:9,end:18};
       var earliest=dlParseTime(r.earliest),latest=dlParseTime(r.latest);
@@ -4441,9 +4449,14 @@ function dlProcessExtracted(rows){
   var mapped=[];
   rows.forEach(function(r){
     if(!r.email)return;
-    var nick=EMAIL_MAP[r.email.toLowerCase().trim()];
-    if(!nick)return; /* not in mapping — discard */
-    if(!uploaderNicks.includes(nick))return; /* manager/escalation — discard */
+    var emailClean=r.email.toLowerCase().trim();
+    var nick=EMAIL_MAP[emailClean];
+    if(!nick){
+      var userPart=emailClean.split('@')[0];
+      Object.keys(EMAIL_MAP).forEach(function(k){if(k.split('@')[0]===userPart)nick=EMAIL_MAP[k];});
+    }
+    if(!nick)return;
+    if(!uploaderNicks.includes(nick))return;
     var sh=SHIFTS[nick]||{start:9,end:18};
     /* Parse earliest/latest to hours (decimal) */
     var earliest=dlParseTime(r.earliest);
