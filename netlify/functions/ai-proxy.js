@@ -45,6 +45,8 @@ exports.handler = async function(event, context) {
         let responseData = '';
         res.on('data', (chunk) => { responseData += chunk; });
         res.on('end', () => {
+          console.log('Anthropic status:', res.statusCode);
+          console.log('Anthropic response:', responseData.slice(0, 200));
           try { resolve({ status: res.statusCode, body: JSON.parse(responseData) }); }
           catch(e) { resolve({ status: res.statusCode, body: { error: responseData } }); }
         });
@@ -54,6 +56,7 @@ exports.handler = async function(event, context) {
       req.end();
     });
 
+    console.log('Returning status:', data.status);
     return {
       statusCode: data.status,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
