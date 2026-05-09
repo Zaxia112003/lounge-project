@@ -380,7 +380,7 @@ body.theme-midnight{--bg:#02030a;--bg2:#07080f;--bg3:#0d0e1a;}
 
 /* ── PHOTO WALL ── */
 .pw-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;}
-.pw-stage{position:relative;height:280px;background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.pw-stage{position:relative;height:200px;background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .pw-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s ease;}
 .pw-img.active{opacity:1;}
 .pw-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:10px;}
@@ -453,7 +453,7 @@ body.theme-midnight{--bg:#02030a;--bg2:#07080f;--bg3:#0d0e1a;}
 .ann-see-more:hover{text-decoration:underline;}
 
 /* ── AWARDS ── */
-.awards-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;}
+.awards-grid{display:block;padding:0;}
 .award-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
 .award-card-head{padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
 .award-card-emoji{font-size:18px;line-height:1;}
@@ -866,7 +866,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">Contracts Processing</div>
-        <div class="main-brand-sub" style="color:var(--accent)">RTA PORTAL <span style="opacity:.7;font-size:9px">v.30ae</span></div>
+        <div class="main-brand-sub" style="color:var(--accent)">RTA LOUNGE <span style="opacity:.7;font-size:9px">v.30ae</span></div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -2297,6 +2297,9 @@ function renderMyDay(){
     +'</div>'
     +'<div class="ann-list" id="ann-list"></div>'
     +'</div>'
+    +'<div style="display:flex;gap:16px;align-items:flex-start;margin-top:0">'
+    /* LEFT — Team Photos (50%) */
+    +'<div style="flex:1;min-width:0">'
     +'<div class="sect pw-wrap">'
     +'<div class="sect-head">'
     +'<span class="sect-title">&#128247; Team Photos</span>'
@@ -2304,19 +2307,30 @@ function renderMyDay(){
     +'<span style="font-size:10px;color:var(--muted)">'+pwPinned().length+'/'+PW_MAX_PINNED+' on wall</span>'
     +'<button class="btn btn-outline btn-sm" onclick="pwOpenUploadModal()">+ Add Photo</button>'
     +'</div></div>'
-    +'<!-- no inline file input -->'
     +pwRenderSlideshow()
     +'<div class="pw-footer">'
     +'<div class="pw-dots">'+pwRenderDots()+'</div>'
     +(pwPhotos.length>0?'<a class="pw-gallery-link" onclick="pwOpenGallery()">Open Gallery &#8594;</a>':'')
     +'</div>'
     +'</div>'
+    +'</div>'
+    /* RIGHT — Awards carousel (50%), non-escalation only */
     +(cu&&cu.role!=='escalation'
-      ?'<div class="sect" style="padding:0">'
-        +'<div class="sect-head"><span class="sect-title">&#127942; Awards</span></div>'
-        +'<div class="awards-grid" id="awards-grid"></div>'
+      ?'<div style="flex:1;min-width:0">'
+        +'<div class="sect" style="padding:0">'
+        +'<div class="sect-head" style="padding:14px 16px 10px">'
+        +'<span class="sect-title">&#127942; Awards</span>'
+        +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<button class="btn btn-outline btn-sm" onclick="awardsCarouselPrev()" style="padding:2px 8px">&#8592;</button>'
+        +'<span id="awards-carousel-idx" style="font-size:10px;color:var(--muted)">1 / 4</span>'
+        +'<button class="btn btn-outline btn-sm" onclick="awardsCarouselNext()" style="padding:2px 8px">&#8594;</button>'
         +'</div>'
-      :'');
+        +'</div>'
+        +'<div id="awards-grid" style="padding:0 16px 16px"></div>'
+        +'</div>'
+        +'</div>'
+      :'')
+    +'</div>';
   renderAnnouncements();
   if(cu&&cu.role!=='escalation')renderAwards();
   startClock();
@@ -2427,46 +2441,59 @@ function awardAvatar(nick, size, isYou){
   var initials=nick.charAt(0).toUpperCase();
   return '<div class="'+cls+'" style="width:'+sz+';height:'+sz+';background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:'+(size/2.4|0)+'px;font-weight:700;color:#fff;font-family:var(--font-d)">'+initials+'</div>';
 }
+var _awardsIdx=0;
+
+function awardsCarouselPrev(){
+  _awardsIdx=(_awardsIdx-1+AWARD_DEFS.length)%AWARD_DEFS.length;
+  renderAwards();
+}
+function awardsCarouselNext(){
+  _awardsIdx=(_awardsIdx+1)%AWARD_DEFS.length;
+  renderAwards();
+}
+
 function renderAwards(){
   var el=G('awards-grid');if(!el)return;
-  el.innerHTML=AWARD_DEFS.map(function(def){
-    var data=mdAwards[def.key];
-    var body='';
-    if(data&&data.top&&data.top.length){
-      var top=data.top;
-      var order=[1,0,2];
-      var blocks=['p2','p1','p3'];
-      var sizes=[32,40,28];
-      var medals=['&#129352;','&#129351;','&#129353;'];
-      var cols=order.map(function(rank,col){
-        var p=top[rank];
-        if(!p)return '<div class="award-col"></div>';
-        var isYou=cu&&p.nick===cu.nickname;
-        var av=awardAvatar(p.nick,sizes[col],isYou);
-        var nameCls='award-name'+(isYou?' you':'');
-        return '<div class="award-col">'
-          +av
-          +'<div class="'+nameCls+'">'+(isYou?'&#10024; ':'')+p.nick+'</div>'
-          +'<div class="award-block '+blocks[col]+'">'+medals[col]+'</div>'
-          +'</div>';
-      }).join('');
-      body='<div class="award-podium">'+cols+'</div>';
-    } else {
-      var tba=AWARD_TBA[def.key];
-      body='<div class="award-tba">'
-        +'<div class="award-tba-ico">'+tba.ico+'</div>'
-        +'<div class="award-tba-txt">'+tba.msg+'</div>'
+  var idxEl=G('awards-carousel-idx');
+  if(idxEl)idxEl.textContent=(_awardsIdx+1)+' / '+AWARD_DEFS.length;
+
+  var def=AWARD_DEFS[_awardsIdx];
+  var data=mdAwards[def.key];
+  var body='';
+  if(data&&data.top&&data.top.length){
+    var top=data.top;
+    var order=[1,0,2];
+    var blocks=['p2','p1','p3'];
+    var sizes=[32,40,28];
+    var medals=['&#129352;','&#129351;','&#129353;'];
+    var cols=order.map(function(rank,col){
+      var p=top[rank];
+      if(!p)return '<div class="award-col"></div>';
+      var isYou=cu&&p.nick===cu.nickname;
+      var av=awardAvatar(p.nick,sizes[col],isYou);
+      var nameCls='award-name'+(isYou?' you':'');
+      return '<div class="award-col">'
+        +av
+        +'<div class="'+nameCls+'">'+(isYou?'&#10024; ':'')+p.nick+'</div>'
+        +'<div class="award-block '+blocks[col]+'">'+medals[col]+'</div>'
         +'</div>';
-    }
-    return '<div class="award-card">'
-      +'<div class="award-card-head">'
-      +'<span class="award-card-emoji">'+def.emoji+'</span>'
-      +'<span class="award-card-title">'+def.title+'</span>'
-      +'<span class="award-card-period">'+def.period+'</span>'
-      +'</div>'
-      +'<div class="award-card-body">'+body+'</div>'
+    }).join('');
+    body='<div class="award-podium">'+cols+'</div>';
+  } else {
+    var tba=AWARD_TBA[def.key];
+    body='<div class="award-tba">'
+      +'<div class="award-tba-ico">'+tba.ico+'</div>'
+      +'<div class="award-tba-txt">'+tba.msg+'</div>'
       +'</div>';
-  }).join('');
+  }
+  el.innerHTML='<div class="award-card" style="box-shadow:none;border:none;background:none">'
+    +'<div class="award-card-head">'
+    +'<span class="award-card-emoji">'+def.emoji+'</span>'
+    +'<span class="award-card-title">'+def.title+'</span>'
+    +'<span class="award-card-period">'+def.period+'</span>'
+    +'</div>'
+    +'<div class="award-card-body">'+body+'</div>'
+    +'</div>';
 }
 
 
