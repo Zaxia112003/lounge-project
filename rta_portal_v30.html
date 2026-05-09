@@ -6,7 +6,7 @@
 <title>Contracts Processing — RTA Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style> 
+<style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#07080f;--bg2:#0e1020;--bg3:#13152a;
@@ -3518,7 +3518,7 @@ async function sendAIMessage(){
       +'7. Use a warm, supportive tone. The team works hard and deserves clear guidance. '
       +'\n\nKNOWLEDGE BASE:\n'+kbContext;
 
-    var response=await fetch('/.netlify/functions/claude',{
+    var response=await fetch('/.netlify/functions/ai-proxy',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -4205,7 +4205,7 @@ async function mwDetailHandle(file){
   G('mw-detail-status').innerHTML='&#128257; Reading screenshot with AI...';
   var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
   try{
-    var resp=await fetch('/.netlify/functions/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract the upload report table. Return ONLY a JSON array, no markdown. Each row: {"email":"...","total":0,"earliest":"9:05 am","latest":"5:55 pm"}'}]}]})});
+    var resp=await fetch('/.netlify/functions/ai-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract the upload report table. Return ONLY a JSON array, no markdown. Each row: {"email":"...","total":0,"earliest":"9:05 am","latest":"5:55 pm"}'}]}]})});
     var data=await resp.json();
     var raw=(data.content&&data.content[0]&&data.content[0].text||'').replace(/```json|```/g,'').trim();
     var rows=JSON.parse(raw);
@@ -4269,7 +4269,7 @@ async function mwSLAHandle(file){
   G('mw-sla-status').innerHTML='&#128257; Extracting SLA data with AI...';
   var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
   try{
-    var resp=await fetch('/.netlify/functions/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract the SLA data. Return ONLY JSON, no markdown: {"sla_pct":87.5,"total_tickets":120,"notes":"any visible notes"}'}]}]})});
+    var resp=await fetch('/.netlify/functions/ai-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract the SLA data. Return ONLY JSON, no markdown: {"sla_pct":87.5,"total_tickets":120,"notes":"any visible notes"}'}]}]})});
     var data=await resp.json();
     var raw=(data.content&&data.content[0]&&data.content[0].text||'').replace(/```json|```/g,'').trim();
     mwSLAExtracted=JSON.parse(raw);
@@ -4408,7 +4408,7 @@ async function dlHandleFile(file){
   var mediaType=file.type||'image/png';
 
   try{
-    var resp=await fetch('/.netlify/functions/claude',{
+    var resp=await fetch('/.netlify/functions/ai-proxy',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
