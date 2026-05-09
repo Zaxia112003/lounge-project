@@ -812,7 +812,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">Contracts Processing</div>
-    <div class="brand-sub">RTA Portal</div>
+    <div class="brand-sub">RTA Lounge</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -820,7 +820,8 @@ window.dispatchEvent(new Event('firebase-ready'));
     <label class="flabel">Nickname</label>
     <input class="finput" id="inp-nick" type="text" placeholder="e.g. Aldrin" autocomplete="off" onkeydown="if(event.key==='Enter')handleLogin()"/>
     <div class="err-msg" id="login-err"></div>
-    <button class="btn-grad" onclick="handleLogin()">Sign In</button>
+    <button class="btn-grad" id="login-btn" onclick="handleLogin()">Sign In</button>
+    <div style="margin-top:24px;font-size:10px;color:var(--muted);text-align:center;letter-spacing:.5px">Powered by <span style="color:var(--accent);font-weight:600">Claude</span></div>
   </div>
   <div class="scr" id="scr-setpin">
     <div class="stitle">Set Your PIN <span class="badge-new">First Login</span></div>
@@ -1151,9 +1152,11 @@ async function fsLoadCollection(colName,localRef,mapFn){
     var items=[];
     snap.forEach(function(d){items.push(Object.assign({_fsId:d.id},d.data()));});
     if(mapFn)items=items.map(mapFn);
-    /* Merge into localRef array */
-    localRef.length=0;
-    items.forEach(function(i){localRef.push(i);});
+    /* Only replace if Firestore has data — otherwise keep hardcoded defaults */
+    if(items.length>0){
+      localRef.length=0;
+      items.forEach(function(i){localRef.push(i);});
+    }
   }catch(e){console.warn('fsLoad '+colName,e);}
 }
 
@@ -1177,6 +1180,21 @@ async function fsDeleteDoc(colName,fsId){
 async function fsLoadAll(){
   /* Load-on-login collections */
   await fsLoadCollection('team', TEAM);
+  /* If Firestore team is empty, push hardcoded members */
+  if(fsDb()){
+    try{
+      var teamSnap=await window._fsGetDocs(window._fsColl(fsDb(),'team'));
+      if(teamSnap.empty){
+        TEAM.forEach(function(m){
+          var dir=TEAM_DIR[m.nickname]||{};
+          window._fsSetDoc(window._fsDoc(fsDb(),'team',m.nickname),{
+            nickname:m.nickname,fullName:m.fullName,role:m.role,
+            email:dir.email||'',birthday:dir.birthday||'TBC',hireDate:dir.hireDate||'TBC'
+          },{merge:true});
+        });
+      }
+    }catch(e){console.warn('team seed',e);}
+  }
   /* Rebuild store from loaded TEAM */
   TEAM.forEach(function(m){
     if(m.role)m.role=m.role.toLowerCase(); /* normalize */
@@ -1383,7 +1401,7 @@ let callouts=[];
 let attendance={};
 let notifications=[];
 let nextId=1;
-let activeDateFilter='today';
+let activeDateFilter='month';
 let customRange={from:'',to:''};
 let attCalNick=null,attCalYear=null,attCalMonth=null,attPending=null;
 let settings={theme:'dark',accent:'#8b2dff',compact:true,noMotion:false,use24h:false};
@@ -1759,11 +1777,12 @@ function buildUploaderDOM(){
     </div>
     <div class="sub-pane active" id="sub-perf">
       <div class="filter-bar" id="fbar">
-        <button class="filter-pill active" onclick="setF('today',this)">Today</button>
+        <button class="filter-pill" onclick="setF('today',this)">Today</button>
         <button class="filter-pill" onclick="setF('week',this)">This Week</button>
-        <button class="filter-pill" onclick="setF('month',this)">This Month</button>
+        <button class="filter-pill active" onclick="setF('month',this)">This Month</button>
         <button class="filter-pill" onclick="setF('quarter',this)">This Quarter</button>
         <button class="filter-pill" onclick="setF('year',this)">This Year</button>
+        <button class="filter-pill" style="color:var(--muted)" onclick="setF('all',this)">&#10005; Clear</button>
         <div class="filter-sep"></div>
         <input class="filter-di" type="date" id="cust-from" onchange="setCust()"/>
         <span style="color:var(--muted);font-size:11px">to</span>
@@ -1774,11 +1793,12 @@ function buildUploaderDOM(){
     </div>
     <div class="sub-pane" id="sub-quality">
       <div class="filter-bar" style="margin-bottom:14px">
-        <button class="filter-pill active" onclick="setQPFilter('all',this)">All Time</button>
+        <button class="filter-pill" onclick="setQPFilter('all',this)">All Time</button>
         <button class="filter-pill" onclick="setQPFilter('week',this)">This Week</button>
-        <button class="filter-pill" onclick="setQPFilter('month',this)">This Month</button>
+        <button class="filter-pill active" onclick="setQPFilter('month',this)">This Month</button>
         <button class="filter-pill" onclick="setQPFilter('quarter',this)">This Quarter</button>
         <button class="filter-pill" onclick="setQPFilter('year',this)">This Year</button>
+        <button class="filter-pill" style="color:var(--muted)" onclick="setQPFilter('all',document.querySelector('.filter-pill'))">&#10005; Clear</button>
         <div class="filter-sep"></div>
         <input class="filter-di" type="date" id="qp-from" onchange="setQPCustom()"/>
         <span style="color:var(--muted);font-size:11px">to</span>
@@ -1820,7 +1840,7 @@ function buildUploaderDOM(){
     <div class="sect"><div class="sect-head"><span class="sect-title">&#128172; Feedback &amp; Reports</span></div><div id="space-fb-list"><div class="empty"><div class="empty-ico">&#128172;</div><div class="empty-txt">Feedback coming soon.</div></div></div></div>
   </div>
   </div>`;
-  activeDateFilter='today';
+  activeDateFilter='month';
 }
 
 /* ── ESCALATION DOM ── */
@@ -1851,7 +1871,7 @@ function buildEscalationDOM(){
     </div>
     <div class="lounge-pane" id="lounge-pane-my-team"></div>
   </div>`;
-  activeDateFilter='today';
+  activeDateFilter='month';
 }
 
 /* ── MANAGER DOM ── */
@@ -2834,15 +2854,40 @@ function renderHubInLounge(){
   renderDashboard();
 }
 
+/* ── FILTER CLEAR FUNCTIONS ── */
+function escPerfClearFilter(){
+  escPerfDateFilter='month';
+  escPerfCustomRange={from:'',to:''};
+  document.querySelectorAll('#sub-esc-perf .filter-pill').forEach(function(p){
+    p.classList.toggle('active', p.dataset.f==='month');
+  });
+  renderEscPerfFiltered();
+}
+function escQPClearFilter(){
+  escQPDateFilter='month';
+  escQPCustomRange={from:'',to:''};
+  renderQualityPortal();
+}
+function mgrHubClearFilter(){
+  mgrHubDateFilter='month';
+  mgrHubCustomRange={from:'',to:''};
+  renderMgrHubPerformance();
+}
+function mgrQClearFilter(){
+  mgrQDateFilter='month';
+  mgrQCustomRange={from:'',to:''};
+  renderMgrHubQuality();
+}
+
 /* ── MANAGER HUB ── */
 var mgrHubTab='performance';
-var mgrHubDateFilter='all';
+var mgrHubDateFilter='month';
 var mgrHubCustomRange={from:'',to:''};
 
 function renderManagerHub(){
   var pane=G('lounge-pane-the-hub');if(!pane)return;
   mgrHubTab='performance';
-  mgrHubDateFilter='all';
+  mgrHubDateFilter='month';
   mgrHubCustomRange={from:'',to:''};
 
   pane.innerHTML=
@@ -2864,8 +2909,8 @@ function switchMgrHubTab(tab,btn){
   document.querySelectorAll('#lounge-pane-the-hub .sub-tab').forEach(function(t){t.classList.remove('active');});
   if(btn)btn.classList.add('active');
   var pane=G('mgr-hub-pane-'+tab);if(pane)pane.classList.add('active');
-  if(tab==='quality'){mgrQDateFilter='all';renderMgrHubQuality();}
-  else if(tab==='performance'){mgrHubDateFilter='all';renderMgrHubPerformance();}
+  if(tab==='quality'){mgrQDateFilter='month';renderMgrHubQuality();}
+  else if(tab==='performance'){mgrHubDateFilter='month';renderMgrHubPerformance();}
   else if(tab==='attendance')renderMgrHubAttendance();
 }
 
@@ -2915,6 +2960,7 @@ function renderMgrHubPerformance(){
     +'<input class="filter-di" type="date" id="mgr-hub-from" onchange="setMgrHubCustom()"/>'
     +'<span style="color:var(--muted);font-size:11px">to</span>'
     +'<input class="filter-di" type="date" id="mgr-hub-to" onchange="setMgrHubCustom()"/>'
+    +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrHubClearFilter()">&#10005; Clear</button>'
     +'</div>';
 
   /* ── UPLOADERS ── */
@@ -3011,7 +3057,7 @@ function renderMgrHubPerformance(){
 }
 
 /* ── MGR HUB QUALITY ── */
-var mgrQDateFilter='all';
+var mgrQDateFilter='month';
 var mgrQCustomRange={from:'',to:''};
 
 function mgrQFilter(btn){
@@ -3053,6 +3099,7 @@ function renderMgrHubQuality(){
     +'<input class="filter-di" type="date" id="mgr-q-from" onchange="setMgrQCustom()"/>'
     +'<span style="color:var(--muted);font-size:11px">to</span>'
     +'<input class="filter-di" type="date" id="mgr-q-to" onchange="setMgrQCustom()"/>'
+    +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrQClearFilter()">&#10005; Clear</button>'
     +'</div>';
 
   function makeRow(nick,fullName){
@@ -4167,7 +4214,7 @@ function openMgrWrite(){
   ['mw-err-date','mw-qesc-date','mw-sla-date'].forEach(function(id){var el=G(id);if(el)el.value=today;});
   ['mw-err-addr','mw-err-desc','mw-qesc-addr','mw-qesc-desc'].forEach(function(id){var el=G(id);if(el)el.value='';});
   ['mw-err-msg','mw-qesc-msg','mw-err-prev','mw-qesc-prev'].forEach(function(id){var el=G(id);if(el)el.innerHTML='';});
-  ['mw-err-file','mw-qesc-file','mw-sla-file','mw-detail-file'].forEach(function(id){var el=G(id);if(el)el.value='';});
+  ['mw-err-file','mw-qesc-file','mw-sla-file'].forEach(function(id){var el=G(id);if(el)el.value='';});
   mwDetailReset();mwSLAReset();
   var fillAward=function(key,p1,p2,p3){var data=mdAwards[key];var top=data&&data.top?data.top:[];var e1=G(p1),e2=G(p2),e3=G(p3);if(e1)e1.value=top[0]?top[0].nick:'';if(e2)e2.value=top[1]?top[1].nick:'';if(e3)e3.value=top[2]?top[2].nick:'';};
   fillAward('hero','mw-hero-1','mw-hero-2','mw-hero-3');
@@ -4201,72 +4248,86 @@ async function mwSubmitError(){
   closeMgrWrite();
 }
 
-function mwDetailDrop(e){var f=e.dataTransfer.files[0];if(f)mwDetailHandle(f);}
 function mwDetailReset(){
   mwDetailExtracted=null;
-  var f=G('mw-detail-file');if(f)f.value='';
+  var pa=G('mw-detail-paste');if(pa)pa.value='';
   var st=G('mw-detail-status');if(st)st.textContent='';
   var pv=G('mw-detail-preview');if(pv)pv.style.display='none';
-  var dz=G('mw-detail-drop');if(dz)dz.style.display='';
+  var pw=G('mw-detail-paste-wrap');if(pw)pw.style.display='';
 }
-async function mwDetailHandle(file){
-  if(!file||!file.type.match(/^image\//)){G('mw-detail-status').textContent='Please upload an image file.';return;}
-  G('mw-detail-drop').style.display='none';
-  G('mw-detail-status').innerHTML='&#128257; Reading screenshot with AI...';
-  var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
-  try{
-    var resp=await fetch('/.netlify/functions/ai-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract ALL rows from the upload/sessions report table in this screenshot. Return ONLY a valid JSON array, no markdown, no explanation. Each element must have exactly these keys: email (full email address exactly as shown), total (integer), earliest (time string e.g. "9:05 a.m."), latest (time string). Example: [{"email":"hans.montes@domain.com.au","total":91,"earliest":"9:27 a.m.","latest":"5:58 p.m."}]'}]}]})});
-    var data=await resp.json();
-    var raw=(data.content&&data.content[0]&&data.content[0].text||'').replace(/```json|```/g,'').trim();
-    var rows=JSON.parse(raw);
-    var uploaderNicks=TEAM.filter(function(m){return m.role==='uploader';}).map(function(m){return m.nickname;});
-    var mapped=[];
-    rows.forEach(function(r){
-      if(!r.email)return;
-      var emailClean=r.email.toLowerCase().trim();
-      var nick=EMAIL_MAP[emailClean];
-    /* Fallback: try matching by username part only */
+function mwDetailParse(){
+  var raw=G('mw-detail-paste').value.trim();
+  if(!raw){G('mw-detail-status').textContent='Please paste data first.';return;}
+  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';}).map(function(m){return m.nickname;});
+  var mapped=[];
+  var lines=raw.split('\n').filter(function(l){return l.trim();});
+  lines.forEach(function(line){
+    var parts=line.split('\t');
+    if(parts.length<2)return;
+    var email=parts[0].trim().toLowerCase();
+    var total=parseInt(parts[1].trim())||0;
+    var earliestRaw=parts[2]?parts[2].trim():'';
+    var latestRaw=parts[3]?parts[3].trim():'';
+    var nick=EMAIL_MAP[email];
     if(!nick){
-      var userPart=emailClean.split('@')[0];
+      var userPart=email.split('@')[0];
       var bestMatch=null,bestScore=0;
       Object.keys(EMAIL_MAP).forEach(function(k){
         var kUser=k.split('@')[0];
-        /* Count matching characters */
-        var score=0;
-        var minLen=Math.min(userPart.length,kUser.length);
+        var score=0,minLen=Math.min(userPart.length,kUser.length);
         for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
         score=score/Math.max(userPart.length,kUser.length);
         if(score>0.8&&score>bestScore){bestScore=score;bestMatch=EMAIL_MAP[k];}
       });
       nick=bestMatch;
     }
-      if(!nick||uploaderNicks.indexOf(nick)<0)return;
-      var sh=SHIFTS[nick]||{start:9,end:18};
-      var earliest=dlParseTime(r.earliest),latest=dlParseTime(r.latest);
-      var total=parseInt(r.total)||0,inShift=total,offShift=0;
-      if(earliest!==null&&latest!==null&&total>0){var wS=Math.max(earliest,sh.start),wE=Math.min(latest,sh.end),tw=latest-earliest||1,iw=Math.max(0,wE-wS);inShift=Math.round(total*(iw/tw));offShift=total-inShift;}
-      mapped.push({nick:nick,fullName:(TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick}).fullName,total:total,inShift:inShift,offShift:offShift,earliest:r.earliest,latest:r.latest});
-    });
-    if(!mapped.length){G('mw-detail-status').textContent='No matching uploaders found.';G('mw-detail-drop').style.display='';return;}
-    mwDetailExtracted=mapped;
-    G('mw-detail-status').textContent='';
-    G('mw-detail-table').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="border-bottom:1px solid var(--border2)"><th style="padding:5px 8px;text-align:left;color:var(--muted)">Uploader</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Total</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">In-Shift</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Off-Shift</th><th style="padding:5px 8px;text-align:left;color:var(--muted)">Window</th></tr></thead><tbody>'+mapped.map(function(r){return '<tr><td style="padding:6px 8px;color:var(--text);font-weight:600">'+r.fullName+'</td><td style="padding:6px 8px;text-align:center">'+r.total+'</td><td style="padding:6px 8px;text-align:center;color:var(--green)">'+r.inShift+'</td><td style="padding:6px 8px;text-align:center;color:var(--amber)">'+r.offShift+'</td><td style="padding:6px 8px;color:var(--muted)">'+(r.earliest||'—')+' → '+(r.latest||'—')+'</td></tr>';}).join('')+'</tbody></table>';
-    G('mw-detail-preview').style.display='';
-  }catch(err){G('mw-detail-status').textContent='Could not read screenshot. Please try a clearer image.';G('mw-detail-drop').style.display='';}
+    if(!nick||uploaderNicks.indexOf(nick)<0)return;
+    /* Extract date from timestamp e.g. "April 1, 2026, 10:02 a.m." */
+    var dateStr=null;
+    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
+    if(dateMatch){
+      var monthMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
+      var mo=monthMap[dateMatch[1]]||'01';
+      dateStr=dateMatch[3]+'-'+mo+'-'+dateMatch[2].padStart(2,'0');
+    }
+    var sh=SHIFTS[nick]||{start:9,end:18};
+    var earliest=dlParseTime(earliestRaw),latest=dlParseTime(latestRaw);
+    var inShift=total,offShift=0;
+    if(earliest!==null&&latest!==null&&total>0){
+      var wS=Math.max(earliest,sh.start),wE=Math.min(latest,sh.end),tw=latest-earliest||1,iw=Math.max(0,wE-wS);
+      inShift=Math.round(total*(iw/tw));offShift=total-inShift;
+    }
+    mapped.push({nick:nick,fullName:(TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick}).fullName,total:total,inShift:inShift,offShift:offShift,earliest:earliestRaw,latest:latestRaw,date:dateStr});
+  });
+  if(!mapped.length){G('mw-detail-status').textContent='No matching uploaders found. Check the pasted data.';return;}
+  mwDetailExtracted=mapped;
+  G('mw-detail-status').textContent='';
+  G('mw-detail-paste-wrap').style.display='none';
+  var dates=[...new Set(mapped.map(function(r){return r.date||'Unknown date';}))];
+  var tableHTML='';
+  dates.forEach(function(d){
+    var rows=mapped.filter(function(r){return (r.date||'Unknown date')===d;});
+    tableHTML+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:8px 0 4px">'+d+'</div>';
+    tableHTML+='<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><thead><tr style="border-bottom:1px solid var(--border2)"><th style="padding:5px 8px;text-align:left;color:var(--muted)">Uploader</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Total</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">In-Shift</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Off-Shift</th></tr></thead><tbody>';
+    rows.forEach(function(r){tableHTML+='<tr><td style="padding:6px 8px;color:var(--text);font-weight:600">'+r.fullName+'</td><td style="padding:6px 8px;text-align:center">'+r.total+'</td><td style="padding:6px 8px;text-align:center;color:var(--green)">'+r.inShift+'</td><td style="padding:6px 8px;text-align:center;color:var(--amber)">'+r.offShift+'</td></tr>';});
+    tableHTML+='</tbody></table>';
+  });
+  G('mw-detail-table').innerHTML=tableHTML;
+  G('mw-detail-preview').style.display='';
 }
 function mwDetailConfirm(){
   if(!mwDetailExtracted)return;
-  var today=new Date().toISOString().split('T')[0];
+  var today=getSydneyDate().toISOString().split('T')[0];
   mwDetailExtracted.forEach(function(r){
+    var dateKey=r.date||today;
     if(!perfData[r.nick])perfData[r.nick]={};
-    var ex=perfData[r.nick][today]||{};
-    perfData[r.nick][today]={uploadsTotal:r.total,uploadsInShift:r.inShift,uploadsOffShift:r.offShift,ahtTotal:ex.ahtTotal||0,ahtCount:ex.ahtCount||0,ahtSecs:ex.ahtSecs||0};
+    var ex=perfData[r.nick][dateKey]||{};
+    perfData[r.nick][dateKey]={uploadsTotal:r.total,uploadsInShift:r.inShift,uploadsOffShift:r.offShift,ahtTotal:ex.ahtTotal||0,ahtCount:ex.ahtCount||0,ahtSecs:ex.ahtSecs||0};
     fsSavePerfData(r.nick);
   });
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
   mwDetailReset();closeMgrWrite();
 }
-
 async function mwSubmitQEsc(){
   var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
@@ -4673,7 +4734,7 @@ function submitDailyDetail(){
 /* ── ESCALATION MY HUB — Placeholder KPIs ── */
 function renderEscalationHub(){
   var pane=G('lounge-pane-the-hub');if(!pane)return;
-  escPerfDateFilter='all';
+  escPerfDateFilter='month';
   escPerfCustomRange={from:'',to:''};
   var sh=SHIFTS[cu.nickname];
   var shLabel=sh?'Shift: '+sh.start+':00–'+sh.end+':00 AEST':'';
@@ -4720,11 +4781,12 @@ function renderEscalationHub(){
 
     +'<div class="sub-pane active" id="sub-esc-perf">'
     +'<div class="filter-bar" style="margin-bottom:14px">'
-    +'<button class="filter-pill active" data-f="all" onclick="escPerfFilter(this)">All Time</button>'
+    +'<button class="filter-pill" data-f="all" onclick="escPerfFilter(this)">All Time</button>'
     +'<button class="filter-pill" data-f="week" onclick="escPerfFilter(this)">This Week</button>'
-    +'<button class="filter-pill" data-f="month" onclick="escPerfFilter(this)">This Month</button>'
+    +'<button class="filter-pill active" data-f="month" onclick="escPerfFilter(this)">This Month</button>'
     +'<button class="filter-pill" data-f="quarter" onclick="escPerfFilter(this)">This Quarter</button>'
     +'<button class="filter-pill" data-f="year" onclick="escPerfFilter(this)">This Year</button>'
+    +'<button class="filter-pill" style="color:var(--muted)" onclick="escPerfClearFilter()">&#10005; Clear</button>'
     +'<div class="filter-sep"></div>'
     +'<input class="filter-di" type="date" id="esc-perf-from" onchange="setEscPerfCustom()"/>'
     +'<span style="color:var(--muted);font-size:11px">to</span>'
@@ -4776,11 +4838,12 @@ function renderEscalationHub(){
 
     +'<div class="sub-pane" id="sub-esc-quality">'
     +'<div class="filter-bar" style="margin-bottom:14px">'
-    +'<button class="filter-pill active" data-f="all" onclick="escQPFilter(this)">All Time</button>'
+    +'<button class="filter-pill" data-f="all" onclick="escQPFilter(this)">All Time</button>'
     +'<button class="filter-pill" data-f="week" onclick="escQPFilter(this)">This Week</button>'
-    +'<button class="filter-pill" data-f="month" onclick="escQPFilter(this)">This Month</button>'
+    +'<button class="filter-pill active" data-f="month" onclick="escQPFilter(this)">This Month</button>'
     +'<button class="filter-pill" data-f="quarter" onclick="escQPFilter(this)">This Quarter</button>'
     +'<button class="filter-pill" data-f="year" onclick="escQPFilter(this)">This Year</button>'
+    +'<button class="filter-pill" style="color:var(--muted)" onclick="escQPClearFilter()">&#10005; Clear</button>'
     +'<div class="filter-sep"></div>'
     +'<input class="filter-di" type="date" id="esc-qp-from" onchange="setEscQPCustom()"/>'
     +'<span style="color:var(--muted);font-size:11px">to</span>'
@@ -4938,7 +5001,7 @@ function getLatestSLA(){
 }
 
 /* ── ESCALATION PERFORMANCE FILTER ── */
-var escPerfDateFilter='all';
+var escPerfDateFilter='month';
 var escPerfCustomRange={from:'',to:''};
 
 function escPerfFilter(btn){
@@ -5034,7 +5097,7 @@ function renderEscPerfFiltered(){
 }
 
 /* ── ESCALATION QUALITY ── */
-var escQPDateFilter='all';
+var escQPDateFilter='month';
 var escQPCustomRange={from:'',to:''};
 
 function escQPFilter(btn){
@@ -5729,22 +5792,19 @@ document.addEventListener('DOMContentLoaded',function(){
         <!-- LOG DAILY DETAIL -->
         <div class="dl-section" id="dl-sec-mw-detail">
           <div class="s-section-title">Log Daily Detail</div>
-          <div class="s-row-desc" style="margin-bottom:14px;line-height:1.6">Drop a screenshot of the upload report. The system will read the table and extract uploads per uploader automatically.</div>
-          <div id="mw-detail-drop" style="border:2px dashed var(--border2);border-radius:12px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px"
-            ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
-            ondragleave="this.style.borderColor='var(--border2)'"
-            ondrop="event.preventDefault();this.style.borderColor='var(--border2)';mwDetailDrop(event)"
-            onclick="G('mw-detail-file').click()">
-            <div style="font-size:32px;margin-bottom:8px">&#128247;</div>
-            <div style="font-size:12px;color:var(--muted)">Drag &amp; drop or click to upload screenshot</div>
+          <div class="s-row-desc" style="margin-bottom:14px;line-height:1.6">Copy and paste the data directly from the upload report. The system will parse it automatically.</div>
+          <div id="mw-detail-paste-wrap">
+            <textarea class="form-input" id="mw-detail-paste" rows="8" placeholder="Paste report data here...&#10;&#10;Example:&#10;paul.sibayan@domain.com.au&#9;129&#9;April 1, 2026, 10:02 a.m.&#9;April 1, 2026, 6:48 p.m." style="font-size:11px;font-family:monospace;resize:vertical"></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn btn-primary" style="width:100%" onclick="mwDetailParse()">&#128202; Parse Data</button>
+            </div>
           </div>
-          <input type="file" id="mw-detail-file" accept="image/*" style="display:none" onchange="mwDetailHandle(this.files[0])"/>
-          <div id="mw-detail-status" style="font-size:12px;color:var(--muted);margin-bottom:10px;min-height:18px"></div>
-          <div id="mw-detail-preview" style="display:none">
-            <div style="font-family:var(--font-d);font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Extracted — confirm before saving</div>
+          <div id="mw-detail-status" style="font-size:12px;color:var(--muted);margin-top:10px;min-height:18px"></div>
+          <div id="mw-detail-preview" style="display:none;margin-top:12px">
+            <div style="font-family:var(--font-d);font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Parsed — confirm before saving</div>
             <div id="mw-detail-table" style="margin-bottom:14px"></div>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-outline btn-sm" style="flex:1" onclick="mwDetailReset()">&#8592; Re-upload</button>
+              <button class="btn btn-outline btn-sm" style="flex:1" onclick="mwDetailReset()">&#8592; Clear</button>
               <button class="btn btn-primary btn-sm" style="flex:1" onclick="mwDetailConfirm()">&#10003; Confirm &amp; Save</button>
             </div>
           </div>
