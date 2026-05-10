@@ -2096,6 +2096,8 @@ function buildUploaderDOM(){
         <button class="filter-pill" onclick="setQPFilter('quarter',this)">This Quarter</button>
         <button class="filter-pill" onclick="setQPFilter('year',this)">This Year</button>
         <button class="filter-pill" style="color:var(--muted)" onclick="setQPFilter('all',document.querySelector('.filter-pill'))">&#10005; Clear</button>
+        <div class="filter-sep"></div>
+        <div class="range-cal" id="rcal-upl-quality"><div class="range-cal-trigger" id="rcal-upl-quality-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-upl-quality-popup"></div></div>
 
       </div>
       <div class="sect"><div class="sect-head"><span class="sect-title">&#128203; Quality Remarks</span></div><div class="qp-list" id="qp-list"></div></div>
@@ -2653,8 +2655,8 @@ function renderMyDay(){
     +'</div>'
     +'</div>'
     +'</div>'
-    /* RIGHT — Awards carousel (50%), non-escalation only */
-    +(cu&&cu.role!=='escalation'
+    /* RIGHT — Awards carousel (50%) — all roles */
+    +(cu&&cu.role!=='manager'
       ?'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'
         +'<div class="sect" style="padding:0;flex:1">'
         +'<div class="sect-head" style="padding:14px 16px 10px">'
@@ -4787,8 +4789,6 @@ function slaRemoveDriver(btn){
 }
 function mwSLAReset(){
   var pct=G('mw-sla-pct');if(pct)pct.value='';
-  var tot=G('mw-sla-total');if(tot)tot.value='';
-  var notes=G('mw-sla-notes');if(notes)notes.value='';
   var st=G('mw-sla-status');if(st)st.textContent='';
   /* Reset drivers to one empty row */
   var list=G('sla-drivers-list');
@@ -4800,11 +4800,9 @@ function mwSLAReset(){
 function mwSLAConfirm(){
   var pct=parseFloat(G('mw-sla-pct').value);
   var date=G('mw-sla-date').value||new Date().toISOString().split('T')[0];
-  var total=parseInt(G('mw-sla-total').value)||0;
-  var note=G('mw-sla-notes').value.trim();
   var st=G('mw-sla-status');
   if(isNaN(pct)||pct<0||pct>100){if(st)st.textContent='Please enter a valid SLA % (0–100).';return;}
-  /* Collect drivers */
+  /* Collect drivers — auto-sum for total */
   var drivers=[];
   G('sla-drivers-list').querySelectorAll('.sla-driver-row').forEach(function(row){
     var inputs=row.querySelectorAll('input');
@@ -4812,7 +4810,8 @@ function mwSLAConfirm(){
     var count=parseInt(inputs[1]&&inputs[1].value)||0;
     if(name)drivers.push({name:name,count:count});
   });
-  var entry={date:date,pct:pct,total:total,note:note,drivers:drivers,loggedBy:cu?cu.fullName:'',loggedAt:new Date().toISOString()};
+  var total=drivers.reduce(function(s,d){return s+d.count;},0);
+  var entry={date:date,pct:pct,total:total,drivers:drivers,loggedBy:cu?cu.fullName:'',loggedAt:new Date().toISOString()};
   slaLog.unshift(entry);
   fsSaveSLAEntry(entry);
   pushNotif('📈','Escalation SLA logged: '+pct+'% for '+date+(drivers.length?' · '+drivers.length+' drivers':'')+'.');
@@ -5050,40 +5049,6 @@ async function mwSubmitQEsc(){
   closeMgrWrite();
 }
 
-function mwSLADrop(e){var f=e.dataTransfer.files[0];if(f)mwSLAHandle(f);}
-function mwSLAReset(){
-  mwSLAExtracted=null;
-  var f=G('mw-sla-file');if(f)f.value='';
-  var st=G('mw-sla-status');if(st)st.textContent='';
-  var pv=G('mw-sla-preview');if(pv)pv.style.display='none';
-  var dz=G('mw-sla-drop');if(dz)dz.style.display='';
-}
-async function mwSLAHandle(file){
-  if(!file||!file.type.match(/^image\//)){G('mw-sla-status').textContent='Please upload an image file.';return;}
-  G('mw-sla-drop').style.display='none';
-  G('mw-sla-status').innerHTML='&#128257; Extracting SLA data with AI...';
-  var b64=await new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1]);};r.onerror=rej;r.readAsDataURL(file);});
-  try{
-    var resp=await fetch('/.netlify/functions/ai-proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:file.type||'image/png',data:b64}},{type:'text',text:'Extract the SLA data. Return ONLY JSON, no markdown: {"sla_pct":87.5,"total_tickets":120,"notes":"any visible notes"}'}]}]})});
-    var data=await resp.json();
-    var raw=(data.content&&data.content[0]&&data.content[0].text||'').replace(/```json|```/g,'').trim();
-    mwSLAExtracted=JSON.parse(raw);
-    G('mw-sla-status').textContent='';
-    G('mw-sla-extracted').innerHTML='<div style="display:flex;gap:20px;align-items:center"><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">SLA %</div><div style="font-size:28px;font-weight:700;font-family:var(--font-d);color:'+(mwSLAExtracted.sla_pct>=75?'var(--green)':'var(--red)')+'">'+mwSLAExtracted.sla_pct+'%</div></div><div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Total Tickets</div><div style="font-size:28px;font-weight:700;font-family:var(--font-d);color:var(--text)">'+mwSLAExtracted.total_tickets+'</div></div></div>'+(mwSLAExtracted.notes?'<div style="font-size:11px;color:var(--muted);margin-top:8px">'+mwSLAExtracted.notes+'</div>':'');
-    G('mw-sla-preview').style.display='';
-  }catch(err){G('mw-sla-status').textContent='Could not read screenshot. Please try a clearer image.';G('mw-sla-drop').style.display='';}
-}
-function mwSLAConfirm(){
-  if(!mwSLAExtracted)return;
-  var date=G('mw-sla-date').value||new Date().toISOString().split('T')[0];
-  var notes=G('mw-sla-notes').value.trim();
-  var newSLA={date:date,pct:mwSLAExtracted.sla_pct,total:mwSLAExtracted.total_tickets,notes:notes,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
-  slaLog.unshift(newSLA);
-  fsSaveSLAEntry(newSLA);
-  pushNotif('📈','Escalation SLA logged: '+mwSLAExtracted.sla_pct+'% for '+date+'.','sla');
-  mwSLAReset();closeMgrWrite();
-  if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();
-}
 
 function mwSubmitAwards(){
   var syd=getSydneyDate();
@@ -5381,6 +5346,63 @@ function renderDailyLogErrors(){
   }).join('');
 }
 
+/* ── ESCALATION LOG DAILY DETAIL ── */
+var escDetailExtracted=null;
+function escDetailReset(){
+  escDetailExtracted=null;
+  var pa=G('esc-detail-paste');if(pa)pa.value='';
+  var st=G('esc-detail-status');if(st)st.textContent='';
+  var pv=G('esc-detail-preview');if(pv)pv.style.display='none';
+  var pw=G('esc-detail-paste-wrap');if(pw)pw.style.display='';
+}
+function escDetailParse(){
+  var raw=G('esc-detail-paste').value.trim();
+  var st=G('esc-detail-status');
+  if(!raw){if(st)st.textContent='Please paste data first.';return;}
+  var nick=cu.nickname;var matched=null;
+  var lines=raw.split('\n').filter(function(l){return l.trim();});
+  lines.forEach(function(line){
+    var parts=line.split('\t');if(parts.length<2)return;
+    var lineEmail=parts[0].trim().toLowerCase();
+    var lineNick=EMAIL_MAP[lineEmail];
+    if(!lineNick){
+      var userPart=lineEmail.split('@')[0];
+      Object.keys(EMAIL_MAP).forEach(function(k){
+        var kUser=k.split('@')[0];var score=0,minLen=Math.min(userPart.length,kUser.length);
+        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
+        score=score/Math.max(userPart.length,kUser.length);
+        if(score>0.8)lineNick=EMAIL_MAP[k];
+      });
+    }
+    if(lineNick!==nick)return;
+    var total=parseInt(parts[1].trim())||0;
+    var earliestRaw=parts[2]?parts[2].trim():'';
+    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
+    var dateStr=null;
+    if(dateMatch){var mMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};dateStr=dateMatch[3]+'-'+(mMap[dateMatch[1]]||'01')+'-'+dateMatch[2].padStart(2,'0');}
+    matched={nick:nick,fullName:cu.fullName,total:total,date:dateStr,earliest:earliestRaw};
+  });
+  if(!matched){if(st)st.textContent='Your row was not found. Check the pasted data contains your email.';return;}
+  escDetailExtracted=matched;if(st)st.textContent='';
+  G('esc-detail-paste-wrap').style.display='none';
+  var today=new Date().toISOString().split('T')[0];
+  G('esc-detail-table').innerHTML='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">'+(matched.date||today)+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid var(--border2)"><th style="padding:5px 8px;text-align:left;color:var(--muted)">Member</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Total Uploads</th></tr></thead>'
+    +'<tbody><tr><td style="padding:6px 8px;color:var(--text);font-weight:600">'+matched.fullName+'</td><td style="padding:6px 8px;text-align:center">'+matched.total+'</td></tr></tbody></table>';
+  G('esc-detail-preview').style.display='';
+}
+function escDetailConfirm(){
+  if(!escDetailExtracted)return;
+  var r=escDetailExtracted;var today=new Date().toISOString().split('T')[0];
+  var dateKey=r.date||today;
+  if(!perfData[r.nick])perfData[r.nick]={};
+  var ex=perfData[r.nick][dateKey]||{};
+  perfData[r.nick][dateKey]=Object.assign(ex,{uploadsTotal:r.total,uploadsInShift:r.total,uploadsOffShift:0});
+  fsSavePerfData(r.nick);
+  pushNotif('📊','Daily detail saved — '+r.total+' uploads for '+r.fullName+'.','detail');
+  escDetailReset();closeDailyLog();
+}
+
 /* initDailyLog — populate uploader dropdown */
 function initDailyLog(){
   var sel=G('esc-log-uploader');
@@ -5437,13 +5459,24 @@ function renderEscalationHub(){
   var pane=G('lounge-pane-the-hub');if(!pane)return;
   escPerfDateFilter='month';
   escPerfCustomRange={from:'',to:''};
+  setTimeout(function(){
+    if(G('rcal-esc-perf-trigger'))rcalCreate('rcal-esc-perf',function(from,to){
+      escPerfCustomRange={from:from,to:to};escPerfDateFilter='custom';
+      document.querySelectorAll('#sub-esc-perf .filter-pill').forEach(function(p){p.classList.remove('active');});
+      renderEscPerfFiltered();
+    });
+    if(G('rcal-esc-q-trigger'))rcalCreate('rcal-esc-q',function(from,to){
+      escQPCustomRange={from:from,to:to};escQPDateFilter='custom';
+      document.querySelectorAll('#sub-esc-quality .filter-pill').forEach(function(p){p.classList.remove('active');});
+    });
+  },100);
   var sh=SHIFTS[cu.nickname];
   var shLabel=sh?'Shift: '+sh.start+':00–'+sh.end+':00 AEST':'';
   /* Default view: all-time sessions and uploads */
   var totalSecs=timerSessions.reduce(function(a,b){return a+b.seconds;},0);
   var timerHrs=totalSecs/3600;
   var allUploads=Object.values(perfData[cu.nickname]||{});
-  var inShiftTotal=allUploads.reduce(function(a,d){return a+(d.uploadsInShift||0);},0);
+  var inShiftTotal=allUploads.reduce(function(a,d){return a+(d.uploadsTotal||0);},0);
   var uploadRate=timerHrs>0?(inShiftTotal/timerHrs).toFixed(1):'—';
   var latest=getLatestSLA();
   var slaPct=latest?latest.pct:null;
@@ -5489,9 +5522,7 @@ function renderEscalationHub(){
     +'<button class="filter-pill" data-f="year" onclick="escPerfFilter(this)">This Year</button>'
     +'<button class="filter-pill" style="color:var(--muted)" onclick="escPerfClearFilter()">&#10005; Clear</button>'
     +'<div class="filter-sep"></div>'
-    +'<input class="filter-di" type="date" id="esc-perf-from" onchange="setEscPerfCustom()"/>'
-    +'<span style="color:var(--muted);font-size:11px">to</span>'
-    +'<input class="filter-di" type="date" id="esc-perf-to" onchange="setEscPerfCustom()"/>'
+    +'<div class="range-cal" id="rcal-esc-perf"><div class="range-cal-trigger" id="rcal-esc-perf-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-esc-perf-popup"></div></div>'
     +'</div>'
     +'<div class="timer-card" style="margin-bottom:16px">'
     +'<div><div class="timer-lbl">&#9201; Upload Session Timer</div>'
@@ -5847,7 +5878,7 @@ function renderEscQuality(){
       +'<div class="qp-header"><div>'+avEl(c.uploader,34)+'</div>'
       +'<div class="qp-meta"><div class="qp-address">'+c.address+'</div>'
       +'<div class="qp-detail">'+(isCrit?'Quality Escalation':'Contract Error')+' \xb7 '+fmtDate(c.date)+' \xb7 Logged by '+logger+'</div></div>'+stBadge(c.status)+'</div>'
-      +'<div class="qp-body">'+c.feedback+'</div>'+ss+ackSect
+      +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Error Description</div>'+'<div class="qp-body">'+c.feedback+'</div>'+ss+ackSect
       +'<div class="qp-footer"><span style="font-size:10px;color:var(--muted2)">For: '+c.uploader+'</span></div></div>';
   }).join('');
 }
@@ -6099,7 +6130,7 @@ function renderQualityPortal(){
       +'<div class="qp-header" style="margin-bottom:0"><div>'+avEl(c.uploader,28)+'</div><div class="qp-meta"><div class="qp-address" style="font-size:12px">'+c.address+'</div>'
       +'<div class="qp-detail">'+(isCrit?'Quality Escalation':'Contract Error')+' · '+fmtDate(c.date)+'</div></div>'+stBadge(c.status)+'</div>'
       +'<div id="qp-detail-'+c.id+'" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
-      +'<div class="qp-body">'+c.feedback+'</div>'+ss+ackSect
+      +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Error Description</div>'+'<div class="qp-body">'+c.feedback+'</div>'+ss+ackSect
       +'<div class="qp-footer"><span style="font-size:10px;color:var(--muted2)">For: '+c.uploader+'</span>'+completeBtn+'</div>'
       +'</div>'
       +'</div>';
@@ -6515,11 +6546,6 @@ document.addEventListener('DOMContentLoaded',function(){
             </div>
           </div>
 
-          <div class="form-group" style="margin-top:14px">
-            <label class="form-label">Total Escalated Tickets</label>
-            <input class="form-input" id="mw-sla-total" type="number" min="0" placeholder="e.g. 790" style="max-width:120px"/>
-          </div>
-
           <div style="margin-top:16px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
               <label class="form-label" style="margin:0">Top Escalation Drivers</label>
@@ -6534,10 +6560,6 @@ document.addEventListener('DOMContentLoaded',function(){
             </div>
           </div>
 
-          <div class="form-group" style="margin-top:14px">
-            <label class="form-label">Notes <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-            <textarea class="form-input" id="mw-sla-notes" rows="2" placeholder="Additional context..."></textarea>
-          </div>
           <div id="mw-sla-status" style="font-size:12px;color:var(--red);min-height:16px;margin-top:6px"></div>
           <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="mwSLAConfirm()">&#10003; Save SLA Entry</button>
         </div>
@@ -6574,8 +6596,27 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="dl-body">
       <div class="dl-tabs">
         <button class="dl-tab active" data-tab="error" onclick="switchDailyLogTab('error',this)">&#9997;&#65039; Log Error</button>
+        <button class="dl-tab" data-tab="esc-detail" onclick="switchDailyLogTab('esc-detail',this);escDetailReset()">&#128202; Log Daily Detail</button>
       </div>
       <div class="dl-pane">
+        <!-- Log Daily Detail (escalation) -->
+        <div class="dl-section" id="dl-sec-esc-detail" style="display:none">
+          <div class="s-section-title">Log Daily Detail</div>
+          <div class="s-row-desc" style="margin-bottom:14px;line-height:1.6">Paste the daily upload report. The system will parse your row automatically.</div>
+          <div id="esc-detail-paste-wrap">
+            <textarea class="form-input" id="esc-detail-paste" rows="6" placeholder="Paste report data here...&#10;&#10;Example:&#10;astrid.cortes@domain.com.au&#9;50&#9;April 1, 2026, 9:14 a.m.&#9;April 1, 2026, 5:41 p.m." style="font-size:11px;font-family:monospace;resize:vertical"></textarea>
+            <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="escDetailParse()">&#128202; Parse Data</button>
+          </div>
+          <div id="esc-detail-status" style="font-size:12px;color:var(--muted);margin-top:10px;min-height:18px"></div>
+          <div id="esc-detail-preview" style="display:none;margin-top:12px">
+            <div style="font-family:var(--font-d);font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Parsed — confirm before saving</div>
+            <div id="esc-detail-table" style="margin-bottom:14px"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-outline btn-sm" style="flex:1" onclick="escDetailReset()">&#8592; Clear</button>
+              <button class="btn btn-primary btn-sm" style="flex:1" onclick="escDetailConfirm()">&#10003; Confirm &amp; Save</button>
+            </div>
+          </div>
+        </div>
         <!-- Log Error -->
         <div class="dl-section" id="dl-sec-error">
           <div class="s-section-title">Log Error</div>
