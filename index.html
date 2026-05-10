@@ -3507,12 +3507,6 @@ function renderMgrHubPerformance(){
   var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
 
   /* Shared SLA */
-  var allSlaEntries=slaLog.filter(function(e){return mgrHubInRange(e.date);});
-  var sharedSLA=allSlaEntries.length?(allSlaEntries.reduce(function(s,e){return s+e.pct;},0)/allSlaEntries.length).toFixed(1)+'%':'—';
-  var sharedSlaBadge=allSlaEntries.length
-    ?('<span class="esc-metric-badge '+(parseFloat(sharedSLA)>=75?'good':'bad')+'">'+sharedSLA+'</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>')
-    :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
-
   var filteredSecs=(timerSessions||[]).filter(function(s){return mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
   var filteredHrs=filteredSecs/3600;
 
@@ -3558,7 +3552,55 @@ function renderMgrHubPerformance(){
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></td>'
     +'</tr>';
 
-  var escSection='<div class="sect">'
+  /* Aggregate SLA entries in range */
+  var slaInRange=slaLog.filter(function(e){return mgrHubInRange(e.date);});
+  var avgSLA=slaInRange.length?(slaInRange.reduce(function(s,e){return s+(e.pct||0);},0)/slaInRange.length).toFixed(1):'—';
+  var sharedSlaBadge=slaInRange.length
+    ?('<span class="esc-metric-badge '+(parseFloat(avgSLA)>=75?'good':'bad')+'">'+avgSLA+'%</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Avg · Target ≥75%</div>')
+    :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
+
+  /* Aggregate drivers across ALL SLA entries in range */
+  var driverMap={};
+  slaInRange.forEach(function(e){
+    if(!e.drivers||!e.drivers.length)return;
+    e.drivers.forEach(function(d){
+      if(!d.name)return;
+      driverMap[d.name]=(driverMap[d.name]||0)+(d.count||0);
+    });
+  });
+  var aggregatedDrivers=Object.keys(driverMap)
+    .map(function(name){return {name:name,count:driverMap[name]};})
+    .sort(function(a,b){return b.count-a.count;});
+  var grandTotalDrivers=aggregatedDrivers.reduce(function(s,d){return s+d.count;},0);
+  var maxCount=aggregatedDrivers.length?aggregatedDrivers[0].count:1;
+
+  var driversHTML='';
+  if(aggregatedDrivers.length){
+    driversHTML=aggregatedDrivers.slice(0,8).map(function(d){
+      var pct=Math.round((d.count/maxCount)*100);
+      return '<div style="margin-bottom:9px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
+        +'<span style="font-size:11px;color:var(--text);font-weight:500;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:78%">'+d.name+'</span>'
+        +'<span style="font-size:11px;font-weight:600;color:var(--muted);flex-shrink:0;margin-left:4px">'+d.count+'</span>'
+        +'</div>'
+        +'<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">'
+        +'<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:3px"></div>'
+        +'</div></div>';
+    }).join('');
+    /* Grand total row */
+    driversHTML+='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Total escalated</span>'
+      +'<span style="font-size:15px;font-weight:700;color:var(--text)">'+grandTotalDrivers+'</span>'
+      +'</div>';
+    var entryLabel=slaInRange.length===1?'1 entry':slaInRange.length+' entries';
+    driversHTML='<div style="font-size:10px;color:var(--muted);margin-bottom:10px">&#128202; Aggregated from '+entryLabel+'</div>'+driversHTML;
+  } else {
+    driversHTML='<div style="font-size:12px;color:var(--muted);padding:20px 0;text-align:center">No driver data logged yet.<br><span style="font-size:11px">Use Log SLA to add drivers.</span></div>';
+  }
+
+  var escSection='<div style="display:flex;gap:16px;align-items:flex-start">'
+    /* 3/4 — escalation perf table */
+    +'<div style="flex:3;min-width:0"><div class="sect">'
     +'<div class="sect-head"><span class="sect-title">&#9889; Escalation</span></div>'
     +'<table style="width:100%;border-collapse:collapse">'
     +'<thead><tr style="border-bottom:1px solid var(--border2)">'
@@ -3569,7 +3611,13 @@ function renderMgrHubPerformance(){
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</th>'
     +'</tr></thead>'
     +'<tbody>'+escRows+escGrandTotal+'</tbody>'
-    +'</table></div>';
+    +'</table></div></div>'
+    /* 1/4 — top drivers */
+    +'<div style="flex:1;min-width:0"><div class="sect" style="padding:14px">'
+    +'<div class="sect-head" style="padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px"><span class="sect-title" style="font-size:12px">&#128202; Top Escalation Drivers</span></div>'
+    +driversHTML
+    +'</div></div>'
+    +'</div>';
 
   el.innerHTML=filterBar+uplSection+escSection;
 
@@ -4721,7 +4769,139 @@ function openMemberProfile(nick){
 /* ── ESCALATION PORTAL ── */
 
 /* ── MANAGER WRITE OVERLAY ── */
-var mwSLAExtracted=null;
+/* ── LOG SLA — PASTE PARSER ── */
+function slaAddDriver(){
+  var list=G('sla-drivers-list');
+  var row=document.createElement('div');
+  row.className='sla-driver-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 80px auto;gap:6px;align-items:center';
+  row.innerHTML='<input class="form-input" placeholder="Driver name" style="font-size:12px"/>'
+    +'<input class="form-input" type="number" min="0" placeholder="Count" style="font-size:12px"/>'
+    +'<button onclick="slaRemoveDriver(this)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px">&#215;</button>';
+  list.appendChild(row);
+}
+function slaRemoveDriver(btn){
+  var rows=G('sla-drivers-list').querySelectorAll('.sla-driver-row');
+  if(rows.length<=1)return; /* keep at least one row */
+  btn.closest('.sla-driver-row').remove();
+}
+function mwSLAReset(){
+  var pct=G('mw-sla-pct');if(pct)pct.value='';
+  var tot=G('mw-sla-total');if(tot)tot.value='';
+  var notes=G('mw-sla-notes');if(notes)notes.value='';
+  var st=G('mw-sla-status');if(st)st.textContent='';
+  /* Reset drivers to one empty row */
+  var list=G('sla-drivers-list');
+  if(list)list.innerHTML='<div class="sla-driver-row" style="display:grid;grid-template-columns:1fr 80px auto;gap:6px;align-items:center">'
+    +'<input class="form-input" placeholder="Driver name e.g. Vendor\'s Don\'t Match Contract" style="font-size:12px"/>'
+    +'<input class="form-input" type="number" min="0" placeholder="Count" style="font-size:12px"/>'
+    +'<button onclick="slaRemoveDriver(this)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px">&#215;</button></div>';
+}
+function mwSLAConfirm(){
+  var pct=parseFloat(G('mw-sla-pct').value);
+  var date=G('mw-sla-date').value||new Date().toISOString().split('T')[0];
+  var total=parseInt(G('mw-sla-total').value)||0;
+  var note=G('mw-sla-notes').value.trim();
+  var st=G('mw-sla-status');
+  if(isNaN(pct)||pct<0||pct>100){if(st)st.textContent='Please enter a valid SLA % (0–100).';return;}
+  /* Collect drivers */
+  var drivers=[];
+  G('sla-drivers-list').querySelectorAll('.sla-driver-row').forEach(function(row){
+    var inputs=row.querySelectorAll('input');
+    var name=inputs[0]&&inputs[0].value.trim();
+    var count=parseInt(inputs[1]&&inputs[1].value)||0;
+    if(name)drivers.push({name:name,count:count});
+  });
+  var entry={date:date,pct:pct,total:total,note:note,drivers:drivers,loggedBy:cu?cu.fullName:'',loggedAt:new Date().toISOString()};
+  slaLog.unshift(entry);
+  fsSaveSLAEntry(entry);
+  pushNotif('📈','Escalation SLA logged: '+pct+'% for '+date+(drivers.length?' · '+drivers.length+' drivers':'')+'.');
+  mwSLAReset();closeMgrWrite();
+  if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();
+}
+
+/* ── LOG AWARDS — DROPDOWN SELECTOR ── */
+function renderAwardForm(){
+  var key=G('mw-award-category').value;
+  var form=G('mw-award-form');
+  var saveBtn=G('mw-award-save-btn');
+  if(!key){form.style.display='none';if(saveBtn)saveBtn.style.display='none';return;}
+  form.style.display='block';if(saveBtn)saveBtn.style.display='block';
+
+  var allOpts='<option value="">— None —</option>'
+    +TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';})
+    .sort(function(a,b){return a.fullName.localeCompare(b.fullName);})
+    .map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
+
+  var selStyle='background:var(--bg3);color:var(--text);border-color:var(--border)';
+  var def=AWARD_DEFS.find(function(d){return d.key===key;});
+  var criteria={quality:'Based on Quality Score %',uploads:'Based on Avg. Daily Upload',hero:'Based on Avg. Daily · Quality Score % · Quality Esc',quarter:'Based on Avg. Daily · Quality Score % · Quality Esc (Quarter)'};
+
+  var html='<div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:8px 12px;background:var(--bg3);border-radius:8px">'+def.emoji+' <strong>'+def.title+'</strong> &mdash; '+criteria[key]+'</div>';
+  html+='<div style="display:flex;flex-direction:column;gap:10px">';
+
+  if(key==='quality'||key==='uploads'){
+    var scoreLabel=key==='quality'?'Score %':'Avg/Day';
+    ['1st','2nd','3rd'].forEach(function(place,i){
+      html+='<div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">'
+        +'<div><label class="form-label">'+place+'</label><select class="form-input" id="aw-p'+(i+1)+'-nick" style="'+selStyle+'">'+allOpts+'</select></div>'
+        +'<div><label class="form-label">'+scoreLabel+'</label><input class="form-input" id="aw-p'+(i+1)+'-score" type="number" step="0.1" min="0"'+(key==='quality'?' max="100"':'')+' placeholder="0.0" style="width:90px"/></div>'
+        +'</div>';
+    });
+  } else {
+    /* Hero / Quarter — 3 metrics */
+    ['1st','2nd','3rd'].forEach(function(place,i){
+      html+='<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:2px">'
+        +'<label class="form-label">'+place+'</label>'
+        +'<select class="form-input" id="aw-p'+(i+1)+'-nick" style="'+selStyle+';margin-bottom:8px">'+allOpts+'</select>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+        +'<div><label class="form-label">Avg/Day</label><input class="form-input" id="aw-p'+(i+1)+'-adu" type="number" step="0.1" min="0" placeholder="0"/></div>'
+        +'<div><label class="form-label">Q %</label><input class="form-input" id="aw-p'+(i+1)+'-qs" type="number" step="0.1" min="0" max="100" placeholder="0"/></div>'
+        +'<div><label class="form-label">Esc</label><input class="form-input" id="aw-p'+(i+1)+'-esc" type="number" min="0" placeholder="0"/></div>'
+        +'</div></div>';
+    });
+  }
+  html+='</div>';
+  form.innerHTML=html;
+}
+
+function mwSubmitAwards(){
+  var key=G('mw-award-category').value;
+  if(!key){alert('Please select an award category.');return;}
+  var syd=getSydneyDate();
+  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var mon=months[syd.getMonth()];var yr=syd.getFullYear();
+  var weekNum=Math.ceil(syd.getDate()/7);var weekLabel='Week '+weekNum;
+  var q='Q'+(Math.floor(syd.getMonth()/3)+1)+' '+yr;
+  var medals=['🥇','🥈','🥉'];
+  function gv(id){var el=G(id);return el?el.value:'';}
+
+  var top=[];
+  [1,2,3].forEach(function(n){
+    var nick=gv('aw-p'+n+'-nick');if(!nick)return;
+    var entry={nick:nick};
+    if(key==='quality')entry.score=gv('aw-p'+n+'-score');
+    else if(key==='uploads')entry.score=gv('aw-p'+n+'-score');
+    else{entry.adu=gv('aw-p'+n+'-adu');entry.qs=gv('aw-p'+n+'-qs');entry.esc=gv('aw-p'+n+'-esc');}
+    top.push(entry);
+  });
+  if(!top.length){alert('Please select at least 1st place.');return;}
+
+  var def=AWARD_DEFS.find(function(d){return d.key===key;});
+  var label=key==='quarter'?q:mon+', '+weekLabel+' — '+yr;
+  mdAwards[key]={top:top};
+  top.forEach(function(p,i){
+    var hist={nick:p.nick,award:def.title,emoji:def.emoji,label:label+' '+medals[i],score:p.score||null,adu:p.adu||null,qs:p.qs||null,esc:p.esc||null,date:syd.toISOString()};
+    awardHistory.push(hist);fsSaveAwardHistory(hist);
+  });
+  fsSaveAwards();
+  pushNotif('🏆',def.title+' updated by '+cu.fullName+'.','awards');
+  if(typeof renderAwards==='function')renderAwards();
+  /* Reset form */
+  G('mw-award-category').value='';
+  renderAwardForm();
+  closeMgrWrite();
+}
 var mwDetailExtracted=null;
 
 function openMgrWrite(){
@@ -6324,129 +6504,59 @@ document.addEventListener('DOMContentLoaded',function(){
         <!-- LOG SLA (AI SCREENSHOT) -->
         <div class="dl-section" id="dl-sec-mw-sla">
           <div class="s-section-title">Log Escalation SLA</div>
-          <div class="s-row-desc" style="margin-bottom:14px;line-height:1.6">Drop a screenshot of the SLA report. AI will extract the SLA % and ticket count automatically.</div>
           <div class="form-group"><label class="form-label">Date</label>
             <input class="form-input" id="mw-sla-date" type="date"/></div>
-          <div id="mw-sla-drop" style="border:2px dashed var(--border2);border-radius:12px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:14px"
-            ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
-            ondragleave="this.style.borderColor='var(--border2)'"
-            ondrop="event.preventDefault();this.style.borderColor='var(--border2)';mwSLADrop(event)"
-            onclick="G('mw-sla-file').click()">
-            <div style="font-size:32px;margin-bottom:8px">&#128202;</div>
-            <div style="font-size:12px;color:var(--muted)">Drag &amp; drop or click to upload SLA screenshot</div>
-          </div>
-          <input type="file" id="mw-sla-file" accept="image/*" style="display:none" onchange="mwSLAHandle(this.files[0])"/>
-          <div id="mw-sla-status" style="font-size:12px;color:var(--muted);margin-bottom:10px;min-height:18px"></div>
-          <div id="mw-sla-preview" style="display:none">
-            <div id="mw-sla-extracted" style="margin-bottom:14px;padding:14px;background:var(--bg3);border-radius:10px;font-size:13px"></div>
-            <div class="form-group"><label class="form-label">Notes (optional)</label>
-              <textarea class="form-input" id="mw-sla-notes" rows="2" placeholder="Additional context..."></textarea></div>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-outline btn-sm" style="flex:1" onclick="mwSLAReset()">&#8592; Re-upload</button>
-              <button class="btn btn-primary btn-sm" style="flex:1" onclick="mwSLAConfirm()">&#10003; Confirm &amp; Save</button>
+
+          <div class="form-group" style="margin-top:12px">
+            <label class="form-label">Escalated Contracts Upload SLA %</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input class="form-input" id="mw-sla-pct" type="number" step="0.1" min="0" max="100" placeholder="e.g. 75.4" style="max-width:120px"/>
+              <span style="font-size:14px;color:var(--muted)">%</span>
             </div>
           </div>
+
+          <div class="form-group" style="margin-top:14px">
+            <label class="form-label">Total Escalated Tickets</label>
+            <input class="form-input" id="mw-sla-total" type="number" min="0" placeholder="e.g. 790" style="max-width:120px"/>
+          </div>
+
+          <div style="margin-top:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <label class="form-label" style="margin:0">Top Escalation Drivers</label>
+              <button class="btn btn-outline btn-sm" onclick="slaAddDriver()">&#43; Add Driver</button>
+            </div>
+            <div id="sla-drivers-list" style="display:flex;flex-direction:column;gap:6px">
+              <div class="sla-driver-row" style="display:grid;grid-template-columns:1fr 80px auto;gap:6px;align-items:center">
+                <input class="form-input" placeholder="Driver name e.g. Vendor's Don't Match Contract" style="font-size:12px"/>
+                <input class="form-input" type="number" min="0" placeholder="Count" style="font-size:12px"/>
+                <button onclick="slaRemoveDriver(this)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;padding:4px">&#215;</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top:14px">
+            <label class="form-label">Notes <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+            <textarea class="form-input" id="mw-sla-notes" rows="2" placeholder="Additional context..."></textarea>
+          </div>
+          <div id="mw-sla-status" style="font-size:12px;color:var(--red);min-height:16px;margin-top:6px"></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="mwSLAConfirm()">&#10003; Save SLA Entry</button>
         </div>
 
         <!-- LOG AWARDS -->
         <div class="dl-section" id="dl-sec-mw-awards">
           <div class="s-section-title">Log Awards</div>
-          <div style="display:flex;flex-direction:column;gap:16px;margin-top:4px">
-
-            <!-- Quality Champion -->
-            <div class="sect" style="padding:14px">
-              <div class="sect-head"><span class="sect-title">&#127942; Quality Champion</span></div>
-              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Quality Score %</div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-                  <div><label class="form-label">1st</label><select class="form-input" id="mw-qc-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><label class="form-label">Score %</label><input class="form-input" id="mw-qc-1-score" type="number" step="0.1" min="0" max="100" placeholder="0.0" style="width:80px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-qc-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-qc-2-score" type="number" step="0.1" min="0" max="100" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-qc-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-qc-3-score" type="number" step="0.1" min="0" max="100" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Uploading Monster -->
-            <div class="sect" style="padding:14px">
-              <div class="sect-head"><span class="sect-title">&#128126; Uploading Monster</span></div>
-              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Avg. Daily Upload</div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-                  <div><label class="form-label">1st</label><select class="form-input" id="mw-um-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><label class="form-label">Avg/Day</label><input class="form-input" id="mw-um-1-score" type="number" step="0.1" min="0" placeholder="0.0" style="width:80px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-um-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-um-2-score" type="number" step="0.1" min="0" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-um-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-um-3-score" type="number" step="0.1" min="0" placeholder="0.0" style="width:80px;margin-top:18px"/></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Hero of the Month -->
-            <div class="sect" style="padding:14px">
-              <div class="sect-head"><span class="sect-title">&#129464; Hero of the Month</span></div>
-              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Avg. Daily, Quality Score %, Quality Esc</div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
-                  <div><label class="form-label">1st</label><select class="form-input" id="mw-hero-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><label class="form-label">Avg/Day</label><input class="form-input" id="mw-hero-1-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px"/></div>
-                  <div><label class="form-label">Q%</label><input class="form-input" id="mw-hero-1-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px"/></div>
-                  <div><label class="form-label">Esc</label><input class="form-input" id="mw-hero-1-esc" type="number" min="0" placeholder="0" style="width:48px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
-                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-hero-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-hero-2-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-hero-2-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-hero-3-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
-                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-hero-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-hero-3-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-hero-3-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-hero-2-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Quarter Master -->
-            <div class="sect" style="padding:14px">
-              <div class="sect-head"><span class="sect-title">&#127775; Quarter Master</span></div>
-              <div style="font-size:10px;color:var(--muted);margin:4px 0 10px">Based on Avg. Daily, Quality Score %, Quality Esc</div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
-                  <div><label class="form-label">1st</label><select class="form-input" id="mw-qm-1" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><label class="form-label">Avg/Day</label><input class="form-input" id="mw-qm-1-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px"/></div>
-                  <div><label class="form-label">Q%</label><input class="form-input" id="mw-qm-1-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px"/></div>
-                  <div><label class="form-label">Esc</label><input class="form-input" id="mw-qm-1-esc" type="number" min="0" placeholder="0" style="width:48px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
-                  <div><label class="form-label">2nd</label><select class="form-input" id="mw-qm-2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-qm-2-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-qm-2-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-qm-2-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:end">
-                  <div><label class="form-label">3rd</label><select class="form-input" id="mw-qm-3" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— None —</option></select></div>
-                  <div><input class="form-input" id="mw-qm-3-adu" type="number" step="0.1" min="0" placeholder="0" style="width:64px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-qm-3-qs" type="number" step="0.1" min="0" max="100" placeholder="0" style="width:56px;margin-top:18px"/></div>
-                  <div><input class="form-input" id="mw-qm-3-esc" type="number" min="0" placeholder="0" style="width:48px;margin-top:18px"/></div>
-                </div>
-              </div>
-            </div>
-
-            <button class="btn btn-primary" style="width:100%" onclick="mwSubmitAwards()">&#127942; Save Awards</button>
+          <div class="form-group" style="margin-bottom:16px">
+            <label class="form-label">Award Category</label>
+            <select class="form-input" id="mw-award-category" onchange="renderAwardForm()" style="background:var(--bg3);color:var(--text);border-color:var(--border)">
+              <option value="">— Select a category —</option>
+              <option value="quality">&#127942; Quality Champion</option>
+              <option value="uploads">&#128126; Uploading Monster</option>
+              <option value="hero">&#129464; Hero of the Month</option>
+              <option value="quarter">&#127775; Quarter Master</option>
+            </select>
           </div>
+          <div id="mw-award-form" style="display:none"></div>
+          <button class="btn btn-primary" id="mw-award-save-btn" style="width:100%;margin-top:14px;display:none" onclick="mwSubmitAwards()">&#127942; Save Award</button>
         </div>
 
       </div>
