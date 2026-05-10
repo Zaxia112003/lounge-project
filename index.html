@@ -2172,12 +2172,13 @@ async function loadPendingReviews(){
 
 function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
-  /* Bell shows for: Pending (needs ack) OR Completed-unread (manager finished) */
+  /* Bell shows for: Pending (not yet seen/acked) OR Completed-unread (manager finished) */
   var myCallouts=callouts.filter(function(co){
     return co.uploader===cu.nickname
       &&co.status!=='pending_review'
       &&co.status!=='discarded'
-      &&co.status!=='Acknowledged';
+      &&co.status!=='Acknowledged'
+      &&!co.bellSeen;
   });
   var wrap=G('member-bell-wrap');
   var badge=G('member-bell-badge');
@@ -2195,7 +2196,8 @@ function openMemberBellPanel(){
     return co.uploader===cu.nickname
       &&co.status!=='pending_review'
       &&co.status!=='discarded'
-      &&co.status!=='Acknowledged';
+      &&co.status!=='Acknowledged'
+      &&!co.bellSeen;
   });
   var list=G('member-notif-list');if(!list)return;
   var html='';
@@ -2204,7 +2206,11 @@ function openMemberBellPanel(){
   if(pending.length){
     html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">Needs Acknowledgement ('+pending.length+')</div>';
     html+=pending.map(function(co){
-      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();navigateToQuality()">'        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+co.address+'</div>'        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtDate(co.date)+' · Logged by '+(co.loggedBy||'Manager')+'</div></div>'        +'<span style="font-size:10px;background:rgba(255,61,61,.12);color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0">Acknowledge</span>'        +'</div>';
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();dismissAndNavigate('+co.id+')">'
+        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+co.address+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtDate(co.date)+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(255,61,61,.12);color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0">Acknowledge</span>'
+        +'</div>';
     }).join('');
   }
   if(completed.length){
@@ -2221,6 +2227,18 @@ function openMemberBellPanel(){
 
 function closeMemberNotif(){var m=G('modal-member-notif');if(m)m.classList.remove('open');}
 function closeAckedRef(){var m=G('modal-reviews');if(m)m.classList.remove('open');}
+
+function dismissAndNavigate(id){
+  var co=callouts.find(function(x){return x.id===id;});
+  if(co&&co.status==='Pending'){
+    co.bellSeen=true;
+    if(co._fsId){
+      try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{bellSeen:true});}catch(e){}
+    }
+  }
+  updateMemberBell();
+  navigateToQuality();
+}
 
 function navigateToQuality(){
   if(cu&&cu.role==='escalation'){
@@ -5686,10 +5704,10 @@ function dlConfirmSave(){
 function switchDailyLogTab(tab, btn){
   var overlay=G('daily-log-overlay');if(!overlay)return;
   overlay.querySelectorAll('.dl-tab').forEach(function(t){t.classList.remove('active');});
-  overlay.querySelectorAll('.dl-section').forEach(function(s){s.style.display='none';});
+  overlay.querySelectorAll('.dl-section').forEach(function(s){s.classList.remove('active');s.style.display='';});
   if(btn)btn.classList.add('active');
   else{var b=overlay.querySelector('.dl-tab[data-tab="'+tab+'"]');if(b)b.classList.add('active');}
-  var sec=G('dl-sec-'+tab);if(sec)sec.style.display='';
+  var sec=G('dl-sec-'+tab);if(sec)sec.classList.add('active');
 }
 
 function renderDailyLogErrors(){
@@ -7047,7 +7065,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
       <div class="dl-pane">
         <!-- Log Daily Detail (escalation) -->
-        <div class="dl-section" id="dl-sec-esc-detail" style="display:none">
+        <div class="dl-section" id="dl-sec-esc-detail">
           <div class="s-section-title">Log Daily Detail</div>
           <div class="s-row-desc" style="margin-bottom:14px;line-height:1.6">Paste the daily upload report. The system will parse your row automatically.</div>
           <div id="esc-detail-paste-wrap">
