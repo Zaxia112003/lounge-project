@@ -1633,8 +1633,9 @@ function goDash(){
   if(settings.theme)setTheme(settings.theme,null);
   /* Show mailbox for all roles */
   var mw=G('mailbox-wrap');if(mw)mw.style.display='flex';
-  /* Show review badge for manager only */
-  /* Bell shown/hidden dynamically via updateNotifBell() and updateMemberBell() */
+  /* Reset both bells on login — each update function shows only the right one */
+  var nbw=G('notif-bell-wrap');if(nbw)nbw.style.display='none';
+  var mbw=G('member-bell-wrap');if(mbw)mbw.style.display='none';
   updateMailboxBadge();
   /* Restore avatar from localStorage */
   try{
@@ -1822,12 +1823,17 @@ function _uaDates(){
   }
   return dates;
 }
-function renderUnifiedAttendance(containerId,isManager){
+function renderUnifiedAttendance(containerId,isManager,groupFilter,nameFilter){
   var el=G(containerId);if(!el)return;
   var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
   var s=_uniAtt;var today=new Date();today.setHours(0,0,0,0);
   var todayStr=_uas(today);var dates=_uaDates();
-  var members=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var members=TEAM.filter(function(m){
+    if(m.role&&m.role.toLowerCase()==='manager')return false;
+    if(groupFilter&&groupFilter!=='all'&&m.role.toLowerCase()!==groupFilter)return false;
+    if(nameFilter&&m.nickname!==nameFilter)return false;
+    return true;
+  });
   var navTitle=s.mode==='week'
     ?('Week of '+dates[0].getDate()+' '+MONTHS[dates[0].getMonth()]+' '+dates[0].getFullYear())
     :(MONTHS[s.month]+' '+s.year);
@@ -1993,6 +1999,39 @@ function sendManagerReviewNotif(callout){
   window._pendingReviews=window._pendingReviews||[];
   window._pendingReviews.push(thread);
   updateReviewBadge();
+}
+
+/* ── MANAGER DIRECT ERROR NOTIFICATION (skips pending_review — manager is the author) ── */
+function sendManagerDirectNotif(callout){
+  var uplMem=TEAM.find(function(m){return m.nickname===callout.uploader;})||{fullName:callout.uploader};
+  var thread={
+    id:'rev_'+callout.id,
+    type:'error_review',
+    from:cu.nickname,
+    fromFull:cu.fullName,
+    to:cu.nickname,
+    calloutId:callout.id,
+    calloutFsId:callout._fsId||null,
+    uploader:callout.uploader,
+    uploaderFull:uplMem.fullName,
+    address:callout.address,
+    date:callout.date,
+    feedback:callout.feedback,
+    screenshot:callout.screenshot||null,
+    postedAt:Date.now(),
+    unread:false,
+    status:'approved'  /* skip pending_review — already reviewed (manager wrote it) */
+  };
+  if(fsDb()){
+    try{
+      window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),thread).then(function(ref){
+        thread._fsId=ref.id;
+      }).catch(function(e){console.warn('directNotif save',e);});
+    }catch(e){console.warn('directNotif',e);}
+  }
+  window._pendingReviews=window._pendingReviews||[];
+  window._pendingReviews.push(thread);
+  /* No badge update here — thread starts as 'approved', only shows in bell after uploader acks */
 }
 
 function updateReviewBadge(){updateNotifBell();}
@@ -2967,7 +3006,7 @@ function pwRenderGalleryModal(){
           :'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg3);color:var(--muted);border:1px solid var(--border);cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwPin(+this.dataset.id);pwRenderGalleryModal()">Pin to Wall</button>')
         :(p.pinned?'<div style="font-size:9px;color:var(--accent);text-align:center">📌 On Wall</div>':'');
       return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">'
-        +'<img src="'+p.src+'" style=\"width:100%;height:110px;object-fit:cover;display:block\" />'
+        +'<img src="'+p.src+'" style=\"width:100%;height:110px;object-fit:cover;display:block;cursor:pointer\" onclick=\"pwOpenFullPhoto('+p.id+')\" title=\"Click to enlarge\" />'
         +'<div style="padding:6px">'
         +'<div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.uploaderFull+'</div>'
         +(p.caption?'<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.caption+'</div>':'')
@@ -3760,11 +3799,23 @@ function mgrQClearFilter(){
   mgrQCustomRange={from:'',to:''};
   renderMgrHubQuality();
 }
+function mgrHubSetGroup(g){mgrHubGroupFilter=g;mgrHubNameFilter='';renderMgrHubPerformance();}
+function mgrHubSetName(n){mgrHubNameFilter=n;renderMgrHubPerformance();}
+function mgrHubClearGroupName(){mgrHubGroupFilter='all';mgrHubNameFilter='';renderMgrHubPerformance();}
+function mgrQSetGroup(g){mgrQGroupFilter=g;mgrQNameFilter='';renderMgrHubQuality();}
+function mgrQSetName(n){mgrQNameFilter=n;renderMgrHubQuality();}
+function mgrQClearGroupName(){mgrQGroupFilter='all';mgrQNameFilter='';renderMgrHubQuality();}
+function mgrAttSetGroup(g){mgrAttGroupFilter=g;mgrAttNameFilter='';renderMgrHubAttendance();}
+function mgrAttSetName(n){mgrAttNameFilter=n;renderMgrHubAttendance();}
+function mgrAttClearGroupName(){mgrAttGroupFilter='all';mgrAttNameFilter='';renderMgrHubAttendance();}
+
 
 /* ── MANAGER HUB ── */
 var mgrHubTab='performance';
 var mgrHubDateFilter='month';
 var mgrHubCustomRange={from:'',to:''};
+var mgrHubGroupFilter='all'; /* 'all','uploader','escalation' */
+var mgrHubNameFilter='';    /* '' = all, or specific nickname */
 
 function renderManagerHub(){
   var pane=G('lounge-pane-the-hub');if(!pane)return;
@@ -3861,8 +3912,13 @@ function renderMgrHubPerformance(){
     +'<div class="range-cal" id="rcal-mgr-perf"><div class="range-cal-trigger" id="rcal-mgr-perf-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-mgr-perf-popup"></div></div>'
     +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrHubClearFilter()">&#10005; Clear</button>'    +'</div>';
 
+  /* ── GROUP + NAME FILTER BAR (Performance) ── */
+  var allPerfMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var groupFilterBar='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">'    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Group:</span>'    +'<button class="filter-pill'+(mgrHubGroupFilter==='all'?' active':'')+'" onclick="mgrHubSetGroup(\'all\')">All</button>'    +'<button class="filter-pill'+(mgrHubGroupFilter==='uploader'?' active':'')+'" onclick="mgrHubSetGroup(\'uploader\')">Uploaders</button>'    +'<button class="filter-pill'+(mgrHubGroupFilter==='escalation'?' active':'')+'" onclick="mgrHubSetGroup(\'escalation\')">Escalation</button>'    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:8px">Member:</span>'    +'<select style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer" onchange="mgrHubSetName(this.value)">'    +'<option value="">All Members</option>'    +allPerfMembers.filter(function(m){return mgrHubGroupFilter==='all'||m.role.toLowerCase()===mgrHubGroupFilter;}).map(function(m){return '<option value="'+m.nickname+'"'+(mgrHubNameFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('')    +'</select>'    +(mgrHubGroupFilter!=='all'||mgrHubNameFilter?'<button class="filter-pill" style="color:var(--muted)" onclick="mgrHubClearGroupName()">&#10005; Clear</button>':'')    +'</div>';
+  /* Apply group + name filter to member list */
+  var perfFilteredMembers=allPerfMembers.filter(function(m){    if(mgrHubGroupFilter!=='all'&&m.role.toLowerCase()!==mgrHubGroupFilter)return false;    if(mgrHubNameFilter&&m.nickname!==mgrHubNameFilter)return false;    return true;  });  var showUplSection=mgrHubGroupFilter==='all'||mgrHubGroupFilter==='uploader';  var showEscSection=mgrHubGroupFilter==='all'||mgrHubGroupFilter==='escalation';
   /* ── UPLOADERS ── */
-  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
+  var uploaders=mgrHubNameFilter    ?perfFilteredMembers.filter(function(m){return m.role.toLowerCase()==='uploader';})    :TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});  if(mgrHubGroupFilter==='escalation')uploaders=[];
   var uplData=uploaders.map(function(m){
     var nick=m.nickname;
     var days=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
@@ -3920,7 +3976,10 @@ function renderMgrHubPerformance(){
     +'</div>';
 
   /* ── ESCALATION ── */
-  var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
+  var escMembers=mgrHubNameFilter
+    ?perfFilteredMembers.filter(function(m){return m.role.toLowerCase()==='escalation';})
+    :TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
+  if(mgrHubGroupFilter==='uploader')escMembers=[];
 
   /* Shared SLA */
   var filteredSecs=(timerSessions||[]).filter(function(s){return mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
@@ -4036,7 +4095,7 @@ function renderMgrHubPerformance(){
     +'</div></div>'
     +'</div>';
 
-  el.innerHTML=filterBar+uplSection+escSection;
+  el.innerHTML=filterBar+groupFilterBar+uplSection+escSection;
 
   /* Restore custom date inputs if active */
   if(mgrHubDateFilter==='custom'){
@@ -4049,6 +4108,10 @@ function renderMgrHubPerformance(){
 /* ── MGR HUB QUALITY ── */
 var mgrQDateFilter='month';
 var mgrQCustomRange={from:'',to:''};
+var mgrQGroupFilter='all';
+var mgrQNameFilter='';
+var mgrAttGroupFilter='all';
+var mgrAttNameFilter='';
 
 function mgrQFilter(btn){
   mgrQDateFilter=btn.dataset.f||'all';
@@ -4120,21 +4183,19 @@ function renderMgrHubQuality(){
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Contract Errors</th>'
     +'</tr></thead>';
 
+  /* Group + name filter (Quality) */
+  var allQMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var qGroupFilterBar='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">'    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Group:</span>'    +'<button class="filter-pill'+(mgrQGroupFilter==='all'?' active':'')+'" onclick="mgrQSetGroup(\'all\')">All</button>'    +'<button class="filter-pill'+(mgrQGroupFilter==='uploader'?' active':'')+'" onclick="mgrQSetGroup(\'uploader\')">Uploaders</button>'    +'<button class="filter-pill'+(mgrQGroupFilter==='escalation'?' active':'')+'" onclick="mgrQSetGroup(\'escalation\')">Escalation</button>'    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:8px">Member:</span>'    +'<select style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer" onchange="mgrQSetName(this.value)">'    +'<option value="">All Members</option>'    +allQMembers.filter(function(m){return mgrQGroupFilter==='all'||m.role.toLowerCase()===mgrQGroupFilter;}).map(function(m){return '<option value="'+m.nickname+'"'+(mgrQNameFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('')    +'</select>'    +(mgrQGroupFilter!=='all'||mgrQNameFilter?'<button class="filter-pill" style="color:var(--muted)" onclick="mgrQClearGroupName()">&#10005; Clear</button>':'')    +'</div>';
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
   var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
-
+  if(mgrQNameFilter){uploaders=uploaders.filter(function(m){return m.nickname===mgrQNameFilter;});escMembers=escMembers.filter(function(m){return m.nickname===mgrQNameFilter;});}
+  if(mgrQGroupFilter==='uploader')escMembers=[];
+  if(mgrQGroupFilter==='escalation')uploaders=[];
   var uplRows=uploaders.map(function(m){return makeRow(m.nickname,m.fullName);}).join('');
   var escRows=escMembers.map(function(m){return makeRow(m.nickname,m.fullName);}).join('');
-
-  el.innerHTML=filterBar
-    +'<div class="sect" style="margin-bottom:16px">'
-    +'<div class="sect-head"><span class="sect-title">&#128188; Uploaders</span></div>'
-    +'<table style="width:100%;border-collapse:collapse">'+hdr+'<tbody>'+uplRows+'</tbody></table>'
-    +'</div>'
-    +'<div class="sect">'
-    +'<div class="sect-head"><span class="sect-title">&#9889; Escalation</span></div>'
-    +'<table style="width:100%;border-collapse:collapse">'+hdr+'<tbody>'+escRows+'</tbody></table>'
-    +'</div>';
+  var uplBlock=uploaders.length?'<div class="sect" style="margin-bottom:16px"><div class="sect-head"><span class="sect-title">&#128188; Uploaders</span></div><table style="width:100%;border-collapse:collapse">'+hdr+'<tbody>'+uplRows+'</tbody></table></div>':'';
+  var escBlock=escMembers.length?'<div class="sect"><div class="sect-head"><span class="sect-title">&#9889; Escalation</span></div><table style="width:100%;border-collapse:collapse">'+hdr+'<tbody>'+escRows+'</tbody></table></div>':'';
+  el.innerHTML=filterBar+qGroupFilterBar+uplBlock+escBlock;
 
   if(mgrQDateFilter==='custom'){
     var fi=G('mgr-q-from'),ti=G('mgr-q-to');
@@ -4167,7 +4228,7 @@ function toggleQDetailExpand(row){
 function renderQDetailList(items){
   var el=G('qdetail-list');if(!el)return;
   if(!items.length){el.innerHTML='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No entries for this period.</div>';return;}
-  var statusColors={Pending:'var(--amber)',Acknowledged:'var(--green)',Resolved:'var(--accent)'};
+  var statusColors={Pending:'var(--amber)',Acknowledged:'var(--blue)',Completed:'var(--green)',Resolved:'var(--accent)'};
   el.innerHTML=items.map(function(c){
     var statusBadge='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg3);color:'+(statusColors[c.status]||'var(--amber)')+'">'+( c.status||'Pending')+'</span>';
     var escTag=c.escalationMember?'<span style="font-size:10px;color:var(--muted)"> · Esc: '+c.escalationMember+'</span>':'';
@@ -4214,7 +4275,13 @@ function deleteQDetailEntry(id){
   renderMgrHubQuality();
 }
 
-function renderMgrHubAttendance(){renderUnifiedAttendance('mgr-hub-pane-attendance',true);}
+function renderMgrHubAttendance(){
+  var el=G('mgr-hub-pane-attendance');if(!el)return;
+  var allAttMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var attFilterBar='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">'    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Group:</span>'    +'<button class="filter-pill'+(mgrAttGroupFilter==='all'?' active':'')+'" onclick="mgrAttSetGroup(\'all\')">All</button>'    +'<button class="filter-pill'+(mgrAttGroupFilter==='uploader'?' active':'')+'" onclick="mgrAttSetGroup(\'uploader\')">Uploaders</button>'    +'<button class="filter-pill'+(mgrAttGroupFilter==='escalation'?' active':'')+'" onclick="mgrAttSetGroup(\'escalation\')">Escalation</button>'    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:8px">Member:</span>'    +'<select style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer" onchange="mgrAttSetName(this.value)">'    +'<option value="">All Members</option>'    +allAttMembers.filter(function(m){return mgrAttGroupFilter==='all'||m.role.toLowerCase()===mgrAttGroupFilter;}).map(function(m){return '<option value="'+m.nickname+'"'+(mgrAttNameFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('')    +'</select>'    +(mgrAttGroupFilter!=='all'||mgrAttNameFilter?'<button class="filter-pill" style="color:var(--muted)" onclick="mgrAttClearGroupName()">&#10005; Clear</button>':'')    +'</div>';
+  el.innerHTML=attFilterBar+'<div id="att-grid-inner"></div>';
+  renderUnifiedAttendance('att-grid-inner',true,mgrAttGroupFilter,mgrAttNameFilter);
+}
 
 function openAttModal(nick,fullName,date){
   var existing=attendanceLog.find(function(e){return e.nick===nick&&e.date===date;});
@@ -5365,6 +5432,8 @@ async function mwSubmitError(){
   var newCallout={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
   callouts.push(newCallout);
   fsSaveCallout(newCallout);
+  sendManagerDirectNotif(newCallout);
+  updateMemberBell();
   pushNotif('📋','Contract error logged for '+uplMem.fullName+': "'+addr+'".','qscore');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
   closeMgrWrite();
@@ -5459,6 +5528,8 @@ async function mwSubmitQEsc(){
   var newQEsc={id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
   callouts.push(newQEsc);
   fsSaveCallout(newQEsc);
+  sendManagerDirectNotif(newQEsc);
+  updateMemberBell();
   pushNotif('🚨','Critical escalation logged for '+uplMem.fullName+' at "'+addr+'".','qesc');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
   closeMgrWrite();
@@ -5741,9 +5812,9 @@ function renderDailyLogErrors(){
     return({
       'Pending':'<span class="st-pending">Pending</span>',
       'In Review':'<span class="st-review">In Review</span>',
-      'Acknowledged':'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',
+      'Acknowledged':'<span class="st-review">Acknowledged</span>',
       'Completed':'<span class="st-done">Completed</span>'
-    }[s]||'<span class="st-pending">'+s+'</span>');
+    }[s]||'<span class="st-pending">'+(s==='pending_review'?'Pending Review':s)+'</span>');
   };
   el.innerHTML=list.map(function(c){
     var uplMem=TEAM.find(function(m){return m.nickname===c.uploader;})||{fullName:c.uploader};
@@ -6306,7 +6377,7 @@ function renderEscQuality(){
     if(rs)list=list.filter(function(c){try{return new Date(c.date+'T00:00:00')>=rs;}catch(e){return true;}});
   }
   if(!list.length){target.innerHTML='<div class="empty"><div class="empty-ico">&#9989;</div><div class="empty-txt">No quality entries to show.</div></div>';return;}
-  var stBadge=function(s){return({Pending:'<span class="st-pending">Pending</span>',"In Review":'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);};
+  var stBadge=function(s){return({Pending:'<span class="st-pending">Pending</span>',"In Review":'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);};
   target.innerHTML=list.map(function(c){
     var isCrit=c.type==='qesc';
     var logger=(TEAM.find(function(m){return m.nickname===c.loggedBy;})||{fullName:c.loggedBy||''}).fullName;
@@ -6546,7 +6617,7 @@ async function submitQScore(){
   if(cu.role==='escalation')renderDailyLogErrors();
 }
 
-const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review':`<span class="st-review">In Review</span>`,Acknowledged:`<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>`,Completed:`<span class="st-done">Completed</span>`}[s]||s);
+const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review':`<span class="st-review">In Review</span>`,Acknowledged:`<span class="st-review">Acknowledged</span>`,Completed:`<span class="st-done">Completed</span>`}[s]||s);
 
 function renderQualityPortal(){
   const nick=cu.nickname,role=cu.role;
@@ -6571,7 +6642,7 @@ function renderQualityPortal(){
   const target=G('callouts-list-mgr')||G('qp-list');
   if(!target)return;
   if(!list.length){target.innerHTML='<div class="empty"><div class="empty-ico">&#9989;</div><div class="empty-txt">No quality entries to show.</div></div>';return;}
-  const stBadge=s=>({Pending:'<span class="st-pending">Pending</span>','In Review':'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);
+  const stBadge=s=>({Pending:'<span class="st-pending">Pending</span>','In Review':'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);
   target.innerHTML=list.map(c=>{
     const isCrit=c.type==='qesc';
     const logger=(TEAM.find(m=>m.nickname===c.loggedBy)||{fullName:c.loggedBy}).fullName;
@@ -6609,19 +6680,30 @@ function ackCo(id){
     try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',c._fsId),{insight:c.insight,status:'Acknowledged',acknowledgedAt:c.acknowledgedAt});}
     catch(e){console.warn('ackCo fsUpdate',e);}
   }
-  /* Notify manager via errorReviews — find matching thread and update */
+  /* Notify manager via errorReviews — update matching thread regardless of who's logged in */
+  var ackCalloutId=c.id;var ackCalloutFsId=c._fsId||null;var ackInsight=c.insight;var ackAt=c.acknowledgedAt;
+  /* Try in-memory first (manager session) */
   if(window._pendingReviews){
-    var thread=window._pendingReviews.find(function(r){return r.calloutId===c.id||r.calloutId===c._fsId;});
+    var thread=window._pendingReviews.find(function(r){return r.calloutId===ackCalloutId||r.calloutId===ackCalloutFsId;});
     if(thread){
-      thread.status='acknowledged';
-      thread.insight=c.insight;
-      thread.acknowledgedAt=c.acknowledgedAt;
-      thread.uploaderFull=cu.fullName;
+      thread.status='acknowledged';thread.insight=ackInsight;thread.acknowledgedAt=ackAt;thread.uploaderFull=cu.fullName;
       if(thread._fsId){
-        try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'acknowledged',insight:c.insight,acknowledgedAt:c.acknowledgedAt});}
+        try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'acknowledged',insight:ackInsight,acknowledgedAt:ackAt});}
         catch(e){}
       }
     }
+  } else if(fsDb()){
+    /* Uploader session — query Firestore directly to find and update the thread */
+    try{
+      window._fsGetDocs(window._fsColl(fsDb(),'errorReviews')).then(function(snap){
+        snap.forEach(function(d){
+          var r=d.data();
+          if(r.calloutId===ackCalloutId||r.calloutId===ackCalloutFsId){
+            window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',d.id),{status:'acknowledged',insight:ackInsight,acknowledgedAt:ackAt}).catch(function(e){console.warn('ackCo thread update',e);});
+          }
+        });
+      });
+    }catch(e){console.warn('ackCo errorReviews query',e);}
   }
   pushNotif('✅',cu.fullName+' acknowledged the call-out for "'+c.address+'".','ack');
   /* Update card in place */
@@ -7237,7 +7319,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- GALLERY MODAL -->
 <div class="modal-overlay" id="modal-gallery" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:960px;width:92vw;max-height:92vh;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:960px;width:92vw;max-height:92vh;min-height:75vh;display:flex;flex-direction:column">
     <button class="modal-close" onclick="G('modal-gallery').classList.remove('open')">&#x2715;</button>
     <div class="modal-title">&#128247; Photo Gallery</div>
     <div id="modal-gallery-grid" style="flex:1;overflow-y:auto;margin-top:14px"></div>
