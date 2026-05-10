@@ -3536,6 +3536,13 @@ function renderMgrHubPerformance(){
     return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,qualEsc:qualEsc};
   });
 
+  /* Build SLA badge BEFORE escRows so it's defined when rows render */
+  var slaInRange=slaLog.filter(function(e){return mgrHubInRange(e.date);});
+  var avgSLA=slaInRange.length?(slaInRange.reduce(function(s,e){return s+(e.pct||0);},0)/slaInRange.length).toFixed(1):'—';
+  var sharedSlaBadge=slaInRange.length
+    ?('<span class="esc-metric-badge '+(parseFloat(avgSLA)>=75?'good':'bad')+'">'+avgSLA+'%</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Avg · Target ≥75%</div>')
+    :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
+
   var escRows=escData.map(function(r,i){
     var rateStr=r.rate!==null?r.rate.toFixed(1):'0.0';
     var qualBadge=r.qualEsc===0
@@ -3543,8 +3550,9 @@ function renderMgrHubPerformance(){
       :r.qualEsc<=3
       ?'<span class="esc-metric-badge warn">'+r.qualEsc+'</span>'
       :'<span class="esc-metric-badge bad">'+r.qualEsc+'</span>';
+    /* SLA: true rowspan on first row only, omit cell on subsequent rows */
     var slaCell=i===0
-      ?'<td rowspan="'+escMembers.length+'" style="text-align:center;vertical-align:middle;padding:10px 12px;border-bottom:1px solid var(--border)">'+sharedSlaBadge+'</td>'
+      ?'<td rowspan="'+escData.length+'" style="text-align:center;vertical-align:middle;padding:10px 12px">'+sharedSlaBadge+'</td>'
       :'';
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
@@ -3565,16 +3573,9 @@ function renderMgrHubPerformance(){
     +'<td style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscRate+'</div><div style="font-size:10px;color:var(--muted)">avg upload rate</div></td>'
-    +'<td style="text-align:center;padding:10px 12px"><span class="esc-metric-badge warn">Shared</span></td>'
+    +'<td style="text-align:center;padding:10px 12px">'+sharedSlaBadge+'</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></td>'
     +'</tr>';
-
-  /* Aggregate SLA entries in range */
-  var slaInRange=slaLog.filter(function(e){return mgrHubInRange(e.date);});
-  var avgSLA=slaInRange.length?(slaInRange.reduce(function(s,e){return s+(e.pct||0);},0)/slaInRange.length).toFixed(1):'—';
-  var sharedSlaBadge=slaInRange.length
-    ?('<span class="esc-metric-badge '+(parseFloat(avgSLA)>=75?'good':'bad')+'">'+avgSLA+'%</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Avg · Target ≥75%</div>')
-    :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
 
   /* Aggregate drivers across ALL SLA entries in range */
   var driverMap={};
