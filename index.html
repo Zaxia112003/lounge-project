@@ -6,11 +6,7 @@
 <title>The Lounge Project</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<<<<<<< HEAD
 <style>
-=======
-<style>  
->>>>>>> 8c60d390e171b8d42c7df62816d9b34c7866606a
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#07080f;--bg2:#0e1020;--bg3:#13152a;
@@ -2759,7 +2755,7 @@ function pwRenderSlideshow(){
   var cur=pinned[pwSlideIdx];
   var imgs=pinned.map(function(p,i){
     return '<img class="pw-img'+(i===pwSlideIdx?' active':'')+'" src="'+p.src+'" alt="'+p.uploaderFull
-      +'" style="cursor:zoom-in" onclick="pwOpenFullPhoto(\''+(p._fsId||p.id)+'\')"/>';
+      +'"/>';
   }).join('');
   var arrows=pinned.length>1
     ?'<div class="pw-arrow pw-prev" onclick="pwSlide(-1)">&#8249;</div>'
@@ -2818,7 +2814,7 @@ function pwRenderGalleryModal(){
           :'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg3);color:var(--muted);border:1px solid var(--border);cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwPin(+this.dataset.id);pwRenderGalleryModal()">Pin to Wall</button>')
         :(p.pinned?'<div style="font-size:9px;color:var(--accent);text-align:center">📌 On Wall</div>':'');
       return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">'
-        +'<img src="'+p.src+'" style="width:100%;height:110px;object-fit:cover;cursor:pointer;display:block" onclick="pwOpenFullPhoto(\''+p._fsId+'\')" />'
+        +'<img src="'+p.src+'" style=\"width:100%;height:110px;object-fit:cover;display:block\" />'
         +'<div style="padding:6px">'
         +'<div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.uploaderFull+'</div>'
         +(p.caption?'<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.caption+'</div>':'')
