@@ -1324,7 +1324,8 @@ function fsStartRealtimeListeners(){
     if(G('qp-list'))renderQualityPortal();
     if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
     if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
-    if(G('daily-tbl'))renderDailyTbl();
+    /* Only re-render daily table if uploader hub is active — pass correct args */
+    if(G('daily-tbl')&&cu&&cu.nickname)renderDailyTbl(cu.nickname,getDateRange());
   }));
 
   /* perfData */
