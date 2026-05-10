@@ -1996,7 +1996,7 @@ function sendManagerReviewNotif(callout){
 
 function updateReviewBadge(){updateNotifBell();}
 function updateNotifBell(){
-  var errCount=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review';}).length;
+  var errCount=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review'||r.status==='acknowledged';}).length;
   var photoCount=(window.pwPending||[]).length;
   var total=errCount+photoCount;
   var wrap=G('notif-bell-wrap');
@@ -2006,6 +2006,7 @@ function updateNotifBell(){
 }
 function openNotifBell(){
   var errPending=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review';});
+  var errAcked=(window._pendingReviews||[]).filter(function(r){return r.status==='acknowledged';});
   var photoPending=window.pwPending||[];
   var list=G('review-list');if(!list)return;
   var html='';
@@ -2017,6 +2018,18 @@ function openNotifBell(){
         +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+r.address+'</div>'
         +'<div style="font-size:11px;color:var(--muted);margin-top:2px">For '+r.uploaderFull+' \xb7 '+r.date+'</div></div>'
         +'<span style="font-size:10px;background:rgba(255,61,61,.12);color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0">Review</span>'
+        +'</div>';
+    }).join('');
+  }
+  if(errAcked&&errAcked.length){
+    if(errPending.length)html=html.slice(0,-1)+';border-top:1px solid var(--border)">';
+    html+='Feedback Acknowledged ('+errAcked.length+')</div>';
+    window._ackedListCache=errAcked;
+    html+=errAcked.map(function(r,idx){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" data-aidx="'+idx+'" onclick="G(\'modal-reviews\').classList.remove(\'open\');openAckedReview(this)">'
+        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+r.address+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+r.uploaderFull+' \xb7 '+r.date+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(34,197,94,.12);color:var(--green);padding:2px 8px;border-radius:8px;flex-shrink:0">Acknowledged</span>'
         +'</div>';
     }).join('');
   }
@@ -2159,11 +2172,12 @@ async function loadPendingReviews(){
 
 function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
+  /* Bell shows for: Pending (needs ack) OR Completed-unread (manager finished) */
   var myCallouts=callouts.filter(function(co){
     return co.uploader===cu.nickname
       &&co.status!=='pending_review'
       &&co.status!=='discarded'
-      &&co.status!=='Completed';
+      &&co.status!=='Acknowledged';
   });
   var wrap=G('member-bell-wrap');
   var badge=G('member-bell-badge');
@@ -2171,7 +2185,44 @@ function updateMemberBell(){
   if(badge){badge.textContent=myCallouts.length;badge.style.display=myCallouts.length>0?'flex':'none';}
 }
 function memberBellClick(){
-  /* Navigate to Quality tab */
+  /* Open uploader notification panel */
+  openMemberBellPanel();
+}
+
+function openMemberBellPanel(){
+  if(!cu||cu.role==='manager')return;
+  var myCallouts=callouts.filter(function(co){
+    return co.uploader===cu.nickname
+      &&co.status!=='pending_review'
+      &&co.status!=='discarded'
+      &&co.status!=='Acknowledged';
+  });
+  var list=G('member-notif-list');if(!list)return;
+  var html='';
+  var pending=myCallouts.filter(function(co){return co.status==='Pending';});
+  var completed=myCallouts.filter(function(co){return co.status==='Completed';});
+  if(pending.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">Needs Acknowledgement ('+pending.length+')</div>';
+    html+=pending.map(function(co){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();navigateToQuality()">'        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+co.address+'</div>'        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtDate(co.date)+' · Logged by '+(co.loggedBy||'Manager')+'</div></div>'        +'<span style="font-size:10px;background:rgba(255,61,61,.12);color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0">Acknowledge</span>'        +'</div>';
+    }).join('');
+  }
+  if(completed.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)'+(pending.length?';border-top:1px solid var(--border)':'')+'">Completed by Manager ('+completed.length+')</div>';
+    html+=completed.map(function(co){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();openMemberCompleteView('+co.id+')">'        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+co.address+'</div>'        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtDate(co.date)+'</div></div>'        +'<span style="font-size:10px;background:rgba(34,197,94,.12);color:var(--green);padding:2px 8px;border-radius:8px;flex-shrink:0">Completed</span>'        +'</div>';
+    }).join('');
+  }
+  if(!html)html='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No notifications.</div>';
+  list.innerHTML=html;
+  G('modal-member-notif').classList.add('open');
+}
+
+
+function closeMemberNotif(){var m=G('modal-member-notif');if(m)m.classList.remove('open');}
+function closeAckedRef(){var m=G('modal-reviews');if(m)m.classList.remove('open');}
+
+function navigateToQuality(){
   if(cu&&cu.role==='escalation'){
     switchLoungeTab('the-hub',document.querySelector('.lounge-tab[data-tab="the-hub"]'));
     setTimeout(function(){switchSubTab('esc-quality',document.querySelector('#sub-esc-quality'));},100);
@@ -2179,6 +2230,73 @@ function memberBellClick(){
     switchLoungeTab('the-hub',document.querySelector('.lounge-tab[data-tab="the-hub"]'));
     setTimeout(function(){switchSubTab('sub-qual',document.querySelector('.sub-tab[data-sub="sub-qual"]'));},100);
   }
+}
+
+function openMemberCompleteView(id){
+  var co=callouts.find(function(x){return x.id===id;});if(!co)return;
+  G('mcv-address').textContent=co.address;
+  G('mcv-date').textContent=fmtDate(co.date);
+  G('mcv-feedback').textContent=co.feedback||'—';
+  G('mcv-insight').textContent=co.insight||'—';
+  G('mcv-mgr-remarks').textContent=co.managerRemarks||'No additional remarks.';
+  G('modal-member-complete-view').classList.add('open');
+}
+
+
+function openAckedReview(el){
+  var idx=parseInt(el.dataset.aidx);
+  var thread=(window._ackedListCache||[])[idx];
+  if(!thread)return;
+  /* Find the callout for insight */
+  var co=callouts.find(function(x){return x.id===thread.calloutId||x._fsId===thread.calloutId;});
+  G('acked-modal-address').textContent=thread.address||'—';
+  G('acked-modal-uploader').textContent=thread.uploaderFull||'—';
+  G('acked-modal-date').textContent=thread.date||'—';
+  G('acked-modal-feedback').textContent=thread.feedback||'—';
+  G('acked-modal-insight').textContent=(co&&co.insight)||thread.insight||'—';
+  G('acked-modal-remarks').value='';
+  G('acked-modal-err').textContent='';
+  G('modal-acked-review').dataset.threadId=thread.id;
+  G('modal-acked-review').dataset.calloutId=co?co.id:'';
+  G('modal-acked-review').dataset.calloutFsId=co?co._fsId:'';
+  G('modal-acked-review').classList.add('open');
+}
+
+async function completeError(){
+  var modal=G('modal-acked-review');
+  var threadId=modal.dataset.threadId;
+  var calloutId=parseInt(modal.dataset.calloutId);
+  var calloutFsId=modal.dataset.calloutFsId;
+  var remarks=G('acked-modal-remarks').value.trim();
+  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  var co=callouts.find(function(x){return x.id===calloutId||x._fsId===calloutFsId;});
+  if(!co&&!thread){G('acked-modal-err').textContent='Error: callout not found.';return;}
+  /* Update callout */
+  if(co){
+    co.status='Completed';
+    co.managerRemarks=remarks||'';
+    co.completedAt=new Date().toISOString();
+    if(co._fsId){
+      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'Completed',managerRemarks:co.managerRemarks,completedAt:co.completedAt});}
+      catch(e){console.warn('completeError callout',e);}
+    }
+  }
+  /* Update thread */
+  if(thread){
+    thread.status='completed';
+    thread.managerRemarks=remarks||'';
+    if(thread._fsId){
+      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'completed',managerRemarks:remarks||''});}
+      catch(e){}
+    }
+  }
+  pushNotif('🏁','Error for "'+(co?co.address:(thread?thread.address:''))+'" marked as Completed.','complete');
+  modal.classList.remove('open');
+  /* Refresh manager quality views */
+  if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
+  if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
+  updateNotifBell();
+  updateMemberBell();
 }
 
 /* ── END MANAGER ERROR REVIEW ── */
@@ -5588,6 +5706,7 @@ function renderDailyLogErrors(){
     return({
       'Pending':'<span class="st-pending">Pending</span>',
       'In Review':'<span class="st-review">In Review</span>',
+      'Acknowledged':'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',
       'Completed':'<span class="st-done">Completed</span>'
     }[s]||'<span class="st-pending">'+s+'</span>');
   };
@@ -6152,16 +6271,22 @@ function renderEscQuality(){
     if(rs)list=list.filter(function(c){try{return new Date(c.date+'T00:00:00')>=rs;}catch(e){return true;}});
   }
   if(!list.length){target.innerHTML='<div class="empty"><div class="empty-ico">&#9989;</div><div class="empty-txt">No quality entries to show.</div></div>';return;}
-  var stBadge=function(s){return({Pending:'<span class="st-pending">Pending</span>',"In Review":'<span class="st-review">In Review</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);};
+  var stBadge=function(s){return({Pending:'<span class="st-pending">Pending</span>',"In Review":'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);};
   target.innerHTML=list.map(function(c){
     var isCrit=c.type==='qesc';
     var logger=(TEAM.find(function(m){return m.nickname===c.loggedBy;})||{fullName:c.loggedBy||''}).fullName;
     var ss=c.screenshot?'<img src="'+c.screenshot+'" class="qp-screenshot" alt="ss"/>':'';
     var critBadge=isCrit?'<div class="qp-crit-badge">&#128680; CRITICAL</div>':'';
     var canAck=c.uploader===cu.nickname&&c.status==='Pending';
+    var isAcked=c.status==='Acknowledged'||c.status==='Completed';
     var ackSect='';
     if(canAck){ackSect='<div class="ack-wrap"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+c.id+'"></textarea></div><button class="btn btn-primary btn-sm" data-id="'+c.id+'" onclick="ackCo(+this.dataset.id)">&#10003; Acknowledge</button> ';}
-    else if(c.insight){ackSect='<div class="insight-box"><div class="insight-lbl">&#10003; Insight</div><div class="insight-txt">'+c.insight+'</div></div>';}
+    else if(isAcked&&c.insight){
+      ackSect='<div class="insight-box"><div class="insight-lbl">&#10003; Your Insight</div><div class="insight-txt">'+c.insight+'</div></div>';
+      if(c.status==='Completed'&&c.managerRemarks){
+        ackSect+='<div class="insight-box" style="margin-top:6px;border-color:rgba(139,45,255,.2)"><div class="insight-lbl" style="color:var(--accent)">&#128221; Manager Remarks</div><div class="insight-txt">'+c.managerRemarks+'</div></div>';
+      }
+    } else if(c.insight){ackSect='<div class="insight-box"><div class="insight-lbl">&#10003; Insight</div><div class="insight-txt">'+c.insight+'</div></div>';}
     return '<div class="qp-card'+(isCrit?' critical':'')+'">'+critBadge
       +'<div class="qp-header"><div>'+avEl(c.uploader,34)+'</div>'
       +'<div class="qp-meta"><div class="qp-address">'+c.address+'</div>'
@@ -6386,7 +6511,7 @@ async function submitQScore(){
   if(cu.role==='escalation')renderDailyLogErrors();
 }
 
-const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review':`<span class="st-review">In Review</span>`,Completed:`<span class="st-done">Completed</span>`}[s]||s);
+const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review':`<span class="st-review">In Review</span>`,Acknowledged:`<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>`,Completed:`<span class="st-done">Completed</span>`}[s]||s);
 
 function renderQualityPortal(){
   const nick=cu.nickname,role=cu.role;
@@ -6411,7 +6536,7 @@ function renderQualityPortal(){
   const target=G('callouts-list-mgr')||G('qp-list');
   if(!target)return;
   if(!list.length){target.innerHTML='<div class="empty"><div class="empty-ico">&#9989;</div><div class="empty-txt">No quality entries to show.</div></div>';return;}
-  const stBadge=s=>({Pending:'<span class="st-pending">Pending</span>','In Review':'<span class="st-review">In Review</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);
+  const stBadge=s=>({Pending:'<span class="st-pending">Pending</span>','In Review':'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);
   target.innerHTML=list.map(c=>{
     const isCrit=c.type==='qesc';
     const logger=(TEAM.find(m=>m.nickname===c.loggedBy)||{fullName:c.loggedBy}).fullName;
@@ -6442,14 +6567,34 @@ function toggleCalloutDetail(id){
 function ackCo(id){
   const c=callouts.find(x=>x.id===id);if(!c)return;
   const el=G('ack-'+id);if(!el||!el.value.trim()){alert('Please add your insight and commitment.');return;}
-  c.insight=el.value.trim();c.status='In Review';
-  if(c._fsId){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',c._fsId),{insight:c.insight,status:'In Review'});}catch(e){}}
-  pushNotif('✅',cu.fullName+' acknowledged the call-out for "'+c.address+'" and added their insight.','ack');
-  /* Update just the ack section in place — don't re-render and collapse */
+  c.insight=el.value.trim();
+  c.status='Acknowledged';
+  c.acknowledgedAt=new Date().toISOString();
+  if(c._fsId){
+    try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',c._fsId),{insight:c.insight,status:'Acknowledged',acknowledgedAt:c.acknowledgedAt});}
+    catch(e){console.warn('ackCo fsUpdate',e);}
+  }
+  /* Notify manager via errorReviews — find matching thread and update */
+  if(window._pendingReviews){
+    var thread=window._pendingReviews.find(function(r){return r.calloutId===c.id||r.calloutId===c._fsId;});
+    if(thread){
+      thread.status='acknowledged';
+      thread.insight=c.insight;
+      thread.acknowledgedAt=c.acknowledgedAt;
+      thread.uploaderFull=cu.fullName;
+      if(thread._fsId){
+        try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'acknowledged',insight:c.insight,acknowledgedAt:c.acknowledgedAt});}
+        catch(e){}
+      }
+    }
+  }
+  pushNotif('✅',cu.fullName+' acknowledged the call-out for "'+c.address+'".','ack');
+  /* Update card in place */
   var ackWrap=el.closest('.ack-wrap');
-  if(ackWrap){ackWrap.innerHTML='<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:4px">✓ Acknowledged &mdash; Under Review</div>';}
-  var ackBtn=G('qp-detail-'+id)&&G('qp-detail-'+id).querySelector('button.btn-primary');
+  if(ackWrap){ackWrap.innerHTML='<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:4px">✓ Acknowledged — Awaiting Manager Review</div>';}
+  var ackBtn=document.querySelector('[data-id="'+id+'"].btn-primary');
   if(ackBtn)ackBtn.remove();
+  updateMemberBell();
 }
 function completeCo(id){
   const c=callouts.find(x=>x.id===id);if(!c)return;
@@ -7297,6 +7442,90 @@ document.addEventListener('DOMContentLoaded',function(){
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn-outline" style="flex:1;color:var(--red);border-color:rgba(255,61,61,.3)" onclick="discardReview()">&#128465; Discard</button>
       <button class="btn btn-primary" style="flex:2" onclick="submitReview()">&#10003; Submit to Uploader</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEMBER BELL NOTIFICATION PANEL -->
+<div class="modal-overlay" id="modal-member-notif" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:420px">
+    <button class="modal-close" onclick="G('modal-member-notif').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#128276; My Notifications</div>
+    <div id="member-notif-list" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-top:12px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="G('modal-member-notif').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGER ACKED REVIEW MODAL (Feedback Acknowledged → Complete) -->
+<div class="modal-overlay" id="modal-acked-review" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:520px">
+    <button class="modal-close" onclick="G('modal-acked-review').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#10003; Feedback Acknowledged</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Uploader</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" id="acked-modal-uploader"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Date</div>
+        <div style="font-size:13px;color:var(--text)" id="acked-modal-date"></div>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Property / Contract</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" id="acked-modal-address"></div>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Error Description</div>
+        <div style="font-size:12px;color:var(--text);background:var(--bg3);border-radius:8px;padding:8px 12px;line-height:1.6" id="acked-modal-feedback"></div>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Uploader&#39;s Insight &amp; Commitment</div>
+        <div style="font-size:12px;color:var(--green);background:rgba(34,197,94,.08);border-radius:8px;padding:8px 12px;line-height:1.6;border:1px solid rgba(34,197,94,.2)" id="acked-modal-insight"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Manager Remarks <span style="font-size:10px;color:var(--muted);font-weight:400">(optional — visible to uploader on completion)</span></label>
+      <textarea class="form-input" id="acked-modal-remarks" rows="3" placeholder="Add remarks if needed..."></textarea>
+    </div>
+    <div class="err-msg" id="acked-modal-err" style="margin-top:8px;text-align:left"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-outline" style="flex:1" onclick="G('modal-acked-review').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" style="flex:2;background:var(--green)" onclick="completeError()">&#10003; Mark as Complete</button>
+    </div>
+  </div>
+</div>
+
+<!-- MEMBER COMPLETE VIEW MODAL (uploader sees completed error + manager remarks) -->
+<div class="modal-overlay" id="modal-member-complete-view" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:460px">
+    <button class="modal-close" onclick="G('modal-member-complete-view').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#127937; Quality Remark Completed</div>
+    <div style="display:grid;gap:10px;margin:12px 0">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Property</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" id="mcv-address"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Date</div>
+        <div style="font-size:12px;color:var(--text)" id="mcv-date"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Error</div>
+        <div style="font-size:12px;color:var(--text);background:var(--bg3);border-radius:8px;padding:8px 12px;line-height:1.6" id="mcv-feedback"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Your Insight</div>
+        <div style="font-size:12px;color:var(--green);background:rgba(34,197,94,.08);border-radius:8px;padding:8px 12px;line-height:1.6;border:1px solid rgba(34,197,94,.2)" id="mcv-insight"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Manager Remarks</div>
+        <div style="font-size:12px;color:var(--accent);background:rgba(139,45,255,.06);border-radius:8px;padding:8px 12px;line-height:1.6;border:1px solid rgba(139,45,255,.15)" id="mcv-mgr-remarks"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="G('modal-member-complete-view').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>
