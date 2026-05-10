@@ -2071,19 +2071,33 @@ function openReviewsPanel(){
   var pending=window._pendingReviews||[];
   var list=G('review-list');
   if(!list)return;
-  if(!pending.length){
-    list.innerHTML='<div style="padding:20px;text-align:center;font-size:12px;color:var(--muted)">No errors pending review.</div>';
-  } else {
-    list.innerHTML=pending.filter(function(r){return r.status==='pending_review';}).map(function(r,idx){
+  var errPending=pending.filter(function(r){return r.status==='pending_review';});
+  var errAcked=pending.filter(function(r){return r.status==='acknowledged';});
+  var html='';
+  if(errPending.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">Error Reviews ('+errPending.length+')</div>';
+    html+=errPending.map(function(r,idx){
       return '<div style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" data-ridx="'+idx+'" onclick="openReviewByIdx(this)">'
         +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+r.address+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">For '+r.uploaderFull+' \xb7 '+r.date+'</div></div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">For '+r.uploaderFull+' · '+r.date+'</div></div>'
         +'<span style="font-size:10px;background:var(--amber);color:#fff;padding:2px 8px;border-radius:8px;opacity:.85">Review</span>'
         +'</div>';
     }).join('');
-    /* store filtered list for index lookup */
-    window._reviewListCache=pending.filter(function(r){return r.status==='pending_review';});
+    window._reviewListCache=errPending;
   }
+  if(errAcked.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)'+(errPending.length?';border-top:1px solid var(--border)':'')+'">Feedback Acknowledged ('+errAcked.length+')</div>';
+    html+=errAcked.map(function(r,idx){
+      return '<div style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" data-aidx="'+idx+'" onclick="openAckedReview(this)">'
+        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+r.address+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+r.uploaderFull+' acknowledged · '+r.date+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(34,197,94,.15);color:var(--green);padding:2px 8px;border-radius:8px">Complete</span>'
+        +'</div>';
+    }).join('');
+    window._ackedListCache=errAcked;
+  }
+  if(!html)html='<div style="padding:20px;text-align:center;font-size:12px;color:var(--muted)">No errors pending review.</div>';
+  list.innerHTML=html;
   G('modal-reviews').classList.add('open');
 }
 
@@ -2125,6 +2139,7 @@ async function submitReview(){
   if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
   if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
   updateReviewBadge();
+  updateMemberBell();
 }
 
 async function discardReview(){
@@ -2172,13 +2187,10 @@ async function loadPendingReviews(){
 
 function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
-  /* Bell shows for: Pending (not yet seen/acked) OR Completed-unread (manager finished) */
+  /* Bell shows for: Pending (needs ack) OR Completed (not yet read by uploader) */
   var myCallouts=callouts.filter(function(co){
     return co.uploader===cu.nickname
-      &&co.status!=='pending_review'
-      &&co.status!=='discarded'
-      &&co.status!=='Acknowledged'
-      &&!co.bellSeen;
+      &&((co.status==='Pending')||(co.status==='Completed'&&!co.completedRead));
   });
   var wrap=G('member-bell-wrap');
   var badge=G('member-bell-badge');
@@ -2194,10 +2206,7 @@ function openMemberBellPanel(){
   if(!cu||cu.role==='manager')return;
   var myCallouts=callouts.filter(function(co){
     return co.uploader===cu.nickname
-      &&co.status!=='pending_review'
-      &&co.status!=='discarded'
-      &&co.status!=='Acknowledged'
-      &&!co.bellSeen;
+      &&((co.status==='Pending')||(co.status==='Completed'&&!co.completedRead));
   });
   var list=G('member-notif-list');if(!list)return;
   var html='';
@@ -2229,14 +2238,8 @@ function closeMemberNotif(){var m=G('modal-member-notif');if(m)m.classList.remov
 function closeAckedRef(){var m=G('modal-reviews');if(m)m.classList.remove('open');}
 
 function dismissAndNavigate(id){
-  var co=callouts.find(function(x){return x.id===id;});
-  if(co&&co.status==='Pending'){
-    co.bellSeen=true;
-    if(co._fsId){
-      try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{bellSeen:true});}catch(e){}
-    }
-  }
-  updateMemberBell();
+  /* Just close the bell panel and navigate to quality page */
+  /* Bell will clear once the uploader acknowledges (status changes) */
   navigateToQuality();
 }
 
@@ -2245,8 +2248,12 @@ function navigateToQuality(){
     switchLoungeTab('the-hub',document.querySelector('.lounge-tab[data-tab="the-hub"]'));
     setTimeout(function(){switchSubTab('esc-quality',document.querySelector('#sub-esc-quality'));},100);
   } else {
+    /* Uploader: navigate to My Hub then activate Quality sub-tab */
     switchLoungeTab('the-hub',document.querySelector('.lounge-tab[data-tab="the-hub"]'));
-    setTimeout(function(){switchSubTab('sub-qual',document.querySelector('.sub-tab[data-sub="sub-qual"]'));},100);
+    setTimeout(function(){
+      var qualBtn=document.querySelector('.sub-tab[onclick*="quality"]');
+      if(qualBtn)switchSubTab('quality',qualBtn);
+    },150);
   }
 }
 
@@ -2257,6 +2264,14 @@ function openMemberCompleteView(id){
   G('mcv-feedback').textContent=co.feedback||'—';
   G('mcv-insight').textContent=co.insight||'—';
   G('mcv-mgr-remarks').textContent=co.managerRemarks||'No additional remarks.';
+  /* Mark as read so bell clears */
+  if(!co.completedRead){
+    co.completedRead=true;
+    if(co._fsId){
+      try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{completedRead:true});}catch(e){}
+    }
+    updateMemberBell();
+  }
   G('modal-member-complete-view').classList.add('open');
 }
 
@@ -2294,8 +2309,9 @@ async function completeError(){
     co.status='Completed';
     co.managerRemarks=remarks||'';
     co.completedAt=new Date().toISOString();
+    co.completedRead=false;
     if(co._fsId){
-      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'Completed',managerRemarks:co.managerRemarks,completedAt:co.completedAt});}
+      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'Completed',managerRemarks:co.managerRemarks,completedAt:co.completedAt,completedRead:false});}
       catch(e){console.warn('completeError callout',e);}
     }
   }
