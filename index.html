@@ -2150,8 +2150,21 @@ function openReviewByIdx(el){
 async function submitReview(){
   var modal=G('modal-error-review');
   var threadId=modal.dataset.threadId;
-  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  /* Always re-fetch from _pendingReviews to get the latest _fsId (avoids stale cache) */
+  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId||r._fsId===threadId;});
   if(!thread)return;
+  /* If _fsId is still missing, try to find it in Firestore before proceeding */
+  if(!thread._fsId&&fsDb()){
+    try{
+      var snap=await window._fsGetDocs(window._fsColl(fsDb(),'errorReviews'));
+      snap.forEach(function(d){
+        var data=d.data();
+        if(data.id===threadId||(data.calloutId&&data.calloutId===thread.calloutId)){
+          thread._fsId=d.id;
+        }
+      });
+    }catch(e){console.warn('submitReview fsId lookup',e);}
+  }
   var editedFeedback=G('rev-modal-feedback').value.trim();
   if(!editedFeedback){G('rev-modal-err').textContent='Please add an error description.';return;}
   /* Find the callout and update it */
@@ -2213,11 +2226,23 @@ async function loadPendingReviews(){
   try{
     var snap=await window._fsGetDocs(window._fsColl(fsDb(),'errorReviews'));
     window._pendingReviews=[];
-    snap.forEach(function(d){window._pendingReviews.push(Object.assign({_fsId:d.id},d.data()));});
-    /* Realtime listener */
+    snap.forEach(function(d){
+      var r=Object.assign({_fsId:d.id},d.data());
+      if(r.status==='pending_review'||r.status==='acknowledged'){
+        window._pendingReviews.push(r);
+      }
+    });
+    /* Realtime listener — only keep actionable threads in memory */
     window._fsOnSnapshot(window._fsColl(fsDb(),'errorReviews'),function(snap){
       window._pendingReviews=[];
-      snap.forEach(function(d){window._pendingReviews.push(Object.assign({_fsId:d.id},d.data()));});
+      snap.forEach(function(d){
+        var r=Object.assign({_fsId:d.id},d.data());
+        /* Only keep threads that need manager action (pending_review or acknowledged) */
+        /* approved/discarded/completed are resolved — exclude from bell */
+        if(r.status==='pending_review'||r.status==='acknowledged'){
+          window._pendingReviews.push(r);
+        }
+      });
       updateReviewBadge();
     });
     updateReviewBadge();
@@ -3006,7 +3031,7 @@ function pwRenderGalleryModal(){
           :'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg3);color:var(--muted);border:1px solid var(--border);cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwPin(+this.dataset.id);pwRenderGalleryModal()">Pin to Wall</button>')
         :(p.pinned?'<div style="font-size:9px;color:var(--accent);text-align:center">📌 On Wall</div>':'');
       return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">'
-        +'<img src="'+p.src+'" style=\"width:100%;height:110px;object-fit:cover;display:block;cursor:pointer\" onclick=\"pwOpenFullPhoto('+p.id+')\" title=\"Click to enlarge\" />'
+        +'<img src="'+p.src+'" data-pid="'+p.id+'" style="width:100%;height:110px;object-fit:cover;display:block;cursor:pointer" onclick="pwOpenFullPhoto(+this.dataset.pid)" title="Click to enlarge" />'
         +'<div style="padding:6px">'
         +'<div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.uploaderFull+'</div>'
         +(p.caption?'<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.caption+'</div>':'')
