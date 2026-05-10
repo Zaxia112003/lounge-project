@@ -908,6 +908,12 @@ window.dispatchEvent(new Event('firebase-ready'));
         <span class="sb-mailbox-badge" id="mailbox-badge">0</span>
       </div>
       <button class="sb-help-btn" onclick="openAI()" title="Ask Koby">?</button>
+      <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
+        <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <span id="notif-bell-badge" style="position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 3px;pointer-events:none;line-height:1"></span>
+      </div>
     </div>
     <div class="sb-bottom"></div>
   </div>
@@ -1619,6 +1625,8 @@ function goDash(){
   if(settings.theme)setTheme(settings.theme,null);
   /* Show mailbox for all roles */
   var mw=G('mailbox-wrap');if(mw)mw.style.display='flex';
+  /* Show review badge for manager only */
+  /* Bell shown/hidden dynamically via updateNotifBell() */
   updateMailboxBadge();
   /* Restore avatar from localStorage */
   try{
@@ -1626,6 +1634,7 @@ function goDash(){
     if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[cu.fullName]=saved;}
   }catch(e){}
   buildSidebar();buildMain();
+  if(cu&&cu.role==='manager')loadPendingReviews();
   var li=G('main-loggedin');if(li&&cu)li.innerHTML='Logged in as <span style="color:var(--accent);font-weight:700">'+cu.fullName+'</span>';
   /* Init range calendars */
   setTimeout(function(){
@@ -1938,6 +1947,209 @@ async function changePin(){
   G('s-cur-pin').value='';G('s-new-pin').value='';G('s-confirm-pin').value='';
   setTimeout(function(){errEl.textContent='';errEl.style.color='';},3000);
 }
+
+
+/* ── MANAGER ERROR REVIEW NOTIFICATION ── */
+function sendManagerReviewNotif(callout){
+  var manager=TEAM.find(function(m){return m.role&&m.role.toLowerCase()==='manager';});
+  if(!manager)return;
+  var uplMem=TEAM.find(function(m){return m.nickname===callout.uploader;})||{fullName:callout.uploader};
+  var msg='Error logged by '+callout.loggedBy+' for '+uplMem.fullName+' — "'+callout.address+'" — awaiting your review.';
+  /* Store as a pending-review thread in chatStore so manager sees it in mailbox */
+  var thread={
+    id:'rev_'+callout.id,
+    type:'error_review',
+    from:callout.loggedBy,
+    fromFull:callout.loggedBy,
+    to:manager.nickname,
+    calloutId:callout.id,
+    calloutFsId:callout._fsId||null,
+    uploader:callout.uploader,
+    uploaderFull:uplMem.fullName,
+    address:callout.address,
+    date:callout.date,
+    feedback:callout.feedback,
+    screenshot:callout.screenshot||null,
+    postedAt:Date.now(),
+    unread:true,
+    status:'pending_review'
+  };
+  /* Save to Firestore errorReviews collection */
+  if(fsDb()){
+    try{
+      window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),thread).then(function(ref){
+        thread._fsId=ref.id;
+      }).catch(function(e){console.warn('errorReview save',e);});
+    }catch(e){console.warn('errorReview',e);}
+  }
+  window._pendingReviews=window._pendingReviews||[];
+  window._pendingReviews.push(thread);
+  updateReviewBadge();
+}
+
+function updateReviewBadge(){updateNotifBell();}
+function updateNotifBell(){
+  var errCount=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review';}).length;
+  var photoCount=(window.pwPending||[]).length;
+  var total=errCount+photoCount;
+  var wrap=G('notif-bell-wrap');
+  var badge=G('notif-bell-badge');
+  if(wrap)wrap.style.display=(cu&&cu.role==='manager'&&total>0)?'block':'none';
+  if(badge){badge.textContent=total;badge.style.display=total>0?'flex':'none';}
+}
+function openNotifBell(){
+  var errPending=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review';});
+  var photoPending=window.pwPending||[];
+  var list=G('review-list');if(!list)return;
+  var html='';
+  if(errPending.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">Error Reviews ('+errPending.length+')</div>';
+    window._reviewListCache=errPending;
+    html+=errPending.map(function(r,idx){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" data-ridx="'+idx+'" onclick="G(\'modal-reviews\').classList.remove(\'open\');openReviewByIdx(this)">'
+        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+r.address+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">For '+r.uploaderFull+' \xb7 '+r.date+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(255,61,61,.12);color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0">Review</span>'
+        +'</div>';
+    }).join('');
+  }
+  if(photoPending.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)'+(errPending.length?';border-top:1px solid var(--border)':'')+'">'
+      +'Photo Approvals ('+photoPending.length+')</div>';
+    html+=photoPending.map(function(p){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px" onclick="G(\'modal-reviews\').classList.remove(\'open\');pwOpenPendingModal()">'
+        +'<img src="'+p.src+'" style="width:38px;height:38px;border-radius:6px;object-fit:cover;flex-shrink:0"/>'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(p.caption||'No caption')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">By '+p.uploaderFull+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(139,45,255,.1);color:var(--accent);padding:2px 8px;border-radius:8px;flex-shrink:0">Approve</span>'
+        +'</div>';
+    }).join('');
+  }
+  if(!html)html='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No pending notifications.</div>';
+  list.innerHTML=html;
+  var title=G('modal-reviews').querySelector('.modal-title');
+  if(title)title.textContent='Notifications';
+  G('modal-reviews').classList.add('open');
+}
+
+function openReviewModal(thread){
+  G('rev-modal-address').textContent=thread.address;
+  G('rev-modal-uploader').textContent=thread.uploaderFull;
+  G('rev-modal-date').textContent=thread.date;
+  G('rev-modal-logged').textContent=thread.fromFull||thread.from;
+  G('rev-modal-feedback').value=thread.feedback||'';
+  if(thread.screenshot){G('rev-modal-ss').src=thread.screenshot;G('rev-modal-ss').style.display='';}
+  else{G('rev-modal-ss').style.display='none';}
+  G('modal-error-review').dataset.threadId=thread.id;
+  G('modal-error-review').classList.add('open');
+  /* Mark read */
+  thread.unread=false;
+  updateReviewBadge();
+}
+
+function openReviewsPanel(){
+  var pending=window._pendingReviews||[];
+  var list=G('review-list');
+  if(!list)return;
+  if(!pending.length){
+    list.innerHTML='<div style="padding:20px;text-align:center;font-size:12px;color:var(--muted)">No errors pending review.</div>';
+  } else {
+    list.innerHTML=pending.filter(function(r){return r.status==='pending_review';}).map(function(r,idx){
+      return '<div style="padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" data-ridx="'+idx+'" onclick="openReviewByIdx(this)">'
+        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+r.address+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">For '+r.uploaderFull+' \xb7 '+r.date+'</div></div>'
+        +'<span style="font-size:10px;background:var(--amber);color:#fff;padding:2px 8px;border-radius:8px;opacity:.85">Review</span>'
+        +'</div>';
+    }).join('');
+    /* store filtered list for index lookup */
+    window._reviewListCache=pending.filter(function(r){return r.status==='pending_review';});
+  }
+  G('modal-reviews').classList.add('open');
+}
+
+function openReviewByIdx(el){
+  var idx=parseInt(el.dataset.ridx);
+  var thread=(window._reviewListCache||[])[idx];
+  if(thread)openReviewModal(thread);
+}
+
+async function submitReview(){
+  var modal=G('modal-error-review');
+  var threadId=modal.dataset.threadId;
+  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  if(!thread)return;
+  var editedFeedback=G('rev-modal-feedback').value.trim();
+  if(!editedFeedback){G('rev-modal-err').textContent='Please add an error description.';return;}
+  /* Find the callout and update it */
+  var co=callouts.find(function(c){return c.id===thread.calloutId;});
+  if(co){
+    co.feedback=editedFeedback;
+    co.status='Pending';
+    co.managerReviewed=true;
+    co.reviewedAt=new Date().toISOString();
+    if(co._fsId){
+      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{feedback:editedFeedback,status:'Pending',managerReviewed:true,reviewedAt:co.reviewedAt});}
+      catch(e){console.warn('review update',e);}
+    }
+  }
+  /* Mark review as approved */
+  thread.status='approved';
+  if(thread._fsId){
+    try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'approved'});}
+    catch(e){}
+  }
+  pushNotif('📋','Error for "'+thread.address+'" approved and sent to '+thread.uploaderFull+'.','qscore');
+  G('modal-error-review').classList.remove('open');
+  G('modal-reviews').classList.remove('open');
+  renderQualityPortal();
+  if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
+  if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
+  updateReviewBadge();
+}
+
+async function discardReview(){
+  var modal=G('modal-error-review');
+  var threadId=modal.dataset.threadId;
+  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  if(!thread)return;
+  if(!confirm('Discard this error? It will be kept as a hidden record but never shown to the uploader.'))return;
+  /* Mark callout as discarded — not deleted */
+  var co=callouts.find(function(c){return c.id===thread.calloutId;});
+  if(co){
+    co.status='discarded';
+    if(co._fsId){
+      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'discarded'});}
+      catch(e){console.warn('discard',e);}
+    }
+  }
+  thread.status='discarded';
+  if(thread._fsId){
+    try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}
+    catch(e){}
+  }
+  G('modal-error-review').classList.remove('open');
+  G('modal-reviews').classList.remove('open');
+  updateReviewBadge();
+}
+
+/* Load pending reviews from Firestore on login */
+async function loadPendingReviews(){
+  if(!fsDb()||cu.role!=='manager')return;
+  try{
+    var snap=await window._fsGetDocs(window._fsColl(fsDb(),'errorReviews'));
+    window._pendingReviews=[];
+    snap.forEach(function(d){window._pendingReviews.push(Object.assign({_fsId:d.id},d.data()));});
+    /* Realtime listener */
+    window._fsOnSnapshot(window._fsColl(fsDb(),'errorReviews'),function(snap){
+      window._pendingReviews=[];
+      snap.forEach(function(d){window._pendingReviews.push(Object.assign({_fsId:d.id},d.data()));});
+      updateReviewBadge();
+    });
+    updateReviewBadge();
+  }catch(e){console.warn('loadPendingReviews',e);}
+}
+
+/* ── END MANAGER ERROR REVIEW ── */
 
 /* ── SETTINGS ── */
 function openSettings(){
@@ -2347,6 +2559,8 @@ function pwStartListeners(){
   window._fsOnSnapshot(window._fsColl(window._db,'photosPending'),function(snap){
     pwPending=[];
     snap.forEach(function(d){pwPending.push(Object.assign({_fsId:d.id},d.data()));});
+    window.pwPending=pwPending;
+    if(typeof updateNotifBell==='function')updateNotifBell();
   });
 }
 
@@ -3472,7 +3686,7 @@ function renderMgrHubPerformance(){
     var offShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
     var avgDaily=days.length?(totalUploads/days.length):null;
     var qualEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
-    var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&mgrHubInRange(c.date);}).length;
+    var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&mgrHubInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
     var qScore=totalUploads>0?((totalUploads-errors)/totalUploads*100):null;
     return {m:m,nick:nick,totalUploads:totalUploads,inShift:inShift,offShift:offShift,avgDaily:avgDaily,qualEsc:qualEsc,errors:errors,qScore:qScore};
   });
@@ -3633,7 +3847,7 @@ function renderMgrHubPerformance(){
     /* 1/4 — top drivers */
     +'<div style="flex:1;min-width:0"><div class="sect" style="padding:14px">'
     +'<div class="sect-head" style="padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px"><span class="sect-title" style="font-size:12px">&#128202; Top Escalation Drivers</span></div>'
-    +driversHTML
+    +'<div style="max-height:200px;overflow-y:auto;">'+driversHTML+'</div>'
     +'</div></div>'
     +'</div>';
 
@@ -3694,11 +3908,11 @@ function renderMgrHubQuality(){
   function makeRow(nick,fullName){
     /* Contract Escalations (qesc) — everyone involved (uploader or escalationMember) */
     var escItems=callouts.filter(function(c){
-      return c.type==='qesc'&&mgrQInRange(c.date)&&(c.uploader===nick||c.escalationMember===nick);
+      return c.type==='qesc'&&mgrQInRange(c.date)&&(c.uploader===nick||c.escalationMember===nick)&&c.status!=='discarded';
     });
     /* Contract Errors (qscore) — logged against this uploader */
     var errItems=callouts.filter(function(c){
-      return c.type==='qscore'&&mgrQInRange(c.date)&&c.uploader===nick;
+      return c.type==='qscore'&&mgrQInRange(c.date)&&c.uploader===nick&&c.status!=='pending_review'&&c.status!=='discarded';
     });
     var escCount=escItems.length;
     var errCount=errItems.length;
@@ -4961,7 +5175,7 @@ async function mwSubmitError(){
   var upl=G('mw-err-upl').value,addr=G('mw-err-addr').value.trim(),date=G('mw-err-date').value,desc=G('mw-err-desc').value.trim();
   var msg=G('mw-err-msg');msg.textContent='';
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
-  var ss=G('mw-err-file').files[0]?await toB64(G('mw-err-file').files[0]):null;
+  var ss=G('mw-err-file').files[0]?await uploadScreenshot(G('mw-err-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
   var newCallout={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
   callouts.push(newCallout);
@@ -5055,7 +5269,7 @@ async function mwSubmitQEsc(){
   var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
-  var ss=G('mw-qesc-file').files[0]?await toB64(G('mw-qesc-file').files[0]):null;
+  var ss=G('mw-qesc-file').files[0]?await uploadScreenshot(G('mw-qesc-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
   var newQEsc={id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
   callouts.push(newQEsc);
@@ -5124,12 +5338,13 @@ async function submitQScoreFromOverlay(){
   var errMsg=G('qscore-err-msg');
   errMsg.textContent='';
   if(!upl||!addr||!date||!err){errMsg.textContent='Please fill in all required fields.';return;}
-  var ss=G('qscore-file2').files[0]?await toB64(G('qscore-file2').files[0]):null;
+  var ss=G('qscore-file2').files[0]?await uploadScreenshot(G('qscore-file2').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
-  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCo);
   fsSaveCallout(newCo);
-  pushNotif('📋','Contract error logged for '+(uplMem?uplMem.fullName:upl)+': "'+addr+'". Review required.','qscore');
+  /* Notify manager via mailbox — do NOT notify escalation */
+  sendManagerReviewNotif(newCo);
   renderQualityPortal();
   closeDailyLog();
 }
@@ -5507,14 +5722,13 @@ function renderEscalationHub(){
       +'<td style="padding:6px 8px;font-size:11px;font-weight:700;color:var(--text)">'+e.pct+'%</td>'
       +'<td style="padding:6px 8px;font-size:11px"><span class="esc-metric-badge '+cls+'" style="padding:1px 7px;font-size:10px">'+(e.pct>=75?'On target':'Below target')+'</span></td>'
       +'<td style="padding:6px 8px;font-size:11px;color:var(--muted)">'+e.total+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px;color:var(--muted)">'+e.loggedBy+'</td>'
       +'</tr>';
   }).join('');
   var driverRows=latestDrivers.map(function(d,idx){
     var maxCount=latestDrivers[0].count||1;
     var barW=Math.round((d.count/maxCount)*100);
-    return '<div style="margin-bottom:10px">'
-      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px">'
+    return '<div style="margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
       +'<span style="font-size:12px;color:var(--text)"><span style="font-family:var(--font-d);font-weight:700;color:var(--accent);margin-right:6px">#'+(idx+1)+'</span>'+d.name+'</span>'
       +'<span style="font-size:12px;font-weight:700;font-family:var(--font-d);color:var(--text)">'+d.count+'</span>'
       +'</div>'
@@ -5567,22 +5781,24 @@ function renderEscalationHub(){
     +'<div class="prog-wrap"><div class="prog-bar" id="esc-rate-bar" style="width:'+Math.min((inShiftTotal/20)*100,100)+'%"></div></div>'
     +'</div></div>'
 
+    +'<div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:0">'
+    /* LEFT — top drivers */
     +(latestDrivers.length
-      ?'<div class="sect"><div class="sect-head"><span class="sect-title">&#128200; Top Escalation Drivers</span>'
+      ?'<div style="flex:1;min-width:0"><div class="sect" style="margin-bottom:0"><div class="sect-head"><span class="sect-title">&#128200; Top Escalation Drivers</span>'
         +(latest?'<span style="font-size:10px;color:var(--muted);margin-left:8px">'+latest.date+'</span>':'')
-        +'</div><div style="padding:4px 0">'+driverRows+'</div></div>'
-      :'')
-
+        +'</div><div style="padding:10px 14px;max-height:220px;overflow-y:auto">'+driverRows+'</div></div></div>'
+      :'<div style="flex:1;min-width:0"></div>')
+    /* RIGHT — SLA history */
     +(slaLog.length
-      ?'<div class="sect" id="esc-perf-sla-sect"><div class="sect-head"><span class="sect-title">&#128202; SLA History</span><span id="esc-perf-sla-avg" style="font-size:10px;color:var(--muted);margin-left:8px"></span></div>'
-        +'<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">'
+      ?'<div style="flex:1;min-width:0"><div class="sect" id="esc-perf-sla-sect" style="margin-bottom:0"><div class="sect-head"><span class="sect-title">&#128202; SLA History</span><span id="esc-perf-sla-avg" style="font-size:10px;color:var(--muted);margin-left:8px"></span></div>'
+        +'<div style="max-height:220px;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">'
         +'<th style="padding:6px 8px;font-size:10px;color:var(--muted);text-align:left">Date</th>'
         +'<th style="padding:6px 8px;font-size:10px;color:var(--muted);text-align:left">SLA %</th>'
         +'<th style="padding:6px 8px;font-size:10px;color:var(--muted);text-align:left">Status</th>'
         +'<th style="padding:6px 8px;font-size:10px;color:var(--muted);text-align:left">Tickets</th>'
-        +'<th style="padding:6px 8px;font-size:10px;color:var(--muted);text-align:left">By</th>'
-        +'</tr></thead><tbody id="esc-perf-sla-tbody">'+slaRows+'</tbody></table></div>'
+        +'</tr></thead><tbody id="esc-perf-sla-tbody">'+slaRows+'</tbody></table></div></div></div>'
       :'')
+    +'</div>'
     +'</div>'
 
     +'<div class="sub-pane" id="sub-esc-quality">'
@@ -5802,7 +6018,7 @@ function renderEscPerfFiltered(){
         +'<td style="padding:6px 8px;font-size:11px;font-weight:700;color:var(--text)">'+e.pct+'%</td>'
         +'<td style="padding:6px 8px;font-size:11px"><span class="esc-metric-badge '+cls+'" style="padding:1px 7px;font-size:10px">'+(e.pct>=75?'On target':'Below target')+'</span></td>'
         +'<td style="padding:6px 8px;font-size:11px;color:var(--muted)">'+e.total+'</td>'
-        +'<td style="padding:6px 8px;font-size:11px;color:var(--muted)">'+e.loggedBy+'</td>'
+
         +'</tr>';
     }).join('');
     if(!filteredSLA.length){
@@ -5968,7 +6184,7 @@ function getStats(nick,range){
   });
   const adu=weightedDays>0?(uploadsTotal/weightedDays):0;
   const myQEsc=callouts.filter(c=>c.type==='qesc'&&(c.uploader===nick||c.escalationMember===nick)&&inRange(c.date,range));
-  const myErr=callouts.filter(c=>c.type==='qscore'&&c.uploader===nick&&inRange(c.date,range));
+  const myErr=callouts.filter(c=>c.type==='qscore'&&c.uploader===nick&&inRange(c.date,range)&&c.status!=='pending_review'&&c.status!=='discarded');
   const qScore=uploadsTotal>0?((uploadsTotal-myErr.length)/uploadsTotal*100):null;
   return{uploadsTotal,uploadsInShift,uploadsOffShift:uploadsTotal-uploadsInShift,adu:Math.round(adu*10)/10,weightedDays:Math.round(weightedDays*10)/10,qEsc:myQEsc.length,errors:myErr.length,qScore};
 }
@@ -6103,11 +6319,20 @@ const parseDur=s=>{if(!s)return 0;const p=s.trim().split(':');if(p.length===3)re
 /* ── QUALITY PORTAL ── */
 function filePrev(inp,pid){const prev=G(pid);prev.innerHTML='';if(inp.files[0])prev.innerHTML=`<div class="file-prev"><span class="file-prev-name">📎 ${inp.files[0].name}</span><button class="file-prev-rm" onclick="G('${inp.id}').value='';G('${pid}').innerHTML=''">✕</button></div>`;}
 const toB64=f=>new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(f);});
+async function uploadScreenshot(file){
+  if(!file||!window._storage)return null;
+  try{
+    var path='screenshots/'+Date.now()+'_'+(cu?cu.nickname:'unknown')+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    var ref=window._storageRef(window._storage,path);
+    await window._uploadBytes(ref,file);
+    return await window._getDownloadURL(ref);
+  }catch(e){console.warn('uploadScreenshot',e);return null;}
+}
 
 async function submitQEsc(){
   const upl=G('qesc-upl').value,addr=G('qesc-addr').value.trim(),date=G('qesc-date').value,fb=G('qesc-fb').value.trim();
   if(!upl||!addr||!date||!fb){alert('Please fill in all required fields.');return;}
-  const ss=G('qesc-file').files[0]?await toB64(G('qesc-file').files[0]):null;
+  const ss=G('qesc-file').files[0]?await uploadScreenshot(G('qesc-file').files[0]):null;
   const uplMem=TEAM.find(m=>m.nickname===upl);
   callouts.push({id:nextId++,type:'qesc',uploader:upl,address:addr,date,feedback:fb,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''});
   closeModal('modal-qesc');
@@ -6118,7 +6343,7 @@ async function submitQEsc(){
 async function submitQScore(){
   const upl=G('qscore-upl').value,addr=G('qscore-addr').value.trim(),date=G('qscore-date').value,err=G('qscore-err').value.trim();
   if(!upl||!addr||!date||!err){alert('Please fill in all required fields.');return;}
-  const ss=G('qscore-file').files[0]?await toB64(G('qscore-file').files[0]):null;
+  const ss=G('qscore-file').files[0]?await uploadScreenshot(G('qscore-file').files[0]):null;
   const uplMem=TEAM.find(m=>m.nickname===upl);
   callouts.push({id:nextId++,type:'qscore',uploader:upl,address:addr,date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''});
   closeModal('modal-qscore');
@@ -6133,7 +6358,7 @@ const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review'
 function renderQualityPortal(){
   const nick=cu.nickname,role=cu.role;
   let list=callouts.slice().reverse();
-  if(role!=='manager')list=list.filter(c=>c.uploader===nick);
+  if(role!=='manager')list=list.filter(c=>c.uploader===nick&&c.status!=='pending_review'&&c.status!=='discarded');
   if(role==='manager'){
     const sf=G('co-status'),tf=G('co-type');
     if(sf&&sf.value!=='all')list=list.filter(c=>c.status===sf.value);
@@ -6989,5 +7214,54 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 </div>
+<!-- ERROR REVIEWS LIST MODAL -->
+<div class="modal-overlay" id="modal-reviews" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:480px">
+    <button class="modal-close" onclick="G('modal-reviews').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#128276; Errors Pending Review</div>
+    <div class="s-row-desc" style="margin-bottom:16px">These errors were logged by escalation and need your review before reaching the uploader.</div>
+    <div id="review-list" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="G('modal-reviews').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ERROR REVIEW DETAIL MODAL -->
+<div class="modal-overlay" id="modal-error-review" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:520px">
+    <button class="modal-close" onclick="G('modal-error-review').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#128221; Review Error Log</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Uploader</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" id="rev-modal-uploader"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Date</div>
+        <div style="font-size:13px;color:var(--text)" id="rev-modal-date"></div>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Property / Contract</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)" id="rev-modal-address"></div>
+      </div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Logged by</div>
+        <div style="font-size:12px;color:var(--muted)" id="rev-modal-logged"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Error Description <span style="font-size:10px;color:var(--muted);font-weight:400">(edit if needed before submitting)</span></label>
+      <textarea class="form-input" id="rev-modal-feedback" rows="4" placeholder="Error description..."></textarea>
+    </div>
+    <img id="rev-modal-ss" src="" alt="screenshot" style="display:none;width:100%;border-radius:8px;margin-top:10px;max-height:200px;object-fit:contain"/>
+    <div class="err-msg" id="rev-modal-err" style="margin-top:8px;text-align:left"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-outline" style="flex:1;color:var(--red);border-color:rgba(255,61,61,.3)" onclick="discardReview()">&#128465; Discard</button>
+      <button class="btn btn-primary" style="flex:2" onclick="submitReview()">&#10003; Submit to Uploader</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
