@@ -252,7 +252,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .qp-meta{flex:1;}
 .qp-address{font-family:var(--font-d);font-size:14px;font-weight:600;letter-spacing:.2px;color:var(--text);margin-bottom:3px;}
 .qp-detail{font-size:11px;color:var(--muted);line-height:1.5;}
-.qp-body{font-size:12px;color:rgba(232,234,246,.68);line-height:1.65;margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;border-left:2px solid rgba(139,45,255,.4);}
+.qp-body{font-size:12px;color:var(--text);line-height:1.65;margin-bottom:12px;padding:10px 12px;background:var(--bg3);border-radius:8px;border-left:2px solid var(--accent);}
 .qp-screenshot{max-width:100%;border-radius:8px;margin-bottom:12px;border:1px solid var(--border);}
 .ack-wrap{background:rgba(139,45,255,.07);border:1px solid rgba(139,45,255,.18);border-radius:8px;padding:12px;margin-bottom:10px;}
 .ack-label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:rgba(192,132,252,.8);margin-bottom:7px;}
@@ -260,7 +260,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .ack-ta::placeholder{color:var(--muted2);}
 .insight-box{background:rgba(29,209,122,.06);border:1px solid rgba(29,209,122,.18);border-radius:8px;padding:10px 12px;margin-bottom:10px;}
 .insight-lbl{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--green);margin-bottom:5px;}
-.insight-txt{font-size:12px;color:rgba(232,234,246,.7);line-height:1.6;}
+.insight-txt{font-size:12px;color:var(--text);line-height:1.6;}
 .qp-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-top:8px;border-top:1px solid var(--border);}
 .qp-assigned{font-size:10px;color:var(--muted2);}
 .st-pending{display:inline-block;background:rgba(255,184,48,.12);color:var(--amber);border:1px solid rgba(255,184,48,.28);font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:4px;}
@@ -2673,7 +2673,7 @@ function renderMyDay(){
       :'')
     +'</div>';
   renderAnnouncements();
-  if(cu&&cu.role!=='escalation')renderAwards();
+  renderAwards();
   startClock();
 }
 
@@ -3326,6 +3326,7 @@ function rcalCreate(id,onRange){
 function escPerfClearFilter(){
   escPerfDateFilter='month';
   escPerfCustomRange={from:'',to:''};
+  setTimeout(function(){if(G('awards-grid'))renderAwards();},200);
   document.querySelectorAll('#sub-esc-perf .filter-pill').forEach(function(p){
     p.classList.toggle('active', p.dataset.f==='month');
   });
@@ -3578,7 +3579,7 @@ function renderMgrHubPerformance(){
 
   var driversHTML='';
   if(aggregatedDrivers.length){
-    driversHTML=aggregatedDrivers.slice(0,8).map(function(d){
+    driversHTML=aggregatedDrivers.slice(0,5).map(function(d){
       var pct=Math.round((d.count/maxCount)*100);
       return '<div style="margin-bottom:9px">'
         +'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
@@ -5459,6 +5460,7 @@ function renderEscalationHub(){
   var pane=G('lounge-pane-the-hub');if(!pane)return;
   escPerfDateFilter='month';
   escPerfCustomRange={from:'',to:''};
+  setTimeout(function(){if(G('awards-grid'))renderAwards();},200);
   setTimeout(function(){
     if(G('rcal-esc-perf-trigger'))rcalCreate('rcal-esc-perf',function(from,to){
       escPerfCustomRange={from:from,to:to};escPerfDateFilter='custom';
@@ -5537,10 +5539,10 @@ function renderEscalationHub(){
     +'<div class="kpi-grid" style="margin-bottom:16px">'
     +'<div class="kpi-card">'
     +'<div class="kpi-label">&#128247; Escalation SLA</div>'
-    +'<div class="kpi-value">'+(slaPct!==null?slaPct+'%':'—')+'</div>'
-    +'<span class="esc-metric-badge '+slaBadgeCls+'" style="margin-top:6px">'+slaBadgeTxt+'</span>'
-    +'<div class="kpi-sub">Target: ≥75% · '+(latest?'Last: '+latest.date:'No data yet')+'</div>'
-    +'<div class="prog-wrap"><div class="prog-bar" style="width:'+Math.min(slaPct||0,100)+'%;background:'+(slaPct!==null&&slaPct>=75?'var(--green)':'var(--red)')+'"></div></div>'
+    +'<div class="kpi-value" id="esc-sla-kpi-val">'+(slaPct!==null?slaPct+'%':'—')+'</div>'
+    +'<span class="esc-metric-badge '+slaBadgeCls+'" id="esc-sla-kpi-badge" style="margin-top:6px">'+slaBadgeTxt+'</span>'
+    +'<div class="kpi-sub" id="esc-sla-kpi-sub">Target: ≥75% · '+(latest?'Last: '+latest.date:'No data yet')+'</div>'
+    +'<div class="prog-wrap"><div class="prog-bar" id="esc-sla-kpi-bar" style="width:'+Math.min(slaPct||0,100)+'%;background:'+(slaPct!==null&&slaPct>=75?'var(--green)':'var(--red)')+'"></div></div>'
     +'</div>'
     +'<div class="kpi-card">'
     +'<div class="kpi-label">&#128200; Upload Rate</div>'
@@ -5815,7 +5817,7 @@ function renderEscPerfFiltered(){
   var dayData=perfData[nick]||{};
   var filteredUploads=Object.keys(dayData).reduce(function(acc,date){
     if(!inFilterRange(date))return acc;
-    return acc+(dayData[date].uploadsInShift||0);
+    return acc+(dayData[date].uploadsTotal||0);
   },0);
 
   var rate=filteredHrs>0?(filteredUploads/filteredHrs).toFixed(1):'—';
@@ -5826,6 +5828,28 @@ function renderEscPerfFiltered(){
   if(rateVal)rateVal.textContent=rate;
   if(rateSub)rateSub.innerHTML='<span id="esc-rate-active-link" onclick="openTimerLog()" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:var(--muted)">Active: '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0h')+'</span> · Uploads: '+filteredUploads;
   if(rateBar)rateBar.style.width=Math.min((filteredUploads/20)*100,100)+'%';
+
+  /* Update SLA KPI card from filtered data */
+  var slaKpiVal=G('esc-sla-kpi-val');
+  var slaKpiBadge=G('esc-sla-kpi-badge');
+  var slaKpiBar=G('esc-sla-kpi-bar');
+  var slaKpiSub=G('esc-sla-kpi-sub');
+  if(filteredSLA.length){
+    var latestFiltered=filteredSLA[0];
+    var avgSlaFiltered=filteredSLA.reduce(function(s,e){return s+e.pct;},0)/filteredSLA.length;
+    var dispPct=avgSlaFiltered.toFixed(1);
+    var badgeCls=avgSlaFiltered>=75?'good':'bad';
+    var badgeTxt=avgSlaFiltered>=75?'✓ On target':'⚠ Below target';
+    if(slaKpiVal)slaKpiVal.textContent=dispPct+'%';
+    if(slaKpiBadge){slaKpiBadge.textContent=badgeTxt;slaKpiBadge.className='esc-metric-badge '+badgeCls;}
+    if(slaKpiBar)slaKpiBar.style.width=Math.min(avgSlaFiltered,100)+'%';
+    if(slaKpiSub)slaKpiSub.textContent='Avg SLA · Latest: '+latestFiltered.date;
+  } else {
+    if(slaKpiVal)slaKpiVal.textContent='—';
+    if(slaKpiBadge){slaKpiBadge.textContent='No data';slaKpiBadge.className='esc-metric-badge warn';}
+    if(slaKpiBar)slaKpiBar.style.width='0%';
+    if(slaKpiSub)slaKpiSub.textContent='Target: ≥75%';
+  }
 }
 
 /* ── ESCALATION QUALITY ── */
