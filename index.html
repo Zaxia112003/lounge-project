@@ -935,6 +935,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
+        <div id="last-sync-label" style="font-size:9px;color:var(--muted);text-align:right;min-height:12px"></div>
         <button class="btn btn-outline btn-sm" onclick="signOut()" style="font-size:10px;padding:3px 10px">&#8617; Sign Out</button>
       </div>
     </div>
@@ -1758,6 +1759,8 @@ async function syncPortal(){
       buildMain();
       if(cu.role==='manager')loadPendingReviews();
     }
+    var now=getSydneyDate();var h=now.getHours(),m=now.getMinutes(),ampm=h>=12?'PM':'AM';h=h%12||12;var ts=h+':'+(m<10?'0':'')+m+' '+ampm;
+    var sl=G('last-sync-label');if(sl)sl.textContent='Last synced '+ts;
     if(btn){btn.textContent='✓ Synced';setTimeout(function(){btn.textContent='⟳ Sync';btn.disabled=false;},1500);}
   }catch(e){
     console.warn('syncPortal',e);
@@ -1889,7 +1892,16 @@ function renderUnifiedAttendance(containerId,isManager,groupFilter,nameFilter){
       if(entry){
         /* Normalize status keys for backwards compatibility */
       var _rawStatus=entry.status;
-      var _normStatus={AL:'PL','Annual Leave':'PL',SickLeave:'SL','Sick Leave':'SL',absent:'Absent',offline:'Offline',tardy:'Tardy',udt:'UDT',holiday:'Holiday'}[_rawStatus]||_rawStatus;
+      /* Normalize: attendance object stores lowercase mapped values; attendanceLog stores original */
+      var _normStatus={
+        /* attendanceLog status strings */
+        AL:'PL','Annual Leave':'PL',SickLeave:'SL','Sick Leave':'SL',
+        absent:'Absent',offline:'Offline',tardy:'Tardy',udt:'UDT',holiday:'Holiday',
+        /* attendance object (submitAttModal statusMap) lowercase values */
+        sl:'SL',al:'PL',half:'UDT',full:'full',nonupload:'full',rdo:'PL',other:'PL',
+        /* attendance object string values */
+        'Sick Leave':'SL','Annual Leave':'PL','Personal Leave':'PL'
+      }[_rawStatus]||_rawStatus;
       var def=ATT_STATUS_DEF[_normStatus]||ATT_STATUS_DEF[_rawStatus]||{label:_rawStatus,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:_rawStatus};
         var tip=def.full+(entry.hours?' ('+entry.hours+'h lost)':(entry.notes?' \u2014 '+entry.notes:''));
         badge='<span title="'+tip+'" style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:700;background:'+def.bg+';color:'+def.color+'">'+def.label+'</span>';
@@ -1977,6 +1989,9 @@ function setupPinKeyboard(){
   document.addEventListener('keydown',function(e){
     var scr=document.querySelector('.scr#scr-pin');
     if(!scr||!scr.classList.contains('active'))return;
+    /* Don't intercept if focus is in an input/textarea */
+    var tag=document.activeElement?document.activeElement.tagName:'';
+    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;
     if(e.key>='0'&&e.key<='9'){pinKey(e.key);e.preventDefault();}
     else if(e.key==='Backspace'||e.key==='Delete'){pinKey('⌫');e.preventDefault();}
     else if(e.key==='Enter'&&_pinBuffer.length===6){pinSubmit();e.preventDefault();}
@@ -4179,7 +4194,7 @@ function renderMgrHubPerformance(){
     +'</div></div>'
     +'</div>';
 
-  el.innerHTML=filterBar+uplSection+escSection;
+  el.innerHTML=filterBar+groupFilterBar+uplSection+escSection;
 
   /* Restore custom date inputs if active */
   if(mgrHubDateFilter==='custom'){
@@ -5314,6 +5329,15 @@ function removeMember(nick){
   renderMyTeam();
 }
 
+function deleteAwardHistory(fsId,nick){
+  if(!fsId||!confirm('Remove this award entry?'))return;
+  var idx=awardHistory.findIndex(function(h){return h._fsId===fsId;});
+  if(idx>-1)awardHistory.splice(idx,1);
+  if(fsDb())try{window._fsDeleteDoc(window._fsDoc(fsDb(),'awardHistory',String(fsId)));}catch(e){}
+  /* Re-open profile to refresh */
+  openMemberProfile(nick);
+}
+
 function openMemberProfile(nick){
   var d=TEAM_DIR[nick];if(!d)return;
   var history=awardHistory.filter(function(h){return h.nick===nick;});
@@ -5326,8 +5350,13 @@ function openMemberProfile(nick){
   var sh=SHIFTS[nick];
   var fmtShift=function(h){var hr=Math.floor(h),min=h%1===0.5?'30':'00';return hr+':'+min;};
   G('member-profile-shift').textContent=sh?fmtShift(sh.start)+' – '+fmtShift(sh.end)+' AEST':'No fixed schedule';
+  var isManager=cu&&cu.role==='manager';
   G('member-profile-awards').innerHTML=history.length
-    ?history.map(function(h){return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:16px">'+h.emoji+'</span><div><div style="font-size:12px;font-weight:600;color:var(--text)">'+h.award+'</div><div style="font-size:11px;color:var(--muted)">'+h.label+'</div></div></div>';}).join('')
+    ?history.map(function(h,hi){
+      var fid=h._fsId||('idx_'+hi);
+      var delBtn=isManager?'<button data-fid="'+fid+'" data-nick="'+h.nick+'" onclick="deleteAwardHistory(this.dataset.fid,this.dataset.nick)" title="Remove" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 6px">&#128465;</button>':'';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:16px">'+h.emoji+'</span><div><div style="font-size:12px;font-weight:600;color:var(--text)">'+h.award+'</div><div style="font-size:11px;color:var(--muted)">'+h.label+'</div></div>'+delBtn+'</div>';
+    }).join('')
     :'<div style="font-size:12px;color:var(--muted);padding:8px 0">No awards yet.</div>';
   G('modal-member-profile').classList.add('open');
 }
