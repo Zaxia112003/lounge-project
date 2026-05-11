@@ -1280,7 +1280,7 @@ async function fsLoadAll(){
   await fsLoadCollection('slaLog', slaLog);
   await fsLoadCollection('attendanceLog', attendanceLog);
   await fsLoadCollection('awardHistory', awardHistory);
-  await fsLoadCollection('timerSessions', timerSessions);
+  await fsLoadCollection('timerSessions', allTimerSessions);
   await pwLoadPhotos();
 
   /* KB and templates stored as single docs */
@@ -1340,6 +1340,11 @@ function fsStartRealtimeListeners(){
     if(G('team-tbl'))renderTeamOverview();
   }));
 
+  /* timerSessions realtime */
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'timerSessions'),function(snap){
+    allTimerSessions.length=0;
+    snap.forEach(function(d){allTimerSessions.push(Object.assign({_fsId:d.id},d.data()));});
+  }));
   /* mdAwards */
   _unsubscribers.push(window._fsOnSnapshot(window._fsDoc(fsDb(),'mdAwards','current'),function(snap){
     if(snap.exists()){
@@ -1844,7 +1849,8 @@ function renderUnifiedAttendance(containerId,isManager){
     :(MONTHS[s.month]+' '+s.year);
   var dateHeaders=dates.map(function(d){
     var isToday=_uas(d)===todayStr;
-    var dayLabel=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':'';
+    var DOW=['Su','Mo','Tu','We','Th','Fr','Sa'];
+    var dayLabel=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':DOW[d.getDay()]+'<br>';
     return '<th style="padding:5px 2px;font-size:10px;font-weight:700;text-align:center;min-width:'
       +(s.mode==='week'?'60px':'28px')+';border:1px solid var(--border2);color:'+(isToday?'var(--accent)':'var(--muted)')+'">'+dayLabel+d.getDate()+'</th>';
   }).join('');
@@ -1858,7 +1864,9 @@ function renderUnifiedAttendance(containerId,isManager){
       if(entry&&entry.status==='Tardy'&&!isManager)entry=null;
       var badge='';
       if(entry){
-        var def=ATT_STATUS_DEF[entry.status]||{label:entry.status,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:entry.status};
+        var _rawSt=entry.status;
+      var _normSt={AL:'PL','Annual Leave':'PL',SickLeave:'SL','Sick Leave':'SL',absent:'Absent',offline:'Offline',tardy:'Tardy',udt:'UDT',holiday:'Holiday',sl:'SL',al:'PL',half:'UDT'}[_rawSt]||_rawSt;
+      var def=ATT_STATUS_DEF[_normSt]||ATT_STATUS_DEF[_rawSt]||{label:_rawSt,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:_rawSt};
         var tip=def.full+(entry.hours?' ('+entry.hours+'h lost)':(entry.notes?' \u2014 '+entry.notes:''));
         badge='<span title="'+tip+'" style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:700;background:'+def.bg+';color:'+def.color+'">'+def.label+'</span>';
       }
@@ -3765,7 +3773,7 @@ function mgrQClearFilter(){
 
 /* ── MANAGER HUB ── */
 var mgrHubTab='performance';
-var mgrHubDateFilter='month';
+var mgrHubDateFilter='today';
 var mgrHubCustomRange={from:'',to:''};
 
 function renderManagerHub(){
@@ -3807,7 +3815,7 @@ function switchMgrHubTab(tab,btn){
       renderMgrHubQuality();
     });
   },50);}
-  else if(tab==='performance'){mgrHubDateFilter='month';renderMgrHubPerformance();setTimeout(function(){
+  else if(tab==='performance'){mgrHubDateFilter='today';renderMgrHubPerformance();setTimeout(function(){
     if(G('rcal-mgr-perf-trigger')&&!G('rcal-mgr-perf-trigger')._rcalInit)rcalCreate('rcal-mgr-perf',function(from,to){
       mgrHubCustomRange={from:from,to:to};mgrHubDateFilter='custom';
       document.querySelectorAll('#mgr-hub-pane-performance .filter-pill').forEach(function(p){p.classList.remove('active');});
@@ -3839,7 +3847,8 @@ function mgrHubInRange(dateStr){
     var d=new Date(dateStr+'T00:00:00');
     var now=new Date();
     var rs,re=null;
-    if(mgrHubDateFilter==='week'){var dw=now.getDay();var m=new Date(now);m.setDate(now.getDate()-(dw===0?6:dw-1));m.setHours(0,0,0,0);rs=m;}
+    if(mgrHubDateFilter==='today'){var tod=getSydneyDate();return dateStr===tod.toISOString().split('T')[0];}
+    else if(mgrHubDateFilter==='week'){var dw=now.getDay();var m=new Date(now);m.setDate(now.getDate()-(dw===0?6:dw-1));m.setHours(0,0,0,0);rs=m;}
     else if(mgrHubDateFilter==='month'){rs=new Date(now.getFullYear(),now.getMonth(),1);}
     else if(mgrHubDateFilter==='quarter'){rs=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);}
     else if(mgrHubDateFilter==='year'){rs=new Date(now.getFullYear(),0,1);}
@@ -3855,6 +3864,7 @@ function renderMgrHubPerformance(){
   /* filter bar */
   var filterBar='<div class="filter-bar" style="margin-bottom:18px">'
     +'<button class="filter-pill'+(mgrHubDateFilter==='all'?' active':'')+'" data-f="all" onclick="mgrHubFilter(this)">All Time</button>'
+    +'<button class="filter-pill'+(mgrHubDateFilter==='today'?' active':'')+'" data-f="today" onclick="mgrHubFilter(this)">Today</button>'
     +'<button class="filter-pill'+(mgrHubDateFilter==='week'?' active':'')+'" data-f="week" onclick="mgrHubFilter(this)">This Week</button>'
     +'<button class="filter-pill'+(mgrHubDateFilter==='month'?' active':'')+'" data-f="month" onclick="mgrHubFilter(this)">This Month</button>'
     +'<button class="filter-pill'+(mgrHubDateFilter==='quarter'?' active':'')+'" data-f="quarter" onclick="mgrHubFilter(this)">This Quarter</button>'
@@ -3934,7 +3944,7 @@ function renderMgrHubPerformance(){
     var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
     var rate=filteredHrs>0?(uplTotal/filteredHrs):null;
     var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
-    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,qualEsc:qualEsc};
+    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,memberHrs:memberHrs,qualEsc:qualEsc};
   });
 
   /* Build SLA badge BEFORE escRows so it's defined when rows render */
@@ -3945,7 +3955,8 @@ function renderMgrHubPerformance(){
     :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
 
   var escRows=escData.map(function(r,i){
-    var rateStr=r.rate!==null?r.rate.toFixed(1):'0.0';
+    var rateSuspect=r.memberHrs>0&&r.memberHrs<0.05;
+    var rateStr=(r.rate!==null&&!rateSuspect)?r.rate.toFixed(1):'—';
     var qualBadge=r.qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
       :r.qualEsc<=3
@@ -3958,7 +3969,7 @@ function renderMgrHubPerformance(){
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px"><span onclick="openMgrTimerLog(\''+r.nick+'\')" style="color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-style:dotted">uploads/hr · '+(r.memberHrs>0?r.memberHrs.toFixed(1)+'h':'0.0h')+'</span></div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -5510,15 +5521,50 @@ function mwDetailConfirm(){
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
   mwDetailReset();closeMgrWrite();
 }
+function openMgrTimerLog(nick){
+  var m=TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick};
+  var sessions=(allTimerSessions||[]).filter(function(s){return s.nick===nick;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var modal=G('modal-mgr-timer');if(!modal)return;
+  G('mgr-timer-title').textContent='⏱ '+m.fullName+' — Timer Sessions';
+  var tbody=G('mgr-timer-tbody');
+  if(!sessions.length){tbody.innerHTML='<tr><td colspan="5" style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No sessions recorded.</td></tr>';}
+  else{
+    tbody.innerHTML=sessions.map(function(s){
+      var hh=Math.floor(s.seconds/3600),mm2=Math.floor((s.seconds%3600)/60),ss2=s.seconds%60;
+      var dur=String(hh).padStart(2,'0')+':'+String(mm2).padStart(2,'0')+':'+String(ss2).padStart(2,'0');
+      var flagged=s.seconds<60||s.seconds>28800;
+      return '<tr style="border-bottom:1px solid var(--border)'+(flagged?';background:rgba(247,43,110,.06)':'')+'">'
+        +'<td style="padding:8px 10px;font-size:11px;color:var(--muted)">'+s.date+'</td>'
+        +'<td style="padding:8px 10px;font-size:11px">'+(s.start||'—').replace('T',' ').slice(0,16)+'</td>'
+        +'<td style="padding:8px 10px;font-size:11px">'+(s.end||'—').replace('T',' ').slice(0,16)+'</td>'
+        +'<td style="padding:8px 10px;font-size:12px;font-weight:700;font-family:var(--font-d);color:var(--accent)">'+dur+(flagged?' ⚠️':'')+'</td>'
+        +'<td style="padding:8px 10px;text-align:center"><button data-fsid="'+(s._fsId||'')+'" data-nick="'+nick+'" onclick="mgrDeleteTimerSession(this.dataset.fsid,this.dataset.nick)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px">🗑️</button></td>'
+        +'</tr>';
+    }).join('');
+    var ts=sessions.reduce(function(a,s){return a+s.seconds;},0);
+    tbody.innerHTML+='<tr style="border-top:2px solid var(--border2);background:rgba(139,45,255,.06)"><td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Total</td><td style="padding:8px 10px;font-size:13px;font-weight:700;font-family:var(--font-d);color:var(--text)">'+String(Math.floor(ts/3600)).padStart(2,'0')+':'+String(Math.floor((ts%3600)/60)).padStart(2,'0')+':00</td><td></td></tr>';
+  }
+  modal.classList.add('open');
+}
+function mgrDeleteTimerSession(fsId,nick){
+  if(!fsId||!confirm('Delete this session?'))return;
+  var i=allTimerSessions.findIndex(function(s){return s._fsId===fsId;});
+  if(i>-1)allTimerSessions.splice(i,1);
+  if(fsDb())try{window._fsDeleteDoc(window._fsDoc(fsDb(),'timerSessions',String(fsId)));}catch(e){}
+  openMgrTimerLog(nick);if(typeof renderMgrHubPerformance==='function')renderMgrHubPerformance();
+}
 async function mwSubmitQEsc(){
   var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-qesc-file').files[0]?await uploadScreenshot(G('mw-qesc-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
-  var newQEsc={id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
-  callouts.push(newQEsc);
-  fsSaveCallout(newQEsc);
+  var sharedMeta={address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
+  var uplCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,status:'Pending',insight:''});
+  callouts.push(uplCallout);fsSaveCallout(uplCallout);
+  if(typeof sendManagerDirectNotif==='function')sendManagerDirectNotif(uplCallout);
+  if(esc){var escCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc_esc',uploader:upl,escalationMember:esc,status:'Pending',insight:'',escThread:true});callouts.push(escCallout);fsSaveCallout(escCallout);}
+  updateMemberBell();
   pushNotif('🚨','Critical escalation logged for '+uplMem.fullName+' at "'+addr+'".','qesc');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
   closeMgrWrite();
@@ -6724,6 +6770,7 @@ function ackCo(id){
       }
     }
   }
+  if(c.type==='qesc_esc'&&c.escalationMember===cu.nickname&&fsDb()){try{window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),{calloutId:c.id,calloutFsId:c._fsId||null,uploader:c.escalationMember,uploaderFull:cu.fullName,address:c.address,date:c.date,feedback:c.feedback,status:'acknowledged',insight:c.insight,acknowledgedAt:c.acknowledgedAt,loggedBy:c.loggedBy,type:'qesc_esc'});}catch(e){}}
   pushNotif('✅',cu.fullName+' acknowledged the call-out for "'+c.address+'".','ack');
   /* Update card in place */
   var ackWrap=el.closest('.ack-wrap');
