@@ -935,10 +935,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn btn-outline btn-sm" onclick="syncPortal()" id="sync-btn" title="Sync data" style="font-size:10px;padding:3px 10px">&#8635; Sync</button>
-          <button class="btn btn-outline btn-sm" onclick="signOut()" style="font-size:10px;padding:3px 10px">&#8617; Sign Out</button>
-        </div>
+        <button class="btn btn-outline btn-sm" onclick="signOut()" style="font-size:10px;padding:3px 10px">&#8617; Sign Out</button>
       </div>
     </div>
     <div class="main-content" id="main-content" style="max-width:none;flex:1;overflow-y:auto"></div>
@@ -1680,8 +1677,8 @@ function buildSidebar(){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
   const wrap=G('sb-av-wrap');
   var avSrc=cu&&AVATARS[cu.fullName];
-  if(avSrc)wrap.innerHTML=`<img class="sb-avatar" src="${avSrc}" alt="${full}"/>`;
-  else{const i=full.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();wrap.innerHTML=`<div class="sb-avatar-init">${i}</div>`;}
+  if(avSrc)wrap.innerHTML=`<img class="sb-avatar" src="${avSrc}" alt="${full}" onclick="syncPortal()" title="Sync" style="cursor:pointer"/>`;
+  else{const i=full.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();wrap.innerHTML=`<div class="sb-avatar-init" onclick="syncPortal()" title="Sync" style="cursor:pointer">${i}</div>`;}
   G('sb-name').textContent=full;
   G('sb-role').textContent={manager:'Manager',escalation:'Escalation Team',uploader:'Uploader'}[role]||role;
   const navDefs={
@@ -2964,31 +2961,23 @@ function pwRenderSlideshow(){
   pwSlideIdx=Math.min(pwSlideIdx,pinned.length-1);
   var cur=pinned[pwSlideIdx];
   var fid=cur._fsId||String(cur.id);
+  /* Wall photos: no click-to-enlarge, no pin/trash icons */
   var imgs=pinned.map(function(p,i){
-    var pfid=p._fsId||String(p.id);
-    return '<img class="pw-img'+(i===pwSlideIdx?' active':'')+'" src="'+p.src+'" alt="'+p.uploaderFull
-      +'" style="cursor:pointer" data-fid="'+pfid+'" onclick="pwOpenFullPhotoByFsId(this.dataset.fid)" title="Click to enlarge"/>';
+    return '<img class="pw-img'+(i===pwSlideIdx?' active':'')+'" src="'+p.src+'" alt="'+p.uploaderFull+'" style="cursor:default"/>';
   }).join('');
   var arrows=pinned.length>1
     ?'<div class="pw-arrow pw-prev" onclick="pwSlide(-1)">&#8249;</div>'
     +'<div class="pw-arrow pw-next" onclick="pwSlide(1)">&#8250;</div>'
     :'';
+  /* Only download button on wall */
   var dlBtn='<a class="pw-btn" onclick="pwDownload(this.dataset.fid)" data-fid="'+fid+'" title="Download">&#8681;</a>';
-  var delBtn=(cu.nickname===cur.uploader||cu.role==='manager')
-    ?'<a class="pw-btn" onclick="pwDelete(this.dataset.fid)" data-fid="'+fid+'" title="Delete" style="background:rgba(255,61,61,.25)">&#128465;</a>'
-    :'';
-  var pinBtn=cu.role==='manager'
-    ?(cur.pinned
-      ?'<a class="pw-btn" onclick="gwGalleryUnpin(this.dataset.fid)" data-fid="'+fid+'" title="Unpin from wall" style="background:rgba(139,45,255,.2)">&#128204;</a>'
-      :'<a class="pw-btn" onclick="gwGalleryPin(this.dataset.fid)" data-fid="'+fid+'" title="Pin to wall">&#128204;</a>')
-    :(cur.pinned?'<span class="pw-btn" style="cursor:default;opacity:.6" title="Pinned to wall">&#128204;</span>':'');
   return '<div class="pw-stage">'+imgs+arrows
     +'<div class="pw-caption">'
     +'<div class="pw-caption-text">'
     +'<div class="pw-caption-name">'+cur.uploaderFull+'</div>'
     +'<div class="pw-caption-sub">'+(cur.caption||'')+'</div>'
     +'</div>'
-    +'<div class="pw-caption-btns">'+pinBtn+dlBtn+delBtn+'</div>'
+    +'<div class="pw-caption-btns">'+dlBtn+'</div>'
     +'</div>'
     +'</div>';
 }
@@ -3026,23 +3015,25 @@ function pwRenderGalleryModal(){
   var sorted=pwPhotos.slice().sort(function(a,b){return b.uploadedAt-a.uploadedAt;});
   var cards=sorted.map(function(p){
     var fid=p._fsId||String(p.id);
-    var pinBtn='';
+    var pinIcon='';
+    var trashIcon='';
     if(isManager){
-      pinBtn=p.pinned
-        ?'<button class="gal-pin-btn gal-pin-active" data-fid="'+fid+'" onclick="event.stopPropagation();gwGalleryUnpin(this.dataset.fid)">📌 On Wall</button>'
-        :'<button class="gal-pin-btn" data-fid="'+fid+'" onclick="event.stopPropagation();gwGalleryPin(this.dataset.fid)">📌 Pin to Wall</button>';
+      /* Red pin = on wall, gray pin = not pinned */
+      pinIcon=p.pinned
+        ?'<button style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:#ef4444;line-height:1" data-fid="'+fid+'" onclick="event.stopPropagation();gwGalleryUnpin(this.dataset.fid)" title="Unpin from wall">📌</button>'
+        :'<button style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;color:var(--muted);line-height:1;filter:grayscale(1)" data-fid="'+fid+'" onclick="event.stopPropagation();gwGalleryPin(this.dataset.fid)" title="Pin to wall">📌</button>';
+      trashIcon='<button style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;color:var(--muted);line-height:1" data-fid="'+fid+'" onclick="event.stopPropagation();pwDelete(this.dataset.fid)" title="Delete photo">🗑️</button>';
     } else {
-      pinBtn=p.pinned?'<div style="font-size:9px;color:var(--accent);text-align:center;padding:2px 0">📌 On Wall</div>':'';
+      pinIcon=p.pinned?'<span style="font-size:14px;color:#ef4444;padding:2px 4px" title="On wall">📌</span>':'<span style="font-size:14px;color:var(--muted);filter:grayscale(1);padding:2px 4px" title="Not pinned">📌</span>';
     }
-    return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border);cursor:pointer" data-fid="'+fid+'" onclick="pwOpenFullPhotoByFsId(this.dataset.fid)">'
-      +'<img src="'+p.src+'" style="width:100%;height:120px;object-fit:cover;display:block;pointer-events:none" />'
-      +'<div style="padding:6px">'
-      +'<div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.uploaderFull+'</div>'
-      +(p.caption?'<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">'+p.caption+'</div>':'')
-      +'<div style="margin-top:5px">'+pinBtn+'</div>'
-      +'</div></div>';
+    return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border);cursor:pointer;position:relative" data-fid="'+fid+'" onclick="pwOpenFullPhotoByFsId(this.dataset.fid)">'
+      +'<img src="'+p.src+'" style="width:100%;height:140px;object-fit:cover;display:block;pointer-events:none" />'
+      +'<div style="position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:flex-end;align-items:center;padding:4px 6px;background:rgba(0,0,0,.35)">'
+      +pinIcon+trashIcon
+      +'</div>'
+      +'</div>';
   }).join('');
-  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:4px">'+cards+'</div>';
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:4px">'+cards+'</div>';
 }
 
 function pwOpenFullPhotoByFsId(fsId){
@@ -3946,7 +3937,7 @@ function buildMgrFilterBar(tab,activeLabel,groupLabel,isOpen,activeDateF,filterF
     return '<button class="filter-pill'+(activeDateF===f?' active':'')+'" data-f="'+f+'" onclick="'+filterFn+'(this)">'+labels[i]+'</button>';
   }).join('');
   var bar='<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'
-    +'<span style="font-size:11px;color:var(--muted)">'+activeLabel+' &middot; '+groupLabel+'</span>'
+    +'<span style="font-size:11px;color:var(--muted)">'+activeLabel+(groupLabel&&groupLabel!=='All Members'?' &middot; '+groupLabel:'')+'</span>'
     +'<button onclick="'+toggleFn+'" style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">'
     +(isOpen?'&#9650; Hide Filters':'&#9660; Show Filters')+'</button></div>';
   if(!isOpen)return bar;
@@ -3959,29 +3950,23 @@ function buildMgrFilterBar(tab,activeLabel,groupLabel,isOpen,activeDateF,filterF
 
 function buildMgrGroupFilterBar(tab,isOpen,groupF,nameF,members,setGroupFn,setNameFn,clearFn){
   if(!isOpen)return '';
-  var s1=setGroupFn; var s2=setNameFn; var s3=clearFn;
-  var a1=groupF==='all'?' active':'';
-  var a2=groupF==='uploader'?' active':'';
-  var a3=groupF==='escalation'?' active':'';
-  var opts=members.filter(function(m){return groupF==='all'||m.role.toLowerCase()===groupF;})
-    .map(function(m){return '<option value="'+m.nickname+'"'+(nameF===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('');
-  var clrBtn=(groupF!=='all'||nameF)?'<button class="filter-pill" style="color:var(--muted)" onclick="'+s3+'()">&#10005; Clear</button>':'' ;
+  /* Group pills removed — member dropdown only */
+  var allMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var opts=allMembers.map(function(m){return '<option value="'+m.nickname+'"'+(nameF===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('');
+  var sel='<select style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer" onchange="'+setNameFn+'(this.value)">'
+    +'<option value="">All Members</option>'+opts+'</select>';
+  var clrBtn=nameF?'<button class="filter-pill" style="color:var(--muted)" onclick="'+clearFn+'()">&#10005; Clear</button>':'';
   return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
-    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Group:</span>'
-    +'<button class="filter-pill'+a1+'" onclick="'+s1+'(\'all\')">All</button>'
-    +'<button class="filter-pill'+a2+'" onclick="'+s1+'(\'uploader\')">Uploaders</button>'
-    +'<button class="filter-pill'+a3+'" onclick="'+s1+'(\'escalation\')">Escalation</button>'
-    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-left:8px">Member:</span>'
-    +'<select style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer" onchange="'+s2+'(this.value)">'
-    +'<option value="">All Members</option>'+opts+'</select>'+clrBtn+'</div>';
+    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Member:</span>'
+    +sel+clrBtn+'</div>';
 }
 
 function mgrHubSetGroup(g){mgrHubGroupFilter=g;mgrHubNameFilter='';renderMgrHubPerformance();}
 function mgrHubSetName(n){mgrHubNameFilter=n;renderMgrHubPerformance();}
-function mgrHubClearGroupName(){mgrHubGroupFilter='all';mgrHubNameFilter='';renderMgrHubPerformance();}
+function mgrHubClearGroupName(){mgrHubNameFilter='';renderMgrHubPerformance();}
 function mgrQSetGroup(g){mgrQGroupFilter=g;mgrQNameFilter='';renderMgrHubQuality();}
 function mgrQSetName(n){mgrQNameFilter=n;renderMgrHubQuality();}
-function mgrQClearGroupName(){mgrQGroupFilter='all';mgrQNameFilter='';renderMgrHubQuality();}
+function mgrQClearGroupName(){mgrQNameFilter='';renderMgrHubQuality();}
 function mgrAttSetGroup(g){mgrAttGroupFilter=g;mgrAttNameFilter='';renderMgrHubAttendance();}
 function mgrAttSetName(n){mgrAttNameFilter=n;renderMgrHubAttendance();}
 function mgrAttClearGroupName(){mgrAttGroupFilter='all';mgrAttNameFilter='';renderMgrHubAttendance();}
@@ -3991,19 +3976,13 @@ function renderMgrHubPerformance(){
 
   /* filter bar */
   var allPerfMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
-  var _perfFiltered=allPerfMembers.filter(function(m){
-    if(mgrHubGroupFilter!=='all'&&m.role.toLowerCase()!==mgrHubGroupFilter)return false;
-    if(mgrHubNameFilter&&m.nickname!==mgrHubNameFilter)return false;
-    return true;
-  });
-  var _perfLabel={all:'All Time',week:'This Week',month:'This Month',quarter:'This Quarter',year:'This Year',custom:'Custom Range'}[mgrHubDateFilter]||'Filtered';
-  var _perfGroup=mgrHubNameFilter?(TEAM.find(function(m){return m.nickname===mgrHubNameFilter;})||{fullName:mgrHubNameFilter}).fullName:(mgrHubGroupFilter==='uploader'?'Uploaders':mgrHubGroupFilter==='escalation'?'Escalation':'All Members');
-  var filterBar=buildMgrFilterBar('perf',_perfLabel,_perfGroup,mgrHubFilterOpen,mgrHubDateFilter,'mgrHubFilter','mgrHubClearFilter','rcal-mgr-perf');
-  var groupFilterBar=buildMgrGroupFilterBar('perf',mgrHubFilterOpen,mgrHubGroupFilter,mgrHubNameFilter,allPerfMembers,'mgrHubSetGroup','mgrHubSetName','mgrHubClearGroupName');
+  var _perfLabel={all:'All Time',today:'Today',week:'This Week',month:'This Month',quarter:'This Quarter',year:'This Year',custom:'Custom Range'}[mgrHubDateFilter]||'Filtered';
+  var _perfMemberLabel=mgrHubNameFilter?(TEAM.find(function(m){return m.nickname===mgrHubNameFilter;})||{fullName:mgrHubNameFilter}).fullName:'All Members';
+  var filterBar=buildMgrFilterBar('perf',_perfLabel,_perfMemberLabel,mgrHubFilterOpen,mgrHubDateFilter,'mgrHubFilter','mgrHubClearFilter','rcal-mgr-perf');
+  var groupFilterBar=buildMgrGroupFilterBar('perf',mgrHubFilterOpen,'all',mgrHubNameFilter,allPerfMembers,'mgrHubSetGroup','mgrHubSetName','mgrHubClearGroupName');
 
     /* ── UPLOADERS ── */
-  var uploaders=_perfFiltered.filter(function(m){return m.role.toLowerCase()==='uploader';});
-  if(!uploaders.length&&!mgrHubNameFilter&&mgrHubGroupFilter==='all')uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
+  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader'&&(!mgrHubNameFilter||m.nickname===mgrHubNameFilter);});
   var uplData=uploaders.map(function(m){
     var nick=m.nickname;
     var days=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
@@ -4236,7 +4215,10 @@ function renderMgrHubQuality(){
   var _qGroup=mgrQNameFilter?(TEAM.find(function(m){return m.nickname===mgrQNameFilter;})||{fullName:mgrQNameFilter}).fullName:(mgrQGroupFilter==='uploader'?'Uploaders':mgrQGroupFilter==='escalation'?'Escalation':'All Members');
   var filterBar=buildMgrFilterBar('quality',_qLabel,_qGroup,mgrQFilterOpen,mgrQDateFilter,'mgrQFilter','mgrQClearFilter','rcal-mgr-quality');
   var allQMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
-  var qGroupFilterBar=buildMgrGroupFilterBar('quality',mgrQFilterOpen,mgrQGroupFilter,mgrQNameFilter,allQMembers,'mgrQSetGroup','mgrQSetName','mgrQClearGroupName');
+  var _qLabel={all:'All Time',today:'Today',week:'This Week',month:'This Month',quarter:'This Quarter',year:'This Year',custom:'Custom Range'}[mgrQDateFilter]||'Filtered';
+  var _qMemberLabel=mgrQNameFilter?(TEAM.find(function(m){return m.nickname===mgrQNameFilter;})||{fullName:mgrQNameFilter}).fullName:'All Members';
+  var filterBar=buildMgrFilterBar('quality',_qLabel,_qMemberLabel,mgrQFilterOpen,mgrQDateFilter,'mgrQFilter','mgrQClearFilter','rcal-mgr-quality');
+  var qGroupFilterBar=buildMgrGroupFilterBar('quality',mgrQFilterOpen,'all',mgrQNameFilter,allQMembers,'mgrQSetGroup','mgrQSetName','mgrQClearGroupName');
 
   
   function makeRow(nick,fullName){
@@ -4269,8 +4251,9 @@ function renderMgrHubQuality(){
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Contract Errors</th>'
     +'</tr></thead>';
 
-  var uploaders=(mgrHubNameFilter||mgrHubGroupFilter!=='all')?_perfFiltered.filter(function(m){return m.role.toLowerCase()==='uploader';}):TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
-  var escMembers=(mgrHubNameFilter||mgrHubGroupFilter!=='all')?_perfFiltered.filter(function(m){return m.role.toLowerCase()==='escalation';}):TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
+  /* Filter by name only (group filter removed) */
+  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader'&&(!mgrHubNameFilter||m.nickname===mgrHubNameFilter);});
+  var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation'&&(!mgrHubNameFilter||m.nickname===mgrHubNameFilter);});
 
   var uplRows=uploaders.map(function(m){return makeRow(m.nickname,m.fullName);}).join('');
   var escRows=escMembers.map(function(m){return makeRow(m.nickname,m.fullName);}).join('');
@@ -5477,8 +5460,6 @@ function openMgrWrite(){
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
   var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
   if(mgrQNameFilter){uploaders=uploaders.filter(function(m){return m.nickname===mgrQNameFilter;});escMembers=escMembers.filter(function(m){return m.nickname===mgrQNameFilter;});}
-  if(mgrQGroupFilter==='uploader')escMembers=[];
-  if(mgrQGroupFilter==='escalation')uploaders=[];
   var uplOpts='<option value="">Select uploader...</option>'+uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   var escOpts='<option value="">Select escalation member...</option>'+escMembers.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   ['mw-err-upl','mw-qesc-upl'].forEach(function(id){var el=G(id);if(el)el.innerHTML=uplOpts;});
