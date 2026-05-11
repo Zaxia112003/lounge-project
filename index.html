@@ -2283,7 +2283,7 @@ function updateMemberBell(){
   var myCallouts=callouts.filter(function(co){
     /* Uploader sees their own errors; Escalation member sees qesc they're named in */
     var isMyError=co.uploader===cu.nickname;
-    var isMyEsc=cu.role==='escalation'&&co.type==='qesc'&&co.escalationMember===cu.nickname;
+    var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname;
     return (isMyError||isMyEsc)
       &&((co.status==='Pending')||(co.status==='Completed'&&!co.completedRead));
   });
@@ -4101,7 +4101,8 @@ function renderMgrHubPerformance(){
     :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
 
   var escRows=escData.map(function(r,i){
-    var rateStr=r.rate!==null?r.rate.toFixed(1):'0.0';
+    var rateSuspect=r.memberHrs>0&&r.memberHrs<0.05;/* <3min total → suspicious */
+    var rateStr=(r.rate!==null&&!rateSuspect)?r.rate.toFixed(1):'—';
     var qualBadge=r.qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
       :r.qualEsc<=3
@@ -4114,7 +4115,7 @@ function renderMgrHubPerformance(){
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(r.memberHrs>0?r.memberHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px"><span onclick="openMgrTimerLog(\''+ r.nick +'\')" style="color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px">uploads/hr · '+(r.memberHrs>0?r.memberHrs.toFixed(1)+'h':'0.0h')+'</span></div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -5636,16 +5637,77 @@ function mwDetailConfirm(){
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
   mwDetailReset();closeMgrWrite();
 }
+/* ── MANAGER TIMER SESSION VIEW ── */
+var _mgrTimerNick=null;
+function openMgrTimerLog(nick){
+  _mgrTimerNick=nick;
+  var m=TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick};
+  var sessions=(allTimerSessions||[]).filter(function(s){return s.nick===nick;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+  var modal=G('modal-mgr-timer');
+  if(!modal)return;
+  G('mgr-timer-title').textContent='⏱ '+m.fullName+' — Timer Sessions';
+  var tbody=G('mgr-timer-tbody');
+  if(!sessions.length){
+    tbody.innerHTML='<tr><td colspan="5" style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No sessions recorded.</td></tr>';
+  } else {
+    tbody.innerHTML=sessions.map(function(s,i){
+      var hh=Math.floor(s.seconds/3600),mm=Math.floor((s.seconds%3600)/60),ss2=s.seconds%60;
+      var dur=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss2).padStart(2,'0');
+      var rate=s.seconds>0?(s.uploads||(0)):(null);/* uploads not stored per-session yet */
+      var flagged=(s.seconds<60)||(s.seconds>8*3600); /* <1min or >8hr */
+      var rowStyle=flagged?'background:rgba(247,43,110,.06)':'';
+      var flagIcon=flagged?'<span title="Suspicious session" style="color:var(--red);margin-left:4px">⚠</span>':'';
+      return '<tr style="border-bottom:1px solid var(--border);'+rowStyle+'">'
+        +'<td style="padding:8px 10px;font-size:11px;color:var(--muted)">'+s.date+'</td>'
+        +'<td style="padding:8px 10px;font-size:11px;color:var(--text)">'+(s.start||'—').replace('T',' ').slice(0,16)+'</td>'
+        +'<td style="padding:8px 10px;font-size:11px;color:var(--text)">'+(s.end||'—').replace('T',' ').slice(0,16)+'</td>'
+        +'<td style="padding:8px 10px;font-size:12px;font-weight:700;font-family:var(--font-d);color:var(--accent)">'+dur+flagIcon+'</td>'
+        +'<td style="padding:8px 10px;text-align:center">'
+        +'<button data-fsid="'+(s._fsId||'')+'" data-nick="'+nick+'" onclick="mgrDeleteTimerSession(this.dataset.fsid,this.dataset.nick)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px" title="Delete session">🗑️</button>'
+        +'</td>'
+        +'</tr>';
+    }).join('');
+    /* Total */
+    var totalSecs=sessions.reduce(function(a,s){return a+s.seconds;},0);
+    var th=Math.floor(totalSecs/3600),tm=Math.floor((totalSecs%3600)/60);
+    tbody.innerHTML+='<tr style="border-top:2px solid var(--border2);background:rgba(139,45,255,.06)">'
+      +'<td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Total</td>'
+      +'<td style="padding:8px 10px;font-size:13px;font-weight:700;font-family:var(--font-d);color:var(--text)">'+String(th).padStart(2,'0')+':'+String(tm).padStart(2,'0')+':00</td>'
+      +'<td></td></tr>';
+  }
+  modal.classList.add('open');
+}
+
+function mgrDeleteTimerSession(fsId,nick){
+  if(!fsId||!confirm('Delete this timer session?'))return;
+  /* Remove from allTimerSessions */
+  var idx=allTimerSessions.findIndex(function(s){return s._fsId===fsId;});
+  if(idx>-1)allTimerSessions.splice(idx,1);
+  /* Remove from Firestore */
+  if(fsDb())try{window._fsDeleteDoc(window._fsDoc(fsDb(),'timerSessions',String(fsId)));}catch(e){}
+  /* Refresh modal and manager hub */
+  openMgrTimerLog(nick);
+  if(typeof renderMgrHubPerformance==='function')renderMgrHubPerformance();
+}
+
 async function mwSubmitQEsc(){
   var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-qesc-file').files[0]?await uploadScreenshot(G('mw-qesc-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
-  var newQEsc={id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
-  callouts.push(newQEsc);
-  fsSaveCallout(newQEsc);
-  sendManagerDirectNotif(newQEsc);
+  var sharedMeta={address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
+  /* Callout 1: for the uploader (existing qesc flow) */
+  var uplCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,status:'Pending',insight:''});
+  callouts.push(uplCallout);
+  fsSaveCallout(uplCallout);
+  sendManagerDirectNotif(uplCallout);
+  /* Callout 2: for the escalation member (independent thread) */
+  if(esc){
+    var escCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc_esc',uploader:upl,escalationMember:esc,status:'Pending',insight:'',escThread:true});
+    callouts.push(escCallout);
+    fsSaveCallout(escCallout);
+  }
   updateMemberBell();
   pushNotif('🚨','Critical escalation logged for '+uplMem.fullName+' at "'+addr+'".','qesc');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
@@ -5941,53 +6003,81 @@ function escDetailParse(){
   var raw=G('esc-detail-paste').value.trim();
   var st=G('esc-detail-status');
   if(!raw){if(st)st.textContent='Please paste data first.';return;}
-  var nick=cu.nickname;var matched=null;
+  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return m.nickname;});
+  var mapped=[];
   var lines=raw.split('\n').filter(function(l){return l.trim();});
   lines.forEach(function(line){
-    /* Support tab-separated and multi-space-separated (Zendesk export formats) */
     var parts=line.split('\t');
-    if(parts.length<2){
-      /* Try splitting on 2+ spaces as fallback */
-      parts=line.trim().split(/  +/);
-    }
+    if(parts.length<2)parts=line.trim().split(/  +/);
     if(parts.length<2)return;
-    var lineEmail=parts[0].trim().toLowerCase();
-    var lineNick=EMAIL_MAP[lineEmail];
-    if(!lineNick){
-      var userPart=lineEmail.split('@')[0];
-      Object.keys(EMAIL_MAP).forEach(function(k){
-        var kUser=k.split('@')[0];var score=0,minLen=Math.min(userPart.length,kUser.length);
-        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
-        score=score/Math.max(userPart.length,kUser.length);
-        if(score>0.8)lineNick=EMAIL_MAP[k];
-      });
-    }
-    if(lineNick!==nick)return;
+    var email=parts[0].trim().toLowerCase();
     var total=parseInt(parts[1].trim())||0;
     var earliestRaw=parts[2]?parts[2].trim():'';
-    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
+    var latestRaw=parts[3]?parts[3].trim():'';
+    var nick=EMAIL_MAP[email];
+    if(!nick){
+      var userPart=email.split('@')[0];
+      var bestMatch=null,bestScore=0;
+      Object.keys(EMAIL_MAP).forEach(function(k){
+        var kUser=k.split('@')[0];
+        var score=0,minLen=Math.min(userPart.length,kUser.length);
+        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
+        score=score/Math.max(userPart.length,kUser.length);
+        if(score>0.8&&score>bestScore){bestScore=score;bestMatch=EMAIL_MAP[k];}
+      });
+      nick=bestMatch;
+    }
+    if(!nick||uploaderNicks.indexOf(nick)<0)return;
     var dateStr=null;
-    if(dateMatch){var mMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};dateStr=dateMatch[3]+'-'+(mMap[dateMatch[1]]||'01')+'-'+dateMatch[2].padStart(2,'0');}
-    matched={nick:nick,fullName:cu.fullName,total:total,date:dateStr,earliest:earliestRaw};
+    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
+    if(dateMatch){
+      var mMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
+      dateStr=dateMatch[3]+'-'+(mMap[dateMatch[1]]||'01')+'-'+dateMatch[2].padStart(2,'0');
+    }
+    var sh=SHIFTS[nick]||{start:9,end:18};
+    var earliest=dlParseTime(earliestRaw),latest=dlParseTime(latestRaw);
+    var inShift=total,offShift=0;
+    if(earliest!==null&&latest!==null&&total>0){
+      var wS=Math.max(earliest,sh.start),wE=Math.min(latest,sh.end),tw=latest-earliest||1,iw=Math.max(0,wE-wS);
+      var ratio=Math.min(iw/tw,1);inShift=Math.round(total*ratio);offShift=total-inShift;
+    }
+    mapped.push({nick:nick,fullName:(TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick}).fullName,total:total,inShift:inShift,offShift:offShift,date:dateStr,earliest:earliestRaw,latest:latestRaw});
   });
-  if(!matched){if(st)st.textContent='Row not found. Your email in system: '+((TEAM_DIR[nick]||{}).email||'NOT SET - add via My Team')+'. Ensure it matches the pasted report email.';return;}
-  escDetailExtracted=matched;if(st)st.textContent='';
+  if(!mapped.length){if(st)st.textContent='No matching uploaders found. Check emails are registered in My Team.';return;}
+  escDetailExtracted=mapped;if(st)st.textContent='';
   G('esc-detail-paste-wrap').style.display='none';
-  var today=new Date().toISOString().split('T')[0];
-  G('esc-detail-table').innerHTML='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">'+(matched.date||today)+'</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid var(--border2)"><th style="padding:5px 8px;text-align:left;color:var(--muted)">Member</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Total Uploads</th></tr></thead>'
-    +'<tbody><tr><td style="padding:6px 8px;color:var(--text);font-weight:600">'+matched.fullName+'</td><td style="padding:6px 8px;text-align:center">'+matched.total+'</td></tr></tbody></table>';
+  var tbl='<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr style="border-bottom:1px solid var(--border2)">'
+    +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Uploader</th>'
+    +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-weight:600">Total</th>'
+    +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-weight:600">In-Shift</th>'
+    +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-weight:600">Off-Shift</th>'
+    +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Window</th>'
+    +'</tr></thead><tbody>'
+    +mapped.map(function(r){
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
+        +'<td style="padding:6px 8px;color:var(--text);font-weight:600">'+r.fullName+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--text)">'+r.total+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--green)">'+r.inShift+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--amber)">'+r.offShift+'</td>'
+        +'<td style="padding:6px 8px;color:var(--muted)">'+(r.earliest||'—')+' → '+(r.latest||'—')+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table>';
+  G('esc-detail-table').innerHTML=tbl;
   G('esc-detail-preview').style.display='';
 }
 function escDetailConfirm(){
-  if(!escDetailExtracted)return;
-  var r=escDetailExtracted;var today=new Date().toISOString().split('T')[0];
-  var dateKey=r.date||today;
-  if(!perfData[r.nick])perfData[r.nick]={};
-  var ex=perfData[r.nick][dateKey]||{};
-  perfData[r.nick][dateKey]=Object.assign(ex,{uploadsTotal:r.total,uploadsInShift:r.total,uploadsOffShift:0});
-  fsSavePerfData(r.nick);
-  pushNotif('📊','Daily detail saved — '+r.total+' uploads for '+r.fullName+'.','detail');
+  if(!escDetailExtracted||!escDetailExtracted.length)return;
+  var today=getSydneyDate().toISOString().split('T')[0];
+  escDetailExtracted.forEach(function(r){
+    var dateKey=r.date||today;
+    if(!perfData[r.nick])perfData[r.nick]={};
+    var ex=perfData[r.nick][dateKey]||{};
+    perfData[r.nick][dateKey]={uploadsTotal:r.total,uploadsInShift:r.inShift,uploadsOffShift:r.offShift,ahtTotal:ex.ahtTotal||0,ahtCount:ex.ahtCount||0,ahtSecs:ex.ahtSecs||0};
+    fsSavePerfData(r.nick);
+  });
+  pushNotif('📊','Daily upload detail saved for '+escDetailExtracted.length+' uploader(s).','detail');
   escDetailReset();closeDailyLog();
 }
 
@@ -6466,7 +6556,12 @@ function setEscQPCustom(){
 function renderEscQuality(){
   var target=G('esc-qp-list');if(!target)return;
   var nick=cu.nickname;
-  var list=callouts.slice().reverse().filter(function(c){return c.uploader===nick;});
+  /* Escalation sees their own qesc_esc callouts (where they are the escalation member) */
+  var list=callouts.slice().reverse().filter(function(c){
+    var isOwnUpload=c.uploader===nick&&c.type!=='qesc_esc';
+    var isEscThread=c.type==='qesc_esc'&&c.escalationMember===nick;
+    return isOwnUpload||isEscThread;
+  });
   if(escQPDateFilter!=='all'){
     var now=new Date();var rs=null;
     if(escQPDateFilter==='week'){var dw=now.getDay();var m2=new Date(now);m2.setDate(now.getDate()-(dw===0?6:dw-1));m2.setHours(0,0,0,0);rs=m2;}
@@ -6485,7 +6580,7 @@ function renderEscQuality(){
     var logger=(TEAM.find(function(m){return m.nickname===c.loggedBy;})||{fullName:c.loggedBy||''}).fullName;
     var ss=c.screenshot?'<img src="'+c.screenshot+'" class="qp-screenshot" alt="ss"/>':'';
     var critBadge=isCrit?'<div class="qp-crit-badge">&#128680; CRITICAL</div>':'';
-    var canAck=c.uploader===cu.nickname&&c.status==='Pending';
+    var canAck=(c.uploader===cu.nickname||c.escalationMember===cu.nickname)&&c.status==='Pending';
     var isAcked=c.status==='Acknowledged'||c.status==='Completed';
     var ackSect='';
     if(canAck){ackSect='<div class="ack-wrap"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+c.id+'"></textarea></div><button class="btn btn-primary btn-sm" data-id="'+c.id+'" onclick="ackCo(+this.dataset.id)">&#10003; Acknowledge</button> ';}
@@ -6834,6 +6929,11 @@ function ackCo(id){
         }
       });
     });}catch(e){console.warn('ackCo query',e);}
+  }
+  /* For escThread callouts, create an errorReview so manager sees acknowledgement */
+  if(c.type==='qesc_esc'&&c.escalationMember===cu.nickname){
+    var escThread={calloutId:c.id,calloutFsId:c._fsId||null,uploader:c.escalationMember,uploaderFull:cu.fullName,address:c.address,date:c.date,feedback:c.feedback,status:'acknowledged',insight:c.insight,acknowledgedAt:c.acknowledgedAt,loggedBy:c.loggedBy,type:'qesc_esc'};
+    if(fsDb()){try{window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),escThread);}catch(e){console.warn('escThread review',e);}}
   }
   pushNotif('✅',cu.fullName+' acknowledged the call-out for "'+c.address+'".','ack');
   /* Update card in place */
@@ -7777,5 +7877,31 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
+
+<!-- MANAGER TIMER SESSION VIEW MODAL -->
+<div class="modal-overlay" id="modal-mgr-timer" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:640px">
+    <button class="modal-close" onclick="G('modal-mgr-timer').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title" id="mgr-timer-title">Timer Sessions</div>
+    <div class="modal-sub">Sessions flagged ⚠ are shorter than 3 minutes or longer than 8 hours.</div>
+    <div style="overflow-x:auto;margin-top:8px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border2)">
+            <th style="padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:left">Date</th>
+            <th style="padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:left">Start</th>
+            <th style="padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:left">End</th>
+            <th style="padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:left">Duration</th>
+            <th style="padding:8px 10px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="mgr-timer-tbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="G('modal-mgr-timer').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
