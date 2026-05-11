@@ -1350,7 +1350,8 @@ function fsStartRealtimeListeners(){
       mdAwards.quarter=data.quarter||null;
       mdAwards.quality=data.quality||null;
       mdAwards.uploads=data.uploads||null;
-      if(G('awards-panel')||document.querySelector('.award-col'))renderAwards&&renderAwards();
+      renderMyDay();
+      if(typeof renderAwards==='function')setTimeout(renderAwards,50);
     }
   }));
 
@@ -1485,13 +1486,13 @@ function loadTeamData(){
 }
 let timerIv=null,timerStart=null,timerStartISO=null,timerOn=false;
 /* timerSessions: [{date:'2026-04-26', start:'2026-04-26T09:30:00', end:'2026-04-26T10:30:00', seconds:3600}] */
-var timerSessions=(function(){try{var s=localStorage.getItem('timerSessions_esc');return s?JSON.parse(s):[];}catch(e){return [];}}());
+var timerSessions=[]; /* loaded per-user after login */
 let perfData={};
 let callouts=[];
 let attendance={};
 let notifications=[];
 let nextId=1;
-let activeDateFilter='month';
+let activeDateFilter='today';
 let customRange={from:'',to:''};
 let attCalNick=null,attCalYear=null,attCalMonth=null,attPending=null;
 let settings={theme:'light',accent:'#8b2dff',compact:true,noMotion:false,use24h:false};
@@ -1647,11 +1648,12 @@ function goDash(){
   }catch(e){}
   buildSidebar();buildMain();
   if(cu&&cu.role==='manager')loadPendingReviews();
+  /* Load user-specific timer sessions */
+  if(cu&&(cu.role==='escalation'||cu.role==='uploader')){
+    try{var _ts=localStorage.getItem('timerSessions_'+cu.nickname);timerSessions=_ts?JSON.parse(_ts):[];}catch(e){timerSessions=[];}
+  }
   var li=G('main-loggedin');if(li&&cu)li.innerHTML='Logged in as <span style="color:var(--accent);font-weight:700">'+cu.fullName+'</span>';
-  /* Init range calendars */
-  setTimeout(function(){
-    if(G('rcal-upl-perf-trigger'))rcalCreate('rcal-upl-perf',function(from,to){customRange={from:from,to:to};activeDateFilter='custom';document.querySelectorAll('.filter-pill').forEach(function(p){p.classList.remove('active');});renderDashboard();});
-  },100);
+  /* rcal-upl-perf is initialized inside renderDashboard after each clone */
 }
 
 /* ── RECOVERED FUNCTIONS ── */
@@ -2219,7 +2221,10 @@ async function loadPendingReviews(){
 function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
   var myCallouts=callouts.filter(function(co){
-    return co.uploader===cu.nickname
+    /* Uploader sees their own errors; Escalation member sees qesc they're named in */
+    var isMyError=co.uploader===cu.nickname;
+    var isMyEsc=cu.role==='escalation'&&co.type==='qesc'&&co.escalationMember===cu.nickname;
+    return (isMyError||isMyEsc)
       &&((co.status==='Pending')||(co.status==='Completed'&&!co.completedRead));
   });
   var wrap=G('member-bell-wrap');
@@ -2235,7 +2240,9 @@ function memberBellClick(){
 function openMemberBellPanel(){
   if(!cu||cu.role==='manager')return;
   var myCallouts=callouts.filter(function(co){
-    return co.uploader===cu.nickname
+    var isMyError=co.uploader===cu.nickname;
+    var isMyEsc=cu.role==='escalation'&&co.type==='qesc'&&co.escalationMember===cu.nickname;
+    return (isMyError||isMyEsc)
       &&((co.status==='Pending')||(co.status==='Completed'&&!co.completedRead));
   });
   var list=G('member-notif-list');if(!list)return;
@@ -2488,9 +2495,9 @@ function buildUploaderDOM(){
     </div>
     <div class="sub-pane active" id="sub-perf">
       <div class="filter-bar" id="fbar">
-        <button class="filter-pill" onclick="setF('today',this)">Today</button>
+        <button class="filter-pill active" onclick="setF('today',this)">Today</button>
         <button class="filter-pill" onclick="setF('week',this)">This Week</button>
-        <button class="filter-pill active" onclick="setF('month',this)">This Month</button>
+        <button class="filter-pill" onclick="setF('month',this)">This Month</button>
         <button class="filter-pill" onclick="setF('quarter',this)">This Quarter</button>
         <button class="filter-pill" onclick="setF('year',this)">This Year</button>
         <button class="filter-pill" style="color:var(--muted)" onclick="setF('all',this)">&#10005; Clear</button>
@@ -3249,7 +3256,8 @@ function awardsCarouselNext(){
 }
 
 function renderAwards(){
-  var el=G('awards-grid');if(!el)return;
+  /* awards-grid may be in cloned hub pane — search all instances */
+  var el=G('awards-grid')||document.querySelector('[id="awards-grid"]');if(!el)return;
   var idxEl=G('awards-carousel-idx');
   if(idxEl)idxEl.textContent=(_awardsIdx+1)+' / '+AWARD_DEFS.length;
 
@@ -5412,6 +5420,7 @@ function mwSubmitAwards(){
   });
   fsSaveAwards();
   pushNotif('🏆',def.title+' updated by '+cu.fullName+'.','awards');
+  renderMyDay();
   if(typeof renderAwards==='function')renderAwards();
   /* Reset form */
   G('mw-award-category').value='';
@@ -5574,36 +5583,7 @@ async function mwSubmitQEsc(){
 }
 
 
-function mwSubmitAwards(){
-  var syd=getSydneyDate();
-  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var mon=months[syd.getMonth()];var yr=syd.getFullYear();
-  var weekNum=Math.ceil(syd.getDate()/7);var weekLabel='Week '+weekNum;
-  var q='Q'+(Math.floor(syd.getMonth()/3)+1)+' '+yr;
-  var medals=['🥇','🥈','🥉'];
-  function gv(id){var el=G(id);return el?el.value:'';}
-  function buildTop(nicks,scores){var top=[];nicks.forEach(function(nick,i){if(nick)top.push({nick:nick,score:scores?scores[i]:null});});return top.length?{top:top}:null;}
-  function saveAward(key,topData,award,emoji,label){
-    mdAwards[key]=topData;
-    if(topData&&topData.top){topData.top.forEach(function(p,i){var entry={nick:p.nick,award:award,emoji:emoji,label:label+' '+medals[i],score:p.score,adu:p.adu,qs:p.qs,esc:p.esc,date:syd.toISOString()};awardHistory.push(entry);fsSaveAwardHistory(entry);});}
-  }
-  var qcTop=buildTop([gv('mw-qc-1'),gv('mw-qc-2'),gv('mw-qc-3')],[gv('mw-qc-1-score'),gv('mw-qc-2-score'),gv('mw-qc-3-score')]);
-  var umTop=buildTop([gv('mw-um-1'),gv('mw-um-2'),gv('mw-um-3')],[gv('mw-um-1-score'),gv('mw-um-2-score'),gv('mw-um-3-score')]);
-  var heroNicks=[gv('mw-hero-1'),gv('mw-hero-2'),gv('mw-hero-3')];
-  var heroTop=buildTop(heroNicks,null);
-  if(heroTop&&heroTop.top){heroTop.top.forEach(function(p,i){var n=i+1;p.adu=gv('mw-hero-'+n+'-adu');p.qs=gv('mw-hero-'+n+'-qs');p.esc=gv('mw-hero-'+n+'-esc');});}
-  var qmNicks=[gv('mw-qm-1'),gv('mw-qm-2'),gv('mw-qm-3')];
-  var qmTop=buildTop(qmNicks,null);
-  if(qmTop&&qmTop.top){qmTop.top.forEach(function(p,i){var n=i+1;p.adu=gv('mw-qm-'+n+'-adu');p.qs=gv('mw-qm-'+n+'-qs');p.esc=gv('mw-qm-'+n+'-esc');});}
-  saveAward('quality',qcTop,'Quality Champion','🏆',mon+', '+weekLabel+' — '+yr);
-  saveAward('uploads',umTop,'Uploading Monster','👾',mon+', '+weekLabel+' — '+yr);
-  saveAward('hero',heroTop,'Hero of the Month','🦸',mon+', '+weekLabel+' — '+yr);
-  saveAward('quarter',qmTop,'Quarter Master','⭐',q);
-  fsSaveAwards();
-  pushNotif('🏆','Awards updated by '+cu.fullName+'.','awards');
-  if(typeof renderAwards==='function')renderAwards();
-  closeMgrWrite();
-}
+
 
 /* ── DAILY LOG OVERLAY ── */
 function openDailyLog(){
@@ -6495,7 +6475,7 @@ function getStats(nick,range){
 function renderDashboard(){
   const nick=cu.nickname;const range=getDateRange();const s=getStats(nick,range);const q=currentQuarter();
   const sub=G('dash-sub');
-  if(sub){const sh=SHIFTS[nick];const lbl={today:'Today',week:'This Week',month:'This Month',quarter:q.label,custom:`${fmtDate(customRange.from)} – ${fmtDate(customRange.to)}`};sub.textContent=(sh?`Shift: ${sh.start}:00–${sh.end}:00 AEST  ·  `:'')+(lbl[activeDateFilter]||'');}
+  if(sub){const sh=SHIFTS[nick];const lbl={today:'Today',week:'This Week',month:'This Month',quarter:q.label,year:'This Year',custom:`${fmtDate(customRange.from)} – ${fmtDate(customRange.to)}`};sub.textContent=(sh?`Shift: ${sh.start}:00–${sh.end}:00 AEST  ·  `:'')+(lbl[activeDateFilter]||'');}
   const qB=s.qScore===null?`<span class="kpi-badge kb-amber">No Data</span>`:s.qScore>=95?`<span class="kpi-badge kb-green">✓ On Target</span>`:`<span class="kpi-badge kb-red">⚠ Below Target</span>`;
   const eB=s.qEsc>3?`<span class="kpi-badge kb-red">⚠ Exceeded</span>`:`<span class="kpi-badge kb-green">✓ On Track</span>`;
   const kpi=G('kpi-grid');
@@ -6526,6 +6506,18 @@ function renderDashboard(){
       <div class="prog-wrap"><div class="prog-bar" style="width:${Math.min(s.qScore||0,100)}%"></div></div>
     </div>`;
   renderDailyTbl(nick,range);
+  /* Re-init custom range calendar after each render (DOM was re-cloned) */
+  setTimeout(function(){
+    if(G('rcal-upl-perf-trigger')&&!G('rcal-upl-perf-trigger')._rcalInit){
+      G('rcal-upl-perf-trigger')._rcalInit=true;
+      rcalCreate('rcal-upl-perf',function(from,to){
+        customRange={from:from,to:to};
+        activeDateFilter='custom';
+        document.querySelectorAll('.filter-pill').forEach(function(p){p.classList.remove('active');});
+        renderDashboard();
+      });
+    }
+  },50);
 }
 
 function renderDailyTbl(nick,range){
@@ -6785,7 +6777,7 @@ function _localDateStr(d){return _localISOString(d).slice(0,10);}
 function _minutesSinceMidnight(d){return d.getHours()*60+d.getMinutes();}
 
 function saveTimerSessions(){
-  try{localStorage.setItem('timerSessions_esc',JSON.stringify(timerSessions));}catch(e){}
+  try{if(cu&&cu.nickname)localStorage.setItem('timerSessions_'+cu.nickname,JSON.stringify(timerSessions));}catch(e){}
   /* Sync last session to Firestore */
   if(timerSessions.length){
     var last=timerSessions[timerSessions.length-1];
