@@ -1280,7 +1280,7 @@ async function fsLoadAll(){
   await fsLoadCollection('slaLog', slaLog);
   await fsLoadCollection('attendanceLog', attendanceLog);
   await fsLoadCollection('awardHistory', awardHistory);
-  await fsLoadCollection('timerSessions', allTimerSessions);
+  await fsLoadCollection('timerSessions', timerSessions);
   await pwLoadPhotos();
 
   /* KB and templates stored as single docs */
@@ -1323,7 +1323,6 @@ function fsStartRealtimeListeners(){
     snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});
     if(typeof updateMemberBell==='function')updateMemberBell();
     if(G('qp-list'))renderQualityPortal();
-    if(G('esc-qp-list'))renderEscQuality();
     if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
     if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
     if(G('daily-tbl'))renderDailyTbl();
@@ -1338,12 +1337,6 @@ function fsStartRealtimeListeners(){
     });
     if(G('kpi-grid'))renderDashboard();
     if(G('team-tbl'))renderTeamOverview();
-  }));
-
-  /* timerSessions realtime */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'timerSessions'),function(snap){
-    allTimerSessions.length=0;
-    snap.forEach(function(d){allTimerSessions.push(Object.assign({_fsId:d.id},d.data()));});
   }));
 
   /* mdAwards */
@@ -1739,7 +1732,6 @@ function switchPanel(id,btn){
 
 
 async function syncPortal(){
-  var btn=G('sync-btn');if(btn){btn.textContent='⧐ Syncing...';btn.disabled=true;}
   try{
     await fsLoadAll();
     _unsubscribers.forEach(function(u){try{u();}catch(e){}});_unsubscribers=[];
@@ -1747,8 +1739,7 @@ async function syncPortal(){
     if(cu){buildMain();if(cu.role==='manager')loadPendingReviews();}
     var now=getSydneyDate();var h=now.getHours(),m=now.getMinutes(),ampm=h>=12?'PM':'AM';h=h%12||12;var ts=h+':'+(m<10?'0':'')+m+' '+ampm;
     var sl=G('last-sync-label');if(sl)sl.textContent='Last synced '+ts;
-    if(btn){btn.textContent='✓ Synced';setTimeout(function(){btn.textContent='⧐ Sync';btn.disabled=false;},1500);}
-  }catch(e){if(btn){btn.textContent='⧐ Sync';btn.disabled=false;}}
+  }catch(e){console.warn('syncPortal',e);}
 }
 function signOut(){
   fsStopListeners();
@@ -1925,7 +1916,7 @@ async function fsSavePin(nickname,pin){
   catch(e){console.warn('fsSavePin',e);}
 }
 function showPinScreen(){
-  _pinMode='verify';_pinBuffer='';renderPinPad();showScr('scr-pin');
+  _pinMode='verify';_pinBuffer='';renderPinPad();showScr('scr-pin');setupPinKeyboard();
 }
 function renderPinPad(){
   var dotsEl=G('pin-dots');var padEl=G('pin-pad');var errEl=G('pin-err');
@@ -1945,6 +1936,19 @@ function pinKey(k){
   else if(_pinBuffer.length<6){_pinBuffer+=k;}
   renderPinPad();
   if(_pinBuffer.length===6)setTimeout(pinSubmit,120);
+}
+function setupPinKeyboard(){
+  if(document._pinKbBound)return;
+  document._pinKbBound=true;
+  document.addEventListener("keydown",function(e){
+    var scr=document.querySelector("#scr-pin");
+    if(!scr||!scr.classList.contains("active"))return;
+    var tag=document.activeElement?document.activeElement.tagName:"";
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
+    if(e.key>="0"&&e.key<="9"){pinKey(e.key);e.preventDefault();}
+    else if(e.key==="Backspace"||e.key==="Delete"){pinKey("⌫");e.preventDefault();}
+    else if(e.key==="Enter"&&_pinBuffer.length===6){pinSubmit();e.preventDefault();}
+  });
 }
 function pinBack(){
   _pinBuffer='';showScr('scr-login');G('inp-nick').value='';
@@ -2163,10 +2167,8 @@ async function discardReview(){
     }
   }
   thread.status='discarded';
-  if(thread._fsId){
-    try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}
-    catch(e){}
-  }
+  if(thread._fsId){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}catch(e){}}
+  if(co&&co._fsId&&fsDb()){try{window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));}catch(e){}var ci=callouts.indexOf(co);if(ci>-1)callouts.splice(ci,1);}
   G('modal-error-review').classList.remove('open');
   G('modal-reviews').classList.remove('open');
   updateReviewBadge();
@@ -2194,7 +2196,7 @@ function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
   /* Bell shows for: Pending (not yet seen/acked) OR Completed-unread (manager finished) */
   var myCallouts=callouts.filter(function(co){
-    var isMyError=co.uploader===cu.nickname&&co.status!=='pending_review'&&co.status!=='discarded'&&co.status!=='Acknowledged'&&!co.bellSeen;
+    var isMyError=co.uploader===cu.nickname&&(co.status==='Pending'||(co.status==='Completed'&&!co.completedRead))&&co.status!=='discarded';
     var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname&&co.status==='Pending';
     return isMyError||isMyEsc;
   });
@@ -2211,11 +2213,9 @@ function memberBellClick(){
 function openMemberBellPanel(){
   if(!cu||cu.role==='manager')return;
   var myCallouts=callouts.filter(function(co){
-    return co.uploader===cu.nickname
-      &&co.status!=='pending_review'
-      &&co.status!=='discarded'
-      &&co.status!=='Acknowledged'
-      &&!co.bellSeen;
+    var isMyError=co.uploader===cu.nickname&&(co.status==='Pending'||(co.status==='Completed'&&!co.completedRead))&&co.status!=='discarded';
+    var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname&&co.status==='Pending';
+    return isMyError||isMyEsc;
   });
   var list=G('member-notif-list');if(!list)return;
   var html='';
@@ -3228,7 +3228,7 @@ function renderAwards(){
         +av
         +'<div class="'+nameCls+'">'+(isYou?'&#10024; ':'')+p.nick+'</div>'
         +scoreLine
-        +'<div class="award-block '+blocks[col]+'">'+( rank===0?medals[col]:'' )+'</div>'
+        +'<div class="award-block '+blocks[col]+'">'+medals[col]+'</div>'
         +'</div>';
     }).join('');
     body='<div class="award-podium">'+cols+'</div>';
@@ -3738,7 +3738,7 @@ function rcalCreate(id,onRange){
 
 /* ── FILTER CLEAR FUNCTIONS ── */
 function escPerfClearFilter(){
-  escPerfDateFilter='month';
+  escPerfDateFilter='today';
   escPerfCustomRange={from:'',to:''};
   setTimeout(function(){if(G('awards-grid'))renderAwards();},200);
   document.querySelectorAll('#sub-esc-perf .filter-pill').forEach(function(p){
@@ -3933,7 +3933,7 @@ function renderMgrHubPerformance(){
     var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
     var rate=filteredHrs>0?(uplTotal/filteredHrs):null;
     var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
-    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,memberHrs:memberHrs,qualEsc:qualEsc};
+    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,qualEsc:qualEsc};
   });
 
   /* Build SLA badge BEFORE escRows so it's defined when rows render */
@@ -3944,8 +3944,7 @@ function renderMgrHubPerformance(){
     :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
 
   var escRows=escData.map(function(r,i){
-    var rateSuspect=r.memberHrs>0&&r.memberHrs<0.05;
-    var rateStr=(r.rate!==null&&!rateSuspect)?r.rate.toFixed(1):'—';
+    var rateStr=r.rate!==null?r.rate.toFixed(1):'0.0';
     var qualBadge=r.qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
       :r.qualEsc<=3
@@ -3958,7 +3957,7 @@ function renderMgrHubPerformance(){
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px"><span onclick="openMgrTimerLog(\''+r.nick+'\')" style="color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-style:dotted">uploads/hr · '+(r.memberHrs>0?r.memberHrs.toFixed(1)+'h':'0.0h')+'</span></div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -5170,18 +5169,15 @@ function removeMember(nick){
 function renderAwardHistoryList(nick,history,isManager){
   var el=G('member-profile-awards');if(!el)return;
   var now=getSydneyDate();var curM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  var filterEl=G('award-hist-month-filter');var sel=filterEl?filterEl.value:curM;
+  var bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><select id="award-hist-month-filter" data-nick="'+nick+'" onchange="filterAwardHistory(this.dataset.nick)" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'+opts+'</select></div>';
   var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var months=[...new Set(history.map(function(h){return h.date?h.date.slice(0,7):'';}).filter(Boolean))].sort().reverse();
-  var opts='<option value="all">All</option>'+months.map(function(m){var p=m.split('-');return '<option value="'+m+'"'+(m===sel?' selected':'')+'>'+MN[parseInt(p[1])-1]+' '+p[0]+'</option>';}).join('');
-  var safeNick=nick.replace(/'/g,"\\'");var bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><select id="award-hist-month-filter" onchange="filterAwardHistory(\'' +safeNick+ '\')" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'+opts+'</select></div>';
+  var opts='<option value="all">All</option>'+months.map(function(m){var pt=m.split('-');return '<option value="'+m+'"'+(m===sel?' selected':'')+'>'+MN[parseInt(pt[1])-1]+' '+pt[0]+'</option>';}).join('');
+  var safeNick=nick.replace(/'/g,"\'");
+  var bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><select id="award-hist-month-filter" data-nick="'+nick+'" onchange="filterAwardHistory(this.dataset.nick)" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'+opts+'</select></div>';
   var filtered=sel==='all'?history:history.filter(function(h){return h.date&&h.date.slice(0,7)===sel;});
   if(!filtered.length){el.innerHTML=bar+'<div style="font-size:12px;color:var(--muted);padding:8px 0">No awards for this period.</div>';return;}
-  el.innerHTML=bar+filtered.map(function(h,hi){
-    var fid=h._fsId||('idx_'+hi);
-    var delBtn=isManager?'<button data-fid="'+fid+'" data-nick="'+h.nick+'" onclick="deleteAwardHistory(this.dataset.fid,this.dataset.nick)" title="Remove" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 6px">&#128465;</button>':'';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:16px">'+h.emoji+'</span><div><div style="font-size:12px;font-weight:600;color:var(--text)">'+h.award+'</div><div style="font-size:11px;color:var(--muted)">'+h.label+'</div></div>'+delBtn+'</div>';
-  }).join('');
+  el.innerHTML=bar+filtered.map(function(h,hi){var fid=h._fsId||('idx_'+hi);var delBtn=isManager?'<button data-fid="'+fid+'" data-nick="'+nick+'" onclick="deleteAwardHistory(this.dataset.fid,this.dataset.nick)" title="Remove" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 6px">&#128465;</button>':'';return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:16px">'+h.emoji+'</span><div><div style="font-size:12px;font-weight:600;color:var(--text)">'+h.award+'</div><div style="font-size:11px;color:var(--muted)">'+h.label+'</div></div>'+delBtn+'</div>';}).join('');
 }
 function filterAwardHistory(nick){
   var history=awardHistory.filter(function(h){return h.nick===nick;}).sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});
@@ -5265,56 +5261,59 @@ function mwSLAConfirm(){
 /* ── LOG AWARDS — DROPDOWN SELECTOR ── */
 function renderAwardForm(){
   var key=G('mw-award-category').value;
-  var formEl=G('mw-award-form');var saveBtn=G('mw-award-save-btn');
-  if(!key){formEl.style.display='none';saveBtn.style.display='none';return;}
-  var defs={
-    quality:{title:'Quality Champion',emoji:'🏅',podium:3,scoreLabel:'Quality Score %',key:'quality',period:'week'},
-    uploads:{title:'Uploading Monster',emoji:'👾',podium:3,scoreLabel:'Total Uploads',key:'uploads',period:'week'},
-    hero:{title:'Hero of the Month',emoji:'🦸',podium:3,scoreLabel:'Quality Score %',key:'hero',period:'month'},
-    quarter:{title:'Quarter Master',emoji:'🌟',podium:3,scoreLabel:'Quality Score %',key:'quarter',period:'quarter'}
-  };
-  var def=defs[key];if(!def){formEl.style.display='none';saveBtn.style.display='none';return;}
-  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
-  var opts='<option value="">— Select —</option>'+uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
-  var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var now=getSydneyDate();var periodHtml='';
-  if(def.period==='week'){
-    var weekOpts='';
-    for(var wi=0;wi<8;wi++){
-      var mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7)-wi*7);
-      var sun=new Date(mon);sun.setDate(mon.getDate()+6);
-      var fmt=function(d){return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();};
-      weekOpts+='<option value="'+mon.toISOString().split('T')[0]+'|'+sun.toISOString().split('T')[0]+'"'+(wi===0?' selected':'')+'>Week of '+fmt(mon)+' – '+fmt(sun)+'</option>';
-    }
-    periodHtml='<div class="form-group"><label class="form-label">Coverage Week</label><select class="form-input" id="aw-period" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+weekOpts+'</select></div>';
-  } else if(def.period==='month'){
-    var monthOpts='';
-    for(var mi=0;mi<12;mi++){
-      var mIdx=(now.getMonth()-mi+12)%12;var mYear=now.getFullYear()-(now.getMonth()-mi<0?1:0);
-      monthOpts+='<option value="'+mYear+'-'+String(mIdx+1).padStart(2,'0')+'|'+mYear+'-'+String(mIdx+1).padStart(2,'0')+'"'+(mi===0?' selected':'')+'>'+MONTHS[mIdx]+' '+mYear+'</option>';
-    }
-    periodHtml='<div class="form-group"><label class="form-label">Coverage Month</label><select class="form-input" id="aw-period" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+monthOpts+'</select></div>';
-  } else if(def.period==='quarter'){
-    var qOpts='';
-    for(var qi=0;qi<4;qi++){
-      var curQ=Math.floor(now.getMonth()/3);var qNum=((curQ-qi)+4)%4;var qYear=now.getFullYear()-(curQ-qi<0?1:0);
-      var qStart=new Date(qYear,qNum*3,1);var qEnd=new Date(qYear,qNum*3+3,0);
-      qOpts+='<option value="'+qStart.toISOString().split('T')[0]+'|'+qEnd.toISOString().split('T')[0]+'"'+(qi===0?' selected':'')+'>Q'+(qNum+1)+' '+qYear+' ('+MONTHS[qNum*3]+'–'+MONTHS[qNum*3+2]+')</option>';
-    }
-    periodHtml='<div class="form-group"><label class="form-label">Coverage Quarter</label><select class="form-input" id="aw-period" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+qOpts+'</select></div>';
+  var form=G('mw-award-form');
+  var saveBtn=G('mw-award-save-btn');
+  if(!key){form.style.display='none';if(saveBtn)saveBtn.style.display='none';return;}
+  form.style.display='block';if(saveBtn)saveBtn.style.display='block';
+
+  var allOpts='<option value="">— None —</option>'
+    +TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';})
+    .sort(function(a,b){return a.fullName.localeCompare(b.fullName);})
+    .map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
+
+  var selStyle='background:var(--bg3);color:var(--text);border-color:var(--border)';
+  var def=AWARD_DEFS.find(function(d){return d.key===key;});
+  var criteria={quality:'Based on Quality Score %',uploads:'Based on Avg. Daily Upload',hero:'Based on Avg. Daily · Quality Score % · Quality Esc',quarter:'Based on Avg. Daily · Quality Score % · Quality Esc (Quarter)'};
+
+  /* Coverage period selector */
+  var MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var now=getSydneyDate();var ph='';
+  if(key==='quality'||key==='uploads'){
+    var wo='';for(var wi=0;wi<8;wi++){var mon=new Date(now);mon.setDate(now.getDate()-((now.getDay()+6)%7)-wi*7);var sun=new Date(mon);sun.setDate(mon.getDate()+6);var fmt=function(d){return(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();};wo+='<option value="'+mon.toISOString().split('T')[0]+'|'+sun.toISOString().split('T')[0]+'"'+(wi===0?' selected':'')+'>Week of '+fmt(mon)+' – '+fmt(sun)+'</option>';}
+    ph='<div class="form-group"><label class="form-label">Coverage Week</label><select class="form-input" id="aw-period" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+wo+'</select></div>';
+  }else if(key==='hero'){
+    var mo='';for(var mi=0;mi<12;mi++){var mIdx=(now.getMonth()-mi+12)%12;var mY=now.getFullYear()-(now.getMonth()-mi<0?1:0);mo+='<option value="'+mY+'-'+String(mIdx+1).padStart(2,'0')+'|'+mY+'-'+String(mIdx+1).padStart(2,'0')+'"'+(mi===0?' selected':'')+'>'+MN[mIdx]+' '+mY+'</option>';}
+    ph='<div class="form-group"><label class="form-label">Coverage Month</label><select class="form-input" id="aw-period" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+mo+'</select></div>';
+  }else if(key==='quarter'){
+    var qo='';for(var qi=0;qi<4;qi++){var cQ=Math.floor(now.getMonth()/3);var qN=((cQ-qi)+4)%4;var qY=now.getFullYear()-(cQ-qi<0?1:0);var qS=new Date(qY,qN*3,1);var qE=new Date(qY,qN*3+3,0);qo+='<option value="'+qS.toISOString().split('T')[0]+'|'+qE.toISOString().split('T')[0]+'"'+(qi===0?' selected':'')+'>Q'+(qN+1)+' '+qY+' ('+MN[qN*3]+'–'+MN[qN*3+2]+')</option>';}
+    ph='<div class="form-group"><label class="form-label">Coverage Quarter</label><select class="form-input" id="aw-period" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+qo+'</select></div>';
   }
-  var html=periodHtml;
-  for(var i=1;i<=def.podium;i++){
-    var medal=['🥇','🥈','🥉'][i-1];
-    html+='<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px">'+medal+' Place '+i+'</div>'
-      +'<div style="display:flex;gap:10px;align-items:flex-start">'
-      +'<div style="flex:2"><label class="form-label">Uploader</label><select class="form-input" id="aw-p'+i+'-nick" style="background:var(--bg3);color:var(--text);border-color:var(--border)">'+opts+'</select></div>'
-      +'<div><label class="form-label">'+def.scoreLabel+'</label><input class="form-input" id="aw-p'+i+'-score" type="number" step="0.1" min="0"'+(key==='quality'?' max="100"':'')+' placeholder="0.0" style="width:90px"/></div>'
-      +'<div><label class="form-label">Esc</label><input class="form-input" id="aw-p'+i+'-esc" type="number" min="0" placeholder="0" style="width:60px"/></div>'
-      +'</div></div>';
+  var html=ph+'<div style="font-size:11px;color:var(--muted);margin-bottom:14px;padding:8px 12px;background:var(--bg3);border-radius:8px">'+def.emoji+' <strong>'+def.title+'</strong> &mdash; '+criteria[key]+'</div>';
+  html+='<div style="display:flex;flex-direction:column;gap:10px">';
+
+  if(key==='quality'||key==='uploads'){
+    var scoreLabel=key==='quality'?'Score %':'Avg/Day';
+    ['1st','2nd','3rd'].forEach(function(place,i){
+      html+='<div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">'
+        +'<div><label class="form-label">'+place+'</label><select class="form-input" id="aw-p'+(i+1)+'-nick" style="'+selStyle+'">'+allOpts+'</select></div>'
+        +'<div><label class="form-label">'+scoreLabel+'</label><input class="form-input" id="aw-p'+(i+1)+'-score" type="number" step="0.1" min="0"'+(key==='quality'?' max="100"':'')+' placeholder="0.0" style="width:90px"/></div>'
+        +'</div>';
+    });
+  } else {
+    /* Hero / Quarter — 3 metrics */
+    ['1st','2nd','3rd'].forEach(function(place,i){
+      html+='<div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:2px">'
+        +'<label class="form-label">'+place+'</label>'
+        +'<select class="form-input" id="aw-p'+(i+1)+'-nick" style="'+selStyle+';margin-bottom:8px">'+allOpts+'</select>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+        +'<div><label class="form-label">Avg/Day</label><input class="form-input" id="aw-p'+(i+1)+'-adu" type="number" step="0.1" min="0" placeholder="0"/></div>'
+        +'<div><label class="form-label">Q %</label><input class="form-input" id="aw-p'+(i+1)+'-qs" type="number" step="0.1" min="0" max="100" placeholder="0"/></div>'
+        +'<div><label class="form-label">Esc</label><input class="form-input" id="aw-p'+(i+1)+'-esc" type="number" min="0" placeholder="0"/></div>'
+        +'</div></div>';
+    });
   }
-  formEl.innerHTML=html;formEl.style.display='';saveBtn.style.display='';
+  html+='</div>';
+  form.innerHTML=html;
 }
 
 function mwSubmitAwards(){
@@ -5340,12 +5339,25 @@ function mwSubmitAwards(){
   if(!top.length){alert('Please select at least 1st place.');return;}
 
   var def=AWARD_DEFS.find(function(d){return d.key===key;});
-  var label=key==='quarter'?q:mon+', '+weekLabel+' — '+yr;
-  mdAwards[key]={top:top};
-  top.forEach(function(p,i){
-    var hist={nick:p.nick,award:def.title,emoji:def.emoji,label:label+' '+medals[i],score:p.score||null,adu:p.adu||null,qs:p.qs||null,esc:p.esc||null,date:syd.toISOString()};
-    awardHistory.push(hist);fsSaveAwardHistory(hist);
-  });
+  /* Read coverage period from selector */
+  var periodEl=G('aw-period');var periodVal=periodEl?periodEl.value:'';var coverageLabel='';
+  if(periodVal&&periodVal.indexOf('|')>-1){
+    var pts=periodVal.split('|');var fr=new Date(pts[0]+'T00:00:00'),to2=new Date(pts[1]+'T00:00:00');
+    var MNS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var diffM=to2.getMonth()-fr.getMonth()+(to2.getFullYear()-fr.getFullYear())*12;
+    if(diffM===0)coverageLabel='Week '+fr.getDate()+'–'+to2.getDate()+' '+MNS[fr.getMonth()]+' '+fr.getFullYear();
+    else if(diffM<=2)coverageLabel='Q'+(Math.floor(fr.getMonth()/3)+1)+' '+fr.getFullYear()+' ('+MNS[fr.getMonth()]+'–'+MNS[to2.getMonth()]+')';
+    else coverageLabel=MNS[fr.getMonth()]+' '+fr.getFullYear();
+  }else{coverageLabel=key==='quarter'?q:mon+', '+weekLabel+' — '+yr;}
+  mdAwards[key]={top:top,coverageLabel:coverageLabel};
+  /* Only save history for 1st place */
+  if(top.length>0){
+    var hist1={nick:top[0].nick,award:def.title,emoji:def.emoji,label:'1st · '+coverageLabel,score:top[0].score||null,adu:top[0].adu||null,qs:top[0].qs||null,esc:top[0].esc||null,date:syd.toISOString(),coverageLabel:coverageLabel};
+    var hId=key+'_'+top[0].nick+'_'+syd.toISOString().split('T')[0];
+    hist1._fsId=hId;
+    var ei=awardHistory.findIndex(function(h){return h._fsId===hId;});if(ei>-1)awardHistory.splice(ei,1);
+    awardHistory.push(hist1);fsSaveAwardHistory(hist1);
+  }
   fsSaveAwards();
   pushNotif('🏆',def.title+' updated by '+cu.fullName+'.','awards');
   if(typeof renderAwards==='function')renderAwards();
@@ -5488,49 +5500,15 @@ function mwDetailConfirm(){
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
   mwDetailReset();closeMgrWrite();
 }
-function openMgrTimerLog(nick){
-  var m=TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick};
-  var sessions=(allTimerSessions||[]).filter(function(s){return s.nick===nick;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
-  var modal=G('modal-mgr-timer');if(!modal)return;
-  G('mgr-timer-title').textContent='⏱ '+m.fullName+' — Timer Sessions';
-  var tbody=G('mgr-timer-tbody');
-  if(!sessions.length){tbody.innerHTML='<tr><td colspan="5" style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No sessions.</td></tr>';}
-  else{
-    tbody.innerHTML=sessions.map(function(s){
-      var hh=Math.floor(s.seconds/3600),mm=Math.floor((s.seconds%3600)/60),ss2=s.seconds%60;
-      var dur=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+':'+String(ss2).padStart(2,'0');
-      var flagged=s.seconds<60||s.seconds>28800;
-      return '<tr style="border-bottom:1px solid var(--border)'+(flagged?';background:rgba(247,43,110,.06)':'')+'">'
-        +'<td style="padding:8px 10px;font-size:11px;color:var(--muted)">'+s.date+'</td>'
-        +'<td style="padding:8px 10px;font-size:11px">'+(s.start||'—').replace('T',' ').slice(0,16)+'</td>'
-        +'<td style="padding:8px 10px;font-size:11px">'+(s.end||'—').replace('T',' ').slice(0,16)+'</td>'
-        +'<td style="padding:8px 10px;font-size:12px;font-weight:700;font-family:var(--font-d);color:var(--accent)">'+dur+(flagged?' ⚠️':'')+'</td>'
-        +'<td style="padding:8px 10px;text-align:center"><button data-fsid="'+(s._fsId||'')+'" data-nick="'+nick+'" onclick="mgrDeleteTimerSession(this.dataset.fsid,this.dataset.nick)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px">🗑️</button></td>'
-        +'</tr>';
-    }).join('');
-    var ts=sessions.reduce(function(a,s){return a+s.seconds;},0);
-    tbody.innerHTML+='<tr style="border-top:2px solid var(--border2);background:rgba(139,45,255,.06)"><td colspan="3" style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Total</td><td style="padding:8px 10px;font-size:13px;font-weight:700;font-family:var(--font-d);color:var(--text)">'+String(Math.floor(ts/3600)).padStart(2,'0')+':'+String(Math.floor((ts%3600)/60)).padStart(2,'0')+':00</td><td></td></tr>';
-  }
-  modal.classList.add('open');
-}
-function mgrDeleteTimerSession(fsId,nick){
-  if(!fsId||!confirm('Delete this session?'))return;
-  var i=allTimerSessions.findIndex(function(s){return s._fsId===fsId;});
-  if(i>-1)allTimerSessions.splice(i,1);
-  if(fsDb())try{window._fsDeleteDoc(window._fsDoc(fsDb(),'timerSessions',String(fsId)));}catch(e){}
-  openMgrTimerLog(nick);if(typeof renderMgrHubPerformance==='function')renderMgrHubPerformance();
-}
 async function mwSubmitQEsc(){
   var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-qesc-file').files[0]?await uploadScreenshot(G('mw-qesc-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
-  var sharedMeta={address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
-  var uplCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,status:'Pending',insight:''});
-  callouts.push(uplCallout);fsSaveCallout(uplCallout);sendManagerDirectNotif(uplCallout);
-  if(esc){var escCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc_esc',uploader:upl,escalationMember:esc,status:'Pending',insight:'',escThread:true});callouts.push(escCallout);fsSaveCallout(escCallout);}
-  updateMemberBell();
+  var newQEsc={id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  callouts.push(newQEsc);
+  fsSaveCallout(newQEsc);
   pushNotif('🚨','Critical escalation logged for '+uplMem.fullName+' at "'+addr+'".','qesc');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
   closeMgrWrite();
@@ -6063,7 +6041,6 @@ function renderEscalationHub(){
     +'<div class="sub-pane" id="sub-esc-quality">'
     +'<div class="filter-bar" style="margin-bottom:14px">'
     +'<button class="filter-pill" data-f="all" onclick="escQPFilter(this)">All Time</button>'
-    +'<button class="filter-pill active" data-f="today" onclick="escQPFilter(this)">Today</button>'
     +'<button class="filter-pill" data-f="week" onclick="escQPFilter(this)">This Week</button>'
     +'<button class="filter-pill active" data-f="month" onclick="escQPFilter(this)">This Month</button>'
     +'<button class="filter-pill" data-f="quarter" onclick="escQPFilter(this)">This Quarter</button>'
@@ -6344,7 +6321,7 @@ function renderEscPerfFiltered(){
 }
 
 /* ── ESCALATION QUALITY ── */
-var escQPDateFilter='today';
+var escQPDateFilter='month';
 var escQPCustomRange={from:'',to:''};
 
 function escQPFilter(btn){
@@ -6366,14 +6343,10 @@ function setEscQPCustom(){
 function renderEscQuality(){
   var target=G('esc-qp-list');if(!target)return;
   var nick=cu.nickname;
-  var list=callouts.slice().reverse().filter(function(c){
-    var isOwnUpload=c.uploader===nick&&c.type!=='qesc_esc';
-    var isEscThread=c.type==='qesc_esc'&&c.escalationMember===nick;
-    return isOwnUpload||isEscThread;});
+  var list=callouts.slice().reverse().filter(function(c){return c.uploader===nick;});
   if(escQPDateFilter!=='all'){
     var now=new Date();var rs=null;
-    if(escQPDateFilter==='today'){var tod=getSydneyDate();var todStr=tod.toISOString().split('T')[0];list=list.filter(function(c){return c.date===todStr;});}
-    else if(escQPDateFilter==='week'){var dw=now.getDay();var m2=new Date(now);m2.setDate(now.getDate()-(dw===0?6:dw-1));m2.setHours(0,0,0,0);rs=m2;}
+    if(escQPDateFilter==='week'){var dw=now.getDay();var m2=new Date(now);m2.setDate(now.getDate()-(dw===0?6:dw-1));m2.setHours(0,0,0,0);rs=m2;}
     else if(escQPDateFilter==='month'){rs=new Date(now.getFullYear(),now.getMonth(),1);}
     else if(escQPDateFilter==='quarter'){rs=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);}
     else if(escQPDateFilter==='custom'&&escQPCustomRange.from&&escQPCustomRange.to){
@@ -6385,12 +6358,11 @@ function renderEscQuality(){
   if(!list.length){target.innerHTML='<div class="empty"><div class="empty-ico">&#9989;</div><div class="empty-txt">No quality entries to show.</div></div>';return;}
   var stBadge=function(s){return({Pending:'<span class="st-pending">Pending</span>',"In Review":'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);};
   target.innerHTML=list.map(function(c){
-    var isCrit=c.type==='qesc'||c.type==='qesc_esc';
-    
+    var isCrit=c.type==='qesc';
     var logger=(TEAM.find(function(m){return m.nickname===c.loggedBy;})||{fullName:c.loggedBy||''}).fullName;
     var ss=c.screenshot?'<img src="'+c.screenshot+'" class="qp-screenshot" alt="ss"/>':'';
     var critBadge=isCrit?'<div class="qp-crit-badge">&#128680; CRITICAL</div>':'';
-    var canAck=(c.uploader===cu.nickname||c.escalationMember===cu.nickname)&&c.status==='Pending';
+    var canAck=c.uploader===cu.nickname&&c.status==='Pending';
     var isAcked=c.status==='Acknowledged'||c.status==='Completed';
     var ackSect='';
     if(canAck){ackSect='<div class="ack-wrap"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+c.id+'"></textarea></div><button class="btn btn-primary btn-sm" data-id="'+c.id+'" onclick="ackCo(+this.dataset.id)">&#10003; Acknowledge</button> ';}
@@ -6700,10 +6672,6 @@ function ackCo(id){
         catch(e){}
       }
     }
-  }
-  if(c.type==='qesc_esc'&&c.escalationMember===cu.nickname){
-    var escThread={calloutId:c.id,calloutFsId:c._fsId||null,uploader:c.escalationMember,uploaderFull:cu.fullName,address:c.address,date:c.date,feedback:c.feedback,status:'acknowledged',insight:c.insight,acknowledgedAt:c.acknowledgedAt,loggedBy:c.loggedBy,type:'qesc_esc'};
-    if(fsDb()){try{window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),escThread);}catch(e){}}
   }
   pushNotif('✅',cu.fullName+' acknowledged the call-out for "'+c.address+'".','ack');
   /* Update card in place */
