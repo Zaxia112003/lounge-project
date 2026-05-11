@@ -1872,7 +1872,8 @@ function renderUnifiedAttendance(containerId,isManager,groupFilter,nameFilter){
     :(MONTHS[s.month]+' '+s.year);
   var dateHeaders=dates.map(function(d){
     var isToday=_uas(d)===todayStr;
-    var dayLabel=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':'';
+    var DOW_LABELS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+    var dayLabel=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':DOW_LABELS[d.getDay()]+'<br>';
     return '<th style="padding:5px 2px;font-size:10px;font-weight:700;text-align:center;min-width:'
       +(s.mode==='week'?'60px':'28px')+';border:1px solid var(--border2);color:'+(isToday?'var(--accent)':'var(--muted)')+'">'+dayLabel+d.getDate()+'</th>';
   }).join('');
@@ -1886,7 +1887,10 @@ function renderUnifiedAttendance(containerId,isManager,groupFilter,nameFilter){
       if(entry&&entry.status==='Tardy'&&!isManager)entry=null;
       var badge='';
       if(entry){
-        var def=ATT_STATUS_DEF[entry.status]||{label:entry.status,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:entry.status};
+        /* Normalize status keys for backwards compatibility */
+      var _rawStatus=entry.status;
+      var _normStatus={AL:'PL','Annual Leave':'PL',SickLeave:'SL','Sick Leave':'SL',absent:'Absent',offline:'Offline',tardy:'Tardy',udt:'UDT',holiday:'Holiday'}[_rawStatus]||_rawStatus;
+      var def=ATT_STATUS_DEF[_normStatus]||ATT_STATUS_DEF[_rawStatus]||{label:_rawStatus,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:_rawStatus};
         var tip=def.full+(entry.hours?' ('+entry.hours+'h lost)':(entry.notes?' \u2014 '+entry.notes:''));
         badge='<span title="'+tip+'" style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:700;background:'+def.bg+';color:'+def.color+'">'+def.label+'</span>';
       }
@@ -1945,7 +1949,7 @@ async function fsSavePin(nickname,pin){
   catch(e){console.warn('fsSavePin',e);}
 }
 function showPinScreen(){
-  _pinMode='verify';_pinBuffer='';renderPinPad();showScr('scr-pin');
+  _pinMode='verify';_pinBuffer='';renderPinPad();showScr('scr-pin');setupPinKeyboard();
 }
 function renderPinPad(){
   var dotsEl=G('pin-dots');var padEl=G('pin-pad');var errEl=G('pin-err');
@@ -1966,6 +1970,19 @@ function pinKey(k){
   renderPinPad();
   if(_pinBuffer.length===6)setTimeout(pinSubmit,120);
 }
+/* Allow physical keyboard number input on PIN screen */
+function setupPinKeyboard(){
+  if(document._pinKbBound)return;
+  document._pinKbBound=true;
+  document.addEventListener('keydown',function(e){
+    var scr=document.querySelector('.scr#scr-pin');
+    if(!scr||!scr.classList.contains('active'))return;
+    if(e.key>='0'&&e.key<='9'){pinKey(e.key);e.preventDefault();}
+    else if(e.key==='Backspace'||e.key==='Delete'){pinKey('⌫');e.preventDefault();}
+    else if(e.key==='Enter'&&_pinBuffer.length===6){pinSubmit();e.preventDefault();}
+  });
+}
+
 function pinBack(){
   _pinBuffer='';showScr('scr-login');G('inp-nick').value='';
   var btn=G('login-btn');if(btn){btn.disabled=false;btn.textContent='Sign In';}
@@ -4051,7 +4068,7 @@ function renderMgrHubPerformance(){
     var memberHrs=memberSecs/3600;
     var rate=memberHrs>0?(uplTotal/memberHrs):null;
     var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
-    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,qualEsc:qualEsc};
+    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,memberHrs:memberHrs,qualEsc:qualEsc};
   });
 
   /* Grand total timer for escalation (all members combined, in range) */
@@ -4082,7 +4099,7 @@ function renderMgrHubPerformance(){
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px;color:var(--muted)">uploads/hr · '+(r.memberHrs>0?r.memberHrs.toFixed(1)+'h':'0.0h')+'</div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -5637,7 +5654,12 @@ async function submitQScoreFromOverlay(){
   var errMsg=G('qscore-err-msg');
   errMsg.textContent='';
   if(!upl||!addr||!date||!err){errMsg.textContent='Please fill in all required fields.';return;}
-  var ss=G('qscore-file2').files[0]?await uploadScreenshot(G('qscore-file2').files[0]):null;
+  var files2=Array.from(G('qscore-file2').files);
+  var ss=null;
+  if(files2.length>0){
+    var ssUrls=await Promise.all(files2.map(function(f){return uploadScreenshot(f);}));
+    ss=ssUrls.filter(Boolean).join('||');
+  }
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
   var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCo);
@@ -5893,7 +5915,13 @@ function escDetailParse(){
   var nick=cu.nickname;var matched=null;
   var lines=raw.split('\n').filter(function(l){return l.trim();});
   lines.forEach(function(line){
-    var parts=line.split('\t');if(parts.length<2)return;
+    /* Support tab-separated and multi-space-separated (Zendesk export formats) */
+    var parts=line.split('\t');
+    if(parts.length<2){
+      /* Try splitting on 2+ spaces as fallback */
+      parts=line.trim().split(/  +/);
+    }
+    if(parts.length<2)return;
     var lineEmail=parts[0].trim().toLowerCase();
     var lineNick=EMAIL_MAP[lineEmail];
     if(!lineNick){
@@ -5913,7 +5941,7 @@ function escDetailParse(){
     if(dateMatch){var mMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};dateStr=dateMatch[3]+'-'+(mMap[dateMatch[1]]||'01')+'-'+dateMatch[2].padStart(2,'0');}
     matched={nick:nick,fullName:cu.fullName,total:total,date:dateStr,earliest:earliestRaw};
   });
-  if(!matched){if(st)st.textContent='Your row was not found. Check the pasted data contains your email.';return;}
+  if(!matched){if(st)st.textContent='Row not found. Your email in system: '+((TEAM_DIR[nick]||{}).email||'NOT SET - add via My Team')+'. Ensure it matches the pasted report email.';return;}
   escDetailExtracted=matched;if(st)st.textContent='';
   G('esc-detail-paste-wrap').style.display='none';
   var today=new Date().toISOString().split('T')[0];
@@ -6537,8 +6565,17 @@ function renderDashboard(){
   setTimeout(function(){
     var trig=G('rcal-upl-perf-trigger');
     if(trig){
-      /* Reset any stale state before re-creating */
-      delete trig._rcalInit;
+      /* Clone trigger to strip all old listeners, then re-attach */
+      var fresh=trig.cloneNode(true);
+      trig.parentNode.replaceChild(fresh,trig);
+      /* Restore label if custom range is active */
+      if(activeDateFilter==='custom'&&customRange.from&&customRange.to){
+        var cf=new Date(customRange.from+'T00:00:00');
+        var ct=new Date(customRange.to+'T00:00:00');
+        var fl=cf.getDate()+'/'+(cf.getMonth()+1)+'/'+cf.getFullYear();
+        var tl=ct.getDate()+'/'+(ct.getMonth()+1)+'/'+ct.getFullYear();
+        fresh.innerHTML='📅 '+fl+' → '+tl;
+      }
       rcalCreate('rcal-upl-perf',function(from,to){
         customRange={from:from,to:to};
         activeDateFilter='custom';
@@ -6640,6 +6677,20 @@ function parseCSV(text,fname){
 const parseDur=s=>{if(!s)return 0;const p=s.trim().split(':');if(p.length===3)return parseInt(p[0])*3600+parseInt(p[1])*60+(parseInt(p[2])||0);if(p.length===2)return parseInt(p[0])*60+(parseInt(p[1])||0);return 0;};
 
 /* ── QUALITY PORTAL ── */
+function multiFilePrev(inp,previewId){
+  var el=G(previewId);if(!el)return;
+  el.innerHTML='';
+  Array.from(inp.files).forEach(function(file){
+    var r=new FileReader();
+    r.onload=function(e){
+      var img=document.createElement('img');
+      img.src=e.target.result;
+      img.style.cssText='width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border)';
+      el.appendChild(img);
+    };
+    r.readAsDataURL(file);
+  });
+}
 function filePrev(inp,pid){const prev=G(pid);prev.innerHTML='';if(inp.files[0])prev.innerHTML=`<div class="file-prev"><span class="file-prev-name">📎 ${inp.files[0].name}</span><button class="file-prev-rm" onclick="G('${inp.id}').value='';G('${pid}').innerHTML=''">✕</button></div>`;}
 const toB64=f=>new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(f);});
 async function uploadScreenshot(file){
@@ -7243,9 +7294,9 @@ document.addEventListener('DOMContentLoaded',function(){
           <div class="form-group"><label class="form-label">Error Description</label><textarea class="form-input" id="qscore-err2" rows="3" placeholder="Describe the error found..."></textarea></div>
           <div class="form-group">
             <label class="form-label">Screenshot <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-            <input type="file" id="qscore-file2" accept="image/*" style="display:none" onchange="filePrev(this,'qscore-prev2')"/>
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('qscore-file2').click()">&#128206; Attach</button>
-            <div id="qscore-prev2"></div>
+            <input type="file" id="qscore-file2" accept="image/*" multiple style="display:none" onchange="multiFilePrev(this,'qscore-prev2')"/>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('qscore-file2').click()">&#128206; Attach Photos</button>
+            <div id="qscore-prev2" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
           </div>
           <div class="err-msg" id="qscore-err-msg" style="text-align:left;margin-bottom:8px"></div>
           <button class="btn btn-primary" style="width:100%" onclick="submitQScoreFromOverlay()">&#9997;&#65039; Log Error</button>
