@@ -1323,6 +1323,7 @@ function fsStartRealtimeListeners(){
     snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});
     if(typeof updateMemberBell==='function')updateMemberBell();
     if(G('qp-list'))renderQualityPortal();
+    if(G('esc-qp-list'))renderEscQuality();
     if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
     if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
     if(G('daily-tbl'))renderDailyTbl();
@@ -5168,16 +5169,24 @@ function removeMember(nick){
 
 function renderAwardHistoryList(nick,history,isManager){
   var el=G('member-profile-awards');if(!el)return;
-  var now=getSydneyDate();var curM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  var bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><select id="award-hist-month-filter" data-nick="'+nick+'" onchange="filterAwardHistory(this.dataset.nick)" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'+opts+'</select></div>';
+  var now=getSydneyDate();
+  var curM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var filterEl=G('award-hist-month-filter');
+  var sel=filterEl?filterEl.value:curM;
   var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var months=[...new Set(history.map(function(h){return h.date?h.date.slice(0,7):'';}).filter(Boolean))].sort().reverse();
-  var opts='<option value="all">All</option>'+months.map(function(m){var pt=m.split('-');return '<option value="'+m+'"'+(m===sel?' selected':'')+'>'+MN[parseInt(pt[1])-1]+' '+pt[0]+'</option>';}).join('');
-  var safeNick=nick.replace(/'/g,"\'");
-  var bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><select id="award-hist-month-filter" data-nick="'+nick+'" onchange="filterAwardHistory(this.dataset.nick)" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'+opts+'</select></div>';
+  var opts='<option value="all"'+(sel==='all'?' selected':'')+'>All</option>'
+    +months.map(function(m){var pt=m.split('-');return '<option value="'+m+'"'+(m===sel?' selected':'')+'>'+MN[parseInt(pt[1])-1]+' '+pt[0]+'</option>';}).join('');
+  var bar='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+    +'<select id="award-hist-month-filter" data-nick="'+nick+'" onchange="filterAwardHistory(this.dataset.nick)" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'+opts+'</select>'
+    +'</div>';
   var filtered=sel==='all'?history:history.filter(function(h){return h.date&&h.date.slice(0,7)===sel;});
   if(!filtered.length){el.innerHTML=bar+'<div style="font-size:12px;color:var(--muted);padding:8px 0">No awards for this period.</div>';return;}
-  el.innerHTML=bar+filtered.map(function(h,hi){var fid=h._fsId||('idx_'+hi);var delBtn=isManager?'<button data-fid="'+fid+'" data-nick="'+nick+'" onclick="deleteAwardHistory(this.dataset.fid,this.dataset.nick)" title="Remove" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 6px">&#128465;</button>':'';return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:16px">'+h.emoji+'</span><div><div style="font-size:12px;font-weight:600;color:var(--text)">'+h.award+'</div><div style="font-size:11px;color:var(--muted)">'+h.label+'</div></div>'+delBtn+'</div>';}).join('');
+  el.innerHTML=bar+filtered.map(function(h,hi){
+    var fid=h._fsId||('idx_'+hi);
+    var delBtn=isManager?'<button data-fid="'+fid+'" data-nick="'+nick+'" onclick="deleteAwardHistory(this.dataset.fid,this.dataset.nick)" title="Remove" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 6px">&#128465;</button>':'';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:16px">'+h.emoji+'</span><div><div style="font-size:12px;font-weight:600;color:var(--text)">'+h.award+'</div><div style="font-size:11px;color:var(--muted)">'+h.label+'</div></div>'+delBtn+'</div>';
+  }).join('');
 }
 function filterAwardHistory(nick){
   var history=awardHistory.filter(function(h){return h.nick===nick;}).sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});
@@ -5360,7 +5369,8 @@ function mwSubmitAwards(){
   }
   fsSaveAwards();
   pushNotif('🏆',def.title+' updated by '+cu.fullName+'.','awards');
-  if(typeof renderAwards==='function')renderAwards();
+  renderMyDay();
+  setTimeout(function(){if(typeof renderAwards==='function')renderAwards();},100);
   /* Reset form */
   G('mw-award-category').value='';
   renderAwardForm();
@@ -5827,50 +5837,84 @@ function escDetailParse(){
   var raw=G('esc-detail-paste').value.trim();
   var st=G('esc-detail-status');
   if(!raw){if(st)st.textContent='Please paste data first.';return;}
-  var nick=cu.nickname;var matched=null;
+  /* Parse ALL uploaders — escalation acts as proxy to manager */
+  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return m.nickname;});
+  var mapped=[];
   var lines=raw.split('\n').filter(function(l){return l.trim();});
   lines.forEach(function(line){
-    var parts=line.split('\t');if(parts.length<2)return;
-    var lineEmail=parts[0].trim().toLowerCase();
-    var lineNick=EMAIL_MAP[lineEmail];
-    if(!lineNick){
-      var userPart=lineEmail.split('@')[0];
-      Object.keys(EMAIL_MAP).forEach(function(k){
-        var kUser=k.split('@')[0];var score=0,minLen=Math.min(userPart.length,kUser.length);
-        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
-        score=score/Math.max(userPart.length,kUser.length);
-        if(score>0.8)lineNick=EMAIL_MAP[k];
-      });
-    }
-    if(lineNick!==nick)return;
+    var parts=line.split('\t');
+    if(parts.length<2)parts=line.trim().split(/  +/);
+    if(parts.length<2)return;
+    var email=parts[0].trim().toLowerCase();
     var total=parseInt(parts[1].trim())||0;
     var earliestRaw=parts[2]?parts[2].trim():'';
-    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
+    var latestRaw=parts[3]?parts[3].trim():'';
+    var nick=EMAIL_MAP[email];
+    if(!nick){
+      var userPart=email.split('@')[0];
+      var bestMatch=null,bestScore=0;
+      Object.keys(EMAIL_MAP).forEach(function(k){
+        var kUser=k.split('@')[0];
+        var score=0,minLen=Math.min(userPart.length,kUser.length);
+        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
+        score=score/Math.max(userPart.length,kUser.length);
+        if(score>0.8&&score>bestScore){bestScore=score;bestMatch=EMAIL_MAP[k];}
+      });
+      nick=bestMatch;
+    }
+    if(!nick||uploaderNicks.indexOf(nick)<0)return;
     var dateStr=null;
-    if(dateMatch){var mMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};dateStr=dateMatch[3]+'-'+(mMap[dateMatch[1]]||'01')+'-'+dateMatch[2].padStart(2,'0');}
-    matched={nick:nick,fullName:cu.fullName,total:total,date:dateStr,earliest:earliestRaw};
+    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
+    if(dateMatch){
+      var mMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
+      dateStr=dateMatch[3]+'-'+(mMap[dateMatch[1]]||'01')+'-'+dateMatch[2].padStart(2,'0');
+    }
+    var sh=SHIFTS[nick]||{start:9,end:18};
+    var earliest=dlParseTime(earliestRaw),latest=dlParseTime(latestRaw);
+    var inShift=total,offShift=0;
+    if(earliest!==null&&latest!==null&&total>0){
+      var wS=Math.max(earliest,sh.start),wE=Math.min(latest,sh.end),tw=latest-earliest||1,iw=Math.max(0,wE-wS);
+      inShift=Math.round(total*(Math.min(iw/tw,1)));offShift=total-inShift;
+    }
+    mapped.push({nick:nick,fullName:(TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick}).fullName,total:total,inShift:inShift,offShift:offShift,date:dateStr,earliest:earliestRaw,latest:latestRaw});
   });
-  if(!matched){if(st)st.textContent='Your row was not found. Check the pasted data contains your email.';return;}
-  escDetailExtracted=matched;if(st)st.textContent='';
+  if(!mapped.length){if(st)st.textContent='No matching uploaders found. Check emails are registered in My Team.';return;}
+  escDetailExtracted=mapped;if(st)st.textContent='';
   G('esc-detail-paste-wrap').style.display='none';
-  var today=new Date().toISOString().split('T')[0];
-  G('esc-detail-table').innerHTML='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">'+(matched.date||today)+'</div>'
-    +'<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="border-bottom:1px solid var(--border2)"><th style="padding:5px 8px;text-align:left;color:var(--muted)">Member</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Total Uploads</th></tr></thead>'
-    +'<tbody><tr><td style="padding:6px 8px;color:var(--text);font-weight:600">'+matched.fullName+'</td><td style="padding:6px 8px;text-align:center">'+matched.total+'</td></tr></tbody></table>';
+  var tbl='<table style="width:100%;border-collapse:collapse;font-size:11px">'
+    +'<thead><tr style="border-bottom:1px solid var(--border2)">'
+    +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Uploader</th>'
+    +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-weight:600">Total</th>'
+    +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-weight:600">In-Shift</th>'
+    +'<th style="padding:5px 8px;text-align:center;color:var(--muted);font-weight:600">Off-Shift</th>'
+    +'<th style="padding:5px 8px;text-align:left;color:var(--muted);font-weight:600">Window</th>'
+    +'</tr></thead><tbody>'
+    +mapped.map(function(r){
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">'
+        +'<td style="padding:6px 8px;color:var(--text);font-weight:600">'+r.fullName+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--text)">'+r.total+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--green)">'+r.inShift+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--amber)">'+r.offShift+'</td>'
+        +'<td style="padding:6px 8px;color:var(--muted)">'+(r.earliest||'—')+' → '+(r.latest||'—')+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table>';
+  G('esc-detail-table').innerHTML=tbl;
   G('esc-detail-preview').style.display='';
 }
 function escDetailConfirm(){
-  if(!escDetailExtracted)return;
-  var r=escDetailExtracted;var today=new Date().toISOString().split('T')[0];
-  var dateKey=r.date||today;
-  if(!perfData[r.nick])perfData[r.nick]={};
-  var ex=perfData[r.nick][dateKey]||{};
-  perfData[r.nick][dateKey]=Object.assign(ex,{uploadsTotal:r.total,uploadsInShift:r.total,uploadsOffShift:0});
-  fsSavePerfData(r.nick);
-  pushNotif('📊','Daily detail saved — '+r.total+' uploads for '+r.fullName+'.','detail');
+  if(!escDetailExtracted||!escDetailExtracted.length)return;
+  var today=getSydneyDate().toISOString().split('T')[0];
+  escDetailExtracted.forEach(function(r){
+    var dateKey=r.date||today;
+    if(!perfData[r.nick])perfData[r.nick]={};
+    var ex=perfData[r.nick][dateKey]||{};
+    perfData[r.nick][dateKey]={uploadsTotal:r.total,uploadsInShift:r.inShift,uploadsOffShift:r.offShift,ahtTotal:ex.ahtTotal||0,ahtCount:ex.ahtCount||0,ahtSecs:ex.ahtSecs||0};
+    fsSavePerfData(r.nick);
+  });
+  pushNotif('📊','Daily upload detail saved for '+escDetailExtracted.length+' uploader(s).','detail');
   escDetailReset();closeDailyLog();
 }
-
 /* initDailyLog — populate uploader dropdown */
 function initDailyLog(){
   var sel=G('esc-log-uploader');
@@ -6041,8 +6085,9 @@ function renderEscalationHub(){
     +'<div class="sub-pane" id="sub-esc-quality">'
     +'<div class="filter-bar" style="margin-bottom:14px">'
     +'<button class="filter-pill" data-f="all" onclick="escQPFilter(this)">All Time</button>'
+    +'<button class="filter-pill active" data-f="today" onclick="escQPFilter(this)">Today</button>'
     +'<button class="filter-pill" data-f="week" onclick="escQPFilter(this)">This Week</button>'
-    +'<button class="filter-pill active" data-f="month" onclick="escQPFilter(this)">This Month</button>'
+    +'<button class="filter-pill" data-f="month" onclick="escQPFilter(this)">This Month</button>'
     +'<button class="filter-pill" data-f="quarter" onclick="escQPFilter(this)">This Quarter</button>'
     +'<button class="filter-pill" data-f="year" onclick="escQPFilter(this)">This Year</button>'
     +'<button class="filter-pill" style="color:var(--muted)" onclick="escQPClearFilter()">&#10005; Clear</button>'
@@ -6321,7 +6366,7 @@ function renderEscPerfFiltered(){
 }
 
 /* ── ESCALATION QUALITY ── */
-var escQPDateFilter='month';
+var escQPDateFilter='today';
 var escQPCustomRange={from:'',to:''};
 
 function escQPFilter(btn){
@@ -6343,10 +6388,15 @@ function setEscQPCustom(){
 function renderEscQuality(){
   var target=G('esc-qp-list');if(!target)return;
   var nick=cu.nickname;
-  var list=callouts.slice().reverse().filter(function(c){return c.uploader===nick;});
+  var list=callouts.slice().reverse().filter(function(c){
+    var isOwnUpload=c.uploader===nick&&c.type!=='qesc_esc';
+    var isEscThread=c.type==='qesc_esc'&&c.escalationMember===nick;
+    return isOwnUpload||isEscThread;
+  });
   if(escQPDateFilter!=='all'){
     var now=new Date();var rs=null;
-    if(escQPDateFilter==='week'){var dw=now.getDay();var m2=new Date(now);m2.setDate(now.getDate()-(dw===0?6:dw-1));m2.setHours(0,0,0,0);rs=m2;}
+    if(escQPDateFilter==='today'){var tod=getSydneyDate();var todStr=tod.toISOString().split('T')[0];list=list.filter(function(c){return c.date===todStr;});}
+    else if(escQPDateFilter==='week'){var dw=now.getDay();var m2=new Date(now);m2.setDate(now.getDate()-(dw===0?6:dw-1));m2.setHours(0,0,0,0);rs=m2;}
     else if(escQPDateFilter==='month'){rs=new Date(now.getFullYear(),now.getMonth(),1);}
     else if(escQPDateFilter==='quarter'){rs=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);}
     else if(escQPDateFilter==='custom'&&escQPCustomRange.from&&escQPCustomRange.to){
@@ -6358,11 +6408,12 @@ function renderEscQuality(){
   if(!list.length){target.innerHTML='<div class="empty"><div class="empty-ico">&#9989;</div><div class="empty-txt">No quality entries to show.</div></div>';return;}
   var stBadge=function(s){return({Pending:'<span class="st-pending">Pending</span>',"In Review":'<span class="st-review">In Review</span>',Acknowledged:'<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>',Completed:'<span class="st-done">Completed</span>'}[s]||s);};
   target.innerHTML=list.map(function(c){
-    var isCrit=c.type==='qesc';
+    var isCrit=c.type==='qesc'||c.type==='qesc_esc';
+    
     var logger=(TEAM.find(function(m){return m.nickname===c.loggedBy;})||{fullName:c.loggedBy||''}).fullName;
     var ss=c.screenshot?'<img src="'+c.screenshot+'" class="qp-screenshot" alt="ss"/>':'';
     var critBadge=isCrit?'<div class="qp-crit-badge">&#128680; CRITICAL</div>':'';
-    var canAck=c.uploader===cu.nickname&&c.status==='Pending';
+    var canAck=(c.uploader===cu.nickname||c.escalationMember===cu.nickname)&&c.status==='Pending';
     var isAcked=c.status==='Acknowledged'||c.status==='Completed';
     var ackSect='';
     if(canAck){ackSect='<div class="ack-wrap"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+c.id+'"></textarea></div><button class="btn btn-primary btn-sm" data-id="'+c.id+'" onclick="ackCo(+this.dataset.id)">&#10003; Acknowledge</button> ';}
