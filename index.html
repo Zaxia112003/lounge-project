@@ -2141,9 +2141,10 @@ async function submitReview(){
   var editedFeedback=G('rev-modal-feedback').value.trim();
   if(!editedFeedback){G('rev-modal-err').textContent='Please add an error description.';return;}
   /* Find the callout and update it */
-  var co=callouts.find(function(c){return c.id===thread.calloutId||c._fsId===String(thread.calloutId||'');});
-  /* Also try matching by calloutFsId */
-  if(!co&&thread.calloutFsId)co=callouts.find(function(c){return c._fsId===thread.calloutFsId;});
+  /* Find callout: try Firestore ID first (most reliable), then numeric id */
+  var co=null;
+  if(thread.calloutFsId)co=callouts.find(function(c){return c._fsId===thread.calloutFsId;});
+  if(!co)co=callouts.find(function(c){return String(c.id)===String(thread.calloutId)||c._fsId===String(thread.calloutId||'');});
   if(co){
     co.feedback=editedFeedback;
     co.status='Pending';
@@ -2201,11 +2202,17 @@ async function loadPendingReviews(){
   try{
     var snap=await window._fsGetDocs(window._fsColl(fsDb(),'errorReviews'));
     window._pendingReviews=[];
-    snap.forEach(function(d){window._pendingReviews.push(Object.assign({_fsId:d.id},d.data()));});
+    snap.forEach(function(d){
+      var data=d.data();
+      if(data.status!=='approved'&&data.status!=='discarded')window._pendingReviews.push(Object.assign({_fsId:d.id},data));
+    });
     /* Realtime listener */
     window._fsOnSnapshot(window._fsColl(fsDb(),'errorReviews'),function(snap){
       window._pendingReviews=[];
-      snap.forEach(function(d){window._pendingReviews.push(Object.assign({_fsId:d.id},d.data()));});
+      snap.forEach(function(d){
+        var data=d.data();
+        if(data.status!=='approved'&&data.status!=='discarded')window._pendingReviews.push(Object.assign({_fsId:d.id},data));
+      });
       updateReviewBadge();
     });
     updateReviewBadge();
@@ -3827,7 +3834,7 @@ function switchMgrHubTab(tab,btn){
   document.querySelectorAll('#lounge-pane-the-hub .sub-tab').forEach(function(t){t.classList.remove('active');});
   if(btn)btn.classList.add('active');
   var pane=G('mgr-hub-pane-'+tab);if(pane)pane.classList.add('active');
-  if(tab==='quality'){mgrQDateFilter='month';renderMgrHubQuality();setTimeout(function(){
+  if(tab==='quality'){mgrQDateFilter='today';renderMgrHubQuality();setTimeout(function(){
     if(G('rcal-mgr-quality-trigger'))rcalCreate('rcal-mgr-quality',function(from,to){
       mgrQCustomRange={from:from,to:to};mgrQDateFilter='custom';
       document.querySelectorAll('#mgr-hub-pane-quality .filter-pill').forEach(function(p){p.classList.remove('active');});
@@ -4091,7 +4098,7 @@ function renderMgrHubPerformance(){
 }
 
 /* ── MGR HUB QUALITY ── */
-var mgrQDateFilter='month';
+var mgrQDateFilter='today';
 var mgrQCustomRange={from:'',to:''};
 
 function mgrQFilter(btn){
@@ -4108,6 +4115,7 @@ function setMgrQCustom(){
 
 function mgrQInRange(dateStr){
   if(mgrQDateFilter==='all')return true;
+  if(mgrQDateFilter==='today'){var tod=getSydneyDate();return dateStr===tod.toISOString().split('T')[0];}
   try{
     var d=new Date(dateStr+'T00:00:00'),now=new Date(),rs,re=null;
     if(mgrQDateFilter==='week'){var dw=now.getDay(),m=new Date(now);m.setDate(now.getDate()-(dw===0?6:dw-1));m.setHours(0,0,0,0);rs=m;}
@@ -4125,6 +4133,7 @@ function renderMgrHubQuality(){
 
   var filterBar='<div class="filter-bar" style="margin-bottom:18px">'
     +'<button class="filter-pill'+(mgrQDateFilter==='all'?' active':'')+'" data-f="all" onclick="mgrQFilter(this)">All Time</button>'
+    +'<button class="filter-pill'+(mgrQDateFilter==='today'?' active':'')+'" data-f="today" onclick="mgrQFilter(this)">Today</button>'
     +'<button class="filter-pill'+(mgrQDateFilter==='week'?' active':'')+'" data-f="week" onclick="mgrQFilter(this)">This Week</button>'
     +'<button class="filter-pill'+(mgrQDateFilter==='month'?' active':'')+'" data-f="month" onclick="mgrQFilter(this)">This Month</button>'
     +'<button class="filter-pill'+(mgrQDateFilter==='quarter'?' active':'')+'" data-f="quarter" onclick="mgrQFilter(this)">This Quarter</button>'
