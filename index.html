@@ -2755,6 +2755,8 @@ var pwPhotos=[];
 var pwPending=[];
 var pwSlideIdx=0;
 var PW_MAX_PINNED=10;
+var _pwAutoplay=null;
+var _pwAutoplayOn=false;
 var PW_MAX_MB=5;
 
 function pwPinned(){return pwPhotos.filter(function(p){return p.pinned;}).sort(function(a,b){return a.pinnedAt-b.pinnedAt;});}
@@ -2917,6 +2919,22 @@ function pwDownload(fsId){
 }
 
 /* ── SLIDE NAV ── */
+function pwStartAutoplay(){
+  if(_pwAutoplay)clearInterval(_pwAutoplay);
+  _pwAutoplayOn=true;
+  _pwAutoplay=setInterval(function(){pwSlide(1);},4000);
+  var btn=G('pw-autoplay-btn');
+  if(btn)btn.innerHTML='&#9646;&#9646;';
+}
+function pwStopAutoplay(){
+  if(_pwAutoplay){clearInterval(_pwAutoplay);_pwAutoplay=null;}
+  _pwAutoplayOn=false;
+  var btn=G('pw-autoplay-btn');
+  if(btn)btn.innerHTML='&#9654;';
+}
+function pwToggleAutoplay(){
+  if(_pwAutoplayOn)pwStopAutoplay();else pwStartAutoplay();
+}
 function pwSlide(dir){
   var pinned=pwPinned();
   if(!pinned.length)return;
@@ -2960,7 +2978,12 @@ function pwRenderSlideshow(){
   var delBtn=(cu.nickname===cur.uploader||cu.role==='manager')
     ?'<a class="pw-btn" onclick="pwDelete(\''+cur._fsId+'\')" title="Delete" style="background:rgba(255,61,61,.25)">&#128465;</a>'
     :'';
-  return '<div class="pw-stage">'+imgs+arrows
+  var autoBtn='<div style="position:absolute;bottom:48px;left:50%;transform:translateX(-50%)">'
+    +'<button id="pw-autoplay-btn" onclick="pwToggleAutoplay()" title="Play/Pause" '
+    +'style="background:rgba(0,0,0,.45);border:none;cursor:pointer;color:#fff;font-size:18px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1">'
+    +(_pwAutoplayOn?'&#9646;&#9646;':'&#9654;')
+    +'</button></div>';
+  return '<div class="pw-stage" style="position:relative">'+imgs+arrows+autoBtn
     +'<div class="pw-caption">'
     +'<div class="pw-caption-text">'
     +'<div class="pw-caption-name">'+cur.uploaderFull+'</div>'
@@ -3122,6 +3145,8 @@ function renderMyDay(){
   renderAnnouncements();
   renderAwards();
   startClock();
+  /* Start wall slideshow autoplay */
+  setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},500);
 }
 
 
@@ -7491,7 +7516,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- GALLERY MODAL -->
 <div class="modal-overlay" id="modal-gallery" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:960px;width:92vw;max-height:720px;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:960px;width:92vw;height:520px;max-height:520px;display:flex;flex-direction:column">
     <button class="modal-close" onclick="G('modal-gallery').classList.remove('open')">&#x2715;</button>
     <div class="modal-title">&#128247; Photo Gallery</div>
     <div id="modal-gallery-grid" style="flex:1;overflow-y:auto;margin-top:14px"></div>
