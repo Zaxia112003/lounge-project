@@ -2266,10 +2266,12 @@ function openMemberBellPanel(){
   if(pending.length){
     html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">Needs Acknowledgement ('+pending.length+')</div>';
     html+=pending.map(function(co){
-      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();dismissAndNavigate('+co.id+')">'
-        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+co.address+'</div>'
-        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtDate(co.date)+'</div></div>'
-        +'<span style="font-size:10px;background:rgba(255,61,61,.12);color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0">Acknowledge</span>'
+      var isCrit=co.type==='qesc'||co.type==='qesc_esc';
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);background:'+(isCrit?'rgba(255,61,61,.04)':'transparent')+';cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();dismissAndNavigate('+co.id+')">'
+        +'<div><div style="font-size:12px;font-weight:600;color:'+(isCrit?'var(--red)':'var(--text)')+'">'
+        +(isCrit?'&#128680; ':'')+co.address+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+(isCrit?'<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--red)">Critical Escalation</span> · ':'')+fmtDate(co.date)+'</div></div>'
+        +'<span style="font-size:10px;background:'+(isCrit?'rgba(255,61,61,.2)':'rgba(255,61,61,.12)')+';color:var(--red);padding:2px 8px;border-radius:8px;flex-shrink:0;'+(isCrit?'font-weight:700':'')+'">'+(isCrit?'⚠ ':'')+'Acknowledge</span>'
         +'</div>';
     }).join('');
   }
@@ -3957,7 +3959,7 @@ function renderMgrHubPerformance(){
     var avgDaily=days.length?(totalUploads/days.length):null;
     var qualEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
     var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&mgrHubInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
-    var qScore=totalUploads>0?((totalUploads-errors)/totalUploads*100):null;
+    var qScore=totalUploads>0?((totalUploads-errors-qualEsc)/totalUploads*100):null;
     return {m:m,nick:nick,totalUploads:totalUploads,inShift:inShift,offShift:offShift,avgDaily:avgDaily,qualEsc:qualEsc,errors:errors,qScore:qScore};
   });
 
@@ -6634,7 +6636,7 @@ function getStats(nick,range){
   const adu=weightedDays>0?(uploadsTotal/weightedDays):0;
   const myQEsc=callouts.filter(c=>c.type==='qesc'&&(c.uploader===nick||c.escalationMember===nick)&&inRange(c.date,range));
   const myErr=callouts.filter(c=>c.type==='qscore'&&c.uploader===nick&&inRange(c.date,range)&&c.status!=='pending_review'&&c.status!=='discarded');
-  const qScore=uploadsTotal>0?((uploadsTotal-myErr.length)/uploadsTotal*100):null;
+  const qScore=uploadsTotal>0?((uploadsTotal-myErr.length-myQEsc.length)/uploadsTotal*100):null;
   return{uploadsTotal,uploadsInShift,uploadsOffShift:uploadsTotal-uploadsInShift,adu:Math.round(adu*10)/10,weightedDays:Math.round(weightedDays*10)/10,qEsc:myQEsc.length,errors:myErr.length,qScore};
 }
 
