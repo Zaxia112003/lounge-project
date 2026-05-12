@@ -4897,15 +4897,18 @@ var ChatDB = {
 
 /* ── FORWARD FROM KOBY ── */
 function forwardToTeam(question, kobyAnswer){
+  var now=new Date();
+  var timeStr=now.toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
   var thread={
-    id: chatStore.nextThreadId++,
+    id: 'fwd_'+Date.now()+'_'+(Math.random().toString(36).slice(2,7)),
     from: cu.nickname,
     fromFull: cu.fullName,
     question: question,
     kobyAnswer: kobyAnswer,
+    postedAt: now.getTime(),
     messages:[
-      {role:'koby', text:kobyAnswer, author:'Koby', time:new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})},
-      {role:'user',  text:question,  author:cu.fullName, time:new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})}
+      {role:'user',  text:question,  author:cu.fullName, time:timeStr},
+      {role:'koby', text:kobyAnswer, author:'Koby', time:timeStr}
     ],
     unread: true,
     kbStatus: null
