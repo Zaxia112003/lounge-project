@@ -2163,6 +2163,9 @@ async function submitReview(){
   pushNotif('📋','Error for "'+thread.address+'" approved and sent to '+thread.uploaderFull+'.','qscore');
   G('modal-error-review').classList.remove('open');
   G('modal-reviews').classList.remove('open');
+  /* Remove from in-memory list so bell clears immediately */
+  if(window._pendingReviews){window._pendingReviews=window._pendingReviews.filter(function(r){return r.id!==threadId;});}
+  updateNotifBell();
   renderQualityPortal();
   if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
   if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
@@ -5408,8 +5411,9 @@ function mwSubmitAwards(){
   }
   fsSaveAwards();
   pushNotif('🏆',def.title+' updated by '+cu.fullName+'.','awards');
-  renderMyDay();
-  setTimeout(function(){if(typeof renderAwards==='function')renderAwards();},100);
+  /* Navigate to My Day so awards-grid is in DOM, then render awards */
+  switchLoungeTab('my-day', document.querySelector('.lounge-tab[data-tab="my-day"]'));
+  setTimeout(function(){renderMyDay();setTimeout(function(){if(typeof renderAwards==='function')renderAwards();},50);},50);
   /* Reset form */
   G('mw-award-category').value='';
   renderAwardForm();
@@ -7098,11 +7102,7 @@ document.addEventListener('DOMContentLoaded',function(){
       document.documentElement.style.setProperty('--sidebar-w','64px');
     }
   })();
-  /* Seed: remove this block when manager posting is live */
-  if(mdAnnouncements.length===0){
-    mdAnnouncements.push({id:nextId++,title:'Welcome to the The Lounge Project',body:'This is your team hub. Use The Lounge to check announcements, team photos, and your performance dashboard. Ask Koby anytime using the ? icon in the sidebar.',author:'Aldrin Elnar',postedAt:Date.now()-1000*60*30});
-  mdAnnouncements.push({id:nextId++,title:'The Lounge Project — Development Journey & What\'s New',body:'The Lounge Project The Lounge Project — Development Journey\n\nFrom a simple idea to a fully-featured team portal, here is a look at the key milestones in building the The Lounge Project:\n\nv11 — My Day\nIntroduced the My Day dashboard — the heart of the portal. Team members can now see the date, announcements, team photo wall, and the awards board all in one place. This was the first version where the portal truly felt like a home base.\n\nv12 — My Space\nAdded My Space as a dedicated area for team content. This version went through significant behind-the-scenes work to get the navigation system reliable and consistent across all roles.\n\nv13 — The Lounge\nMerged My Day and My Space into The Lounge — a single unified dashboard with sub-tabs. This made navigation cleaner and gave the portal a more cohesive feel. The Hub (formerly My Dashboard) moved inside The Lounge as a third tab.\n\nv14 — Layout & Branding\nMajor visual refresh. The sidebar was streamlined, the The Lounge Project brand header was added above the tab bar, Logged In As and Sign Out moved to the top-right, and the settings gear found its permanent home.\n\nv15 — Polish & Time Format\nRedundant headings removed from My Day and My Hub. Version number and ae signature added to the brand header. The Compact Sidebar setting was replaced with a 12h/24h time format toggle.\n\nv16 — Live Clock\nMy Day now shows a live clock below the date — updating every second in 12h format by default. Switches to 24h when toggled in Settings. The clock starts and stops with the My Day tab.\n\nv17 — Introducing Koby\nMeet Koby — your KB assistant. The question mark icon in the sidebar opens a chat panel powered by the Anthropic AI API. Koby is grounded in the The Lounge Project knowledge base and answers questions about uploading procedures, issue handling, vendor rules, and escalation. Responses are role-filtered — escalation staff get access to escalation-specific articles. Koby resets on every open to keep things clean and private.\n\nWhat is next?\nWe are continuously improving the portal based on your feedback. Upcoming features include the full Knowledge Base article browser, manager-side analytics, and more. Stay tuned for announcements here in The Lounge.',author:'Aldrin Elnar',postedAt:Date.now()-1000*60*60*2});
-  }
+    /* Announcement seeds removed — managed via manager portal */
   initNickListener();
   var qd=G('qesc-date');if(qd)qd.value=todayStr();
   var qs=G('qscore-date');if(qs)qs.value=todayStr();
@@ -7458,7 +7458,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- GALLERY MODAL -->
 <div class="modal-overlay" id="modal-gallery" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:960px;width:92vw;max-height:800px;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:960px;width:92vw;max-height:560px;display:flex;flex-direction:column">
     <button class="modal-close" onclick="G('modal-gallery').classList.remove('open')">&#x2715;</button>
     <div class="modal-title">&#128247; Photo Gallery</div>
     <div id="modal-gallery-grid" style="flex:1;overflow-y:auto;margin-top:14px"></div>
