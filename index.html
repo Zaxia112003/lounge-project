@@ -1396,6 +1396,7 @@ function fsSavePerfData(nick){
 
 function fsSaveCallout(c){
   if(!fsDb())return;
+  if(c._fsId){/* Already saved via direct addDoc */try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',c._fsId),(function(){var pl=Object.assign({},c);delete pl._fsId;return pl;})());}catch(e){}return;}
   fsWriteDoc('callouts',c);
 }
 
@@ -2145,15 +2146,26 @@ async function submitReview(){
   var co=null;
   if(thread.calloutFsId)co=callouts.find(function(c){return c._fsId===thread.calloutFsId;});
   if(!co)co=callouts.find(function(c){return String(c.id)===String(thread.calloutId)||c._fsId===String(thread.calloutId||'');});
+  var reviewedAt=new Date().toISOString();
   if(co){
     co.feedback=editedFeedback;
     co.status='Pending';
     co.managerReviewed=true;
-    co.reviewedAt=new Date().toISOString();
-    if(co._fsId){
-      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{feedback:editedFeedback,status:'Pending',managerReviewed:true,reviewedAt:co.reviewedAt});}
-      catch(e){console.warn('review update',e);}
+    co.reviewedAt=reviewedAt;
+  }
+  /* Always update Firestore — even if callout not in memory yet */
+  var calloutFsId=co?co._fsId:thread.calloutFsId;
+  if(calloutFsId&&fsDb()){
+    try{
+      await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',calloutFsId),
+        {feedback:editedFeedback,status:'Pending',managerReviewed:true,reviewedAt:reviewedAt});
+    }catch(e){
+      /* If update fails (doc may not exist with this ID), try addDoc as fallback */
+      console.warn('review update failed, calloutFsId:',calloutFsId,e);
     }
+  } else if(!calloutFsId&&thread.calloutId&&fsDb()){
+    /* calloutFsId not stored — query by numeric id field */
+    console.warn('No calloutFsId on thread — uploader may not receive notification');
   }
   /* Mark review as approved */
   thread.status='approved';
@@ -5694,8 +5706,15 @@ async function submitQScoreFromOverlay(){
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
   var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCo);
-  fsSaveCallout(newCo);
-  /* Notify manager via mailbox — do NOT notify escalation */
+  /* Save callout and wait for Firestore ID before sending review notif */
+  if(fsDb()){
+    try{
+      var coRef=await window._fsAddDoc(window._fsColl(fsDb(),'callouts'),
+        (function(){var pl=Object.assign({},newCo);delete pl._fsId;return pl;})());
+      newCo._fsId=coRef.id;
+    }catch(e){console.warn('callout save',e);}
+  }
+  /* Notify manager — now calloutFsId will be set */
   sendManagerReviewNotif(newCo);
   renderQualityPortal();
   closeDailyLog();
