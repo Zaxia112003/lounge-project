@@ -1667,6 +1667,12 @@ function avEl(nick,sz=30){
   return `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:${Math.floor(sz*.38)}px;font-weight:700;color:#fff;flex-shrink:0;font-family:var(--font-d)">${nick.slice(0,2).toUpperCase()}</div>`;
 }
 function buildSidebar(){
+  /* Show Add Article button to manager and Jelie */
+  var addBtn=G('add-article-btn');
+  if(addBtn){
+    var canAdd=cu&&(cu.role==='manager'||(cu.role==='escalation'&&cu.nickname==='Jelie'));
+    addBtn.style.display=canAdd?'':'none';
+  }
   const{nickname:nick,fullName:full,role}=cu;
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
   const wrap=G('sb-av-wrap');
@@ -2092,7 +2098,7 @@ function openReviewModal(thread){
   G('rev-modal-date').textContent=thread.date;
   G('rev-modal-logged').textContent=thread.fromFull||thread.from;
   G('rev-modal-feedback').value=thread.feedback||'';
-  if(thread.screenshot){G('rev-modal-ss').src=thread.screenshot;G('rev-modal-ss').style.display='';}
+  if(thread.screenshot){var ssEl=G('rev-modal-ss');var firstSrc=thread.screenshot.split('||')[0];ssEl.src=firstSrc;ssEl.style.display='';ssEl.style.cursor='pointer';ssEl.title='Click to view full size';ssEl.dataset.src=firstSrc;ssEl.onclick=function(){window.open(this.dataset.src,'_blank');};}
   else{G('rev-modal-ss').style.display='none';}
   G('modal-error-review').dataset.threadId=thread.id;
   G('modal-error-review').classList.add('open');
@@ -2135,7 +2141,9 @@ async function submitReview(){
   var editedFeedback=G('rev-modal-feedback').value.trim();
   if(!editedFeedback){G('rev-modal-err').textContent='Please add an error description.';return;}
   /* Find the callout and update it */
-  var co=callouts.find(function(c){return c.id===thread.calloutId;});
+  var co=callouts.find(function(c){return c.id===thread.calloutId||c._fsId===String(thread.calloutId||'');});
+  /* Also try matching by calloutFsId */
+  if(!co&&thread.calloutFsId)co=callouts.find(function(c){return c._fsId===thread.calloutFsId;});
   if(co){
     co.feedback=editedFeedback;
     co.status='Pending';
@@ -2602,7 +2610,7 @@ function buildManagerDOM(){
           <button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter('template',this)" style="display:none">&#128196; Templates</button>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
-          <button class="btn btn-primary btn-sm" onclick="openAddArticleModal()">&#43; Add Article</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddArticleModal()" id="add-article-btn">&#43; Add Article</button>
         </div>
       </div>
       <div class="article-list" id="article-list"></div>
@@ -2948,6 +2956,7 @@ function pwRenderDots(){
 }
 
 /* ── PHOTO FULL VIEW ── */
+function pwOpenFullPhotoByFsId(fid){pwOpenFullPhoto(fid);}
 function pwOpenFullPhoto(id){
   /* Support both _fsId (string) and legacy numeric id */
   var p=pwPhotos.find(function(x){return x._fsId===id||String(x.id)===String(id);});
@@ -2969,21 +2978,27 @@ function pwRenderGalleryModal(){
     el.innerHTML='<div class="empty" style="padding:40px;text-align:center"><div style="font-size:32px">📷</div><div style="color:var(--muted);margin-top:8px">No approved photos yet.</div></div>';
     return;
   }
+  var isManager=cu&&cu.role==='manager';
   var sorted=pwPhotos.slice().sort(function(a,b){return b.uploadedAt-a.uploadedAt;});
-  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:4px">'
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:4px">'
     +sorted.map(function(p){
-      var pinBtn=cu.role==='manager'
-        ?(p.pinned
-          ?'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(139,45,255,.2);color:var(--accent);border:none;cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwUnpin(+this.dataset.id);pwRenderGalleryModal()">📌 Pinned</button>'
-          :'<button style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg3);color:var(--muted);border:1px solid var(--border);cursor:pointer;width:100%" data-id="'+p.id+'" onclick="pwPin(+this.dataset.id);pwRenderGalleryModal()">Pin to Wall</button>')
-        :(p.pinned?'<div style="font-size:9px;color:var(--accent);text-align:center">📌 On Wall</div>':'');
-      return '<div style="background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">'
-        +'<img src="'+p.src+'" style=\"width:100%;height:110px;object-fit:cover;display:block\" />'
-        +'<div style="padding:6px">'
-        +'<div style="font-size:10px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.uploaderFull+'</div>'
-        +(p.caption?'<div style="font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+p.caption+'</div>':'')
-        +pinBtn
-        +'</div></div>';
+      var fid=p._fsId||String(p.id);
+      /* Pin icon: 📌 red=pinned, gray=unpinned */
+      var pinBtn=isManager
+        ?'<button title="'+(p.pinned?'Unpin':'Pin to wall')+'" data-fid="'+fid+'" onclick="event.stopPropagation();'+(p.pinned?'gwGalleryUnpin':'gwGalleryPin')+'(this.dataset.fid)" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;line-height:1;'+(p.pinned?'color:#ef4444':'color:#9ca3af;filter:grayscale(1)')+'">📌</button>'
+        :(p.pinned?'<span style="font-size:13px;color:#ef4444;line-height:1">📌</span>':'');
+      /* Download icon */
+      var dlBtn='<button title="Download" data-fid="'+fid+'" onclick="event.stopPropagation();pwDownload(this.dataset.fid)" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;line-height:1;color:#9ca3af">⬇️</button>';
+      /* Trash icon (manager only) */
+      var trashBtn=isManager
+        ?'<button title="Delete" data-fid="'+fid+'" onclick="event.stopPropagation();pwDelete(this.dataset.fid)" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;line-height:1;color:#9ca3af">🗑️</button>'
+        :'';
+      return '<div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);cursor:pointer;background:var(--bg3)" data-fid="'+fid+'" onclick="pwOpenFullPhotoByFsId(this.dataset.fid)">'
+        +'<img src="'+p.src+'" style="width:100%;height:140px;object-fit:cover;display:block;pointer-events:none"/>'
+        +'<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:flex-end;padding:3px 4px;gap:2px" onclick="event.stopPropagation()">'
+        +pinBtn+dlBtn+trashBtn
+        +'</div>'
+        +'</div>';
     }).join('')
     +'</div>';
 }
@@ -5661,7 +5676,8 @@ async function submitQScoreFromOverlay(){
   var errMsg=G('qscore-err-msg');
   errMsg.textContent='';
   if(!upl||!addr||!date||!err){errMsg.textContent='Please fill in all required fields.';return;}
-  var ss=G('qscore-file2').files[0]?await uploadScreenshot(G('qscore-file2').files[0]):null;
+  var _files2=Array.from(G('qscore-file2').files);var ss=null;
+  if(_files2.length>0){var _urls=await Promise.all(_files2.map(function(f){return uploadScreenshot(f);}));ss=_urls.filter(Boolean).join('||');}
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
   var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCo);
@@ -6595,6 +6611,20 @@ function renderDashboard(){
       <div class="prog-wrap"><div class="prog-bar" style="width:${Math.min(s.qScore||0,100)}%"></div></div>
     </div>`;
   renderDailyTbl(nick,range);
+  /* Re-init custom range calendar after render (DOM re-clones) */
+  setTimeout(function(){
+    var trig=G('rcal-upl-perf-trigger');
+    if(trig){
+      var fresh=trig.cloneNode(true);
+      trig.parentNode.replaceChild(fresh,trig);
+      rcalCreate('rcal-upl-perf',function(from,to){
+        customRange={from:from,to:to};
+        activeDateFilter='custom';
+        document.querySelectorAll('#fbar .filter-pill').forEach(function(p){p.classList.remove('active');});
+        renderDashboard();
+      });
+    }
+  },50);
 }
 
 function renderDailyTbl(nick,range){
@@ -6688,6 +6718,20 @@ function parseCSV(text,fname){
 const parseDur=s=>{if(!s)return 0;const p=s.trim().split(':');if(p.length===3)return parseInt(p[0])*3600+parseInt(p[1])*60+(parseInt(p[2])||0);if(p.length===2)return parseInt(p[0])*60+(parseInt(p[1])||0);return 0;};
 
 /* ── QUALITY PORTAL ── */
+function multiFilePrev(inp,previewId){
+  var el=G(previewId);if(!el)return;
+  el.innerHTML='';
+  Array.from(inp.files).forEach(function(file){
+    var r=new FileReader();
+    r.onload=function(e){
+      var img=document.createElement('img');
+      img.src=e.target.result;
+      img.style.cssText='width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border)';
+      el.appendChild(img);
+    };
+    r.readAsDataURL(file);
+  });
+}
 function filePrev(inp,pid){const prev=G(pid);prev.innerHTML='';if(inp.files[0])prev.innerHTML=`<div class="file-prev"><span class="file-prev-name">📎 ${inp.files[0].name}</span><button class="file-prev-rm" onclick="G('${inp.id}').value='';G('${pid}').innerHTML=''">✕</button></div>`;}
 const toB64=f=>new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(f);});
 async function uploadScreenshot(file){
@@ -7288,9 +7332,9 @@ document.addEventListener('DOMContentLoaded',function(){
           <div class="form-group"><label class="form-label">Error Description</label><textarea class="form-input" id="qscore-err2" rows="3" placeholder="Describe the error found..."></textarea></div>
           <div class="form-group">
             <label class="form-label">Screenshot <span style="color:var(--muted);font-weight:400">(optional)</span></label>
-            <input type="file" id="qscore-file2" accept="image/*" style="display:none" onchange="filePrev(this,'qscore-prev2')"/>
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('qscore-file2').click()">&#128206; Attach</button>
-            <div id="qscore-prev2"></div>
+            <input type="file" id="qscore-file2" accept="image/*" multiple style="display:none" onchange="multiFilePrev(this,'qscore-prev2')"/>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('qscore-file2').click()">&#128206; Attach Photos</button>
+            <div id="qscore-prev2" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
           </div>
           <div class="err-msg" id="qscore-err-msg" style="text-align:left;margin-bottom:8px"></div>
           <button class="btn btn-primary" style="width:100%" onclick="submitQScoreFromOverlay()">&#9997;&#65039; Log Error</button>
@@ -7414,7 +7458,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- GALLERY MODAL -->
 <div class="modal-overlay" id="modal-gallery" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:960px;width:92vw;max-height:92vh;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:960px;width:92vw;max-height:800px;display:flex;flex-direction:column">
     <button class="modal-close" onclick="G('modal-gallery').classList.remove('open')">&#x2715;</button>
     <div class="modal-title">&#128247; Photo Gallery</div>
     <div id="modal-gallery-grid" style="flex:1;overflow-y:auto;margin-top:14px"></div>
