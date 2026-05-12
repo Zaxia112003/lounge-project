@@ -3874,8 +3874,18 @@ function renderMgrHubPerformance(){
     +'<div class="range-cal" id="rcal-mgr-perf"><div class="range-cal-trigger" id="rcal-mgr-perf-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-mgr-perf-popup"></div></div>'
     +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrHubClearFilter()">&#10005; Clear</button>'    +'</div>';
 
+  if(!window.mgrHubNameFilter)window.mgrHubNameFilter='';
+  var _allM=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';});
+  var memberDropdown='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">'
+    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Member:</span>'
+    +'<select onchange="window.mgrHubNameFilter=this.value;renderMgrHubPerformance()" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer">'
+    +'<option value="">All Members</option>'
+    +_allM.map(function(m){return '<option value="'+m.nickname+'"'+(window.mgrHubNameFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('')
+    +'</select>'
+    +(window.mgrHubNameFilter?'<button onclick="window.mgrHubNameFilter=\'\';renderMgrHubPerformance()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#10005; Clear</button>':'')
+    +'</div>';
   /* ── UPLOADERS ── */
-  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
+  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader'&&(!window.mgrHubNameFilter||m.nickname===window.mgrHubNameFilter);});
   var uplData=uploaders.map(function(m){
     var nick=m.nickname;
     var days=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
@@ -3933,7 +3943,7 @@ function renderMgrHubPerformance(){
     +'</div>';
 
   /* ── ESCALATION ── */
-  var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
+  var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation'&&(!window.mgrHubNameFilter||m.nickname===window.mgrHubNameFilter);});
 
   /* Shared SLA */
   var filteredSecs=(timerSessions||[]).filter(function(s){return mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
@@ -4052,7 +4062,7 @@ function renderMgrHubPerformance(){
     +'</div></div>'
     +'</div>';
 
-  el.innerHTML=filterBar+uplSection+escSection;
+  el.innerHTML=filterBar+memberDropdown+uplSection+escSection;
 
   /* Restore custom date inputs if active */
   if(mgrHubDateFilter==='custom'){
@@ -5399,6 +5409,8 @@ function openMgrWrite(){
   var uplOpts='<option value="">Select uploader...</option>'+uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   var escOpts='<option value="">Select escalation member...</option>'+escMembers.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   ['mw-err-upl','mw-qesc-upl'].forEach(function(id){var el=G(id);if(el)el.innerHTML=uplOpts;});
+  var allMOpts='<option value="">Select member...</option>'+TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+' ('+m.role+')</option>';}).join('');
+  var qescUplEl=G('mw-qesc-upl');if(qescUplEl)qescUplEl.innerHTML=allMOpts;
   var qescEsc=G('mw-qesc-esc');if(qescEsc)qescEsc.innerHTML=escOpts;
   var allOpts='<option value="">— None —</option>'+TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   ['mw-hero-1','mw-hero-2','mw-hero-3','mw-qm-1','mw-qm-2','mw-qm-3','mw-qc-1','mw-qc-2','mw-qc-3','mw-um-1','mw-um-2','mw-um-3'].forEach(function(id){var el=G(id);if(el)el.innerHTML=allOpts;});
@@ -5525,6 +5537,7 @@ function mwDetailConfirm(){
   mwDetailReset();closeMgrWrite();
 }
 function openMgrTimerLog(nick){
+  window._mgrTimerNick=nick;
   var m=TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick};
   var sessions=(allTimerSessions||[]).filter(function(s){return s.nick===nick;}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
   var modal=G('modal-mgr-timer');if(!modal)return;
@@ -5549,6 +5562,19 @@ function openMgrTimerLog(nick){
   }
   modal.classList.add('open');
 }
+function mgrSaveManualSession(){
+  var nick=window._mgrTimerNick;if(!nick)return;
+  var dateEl=G('mgr-timer-add-date'),minsEl=G('mgr-timer-add-mins');
+  if(!dateEl||!dateEl.value||!minsEl||!minsEl.value){alert('Please enter a date and duration.');return;}
+  var secs=Math.round(parseFloat(minsEl.value)*60);if(secs<=0){alert('Duration must be > 0.');return;}
+  var session={nick:nick,date:dateEl.value,seconds:secs,start:dateEl.value+'T08:30:00',end:null,manual:true};
+  window._fsAddDoc(window._fsColl(fsDb(),'timerSessions'),session).then(function(ref){
+    session._fsId=ref.id;allTimerSessions.push(session);
+    G('mgr-timer-add-form').style.display='none';
+    dateEl.value='';minsEl.value='';
+    openMgrTimerLog(nick);if(typeof renderMgrHubPerformance==='function')renderMgrHubPerformance();
+  }).catch(function(e){alert('Error: '+e.message);});
+}
 function mgrDeleteTimerSession(fsId,nick){
   if(!fsId||!confirm('Delete this session?'))return;
   var i=allTimerSessions.findIndex(function(s){return s._fsId===fsId;});
@@ -5557,18 +5583,20 @@ function mgrDeleteTimerSession(fsId,nick){
   openMgrTimerLog(nick);if(typeof renderMgrHubPerformance==='function')renderMgrHubPerformance();
 }
 async function mwSubmitQEsc(){
-  var upl=G('mw-qesc-upl').value,esc=G('mw-qesc-esc').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
+  var member=G('mw-qesc-upl').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
   var msg=G('mw-qesc-msg');msg.textContent='';
-  if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
+  if(!member||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-qesc-file').files[0]?await uploadScreenshot(G('mw-qesc-file').files[0]):null;
-  var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
-  var sharedMeta={address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
-  var uplCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc',uploader:upl,escalationMember:esc,status:'Pending',insight:''});
-  callouts.push(uplCallout);fsSaveCallout(uplCallout);
-  if(typeof sendManagerDirectNotif==='function')sendManagerDirectNotif(uplCallout);
-  if(esc){var escCallout=Object.assign({},sharedMeta,{id:nextId++,type:'qesc_esc',uploader:upl,escalationMember:esc,status:'Pending',insight:'',escThread:true});callouts.push(escCallout);fsSaveCallout(escCallout);}
+  var mem=TEAM.find(function(m){return m.nickname===member;})||{fullName:member,role:'uploader'};
+  var isEsc=mem.role&&mem.role.toLowerCase()==='escalation';
+  var meta={address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
+  var co=isEsc
+    ?Object.assign({},meta,{id:nextId++,type:'qesc_esc',uploader:member,escalationMember:member,status:'Pending',insight:'',escThread:true})
+    :Object.assign({},meta,{id:nextId++,type:'qesc',uploader:member,escalationMember:'',status:'Pending',insight:''});
+  callouts.push(co);fsSaveCallout(co);
+  if(typeof sendManagerDirectNotif==='function')sendManagerDirectNotif(co);
   updateMemberBell();
-  pushNotif('🚨','Critical escalation logged for '+uplMem.fullName+' at "'+addr+'".','qesc');
+  pushNotif('🚨','Critical escalation logged for '+mem.fullName+' at "'+addr+'".','qesc');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
   closeMgrWrite();
 }
@@ -7716,5 +7744,37 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
+
+<!-- MANAGER TIMER SESSION MODAL -->
+<div class="modal-overlay" id="modal-mgr-timer" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:640px">
+    <button class="modal-close" onclick="G('modal-mgr-timer').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title" id="mgr-timer-title">Timer Sessions</div>
+    <div class="modal-sub">&#x26a0; = under 3 min or over 8 hours.</div>
+    <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse">
+      <thead><tr style="border-bottom:1px solid var(--border2)">
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:left">Date</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:left">Start</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:left">End</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:left">Duration</th>
+        <th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);text-align:center">Action</th>
+      </tr></thead>
+      <tbody id="mgr-timer-tbody"></tbody>
+    </table></div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
+      <button class="btn btn-outline btn-sm" onclick="var f=G('mgr-timer-add-form');f.style.display=f.style.display==='none'?'block':'none'" style="font-size:11px">+ Add Session</button>
+      <button class="btn btn-outline" onclick="G('modal-mgr-timer').classList.remove('open')">Close</button>
+    </div>
+    <div id="mgr-timer-add-form" style="display:none;padding:12px;border-top:1px solid var(--border);background:var(--bg3)">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Add Manual Session</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px">Date</label><input type="date" id="mgr-timer-add-date" class="form-input" style="font-size:11px;padding:4px 8px"/></div>
+        <div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px">Duration (minutes)</label><input type="number" id="mgr-timer-add-mins" class="form-input" min="1" placeholder="e.g. 45" style="font-size:11px;padding:4px 8px;width:100px"/></div>
+        <button class="btn btn-primary btn-sm" onclick="mgrSaveManualSession()" style="font-size:11px">Save</button>
+        <button class="btn btn-outline btn-sm" onclick="G('mgr-timer-add-form').style.display='none'" style="font-size:11px">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
