@@ -2966,7 +2966,6 @@ function pwRenderSlideshow(){
     +'<div class="pw-caption-name">'+cur.uploaderFull+'</div>'
     +'<div class="pw-caption-sub">'+(cur.caption||'')+'</div>'
     +'</div>'
-    +'<div class="pw-caption-btns">'+dlBtn+delBtn+'</div>'
     +'</div>'
     +'</div>';
 }
@@ -3011,7 +3010,7 @@ function pwRenderGalleryModal(){
         ?'<button title="'+(p.pinned?'Unpin':'Pin to wall')+'" data-fid="'+fid+'" onclick="event.stopPropagation();'+(p.pinned?'gwGalleryUnpin':'gwGalleryPin')+'(this.dataset.fid)" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;line-height:1;'+(p.pinned?'color:#ef4444':'color:#9ca3af;filter:grayscale(1)')+'">📌</button>'
         :(p.pinned?'<span style="font-size:13px;color:#ef4444;line-height:1">📌</span>':'');
       /* Download icon */
-      var dlBtn='<button title="Download" data-fid="'+fid+'" onclick="event.stopPropagation();pwDownload(this.dataset.fid)" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;line-height:1;color:#9ca3af">⬇️</button>';
+      var dlBtn='';
       /* Trash icon (manager only) */
       var trashBtn=isManager
         ?'<button title="Delete" data-fid="'+fid+'" onclick="event.stopPropagation();pwDelete(this.dataset.fid)" style="background:none;border:none;cursor:pointer;font-size:15px;padding:2px;line-height:1;color:#9ca3af">🗑️</button>'
@@ -5433,13 +5432,18 @@ function mwSubmitAwards(){
   }
   fsSaveAwards();
   pushNotif('🏆',def.title+' updated by '+cu.fullName+'.','awards');
-  /* Navigate to My Day so awards-grid is in DOM, then render awards */
-  switchLoungeTab('my-day', document.querySelector('.lounge-tab[data-tab="my-day"]'));
-  setTimeout(function(){renderMyDay();setTimeout(function(){if(typeof renderAwards==='function')renderAwards();},50);},50);
-  /* Reset form */
+  /* Reset form and close overlay first */
   G('mw-award-category').value='';
   renderAwardForm();
   closeMgrWrite();
+  /* Navigate to My Day then render — 200ms gives Firestore snapshot time to resolve */
+  setTimeout(function(){
+    switchLoungeTab('my-day', document.querySelector('.lounge-tab[data-tab="my-day"]'));
+    setTimeout(function(){
+      renderMyDay();
+      if(typeof renderAwards==='function')renderAwards();
+    },100);
+  },200);
 }
 var mwDetailExtracted=null;
 
@@ -7487,7 +7491,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- GALLERY MODAL -->
 <div class="modal-overlay" id="modal-gallery" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:960px;width:92vw;max-height:560px;display:flex;flex-direction:column">
+  <div class="modal" style="max-width:960px;width:92vw;max-height:720px;display:flex;flex-direction:column">
     <button class="modal-close" onclick="G('modal-gallery').classList.remove('open')">&#x2715;</button>
     <div class="modal-title">&#128247; Photo Gallery</div>
     <div id="modal-gallery-grid" style="flex:1;overflow-y:auto;margin-top:14px"></div>
