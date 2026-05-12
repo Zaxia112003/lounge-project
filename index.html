@@ -1489,6 +1489,7 @@ function loadTeamData(){
 let timerIv=null,timerStart=null,timerStartISO=null,timerOn=false;
 /* timerSessions: [{date:'2026-04-26', start:'2026-04-26T09:30:00', end:'2026-04-26T10:30:00', seconds:3600}] */
 var timerSessions=(function(){try{var s=localStorage.getItem('timerSessions_esc');return s?JSON.parse(s):[];}catch(e){return [];}}());
+var allTimerSessions=[]; /* all sessions from Firestore, for manager view */
 let perfData={};
 let callouts=[];
 let attendance={};
@@ -3942,7 +3943,9 @@ function renderMgrHubPerformance(){
     var nick=m.nickname;
     var uplDays=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
     var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
-    var rate=filteredHrs>0?(uplTotal/filteredHrs):null;
+    var memberSecs=(allTimerSessions||[]).filter(function(s){return s.nick===nick&&mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
+    var memberHrs=memberSecs/3600;
+    var rate=memberHrs>0?(uplTotal/memberHrs):null;
     var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
     return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,memberHrs:memberHrs,qualEsc:qualEsc};
   });
