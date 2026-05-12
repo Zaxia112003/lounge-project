@@ -1859,8 +1859,9 @@ function renderUnifiedAttendance(containerId,isManager){
     var isToday=_uas(d)===todayStr;
     var DOW=['Su','Mo','Tu','We','Th','Fr','Sa'];
     var dayLabel=s.mode==='week'?['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'<br>':DOW[d.getDay()]+'<br>';
+    var isWknd=d.getDay()===0||d.getDay()===6;
     return '<th style="padding:5px 2px;font-size:10px;font-weight:700;text-align:center;min-width:'
-      +(s.mode==='week'?'60px':'28px')+';border:1px solid var(--border2);color:'+(isToday?'var(--accent)':'var(--muted)')+'">'+dayLabel+d.getDate()+'</th>';
+      +(s.mode==='week'?'60px':'28px')+';border:1px solid var(--border2);background:'+(isWknd?'rgba(0,0,0,.06)':'transparent')+';color:'+(isToday?'var(--accent)':isWknd?'rgba(128,128,128,.5)':'var(--muted)')+'">'+dayLabel+d.getDate()+'</th>';
   }).join('');
   var rows=members.map(function(m){
     var cells=dates.map(function(d){
@@ -1868,7 +1869,8 @@ function renderUnifiedAttendance(containerId,isManager){
       var entry=(attendance[m.nickname]||{})[ds];
       if(!entry){var le=attendanceLog.find(function(e){return e.nick===m.nickname&&e.date===ds;});if(le)entry={status:le.status,notes:le.note||'',hours:le.hours,weight:le.weight};}
       var isToday=ds===todayStr;
-      var cellStyle='text-align:center;padding:3px 1px;border:1px solid var(--border);'+(isToday?'background:rgba(139,45,255,.06);':'');
+      var isWeekend=d.getDay()===0||d.getDay()===6;
+      var cellStyle='text-align:center;padding:3px 1px;border:1px solid var(--border);'+(isWeekend?'background:rgba(0,0,0,.06);':isToday?'background:rgba(139,45,255,.06);':'');
       if(entry&&entry.status==='Tardy'&&!isManager)entry=null;
       var badge='';
       if(entry){
@@ -2978,12 +2980,7 @@ function pwRenderSlideshow(){
   var delBtn=(cu.nickname===cur.uploader||cu.role==='manager')
     ?'<a class="pw-btn" onclick="pwDelete(\''+cur._fsId+'\')" title="Delete" style="background:rgba(255,61,61,.25)">&#128465;</a>'
     :'';
-  var autoBtn='<div style="position:absolute;bottom:48px;left:50%;transform:translateX(-50%)">'
-    +'<button id="pw-autoplay-btn" onclick="pwToggleAutoplay()" title="Play/Pause" '
-    +'style="background:rgba(0,0,0,.45);border:none;cursor:pointer;color:#fff;font-size:18px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1">'
-    +(_pwAutoplayOn?'&#9646;&#9646;':'&#9654;')
-    +'</button></div>';
-  return '<div class="pw-stage" style="position:relative">'+imgs+arrows+autoBtn
+  return '<div class="pw-stage">'+imgs+arrows
     +'<div class="pw-caption">'
     +'<div class="pw-caption-text">'
     +'<div class="pw-caption-name">'+cur.uploaderFull+'</div>'
@@ -3121,6 +3118,9 @@ function renderMyDay(){
     +pwRenderSlideshow()
     +'<div class="pw-footer">'
     +'<div class="pw-dots">'+pwRenderDots()+'</div>'
+    +'<button id="pw-autoplay-btn" onclick="pwToggleAutoplay()" title="Play/Pause" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;opacity:.7;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7">'
+    +(_pwAutoplayOn?'&#9646;&#9646;':'&#9654;')
+    +'</button>'
     +(pwPhotos.length>0?'<a class="pw-gallery-link" onclick="pwOpenGallery()">Open Gallery &#8594;</a>':'')
     +'</div>'
     +'</div>'
