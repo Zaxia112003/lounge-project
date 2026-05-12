@@ -2236,7 +2236,7 @@ function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
   /* Bell shows for: Pending (not yet seen/acked) OR Completed-unread (manager finished) */
   var myCallouts=callouts.filter(function(co){
-    var isMyError=co.uploader===cu.nickname&&(co.status==='Pending'||(co.status==='Completed'&&!co.completedRead))&&co.status!=='discarded';
+    var isMyError=co.uploader===cu.nickname&&co.status==='Pending'&&co.status!=='discarded';
     var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname&&co.status==='Pending';
     return isMyError||isMyEsc;
   });
@@ -2253,7 +2253,7 @@ function memberBellClick(){
 function openMemberBellPanel(){
   if(!cu||cu.role==='manager')return;
   var myCallouts=callouts.filter(function(co){
-    var isMyError=co.uploader===cu.nickname&&(co.status==='Pending'||(co.status==='Completed'&&!co.completedRead))&&co.status!=='discarded';
+    var isMyError=co.uploader===cu.nickname&&co.status==='Pending'&&co.status!=='discarded';
     var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname&&co.status==='Pending';
     return isMyError||isMyEsc;
   });
@@ -2287,7 +2287,8 @@ function closeMemberNotif(){var m=G('modal-member-notif');if(m)m.classList.remov
 function closeAckedRef(){var m=G('modal-reviews');if(m)m.classList.remove('open');}
 
 function dismissAndNavigate(id){
-  var co=callouts.find(function(x){return x.id===id;});
+  var id_str=String(id);
+  var co=callouts.find(function(x){return x.id===id||x._fsId===id_str||String(x.id)===id_str;});
   if(co&&co.status==='Pending'){
     co.bellSeen=true;
     if(co._fsId){
@@ -2304,7 +2305,7 @@ function navigateToQuality(){
     setTimeout(function(){switchSubTab('esc-quality',document.querySelector('#sub-esc-quality'));},100);
   } else {
     switchLoungeTab('the-hub',document.querySelector('.lounge-tab[data-tab="the-hub"]'));
-    setTimeout(function(){switchSubTab('sub-qual',document.querySelector('.sub-tab[data-sub="sub-qual"]'));},100);
+    setTimeout(function(){var qTab=document.querySelector('.sub-tab[onclick*="quality"]');if(qTab)switchSubTab('quality',qTab);},100);
   }
 }
 
