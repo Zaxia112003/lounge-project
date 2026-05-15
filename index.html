@@ -1340,6 +1340,12 @@ function fsStartRealtimeListeners(){
     if(G('team-tbl'))renderTeamOverview();
   }));
 
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'avatars'),function(snap){
+    if(!window.AVATARS)window.AVATARS={};
+    snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
+    if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
+    buildSidebar();
+  }));
   /* timerSessions realtime */
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'timerSessions'),function(snap){
     allTimerSessions.length=0;
@@ -1644,11 +1650,12 @@ function goDash(){
   /* Show review badge for manager only */
   /* Bell shown/hidden dynamically via updateNotifBell() and updateMemberBell() */
   updateMailboxBadge();
-  /* Restore avatar from localStorage */
-  try{
-    var saved=localStorage.getItem('avatar_'+cu.fullName);
-    if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[cu.fullName]=saved;}
-  }catch(e){}
+  try{var saved=localStorage.getItem('avatar_'+cu.fullName);if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[cu.fullName]=saved;}}catch(e){}
+  if(fsDb()){try{window._fsGetDocs(window._fsColl(fsDb(),'avatars')).then(function(snap){
+    if(!window.AVATARS)window.AVATARS={};
+    snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
+    if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
+  }).catch(function(){});}catch(e){}}
   buildSidebar();buildMain();
   if(cu&&cu.role==='manager')loadPendingReviews();
   var li=G('main-loggedin');if(li&&cu)li.innerHTML='Logged in as <span style="color:var(--accent);font-weight:700">'+cu.fullName+'</span>';
@@ -2043,7 +2050,8 @@ function updateReviewBadge(){updateNotifBell();}
 function updateNotifBell(){
   var errCount=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review'||r.status==='acknowledged';}).length;
   var photoCount=(window.pwPending||[]).length;
-  var total=errCount+photoCount;
+  var faqCount=(ChatDB&&ChatDB.getThreads?ChatDB.getThreads().filter(function(t){return t.kbStatus==='pending'&&!t.archived;}).length:0);
+  var total=errCount+photoCount+faqCount;
   var wrap=G('notif-bell-wrap');
   var badge=G('notif-bell-badge');
   if(wrap)wrap.style.display=(cu&&cu.role==='manager'&&total>0)?'block':'none';
@@ -2090,6 +2098,17 @@ function openNotifBell(){
         +'</div>';
     }).join('');
   }
+  var faqPending=(ChatDB&&ChatDB.getThreads?ChatDB.getThreads().filter(function(t){return t.kbStatus==='pending'&&!t.archived;}):[] );
+  if(faqPending.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">FAQ Approvals ('+faqPending.length+')</div>';
+    html+=faqPending.map(function(t){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" data-tid="'+t.id+'" onclick="G(\'modal-reviews\').classList.remove(\'open\');openFAQApproval(this.dataset.tid)">'
+        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+t.question+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">From '+t.fromFull+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(139,45,255,.1);color:var(--accent);padding:2px 8px;border-radius:8px;flex-shrink:0">&#10067; Approve FAQ</span>'
+        +'</div>';
+    }).join('');
+  }
   if(!html)html='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No pending notifications.</div>';
   list.innerHTML=html;
   var title=G('modal-reviews').querySelector('.modal-title');
@@ -2107,9 +2126,9 @@ function openReviewModal(thread){
   else{G('rev-modal-ss').style.display='none';}
   G('modal-error-review').dataset.threadId=thread.id;
   G('modal-error-review').classList.add('open');
-  /* Mark read */
-  thread.unread=false;
-  updateReviewBadge();
+  thread.unread=false;updateReviewBadge();
+  var upBtn=document.querySelector('#modal-error-review button[onclick*="upgradeToEscalation"]');
+  if(upBtn)upBtn.style.display=(thread.type==='qesc'||thread.type==='qesc_esc')?'none':'inline-flex';
 }
 
 function openReviewsPanel(){
@@ -2189,6 +2208,27 @@ async function submitReview(){
   updateReviewBadge();
 }
 
+async function upgradeToEscalation(){
+  var modal=G('modal-error-review');
+  var threadId=modal.dataset.threadId;
+  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  if(!thread){alert('Thread not found.');return;}
+  if(!confirm('Upgrade this error to a Critical Escalation?'))return;
+  var editedFeedback=G('rev-modal-feedback').value.trim()||thread.feedback;
+  var reviewedAt=new Date().toISOString();
+  var co=null;
+  if(thread.calloutFsId)co=callouts.find(function(c){return c._fsId===thread.calloutFsId;});
+  if(!co)co=callouts.find(function(c){return String(c.id)===String(thread.calloutId)||c._fsId===String(thread.calloutId||'');});
+  if(co){co.type='qesc';co.feedback=editedFeedback;co.status='Pending';co.managerReviewed=true;co.reviewedAt=reviewedAt;}
+  var calloutFsId=co?co._fsId:thread.calloutFsId;
+  if(calloutFsId&&fsDb()){try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',calloutFsId),{type:'qesc',feedback:editedFeedback,status:'Pending',managerReviewed:true,reviewedAt:reviewedAt});}catch(e){}}
+  if(thread._fsId&&fsDb()){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'approved'});}catch(e){}}
+  thread.status='approved';
+  if(window._pendingReviews)window._pendingReviews=window._pendingReviews.filter(function(r){return r.id!==threadId;});
+  updateMemberBell();updateNotifBell();
+  G('modal-error-review').classList.remove('open');G('modal-reviews').classList.remove('open');
+  pushNotif('🚨','Error upgraded to Critical Escalation for '+thread.uploaderFull,'qesc');
+}
 async function discardReview(){
   var modal=G('modal-error-review');
   var threadId=modal.dataset.threadId;
@@ -3185,6 +3225,13 @@ function annUpdateBadge(){
   if(!badge)return;
   if(cnt>0){badge.textContent=cnt+' new';badge.classList.add('show');}
   else{badge.textContent='';badge.classList.remove('show');}
+}
+function deleteAnnouncement(id){
+  if(!confirm('Delete this announcement?'))return;
+  var idx=mdAnnouncements.findIndex(function(a){return String(a.id)===String(id)||a.id==id;});
+  if(idx>-1)mdAnnouncements.splice(idx,1);
+  if(fsDb()){try{window._fsGetDocs(window._fsColl(fsDb(),'announcements')).then(function(snap){snap.forEach(function(d){if(String(d.data().id)===String(id)||d.id===String(id))window._fsDeleteDoc(d.ref);});});}catch(e){}}
+  renderAnnouncements();
 }
 function _playAnnouncementSound(){
   try{
@@ -4675,6 +4722,7 @@ async function sendAIMessage(){
         fwdBtn.className='koby-forward-btn';
         fwdBtn.innerHTML='&#128233; Forward to team';
         var capturedQ=lastQ;var capturedA=reply;
+        fwdBtn.textContent='&#10067; Save as FAQ';
         fwdBtn.onclick=function(){forwardToTeam(capturedQ,capturedA);fwdBtn.disabled=true;fwdBtn.textContent='\u2713 Forwarded';};
         fwdWrap.appendChild(fwdBtn);
         think.parentNode.insertBefore(fwdWrap, think.nextSibling);
@@ -4753,6 +4801,7 @@ function handleProfilePhoto(input){
       AVATARS[cu.fullName]=dataUrl;
       /* Persist to localStorage */
       try{localStorage.setItem('avatar_'+cu.fullName,dataUrl);}catch(e){}
+      if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'avatars',cu.fullName.replace(/ /g,'_')),{fullName:cu.fullName,dataUrl:dataUrl,updatedAt:new Date().toISOString()},{merge:true});}catch(e){}}
       /* Update sidebar avatar */
       buildSidebar();
       /* Update preview */
@@ -4897,6 +4946,11 @@ var ChatDB = {
     var t=chatStore.threads.find(function(x){return x.id===threadId;});
     if(t){t.kbStatus='pending';t.kbDraft={q:q,a:a};}
   },
+  archiveThread: function(threadId){
+    var t=chatStore.threads.find(function(x){return x.id===threadId;});
+    if(t){t.archived=true;t.unread=false;fsSaveChatThread(t);}
+    updateMailboxBadge();
+  },
   approveKB:  function(threadId){
     var t=chatStore.threads.find(function(x){return x.id===threadId;});
     if(!t||!t.kbDraft)return;
@@ -4976,7 +5030,8 @@ function closeMailbox(){
 
 function renderThreadList(){
   var role=cu?cu.role:'uploader';
-  var threads=ChatDB.getThreads();
+  var threads=ChatDB.getThreads().filter(function(t){return !t.archived;});
+  var archivedThreads=ChatDB.getThreads().filter(function(t){return t.archived;});
   var visible=[];
   if(role==='uploader'){
     visible=threads.filter(function(t){return t.fromFull===cu.fullName;});
@@ -4994,6 +5049,18 @@ function renderThreadList(){
   if(!visible.length){
     container.innerHTML='<div class="chat-empty"><div class="chat-empty-ico">✉️</div><div>No messages yet.</div></div>';
     return;
+  }
+  if(archivedThreads&&archivedThreads.length){
+    var archHtml='<div style="padding:8px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;border-top:2px solid var(--border2);margin-top:8px;cursor:pointer" onclick="toggleArchivedSection()">&#128450; Archived ('+archivedThreads.length+') <span id="archived-toggle">&#9660;</span></div>'
+      +'<div id="archived-section" style="display:none">'
+      +archivedThreads.map(function(t){
+        return '<div style="padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;opacity:.6;display:flex;align-items:center;justify-content:space-between" data-atid="'+t.id+'" onclick="openThread(this.dataset.atid)">'
+          +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+t.question+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+t.fromFull+' · Completed</div></div>'
+          +'<span style="font-size:10px;color:var(--muted);padding:2px 8px;border:1px solid var(--border);border-radius:8px">Archived</span>'
+          +'</div>';
+      }).join('')+'</div>';
+    setTimeout(function(){var con=G('chat-list');if(con)con.insertAdjacentHTML('beforeend',archHtml);},10);
   }
   container.innerHTML=visible.map(function(t){
     var lastMsg=t.messages[t.messages.length-1];
@@ -5016,6 +5083,21 @@ function deleteThread(id){
   if(idx>-1)chatStore.threads.splice(idx,1);
   if(fsDb()){try{window._fsDeleteDoc(window._fsDoc(fsDb(),'chatStore',String(id)));}catch(e){}}
   updateMailboxBadge();renderThreadList();
+}
+function toggleArchivedSection(){
+  var sec=G('archived-section');var tog=G('archived-toggle');
+  if(!sec)return;var showing=sec.style.display!=='none';
+  sec.style.display=showing?'none':'block';
+  if(tog)tog.innerHTML=showing?'&#9660;':'&#9650;';
+}
+function completeThread(){
+  if(!currentThreadId)return;
+  if(!confirm('Mark this thread as complete and archive it?'))return;
+  ChatDB.archiveThread(currentThreadId);
+  var listView=G('chat-list-view');var threadView=G('chat-thread-view');
+  if(listView)listView.classList.remove('hidden');
+  if(threadView)threadView.classList.remove('active');
+  renderThreadList();
 }
 function openThread(id){
   currentThreadId=id;
@@ -5043,6 +5125,8 @@ function openThread(id){
   /* Show reply input for escalation/manager only */
   var replyWrap=G('thread-reply-wrap');
   if(replyWrap)replyWrap.style.display=(role==='uploader')?'none':'flex';
+  var doneBtn=G('thread-done-btn');
+  if(doneBtn)doneBtn.style.display=(role!=='uploader'&&!t.archived)?'block':'none';
 
   /* Show KB button if escalation/manager and not yet saved */
   var kbBtn=G('thread-kb-btn');
@@ -5123,6 +5207,30 @@ function submitKBDraft(){
   updateMailboxBadge();
 }
 
+function openFAQApproval(threadId){
+  var t=ChatDB.getThread(threadId);if(!t)return;
+  G('faq-q-input').value=t.kbDraft?t.kbDraft.q:t.question;
+  G('faq-a-input').value=t.kbDraft?t.kbDraft.a:t.kobyAnswer;
+  G('faq-err').textContent='';
+  G('modal-faq-approval').dataset.threadId=threadId;
+  G('modal-faq-approval').classList.add('open');
+}
+function approveFAQSave(){
+  var threadId=G('modal-faq-approval').dataset.threadId;
+  var t=ChatDB.getThread(threadId);if(!t)return;
+  var q=G('faq-q-input').value.trim();
+  var a=G('faq-a-input').value.trim();
+  if(!q||!a){G('faq-err').textContent='Please fill in both fields.';return;}
+  var faqArt={id:'faq_'+Date.now(),title:q,role:'both',body:a,category:'faq',createdAt:new Date().toISOString(),createdBy:cu.fullName};
+  if(!window.mdArticles)window.mdArticles=[];
+  window.mdArticles.push(faqArt);
+  if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',String(faqArt.id)),faqArt,{merge:true});}catch(e){}}
+  t.kbStatus='published';t.kbDraft={q:q,a:a};
+  fsSaveChatThread(t);
+  G('modal-faq-approval').classList.remove('open');
+  updateNotifBell();
+  pushNotif('&#10067;','FAQ saved: "'+q+'"','faq');
+}
 function approveKBArticle(){
   ChatDB.approveKB(currentThreadId);
   openThread(currentThreadId);
@@ -7669,6 +7777,7 @@ document.addEventListener('DOMContentLoaded',function(){
           <option value="ann">&#128226; Announcement</option>
           <option value="kb">&#128218; Knowledge Base</option>
           <option value="tmpl">&#128196; Template</option>
+          <option value="faq">&#10067; FAQ</option>
         </select>
       </div>
       <div>
