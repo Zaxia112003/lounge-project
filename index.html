@@ -3248,6 +3248,7 @@ function _playAnnouncementSound(){
     });
   }catch(e){}
 }
+function artDelBtn(btn){deleteArticle(btn.dataset.artid);}
 function deleteArticle(id){
   if(!confirm('Delete this article?'))return;
   var si=typeof id==='string';
@@ -3446,7 +3447,7 @@ function renderSpaceAnn(){
     var unseen=!annSeenIds.has(a.id);
     var dot=unseen?'<span class="ann-new-dot"></span>':'';
     return '<div class="space-ann-card" data-id="'+a.id+'" onclick="viewAnn('+a.id+')">'
-      +'<div class="space-ann-card-title">'+(cu&&cu.role==="manager"?"<button data-artid='"+a.id+"' onclick='event.stopPropagation();deleteArticle(this.dataset.artid)' style='float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px' title='Delete'>&#128465;</button>":"")+dot+a.title+'</div>'
+      +'<div class="space-ann-card-title">'+(cu&&cu.role==="manager"?"<button data-artid='"+a.id+"' onclick=\"event.stopPropagation();deleteArticle(this.dataset.artid)\" style=\"float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px\" title=\"Delete\">&#128465;</button>":"")+dot+a.title+'</div>'
       +'<div class="space-ann-card-preview">'+a.body+'</div>'
       +'<div class="space-ann-card-meta">'+a.author+' &middot; '+timeAgo(new Date(a.postedAt).toISOString())+'</div>'
       +'</div>';
@@ -4722,7 +4723,7 @@ async function sendAIMessage(){
         fwdBtn.className='koby-forward-btn';
         fwdBtn.innerHTML='&#128233; Forward to team';
         var capturedQ=lastQ;var capturedA=reply;
-        fwdBtn.textContent='&#10067; Save as FAQ';
+        fwdBtn.innerHTML='&#10067; Save as FAQ';
         fwdBtn.onclick=function(){forwardToTeam(capturedQ,capturedA);fwdBtn.disabled=true;fwdBtn.textContent='\u2713 Forwarded';};
         fwdWrap.appendChild(fwdBtn);
         think.parentNode.insertBefore(fwdWrap, think.nextSibling);
@@ -5133,7 +5134,7 @@ function openThread(id){
   if(kbBtn){
     if(role!=='uploader'&&!t.kbStatus){
       kbBtn.style.display='inline-flex';
-      kbBtn.textContent='📚 Save as KB Article';
+      kbBtn.innerHTML='&#128218; Save as Article';
     } else if(t.kbStatus==='pending'){
       kbBtn.style.display='inline-flex';
       kbBtn.textContent='⏳ Pending approval';
@@ -5191,7 +5192,7 @@ function sendThreadReply(){
 function openKBDraft(){
   var t=ChatDB.getThread(currentThreadId);
   if(!t)return;
-  G('kb-draft-q').value=t.question;
+  var typeEl=G('kb-draft-type');if(typeEl)typeEl.value=t.kbDraft?t.kbDraft.type||'':'';  G('kb-draft-q').value=t.question;
   G('kb-draft-a').value=t.messages.filter(function(m){return m.role==='reply';}).map(function(m){return m.text;}).join(' ');
   G('modal-kb-draft').classList.add('open');
 }
@@ -5199,12 +5200,17 @@ function openKBDraft(){
 function submitKBDraft(){
   var q=G('kb-draft-q').value.trim();
   var a=G('kb-draft-a').value.trim();
-  if(!q||!a)return;
-  ChatDB.saveKBDraft(currentThreadId, q, a);
+  var type=G('kb-draft-type').value;
+  if(!type){alert('Please select an article type.');return;}
+  if(!q||!a){alert('Please fill in both question and answer.');return;}
+  /* Save draft and set kbStatus to pending so manager bell fires */
+  var t=ChatDB.getThread(currentThreadId);
+  if(t){t.kbStatus='pending';t.kbDraft={q:q,a:a,type:type};fsSaveChatThread(t);}
   G('modal-kb-draft').classList.remove('open');
   openThread(currentThreadId);
-  /* Notify manager — mark thread for approval */
+  updateNotifBell();
   updateMailboxBadge();
+  pushNotif('&#128218;','New article submitted for approval by '+(cu?cu.fullName:'team'),'kb');
 }
 
 function openFAQApproval(threadId){
@@ -5221,7 +5227,9 @@ function approveFAQSave(){
   var q=G('faq-q-input').value.trim();
   var a=G('faq-a-input').value.trim();
   if(!q||!a){G('faq-err').textContent='Please fill in both fields.';return;}
-  var faqArt={id:'faq_'+Date.now(),title:q,role:'both',body:a,category:'faq',createdAt:new Date().toISOString(),createdBy:cu.fullName};
+  var t2=ChatDB.getThread(threadId);
+  var artType=(t2&&t2.kbDraft&&t2.kbDraft.type)?t2.kbDraft.type:'faq';
+  var faqArt={id:'faq_'+Date.now(),title:q,role:'both',body:a,category:artType,createdAt:new Date().toISOString(),createdBy:cu.fullName};
   if(!window.mdArticles)window.mdArticles=[];
   window.mdArticles.push(faqArt);
   if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',String(faqArt.id)),faqArt,{merge:true});}catch(e){}}
@@ -7810,8 +7818,9 @@ document.addEventListener('DOMContentLoaded',function(){
     <button class="ai-close" onclick="closeAI()">&#x2715;</button>
   </div>
   <div class="ai-messages" id="ai-messages"></div>
-  <div class="ai-input-wrap">
-    <textarea class="ai-input" id="ai-input" rows="1" placeholder="Ask about uploading, issues, escalation..." onkeydown="aiKeydown(event)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+  <div style="padding:2px 16px 0;font-size:9px;color:var(--muted);opacity:.7;text-align:center">Koby is AI and can make mistakes. Please double-check responses.</div>
+    <div class="ai-input-wrap">
+    <textarea class="ai-input" id="ai-input" rows="1" placeholder="Ask Koby anything..." onkeydown="aiKeydown(event)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
     <button class="ai-send" id="ai-send" onclick="sendAIMessage()">&#9658;</button>
   </div>
 </div>
@@ -7846,7 +7855,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <textarea class="thread-reply-input" id="thread-reply-input" rows="2" placeholder="Type your reply... (Enter to send)" onkeydown="threadReplyKeydown(event)"></textarea>
       <div class="thread-reply-actions">
         <button class="thread-reply-send" onclick="sendThreadReply()">Send &#9658;</button>
-        <button class="thread-save-kb" id="thread-kb-btn" onclick="openKBDraft()" style="display:none">&#128218; Save as KB Article</button>
+        <button class="thread-save-kb" id="thread-kb-btn" onclick="openKBDraft()" style="display:none">&#128218; Save as Article</button>
         <button class="thread-save-kb" id="thread-approve-btn" onclick="approveKBArticle()" style="display:none;border-color:var(--accent);color:var(--accent)">&#10003; Approve KB Article</button>
       </div>
     </div>
@@ -7857,9 +7866,17 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="modal-overlay" id="modal-kb-draft">
   <div class="modal" style="max-width:500px">
     <button class="modal-close" onclick="G('modal-kb-draft').classList.remove('open')">&#x2715;</button>
-    <div class="ann-modal-title">Save as KB Article</div>
+    <div class="ann-modal-title">Save as Article</div>
     <div class="ann-modal-meta">This will be sent to the manager for approval before publishing.</div>
     <div class="kb-draft-wrap">
+      <div style="margin-bottom:10px">
+        <div class="kb-draft-label">Article Type</div>
+        <select class="form-input" id="kb-draft-type" style="background:var(--bg3);color:var(--text);border-color:var(--border)">
+          <option value="">— Select type —</option>
+          <option value="faq">&#10067; FAQ</option>
+          <option value="kb">&#128218; Knowledge Base</option>
+        </select>
+      </div>
       <div>
         <div class="kb-draft-label">Question</div>
         <textarea class="kb-draft-input" id="kb-draft-q" rows="2" placeholder="Summarize the question..."></textarea>
