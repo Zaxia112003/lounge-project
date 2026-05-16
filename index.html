@@ -5023,6 +5023,18 @@ function openMailbox(){
   if(panel){panel.classList.add('open');}
   if(overlay){overlay.classList.add('open');}
   renderThreadList();
+  renderPendingApprovals();
+  /* Re-fetch chatStore from Firestore to ensure latest kbStatus values */
+  if(fsDb()&&cu&&cu.role==='manager'){
+    try{window._fsGetDocs(window._fsColl(fsDb(),'chatStore')).then(function(snap){
+      var threads=[];
+      snap.forEach(function(d){threads.push(Object.assign({id:d.id},d.data()));});
+      threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
+      chatStore.threads=threads;
+      renderPendingApprovals();
+      renderThreadList();
+    }).catch(function(){});
+  }catch(e){}}
 }
 
 function closeMailbox(){
