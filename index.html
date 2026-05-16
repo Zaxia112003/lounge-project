@@ -3251,26 +3251,6 @@ function _playAnnouncementSound(){
     });
   }catch(e){}
 }
-function uploadImageToStorage(file, callback){
-  var bucket='rta-portal-ee180.firebasestorage.app';
-  var fname='articles/'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+file.name.split('.').pop();
-  var url='https://firebasestorage.googleapis.com/v0/b/'+bucket+'/o?uploadType=media&name='+encodeURIComponent(fname);
-  var reader=new FileReader();
-  reader.onload=function(e){
-    var base64=e.target.result.split(',')[1];
-    fetch(url,{method:'POST',headers:{'Content-Type':file.type},body:file})
-      .then(function(r){return r.json();})
-      .then(function(data){
-        var imgUrl='https://firebasestorage.googleapis.com/v0/b/'+bucket+'/o/'+encodeURIComponent(fname)+'?alt=media';
-        callback(imgUrl);
-      })
-      .catch(function(){
-        /* Fallback: use base64 inline */
-        callback(e.target.result);
-      });
-  };
-  reader.readAsDataURL(file);
-}
 function handleArticlePaste(event, el){
   var items=event.clipboardData&&event.clipboardData.items;
   if(!items)return;
@@ -3278,19 +3258,26 @@ function handleArticlePaste(event, el){
     if(items[i].type.indexOf('image')===0){
       event.preventDefault();
       var file=items[i].getAsFile();
-      /* Show loading placeholder */
-      var sel=window.getSelection();
-      var range=sel.getRangeAt(0);
-      var placeholder=document.createElement('span');
-      placeholder.textContent='[uploading image...]';
-      placeholder.style.color='var(--muted)';
-      range.insertNode(placeholder);
-      uploadImageToStorage(file,function(src){
+      var reader=new FileReader();
+      reader.onload=function(e){
         var img=document.createElement('img');
-        img.src=src;
+        img.src=e.target.result;
         img.style.cssText='max-width:100%;height:auto;border-radius:6px;margin:4px 0;display:block';
-        placeholder.parentNode.replaceChild(img,placeholder);
-      });
+        /* Insert at cursor position */
+        var sel=window.getSelection();
+        if(sel&&sel.rangeCount){
+          var range=sel.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(img);
+          range.setStartAfter(img);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          el.appendChild(img);
+        }
+      };
+      reader.readAsDataURL(file);
       return;
     }
   }
