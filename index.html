@@ -572,6 +572,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 /* ── KB MODAL FORMATTED ── */
 .kb-modal-body{font-size:10.5px;line-height:1.5;color:var(--text);overflow-x:auto;}
 .modal-kb{width:95vw;max-width:95vw;min-width:700px;}
+[contenteditable][data-placeholder]:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none;font-style:italic;}
 .kb-modal-body table{border-spacing:0;border-collapse:collapse;width:100%;margin-bottom:16px;font-size:11px;}
 .kb-modal-body td,.kb-modal-body th{border:1px solid var(--border);padding:5px 7px;vertical-align:top;color:var(--text);}
 .kb-modal-body p{margin:3px 0;line-height:1.5;}
@@ -1370,7 +1371,9 @@ function fsStartRealtimeListeners(){
     threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
     chatStore.threads=threads;
     updateMailboxBadge();
-    if(cu&&cu.role==='manager'){updateNotifBell();renderPendingApprovals();}  }));
+    updateNotifBell();
+    if(cu&&cu.role==='manager')renderPendingApprovals();
+  }));
 
   /* attendance — sync manager-logged attendance to uploader/escalation views */
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'attendance'),function(snap){
@@ -3248,6 +3251,50 @@ function _playAnnouncementSound(){
     });
   }catch(e){}
 }
+function uploadImageToStorage(file, callback){
+  var bucket='rta-portal-ee180.firebasestorage.app';
+  var fname='articles/'+Date.now()+'_'+Math.random().toString(36).slice(2,7)+'.'+file.name.split('.').pop();
+  var url='https://firebasestorage.googleapis.com/v0/b/'+bucket+'/o?uploadType=media&name='+encodeURIComponent(fname);
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var base64=e.target.result.split(',')[1];
+    fetch(url,{method:'POST',headers:{'Content-Type':file.type},body:file})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        var imgUrl='https://firebasestorage.googleapis.com/v0/b/'+bucket+'/o/'+encodeURIComponent(fname)+'?alt=media';
+        callback(imgUrl);
+      })
+      .catch(function(){
+        /* Fallback: use base64 inline */
+        callback(e.target.result);
+      });
+  };
+  reader.readAsDataURL(file);
+}
+function handleArticlePaste(event, el){
+  var items=event.clipboardData&&event.clipboardData.items;
+  if(!items)return;
+  for(var i=0;i<items.length;i++){
+    if(items[i].type.indexOf('image')===0){
+      event.preventDefault();
+      var file=items[i].getAsFile();
+      /* Show loading placeholder */
+      var sel=window.getSelection();
+      var range=sel.getRangeAt(0);
+      var placeholder=document.createElement('span');
+      placeholder.textContent='[uploading image...]';
+      placeholder.style.color='var(--muted)';
+      range.insertNode(placeholder);
+      uploadImageToStorage(file,function(src){
+        var img=document.createElement('img');
+        img.src=src;
+        img.style.cssText='max-width:100%;height:auto;border-radius:6px;margin:4px 0;display:block';
+        placeholder.parentNode.replaceChild(img,placeholder);
+      });
+      return;
+    }
+  }
+}
 function artDelBtn(btn){deleteArticle(btn.dataset.artid);}
 function deleteArticle(id){
   if(!confirm('Delete this article?'))return;
@@ -3468,7 +3515,7 @@ function viewAnn(id){
   _currentViewId='ann-'+id;
   G('ann-view-title').textContent=a.title;
   G('ann-view-meta').textContent=a.author+' · '+timeAgo(new Date(a.postedAt).toISOString());
-  G('ann-view-body').textContent=a.body;
+  G('ann-view-body').innerHTML=a.body||'';
   var mgrActions=G('ann-view-mgr-actions');
   if(mgrActions)mgrActions.style.display=(cu&&cu.role==='manager')?'':'none';
   modal.classList.add('open');
@@ -3690,12 +3737,12 @@ function openAddArticleModal(editType, editItem, editAid){
   typeSelect.value=editType||(editItem?'':typeSelect.value||'ann');
   if(editItem){
     G('add-article-title-inp').value=editItem.title||'';
-    G('add-article-body-inp').value=editItem.body||'';
+    G('add-article-body-inp').innerHTML=editItem.body||'';
     G('add-article-type').value=editType;
     G('add-article-type').disabled=true;
   } else {
     G('add-article-title-inp').value='';
-    G('add-article-body-inp').value='';
+    G('add-article-body-inp').innerHTML='';
     G('add-article-type').disabled=false;
   }
   G('add-article-err').textContent='';
@@ -3706,7 +3753,7 @@ function openAddArticleModal(editType, editItem, editAid){
 function submitAddArticle(){
   var type=G('add-article-type').value;
   var title=G('add-article-title-inp').value.trim();
-  var body=G('add-article-body-inp').value.trim();
+  var body=G('add-article-body-inp').innerHTML.trim();
   var editAid=G('add-article-modal').dataset.editAid;
   if(!title||!body){G('add-article-err').textContent='Title and content are required.';return;}
 
@@ -4942,7 +4989,7 @@ var ChatDB = {
   sendThread: function(thread){ chatStore.threads.unshift(thread); updateMailboxBadge(); fsSaveChatThread(thread); },
   sendReply:  function(threadId, msg){
     var t=chatStore.threads.find(function(x){return x.id===threadId;});
-    if(t){t.messages.push(msg);t.unread=(msg.role!=='reply');}
+    if(t){t.messages.push(msg);t.unread=true;fsSaveChatThread(t);}
     updateMailboxBadge();
   },
   getThreads: function(){ return chatStore.threads; },
@@ -5023,16 +5070,15 @@ function openMailbox(){
   if(panel){panel.classList.add('open');}
   if(overlay){overlay.classList.add('open');}
   renderThreadList();
-  renderPendingApprovals();
-  /* Re-fetch chatStore from Firestore to ensure latest kbStatus values */
-  if(fsDb()&&cu&&cu.role==='manager'){
+  /* Always re-fetch from Firestore so kbStatus and messages are current */
+  if(fsDb()){
     try{window._fsGetDocs(window._fsColl(fsDb(),'chatStore')).then(function(snap){
       var threads=[];
       snap.forEach(function(d){threads.push(Object.assign({id:d.id},d.data()));});
       threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
       chatStore.threads=threads;
-      renderPendingApprovals();
       renderThreadList();
+      if(cu&&cu.role==='manager')renderPendingApprovals();
     }).catch(function(){});
   }catch(e){}}
 }
@@ -5217,8 +5263,8 @@ function sendThreadReply(){
   };
   ChatDB.sendReply(currentThreadId, msg);
   var t=ChatDB.getThread(currentThreadId);
-  /* Mark unread for uploader */
-  if(t){t.unread=true;}
+  /* Persist reply to Firestore so other sessions see it */
+  if(t){t.unread=true;fsSaveChatThread(t);}
   updateMailboxBadge();
   renderThreadMessages(t);
 }
@@ -5227,13 +5273,13 @@ function openKBDraft(){
   var t=ChatDB.getThread(currentThreadId);
   if(!t)return;
   var typeEl=G('kb-draft-type');if(typeEl)typeEl.value=t.kbDraft?t.kbDraft.type||'':'';  G('kb-draft-q').value=t.question;
-  G('kb-draft-a').value=t.messages.filter(function(m){return m.role==='reply';}).map(function(m){return m.text;}).join(' ');
+  G('kb-draft-a').innerHTML=t.messages.filter(function(m){return m.role==='reply';}).map(function(m){return m.text;}).join(' ');
   G('modal-kb-draft').classList.add('open');
 }
 
 function submitKBDraft(){
   var q=G('kb-draft-q').value.trim();
-  var a=G('kb-draft-a').value.trim();
+  var a=G('kb-draft-a').innerHTML.trim();
   var type=G('kb-draft-type').value;
   if(!type){alert('Please select an article type.');return;}
   if(!q||!a){alert('Please fill in both question and answer.');return;}
@@ -5242,8 +5288,9 @@ function submitKBDraft(){
   if(t){
     t.kbStatus='pending';t.kbDraft={q:q,a:a,type:type};
     /* Update Firestore directly to ensure kbStatus is persisted */
-    if(fsDb()){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'chatStore',String(t.id)),{kbStatus:'pending',kbDraft:{q:q,a:a,type:type}});}catch(e){fsSaveChatThread(t);}}
-    else{fsSaveChatThread(t);}
+    /* Use setDoc+merge — works whether doc exists or not */
+    t.kbStatus='pending';t.kbDraft={q:q,a:a,type:type};
+    fsSaveChatThread(t);
   }
   G('modal-kb-draft').classList.remove('open');
   openThread(currentThreadId);
@@ -5255,7 +5302,7 @@ function submitKBDraft(){
 function openFAQApproval(threadId){
   var t=ChatDB.getThread(threadId);if(!t)return;
   G('faq-q-input').value=t.kbDraft?t.kbDraft.q:t.question;
-  G('faq-a-input').value=t.kbDraft?t.kbDraft.a:t.kobyAnswer;
+  G('faq-a-input').innerHTML=t.kbDraft?t.kbDraft.a:t.kobyAnswer;
   G('faq-err').textContent='';
   G('modal-faq-approval').dataset.threadId=threadId;
   G('modal-faq-approval').classList.add('open');
@@ -5264,7 +5311,7 @@ function approveFAQSave(){
   var threadId=G('modal-faq-approval').dataset.threadId;
   var t=ChatDB.getThread(threadId);if(!t)return;
   var q=G('faq-q-input').value.trim();
-  var a=G('faq-a-input').value.trim();
+  var a=G('faq-a-input').innerHTML.trim();
   if(!q||!a){G('faq-err').textContent='Please fill in both fields.';return;}
   var t2=ChatDB.getThread(threadId);
   var artType=(t2&&t2.kbDraft&&t2.kbDraft.type)?t2.kbDraft.type:'faq';
@@ -6529,7 +6576,7 @@ function copyTemplate(id, btn){
   var t=(TEMPLATES||[]).find(function(x){return x.id===id;});
   if(!t)return;
   /* Copy to clipboard */
-  navigator.clipboard.writeText(t.body).then(function(){
+  navigator.clipboard.writeText(t.body.replace(/<img[^>]*>/gi,'[image]').replace(/<[^>]+>/g,'')).then(function(){
     btn.textContent='✓ Copied!';
     btn.classList.add('copied');
     setTimeout(function(){btn.textContent='📋 Copy';btn.classList.remove('copied');},2000);
@@ -7834,7 +7881,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
       <div>
         <label class="form-label">Content</label>
-        <textarea class="form-input" id="add-article-body-inp" rows="6" placeholder="Write your content here..." style="resize:vertical"></textarea>
+        <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none" onpaste="handleArticlePaste(event,this)"></div>
       </div>
       <div class="err-msg" id="add-article-err" style="text-align:left;margin:0"></div>
     </div>
@@ -7924,7 +7971,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
       <div>
         <div class="kb-draft-label">Answer</div>
-        <textarea class="kb-draft-input" id="kb-draft-a" rows="4" placeholder="Summarize the answer..."></textarea>
+        <div class="kb-draft-input" id="kb-draft-a" contenteditable="true" data-placeholder="Summarize the answer... (Ctrl+V to paste images)" style="min-height:80px;max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none" onpaste="handleArticlePaste(event,this)"></div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
         <button class="btn btn-outline btn-sm" onclick="G('modal-kb-draft').classList.remove('open')">Cancel</button>
@@ -7975,8 +8022,9 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
     <img id="rev-modal-ss" src="" alt="screenshot" style="display:none;width:100%;border-radius:8px;margin-top:10px;max-height:200px;object-fit:contain"/>
     <div class="err-msg" id="rev-modal-err" style="margin-top:8px;text-align:left"></div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-outline" style="flex:1;color:var(--red);border-color:rgba(255,61,61,.3)" onclick="discardReview()">&#128465; Discard</button>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button id="rev-upgrade-btn" class="btn btn-outline" style="flex:1;font-size:11px;min-width:120px" onclick="upgradeToEscalation()">&#128680; Upgrade to Critical</button>
+      <button class="btn btn-outline" style="flex:1;color:var(--red);border-color:rgba(255,61,61,.3);min-width:80px" onclick="discardReview()">&#128465; Discard</button>
       <button class="btn btn-primary" style="flex:2" onclick="submitReview()">&#10003; Submit to Uploader</button>
     </div>
   </div>
@@ -8095,6 +8143,27 @@ document.addEventListener('DOMContentLoaded',function(){
         <button class="btn btn-primary btn-sm" onclick="mgrSaveManualSession()" style="font-size:11px">Save</button>
         <button class="btn btn-outline btn-sm" onclick="G('mgr-timer-add-form').style.display='none'" style="font-size:11px">Cancel</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-faq-approval" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-close" onclick="G('modal-faq-approval').classList.remove('open')">&#x2715;</button>
+    <div class="modal-title">&#10067; FAQ Approval</div>
+    <div class="modal-sub">Review and edit before saving to FAQs</div>
+    <div class="form-group" style="margin-top:12px">
+      <label class="form-label">Question</label>
+      <input class="form-input" id="faq-q-input" style="background:var(--bg3);color:var(--text);border-color:var(--border)"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Answer</label>
+      <div class="form-input" id="faq-a-input" contenteditable="true" data-placeholder="Write the answer... (Ctrl+V to paste images)" style="min-height:120px;max-height:250px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none;background:var(--bg3);color:var(--text);border-color:var(--border)" onpaste="handleArticlePaste(event,this)"></div>
+    </div>
+    <div id="faq-err" style="color:var(--red);font-size:12px;margin-bottom:8px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="G('modal-faq-approval').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" onclick="approveFAQSave()">&#10003; Save to FAQs</button>
     </div>
   </div>
 </div>
