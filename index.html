@@ -1370,7 +1370,7 @@ function fsStartRealtimeListeners(){
     threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
     chatStore.threads=threads;
     updateMailboxBadge();
-    if(cu&&cu.role==='manager')updateNotifBell();  }));
+    if(cu&&cu.role==='manager'){updateNotifBell();renderPendingApprovals();}  }));
 
   /* attendance — sync manager-logged attendance to uploader/escalation views */
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'attendance'),function(snap){
@@ -5033,7 +5033,25 @@ function closeMailbox(){
   currentThreadId=null;
 }
 
+function renderPendingApprovals(){
+  var el=G('chat-pending-approvals');if(!el)return;
+  if(!cu||cu.role!=='manager'){el.style.display='none';return;}
+  var pending=ChatDB.getThreads().filter(function(t){return t.kbStatus==='pending'&&t.archived!==true;});
+  if(!pending.length){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML='<div style="padding:8px 16px;font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;background:rgba(139,45,255,.06);display:flex;align-items:center;gap:6px">&#128218; Pending Approval ('+pending.length+')</div>'
+    +pending.map(function(t){
+      return '<div style="padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(139,45,255,.03)" data-ptid="'+t.id+'" onclick="openFAQApproval(this.dataset.ptid)">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(t.kbDraft?t.kbDraft.q:t.question)+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">From '+t.fromFull+' · '+(t.kbDraft&&t.kbDraft.type?t.kbDraft.type.toUpperCase():'Article')+'</div>'
+        +'</div>'
+        +'<span style="font-size:10px;background:rgba(139,45,255,.12);color:var(--accent);padding:2px 10px;border-radius:8px;flex-shrink:0;margin-left:8px">Review</span>'
+        +'</div>';
+    }).join('');
+}
 function renderThreadList(){
+  renderPendingApprovals();
   var role=cu?cu.role:'uploader';
   var threads=ChatDB.getThreads().filter(function(t){return !t.archived;});
   var archivedThreads=ChatDB.getThreads().filter(function(t){return t.archived;});
@@ -5245,6 +5263,7 @@ function approveFAQSave(){
   t.kbStatus='published';t.kbDraft={q:q,a:a};
   fsSaveChatThread(t);
   G('modal-faq-approval').classList.remove('open');
+  renderPendingApprovals();
   updateNotifBell();
   pushNotif('&#10067;','FAQ saved: "'+q+'"','faq');
 }
@@ -7848,6 +7867,7 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
   <!-- Thread list view -->
   <div class="thread-list-view" id="chat-list-view" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+    <div id="chat-pending-approvals" style="display:none;border-bottom:2px solid var(--border2)"></div>
     <div class="chat-thread-list" id="chat-threads"></div>
   </div>
   <!-- Thread detail view -->
