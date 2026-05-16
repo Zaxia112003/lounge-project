@@ -2050,7 +2050,7 @@ function updateReviewBadge(){updateNotifBell();}
 function updateNotifBell(){
   var errCount=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review'||r.status==='acknowledged';}).length;
   var photoCount=(window.pwPending||[]).length;
-  var faqCount=(ChatDB&&ChatDB.getThreads?ChatDB.getThreads().filter(function(t){return t.kbStatus==='pending'&&!t.archived;}).length:0);
+  var faqCount=(ChatDB&&ChatDB.getThreads?ChatDB.getThreads().filter(function(t){return t.kbStatus==='pending'&&t.archived!==true;}).length:0);
   var total=errCount+photoCount+faqCount;
   var wrap=G('notif-bell-wrap');
   var badge=G('notif-bell-badge');
@@ -5209,7 +5209,12 @@ function submitKBDraft(){
   if(!q||!a){alert('Please fill in both question and answer.');return;}
   /* Save draft and set kbStatus to pending so manager bell fires */
   var t=ChatDB.getThread(currentThreadId);
-  if(t){t.kbStatus='pending';t.kbDraft={q:q,a:a,type:type};fsSaveChatThread(t);}
+  if(t){
+    t.kbStatus='pending';t.kbDraft={q:q,a:a,type:type};
+    /* Update Firestore directly to ensure kbStatus is persisted */
+    if(fsDb()){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'chatStore',String(t.id)),{kbStatus:'pending',kbDraft:{q:q,a:a,type:type}});}catch(e){fsSaveChatThread(t);}}
+    else{fsSaveChatThread(t);}
+  }
   G('modal-kb-draft').classList.remove('open');
   openThread(currentThreadId);
   updateNotifBell();
