@@ -3519,7 +3519,11 @@ function renderSpaceAnn(){
   }).join('');
 }
 function viewAnn(id){
-  var a=mdAnnouncements.find(function(x){return x.id===id;});
+  /* Strip prefix to get raw id, search all article stores */
+  var rawId=String(id).replace(/^(ann|kb|tmpl|faq|template)-/,'');
+  var a=mdAnnouncements.find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
+  if(!a&&window.KB_ARTICLES)a=(KB_ARTICLES||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
+  if(!a&&window.mdArticles)a=(mdArticles||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
   if(!a)return;
   annSeenIds.add(id);
   var card=document.querySelector('.space-ann-card[data-id="'+id+'"]');
