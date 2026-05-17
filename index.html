@@ -573,6 +573,12 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .kb-modal-body{font-size:10.5px;line-height:1.5;color:var(--text);overflow-x:auto;}
 .modal-kb{width:95vw;max-width:95vw;min-width:700px;}
 [contenteditable][data-placeholder]:empty:before{content:attr(data-placeholder);color:var(--muted);pointer-events:none;font-style:italic;}
+.fmt-toolbar{display:flex;gap:3px;padding:4px 6px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;flex-wrap:wrap;}
+.fmt-toolbar button{background:none;border:1px solid transparent;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 7px;border-radius:4px;line-height:1.4;transition:all .15s;}
+.fmt-toolbar button:hover{background:var(--bg2);border-color:var(--border);color:var(--text);}
+.fmt-toolbar button.active{background:rgba(139,45,255,.12);border-color:var(--accent);color:var(--accent);}
+.fmt-toolbar .fmt-sep{width:1px;background:var(--border);margin:2px 3px;}
+.fmt-body-wrap .form-input{border-radius:0 0 8px 8px !important;}
 .kb-modal-body table{border-spacing:0;border-collapse:collapse;width:100%;margin-bottom:16px;font-size:11px;}
 .kb-modal-body td,.kb-modal-body th{border:1px solid var(--border);padding:5px 7px;vertical-align:top;color:var(--text);}
 .kb-modal-body p{margin:3px 0;line-height:1.5;}
@@ -3250,6 +3256,28 @@ function _playAnnouncementSound(){
       osc.start(ctx.currentTime+t);osc.stop(ctx.currentTime+t+0.25);
     });
   }catch(e){}
+}
+var _fmtTarget=null;
+function fmtSetTarget(el){_fmtTarget=el;}
+function fmtDo(cmd){
+  var el=_fmtTarget||document.activeElement;
+  if(el&&el.isContentEditable){el.focus();}
+  if(cmd==='highlight'){
+    document.execCommand('styleWithCSS',false,true);
+    document.execCommand('hiliteColor',false,'rgba(255,220,0,.4)');
+  } else if(cmd==='redtext'){
+    document.execCommand('styleWithCSS',false,true);
+    document.execCommand('foreColor',false,'#ef4444');
+  } else {
+    document.execCommand(cmd,false,null);
+  }
+  fmtUpdateState();
+}
+function fmtUpdateState(){
+  var toolbar=G('fmt-toolbar-main');if(!toolbar)return;
+  var btns=toolbar.querySelectorAll('button');
+  var states={0:document.queryCommandState('bold'),1:document.queryCommandState('italic'),2:document.queryCommandState('underline')};
+  btns.forEach(function(b,i){if(i<3)b.classList.toggle('active',!!states[i]);});
 }
 function handleArticlePaste(event, el){
   var items=event.clipboardData&&event.clipboardData.items;
@@ -7868,7 +7896,19 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
       <div>
         <label class="form-label">Content</label>
-        <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none" onpaste="handleArticlePaste(event,this)"></div>
+        <div class="fmt-body-wrap">
+        <div class="fmt-toolbar" id="fmt-toolbar-main">
+          <button title="Bold" onclick="fmtDo('bold')" onmousedown="event.preventDefault()"><b>B</b></button>
+          <button title="Italic" onclick="fmtDo('italic')" onmousedown="event.preventDefault()"><i>I</i></button>
+          <button title="Underline" onclick="fmtDo('underline')" onmousedown="event.preventDefault()"><u>U</u></button>
+          <div class="fmt-sep"></div>
+          <button title="Highlight" onclick="fmtDo('highlight')" onmousedown="event.preventDefault()" style="background:rgba(255,220,0,.3)">&#9632; Highlight</button>
+          <button title="Red text" onclick="fmtDo('redtext')" onmousedown="event.preventDefault()" style="color:#ef4444">&#9632; Red</button>
+          <div class="fmt-sep"></div>
+          <button title="Clear formatting" onclick="fmtDo('removeFormat')" onmousedown="event.preventDefault()">&#10005; Clear</button>
+        </div>
+        <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none;border-radius:0 0 8px 8px" onpaste="handleArticlePaste(event,this)" onfocus="fmtSetTarget(this)" onkeyup="fmtUpdateState()" onmouseup="fmtUpdateState()"></div>
+        </div>
       </div>
       <div class="err-msg" id="add-article-err" style="text-align:left;margin:0"></div>
     </div>
