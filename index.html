@@ -2174,6 +2174,10 @@ async function submitReview(){
   var editedFeedback=G('rev-modal-feedback').value.trim();
   if(!editedFeedback){G('rev-modal-err').textContent='Please add an error description.';return;}
   /* Find the callout and update it */
+  /* Remove from pending list FIRST — before any async writes — to prevent snapshot race */
+  thread.status='approved';
+  if(window._pendingReviews){window._pendingReviews=window._pendingReviews.filter(function(r){return r.id!==threadId;});}
+  updateReviewBadge();updateNotifBell();
   /* Find callout: try Firestore ID first (most reliable), then numeric id */
   var co=null;
   if(thread.calloutFsId)co=callouts.find(function(c){return c._fsId===thread.calloutFsId;});
@@ -2199,8 +2203,9 @@ async function submitReview(){
     /* calloutFsId not stored — query by numeric id field */
     console.warn('No calloutFsId on thread — uploader may not receive notification');
   }
-  /* Mark review as approved */
-  thread.status='approved';
+  /* Mark review as approved — also add to dismissed set so snapshot won't re-add */
+  if(!window._dismissedReviews)window._dismissedReviews=new Set();
+  if(thread._fsId)window._dismissedReviews.add(thread._fsId);
   if(thread._fsId){
     try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'approved'});}
     catch(e){}
@@ -2208,8 +2213,7 @@ async function submitReview(){
   pushNotif('📋','Error for "'+thread.address+'" approved and sent to '+thread.uploaderFull+'.','qscore');
   G('modal-error-review').classList.remove('open');
   G('modal-reviews').classList.remove('open');
-  /* Remove from in-memory list so bell clears immediately */
-  if(window._pendingReviews){window._pendingReviews=window._pendingReviews.filter(function(r){return r.id!==threadId;});}
+  /* Already removed from _pendingReviews at top of function */
   updateNotifBell();
   renderQualityPortal();
   if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
@@ -2276,7 +2280,10 @@ async function loadPendingReviews(){
       window._pendingReviews=[];
       snap.forEach(function(d){
         var data=d.data();
-        if(data.status!=='approved'&&data.status!=='discarded')window._pendingReviews.push(Object.assign({_fsId:d.id},data));
+        /* Skip approved/discarded AND any we've already dismissed this session */
+        if(data.status!=='approved'&&data.status!=='discarded'&&!(window._dismissedReviews||new Set()).has(d.id)){
+          window._pendingReviews.push(Object.assign({_fsId:d.id},data));
+        }
       });
       updateReviewBadge();
     });
