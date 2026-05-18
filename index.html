@@ -1298,6 +1298,14 @@ async function fsLoadAll(){
       var data=Object.assign({id:parseInt(d.id)||d.id},d.data());
       if(existing>-1)KB_ARTICLES[existing]=data;else KB_ARTICLES.push(data);
     });
+    /* Load user-created articles (KB, FAQ, Announcements via Add Article) */
+    var artSnap=await window._fsGetDocs(window._fsColl(fsDb(),'articles'));
+    if(!window.mdArticles)window.mdArticles=[];
+    artSnap.forEach(function(d){
+      var data=Object.assign({id:d.id},d.data());
+      var ei=window.mdArticles.findIndex(function(a){return String(a.id)===d.id;});
+      if(ei>-1)window.mdArticles[ei]=data;else window.mdArticles.push(data);
+    });
     var tmplSnap=await window._fsGetDocs(window._fsColl(fsDb(),'TEMPLATES'));
     tmplSnap.forEach(function(d){
       var data=Object.assign({id:parseInt(d.id)||d.id},d.data());
@@ -1352,6 +1360,14 @@ function fsStartRealtimeListeners(){
     snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
     if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
     buildSidebar();
+  }));
+  /* articles realtime — user-created KB/FAQ/announcements */
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'articles'),function(snap){
+    if(!window.mdArticles)window.mdArticles=[];
+    window.mdArticles.length=0;
+    snap.forEach(function(d){window.mdArticles.push(Object.assign({id:d.id},d.data()));});
+    if(typeof renderArticles==='function')renderArticles();
+    if(typeof renderAnnouncements==='function')renderAnnouncements();
   }));
   /* timerSessions realtime */
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'timerSessions'),function(snap){
@@ -3623,6 +3639,12 @@ function renderArticles(){
     items.push({id:'ann-'+a.id,type:'ann',title:a.title,body:a.body,author:a.author,date:a.postedAt,unseen:!annSeenIds.has(a.id)});
   });
   var role=cu?cu.role:'uploader';
+  /* Include user-created articles from Firestore 'articles' collection */
+  (window.mdArticles||[]).forEach(function(a){
+    var atype=a.category||a.type||'kb';
+    if(atype==='ann'||atype==='announcement')return; /* announcements shown separately */
+    items.push({id:a.id,type:atype,title:a.title,body:a.body,author:a.createdBy||a.author||'',date:a.createdAt?new Date(a.createdAt).getTime():0,unseen:false,role:a.role||'both'});
+  });
   (KB_ARTICLES||[]).forEach(function(a){
     if(a.role==='both'||(a.role==='escalation'&&(role==='escalation'||role==='manager'))){
       items.push({id:'kb-'+a.id,type:'kb',title:a.title,body:a.body,author:'Knowledge Base',date:0,unseen:false,kbId:a.id});
