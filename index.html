@@ -7491,7 +7491,7 @@ function devEnter(){
 document.addEventListener('DOMContentLoaded',function(){
   document.addEventListener('keydown',function(e){
     var tag=document.activeElement?document.activeElement.tagName:'';
-    var inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT';
+    var inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(document.activeElement&&document.activeElement.isContentEditable);
     if(e.key==='Escape'){
       var overlays=['mgr-write-overlay','daily-log-overlay','modal-member-profile','modal-add-member','modal-ann-view','modal-qscore','modal-qesc','modal-att','modal-timer-log','add-article-modal','modal-pw-pending','modal-kb-draft','settings-overlay','mailbox-overlay'];
       for(var i=0;i<overlays.length;i++){var el=G(overlays[i]);if(el&&el.classList.contains('open')){el.classList.remove('open');e.preventDefault();return;}}
@@ -7952,7 +7952,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 
 <div class="modal-overlay" id="modal-ann-view">
-  <div class="modal" style="max-width:540px;position:relative">
+  <div class="modal" style="max-width:92vw;width:92vw;position:relative">
     <button class="modal-close" onclick="G('modal-ann-view').classList.remove('open')">&#x2715;</button>
     <div id="ann-view-mgr-actions" style="display:none;position:absolute;top:16px;right:48px">
       <button onclick="mgrEditCurrent()" title="Edit" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);padding:4px" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">&#9998;</button>
