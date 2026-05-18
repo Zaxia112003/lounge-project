@@ -910,10 +910,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <div class="sb-icon-btn" onclick="openSettings()" title="Settings" style="width:36px;height:36px;">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
-      <div class="sb-mailbox-wrap" id="mailbox-wrap" style="display:none;justify-content:center;position:relative;padding:2px 0;">
-        <button class="sb-mailbox-btn" onclick="openMailbox()" title="Team Messages">&#9993;</button>
-        <span class="sb-mailbox-badge" id="mailbox-badge">0</span>
-      </div>
+
       <button class="sb-help-btn" onclick="openAI()" title="Ask Koby">?</button>
       <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
         <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
@@ -1364,7 +1361,6 @@ function fsStartRealtimeListeners(){
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'avatars'),function(snap){
     if(!window.AVATARS)window.AVATARS={};
     snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
-    if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
     buildSidebar();
   }));
   /* articles realtime — user-created KB/FAQ/announcements */
@@ -1408,7 +1404,6 @@ function fsStartRealtimeListeners(){
     snap.forEach(function(d){threads.push(Object.assign({id:d.id},d.data()));});
     threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
     chatStore.threads=threads;
-    updateMailboxBadge();
     updateNotifBell();
     if(cu&&cu.role==='manager')renderPendingApprovals();
   }));
@@ -1688,16 +1683,11 @@ function goDash(){
   G('pg-dash').classList.add('active');
   /* Apply saved theme */
   if(settings.theme)setTheme(settings.theme,null);
-  /* Show mailbox for all roles */
-  var mw=G('mailbox-wrap');if(mw)mw.style.display='flex';
-  /* Show review badge for manager only */
   /* Bell shown/hidden dynamically via updateNotifBell() and updateMemberBell() */
-  updateMailboxBadge();
   try{var saved=localStorage.getItem('avatar_'+cu.fullName);if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[cu.fullName]=saved;}}catch(e){}
   if(fsDb()){try{window._fsGetDocs(window._fsColl(fsDb(),'avatars')).then(function(snap){
     if(!window.AVATARS)window.AVATARS={};
     snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
-    if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
   }).catch(function(){});}catch(e){}}
   buildSidebar();buildMain();
   if(cu&&cu.role==='manager')loadPendingReviews();
@@ -1752,7 +1742,6 @@ function buildSidebar(){
   if(existingMW)existingMW.remove();
 
   var settingsNav=document.querySelector('.sb-settings-nav');
-  var mailboxWrap=document.getElementById('mailbox-wrap');
 
   if(role==='escalation'){
     var dlBtn=document.createElement('button');
@@ -1762,7 +1751,7 @@ function buildSidebar(){
     dlBtn.style.cssText='width:36px;height:36px;';
     dlBtn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     dlBtn.onclick=function(){openDailyLog();};
-    if(settingsNav&&mailboxWrap)settingsNav.insertBefore(dlBtn,mailboxWrap);
+    if(settingsNav)settingsNav.appendChild(dlBtn);
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
   } else if(role==='manager'){
     var mwBtn=document.createElement('button');
@@ -1772,7 +1761,7 @@ function buildSidebar(){
     mwBtn.style.cssText='width:36px;height:36px;';
     mwBtn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     mwBtn.onclick=function(){openMgrWrite();};
-    if(settingsNav&&mailboxWrap)settingsNav.insertBefore(mwBtn,mailboxWrap);
+    if(settingsNav)settingsNav.appendChild(mwBtn);
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
   } else {
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='';
@@ -2589,7 +2578,6 @@ function buildMain(){
         time:new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})
       }]
     });
-    updateMailboxBadge();
   }
   const role=cu.role;
   if(role==='manager'){buildManagerDOM();renderLounge();}
@@ -2606,7 +2594,7 @@ function buildUploaderDOM(){
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
+      
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
     <div class="lounge-pane" id="lounge-pane-my-space">
@@ -2623,7 +2611,7 @@ function buildUploaderDOM(){
     </div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
-    <div class="lounge-pane" id="lounge-pane-my-team"></div>
+    
       <div id="template-list"></div>
     </div>
   </div>
@@ -2711,7 +2699,7 @@ function buildEscalationDOM(){
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
+      
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
     <div class="lounge-pane" id="lounge-pane-my-space">
@@ -2728,7 +2716,7 @@ function buildEscalationDOM(){
     </div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
-    <div class="lounge-pane" id="lounge-pane-my-team"></div>
+    
   </div>`;
   activeDateFilter='month';
 }
@@ -2744,7 +2732,7 @@ function buildManagerDOM(){
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
+      
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
     <div class="lounge-pane" id="lounge-pane-my-space">
@@ -2764,7 +2752,7 @@ function buildManagerDOM(){
     </div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
-    <div class="lounge-pane" id="lounge-pane-my-team"></div>
+    
   </div>
   <div class="dash-panel" id="overview-panel">
     <div class="panel-header"><div class="panel-title">Team Overview</div><div class="panel-sub">Live performance · All timestamps AEST (Sydney)</div></div>
@@ -3690,7 +3678,6 @@ function switchLoungeTab(tab, btn){
     else if(cu&&cu.role==='manager')renderManagerHub();
     else renderHubInLounge();
   }
-  if(tab==='my-team')renderMyTeam();
   document.querySelectorAll('.lounge-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.lounge-pane').forEach(function(p){p.classList.remove('active');});
   var pane=G('lounge-pane-'+tab);
@@ -4864,17 +4851,18 @@ async function sendAIMessage(){
 
   try{
     var kbContext=getKBContext();
-    var systemPrompt='You are Koby, a friendly assistant for The Lounge Project team. '
-      +'Help uploaders and escalation specialists with their day-to-day questions. '
+    var systemPrompt='You are Koby, the knowledge assistant for The Lounge Project team. '
+      +'You support uploaders and escalation specialists with their day-to-day questions. '
       +'IMPORTANT RULES FOR HOW YOU ANSWER: '
-      +'1. Only answer based on the knowledge base provided. If the answer is not there, say: "I don\'t have that in my KB yet — check with your supervisor or forward your question to the team." '
+      +'1. Only answer based on the knowledge base provided. If the answer is not in the KB, say clearly: "That one\'s not in my KB just yet — best to check with your supervisor or raise it through your team\'s messaging channels." '
       +'2. NEVER copy or paste text directly from the KB. Always paraphrase in your own words. '
-      +'3. Give a short, direct answer first (1-2 sentences). Then offer to go deeper if needed. '
-      +'4. Use plain conversational language — no bold markdown, no bullet forests, no headers unless truly necessary. '
-      +'5. If a procedure has steps, list them simply: 1, 2, 3. Maximum 5 steps before offering to break it down. '
-      +'6. If the KB has a table, summarise what the table means in plain English — do not reproduce the table. '
-      +'7. Warm and supportive tone always. The team works hard. '
-      +'8. If unsure, say so and offer to forward the question to the team. '
+      +'3. Lead with the direct answer (1-2 sentences). Offer to elaborate only if helpful. '
+      +'4. Use plain, clean language — no bold markdown, no bullet forests, no headers unless truly necessary. '
+      +'5. If a procedure has steps, list them simply: 1, 2, 3. Cap at 5 before offering to break it down further. '
+      +'6. If the KB has a table, summarise what it means in plain English — do not reproduce the table. '
+      +'7. Tone: friendly and a bit sarcastic — like that one colleague who actually knows everything but won\'t make you feel bad about asking. Warm, but with a little wit. Never mean, never cold. '
+      +'8. No filler phrases like "Great question!" or "Of course!" — just answer, with personality. '
+      +'9. Every now and then, slip in a light pun or a quick joke — nothing forced, nothing that derails the answer. Keep it subtle. If it fits naturally, go for it. If it doesn\'t, skip it. The answer always comes first. '
       +'\n\nKNOWLEDGE BASE (use as reference only, do not copy verbatim):\n'+kbContext;
 
     var response=await fetch('/.netlify/functions/ai-proxy',{
@@ -4906,21 +4894,7 @@ async function sendAIMessage(){
       think.className='ai-msg assistant';
       think.id='';
       think.textContent=reply;
-      /* Add forward button only when Koby can't answer or user asks to forward */
-      var triggerPhrases=['don\'t have that info','do not have that info','forward','reach out','ask your','check with'];
-      var shouldShowFwd=triggerPhrases.some(function(p){return reply.toLowerCase().indexOf(p)>=0;});
-      if(shouldShowFwd){
-        var fwdWrap=document.createElement('div');
-        fwdWrap.style.cssText='padding:0 0 4px;';
-        var fwdBtn=document.createElement('button');
-        fwdBtn.className='koby-forward-btn';
-        fwdBtn.innerHTML='&#128233; Forward to team';
-        var capturedQ=lastQ;var capturedA=reply;
-        fwdBtn.innerHTML='&#10067; Save as FAQ';
-        fwdBtn.onclick=function(){forwardToTeam(capturedQ,capturedA);fwdBtn.disabled=true;fwdBtn.textContent='\u2713 Forwarded';};
-        fwdWrap.appendChild(fwdBtn);
-        think.parentNode.insertBefore(fwdWrap, think.nextSibling);
-      }
+      /* Reply rendered */
     }
   } catch(err){
     var think=G(thinkId);
@@ -5132,7 +5106,6 @@ var ChatDB = {
   sendReply:  function(threadId, msg){
     var t=chatStore.threads.find(function(x){return x.id===threadId;});
     if(t){t.messages.push(msg);t.unread=true;fsSaveChatThread(t);}
-    updateMailboxBadge();
   },
   getThreads: function(){ return chatStore.threads; },
   getThread:  function(id){ return chatStore.threads.find(function(x){return x.id===id;}); },
@@ -5143,7 +5116,6 @@ var ChatDB = {
   archiveThread: function(threadId){
     var t=chatStore.threads.find(function(x){return x.id===threadId;});
     if(t){t.archived=true;t.unread=false;fsSaveChatThread(t);}
-    updateMailboxBadge();
   },
   approveKB:  function(threadId){
     var t=chatStore.threads.find(function(x){return x.id===threadId;});
@@ -5179,7 +5151,6 @@ function forwardToTeam(question, kobyAnswer){
   if(msgs){
     var conf=document.createElement('div');
     conf.className='ai-msg assistant';
-    conf.textContent='Your question has been forwarded to the team. You will see the reply in your mailbox (✉️).';
     msgs.appendChild(conf);
     msgs.scrollTop=msgs.scrollHeight;
   }
@@ -5304,8 +5275,7 @@ function deleteThread(id){
   if(!confirm('Delete this message thread?'))return;
   var idx=chatStore.threads.findIndex(function(t){return t.id===id;});
   if(idx>-1)chatStore.threads.splice(idx,1);
-  if(fsDb()){try{window._fsDeleteDoc(window._fsDoc(fsDb(),'chatStore',String(id)));}catch(e){}}
-  updateMailboxBadge();renderThreadList();
+  if(fsDb()){try{window._fsDeleteDoc(window._fsDoc(fsDb(),'chatStore',String(id)));}catch(e){}}renderThreadList();
 }
 function toggleArchivedSection(){
   var sec=G('archived-section');var tog=G('archived-toggle');
@@ -5329,7 +5299,6 @@ function openThread(id){
   /* Mark read */
   var role=cu?cu.role:'uploader';
   if(role!=='uploader'||t.fromFull===cu.fullName) t.unread=false;
-  updateMailboxBadge();
 
   var listView=G('chat-list-view');
   var threadView=G('chat-thread-view');
@@ -5407,7 +5376,6 @@ function sendThreadReply(){
   var t=ChatDB.getThread(currentThreadId);
   /* Persist reply to Firestore so other sessions see it */
   if(t){t.unread=true;fsSaveChatThread(t);}
-  updateMailboxBadge();
   renderThreadMessages(t);
 }
 
@@ -5437,7 +5405,6 @@ function submitKBDraft(){
   G('modal-kb-draft').classList.remove('open');
   openThread(currentThreadId);
   updateNotifBell();
-  updateMailboxBadge();
   pushNotif('&#128218;','New article submitted for approval by '+(cu?cu.fullName:'team'),'kb');
 }
 
@@ -7538,7 +7505,7 @@ document.addEventListener('DOMContentLoaded',function(){
     var tag=document.activeElement?document.activeElement.tagName:'';
     var inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(document.activeElement&&document.activeElement.isContentEditable);
     if(e.key==='Escape'){
-      var overlays=['mgr-write-overlay','daily-log-overlay','modal-member-profile','modal-add-member','modal-ann-view','modal-qscore','modal-qesc','modal-att','modal-timer-log','add-article-modal','modal-pw-pending','modal-kb-draft','settings-overlay','mailbox-overlay'];
+      var overlays=['mgr-write-overlay','daily-log-overlay','modal-member-profile','modal-add-member','modal-ann-view','modal-qscore','modal-qesc','modal-att','modal-timer-log','add-article-modal','modal-pw-pending','modal-kb-draft','settings-overlay'];
       for(var i=0;i<overlays.length;i++){var el=G(overlays[i]);if(el&&el.classList.contains('open')){el.classList.remove('open');e.preventDefault();return;}}
       var openModal=document.querySelector('.modal-overlay.open');
       if(openModal){openModal.classList.remove('open');e.preventDefault();}
@@ -8074,44 +8041,6 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="ai-input-wrap">
     <textarea class="ai-input" id="ai-input" rows="1" placeholder="Ask Koby anything..." onkeydown="aiKeydown(event)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
     <button class="ai-send" id="ai-send" onclick="sendAIMessage()">&#9658;</button>
-  </div>
-</div>
-
-<!-- CHAT OVERLAY -->
-<div class="chat-overlay" id="chat-overlay" onclick="closeMailbox()"></div>
-
-<!-- CHAT PANEL -->
-<div class="chat-panel" id="chat-panel">
-  <div class="chat-header">
-    <div>
-      <div class="chat-header-title">&#9993; Team Messages</div>
-      <div class="chat-header-sub">Forwarded questions &amp; replies</div>
-    </div>
-    <button class="chat-close" onclick="closeMailbox()">&#x2715;</button>
-  </div>
-  <!-- Thread list view -->
-  <div class="thread-list-view" id="chat-list-view" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-    <div id="chat-pending-approvals" style="display:none;border-bottom:2px solid var(--border2)"></div>
-    <div class="chat-thread-list" id="chat-threads"></div>
-  </div>
-  <!-- Thread detail view -->
-  <div class="thread-view" id="chat-thread-view">
-    <div class="thread-view-header">
-      <button class="thread-back" onclick="renderThreadList()">&#8592;</button>
-      <div>
-        <div class="thread-view-title" id="thread-view-title"></div>
-        <div class="thread-view-sub" id="thread-view-sub"></div>
-      </div>
-    </div>
-    <div class="thread-messages" id="thread-messages"></div>
-    <div class="thread-reply-wrap" id="thread-reply-wrap" style="display:none;flex-direction:column;gap:8px;">
-      <textarea class="thread-reply-input" id="thread-reply-input" rows="2" placeholder="Type your reply... (Enter to send)" onkeydown="threadReplyKeydown(event)"></textarea>
-      <div class="thread-reply-actions">
-        <button class="thread-reply-send" onclick="sendThreadReply()">Send &#9658;</button>
-        <button class="thread-save-kb" id="thread-kb-btn" onclick="openKBDraft()" style="display:none">&#128218; Save as Article</button>
-        <button class="thread-save-kb" id="thread-approve-btn" onclick="approveKBArticle()" style="display:none;border-color:var(--accent);color:var(--accent)">&#10003; Approve KB Article</button>
-      </div>
-    </div>
   </div>
 </div>
 
