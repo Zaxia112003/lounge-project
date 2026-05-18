@@ -2050,7 +2050,7 @@ async function changePin(){
 
 
 /* ── MANAGER ERROR REVIEW NOTIFICATION ── */
-function sendManagerReviewNotif(callout){
+async function sendManagerReviewNotif(callout){
   /* Use TEAM_DIR as fallback since TEAM[] may be empty before Firestore loads */
   var manager=TEAM.find(function(m){return m.role&&m.role.toLowerCase()==='manager';});
   if(!manager){
@@ -2079,13 +2079,12 @@ function sendManagerReviewNotif(callout){
     unread:true,
     status:'pending_review'
   };
-  /* Save to Firestore errorReviews collection */
+  /* Save to Firestore errorReviews — await so _fsId is set before push */
   if(fsDb()){
     try{
-      window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),thread).then(function(ref){
-        thread._fsId=ref.id;
-      }).catch(function(e){console.warn('errorReview save',e);});
-    }catch(e){console.warn('errorReview',e);}
+      var ref=await window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),thread);
+      thread._fsId=ref.id;
+    }catch(e){console.warn('errorReview save',e);}
   }
   window._pendingReviews=window._pendingReviews||[];
   window._pendingReviews.push(thread);
@@ -4529,9 +4528,11 @@ function toggleQDetailExpand(row){
 function renderQDetailList(items){
   var el=G('qdetail-list');if(!el)return;
   if(!items.length){el.innerHTML='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No entries for this period.</div>';return;}
-  var statusColors={Pending:'var(--amber)',Acknowledged:'var(--green)',Resolved:'var(--accent)'};
+  var statusColors={Pending:'var(--amber)',Acknowledged:'var(--green)',Resolved:'var(--accent)','pending_review':'var(--accent)'};
+  var statusLabels={Pending:'Pending',Acknowledged:'Acknowledged',Resolved:'Resolved','pending_review':'Awaiting Review','discarded':'Discarded'};
   el.innerHTML=items.map(function(c){
-    var statusBadge='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg3);color:'+(statusColors[c.status]||'var(--amber)')+'">'+( c.status||'Pending')+'</span>';
+    var statusLabel=statusLabels[c.status]||c.status||'Pending';
+    var statusBadge='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg3);color:'+(statusColors[c.status]||'var(--amber)')+'">'+statusLabel+'</span>';
     var escTag=c.escalationMember?'<span style="font-size:10px;color:var(--muted)"> · Esc: '+c.escalationMember+'</span>':'';
     var ss=c.screenshot?'<img src="'+c.screenshot+'" style="max-width:100%;border-radius:8px;margin-top:8px"/>'  :'';
     return '<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleQDetailExpand(this)">'
