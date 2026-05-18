@@ -2019,13 +2019,18 @@ async function changePin(){
 
 /* ── MANAGER ERROR REVIEW NOTIFICATION ── */
 function sendManagerReviewNotif(callout){
+  /* Use TEAM_DIR as fallback since TEAM[] may be empty before Firestore loads */
   var manager=TEAM.find(function(m){return m.role&&m.role.toLowerCase()==='manager';});
+  if(!manager){
+    var mgNick=Object.keys(TEAM_DIR).find(function(n){return TEAM_DIR[n].role==='Manager';});
+    if(mgNick)manager=Object.assign({nickname:mgNick},TEAM_DIR[mgNick]);
+  }
   if(!manager)return;
   var uplMem=TEAM.find(function(m){return m.nickname===callout.uploader;})||{fullName:callout.uploader};
   var msg='Error logged by '+callout.loggedBy+' for '+uplMem.fullName+' — "'+callout.address+'" — awaiting your review.';
   /* Store as a pending-review thread in chatStore so manager sees it in mailbox */
   var thread={
-    id:'rev_'+callout.id,
+    id:'rev_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6)),
     type:'error_review',
     from:callout.loggedBy,
     fromFull:callout.loggedBy,
@@ -2200,8 +2205,18 @@ async function submitReview(){
       console.warn('review update failed, calloutFsId:',calloutFsId,e);
     }
   } else if(!calloutFsId&&thread.calloutId&&fsDb()){
-    /* calloutFsId not stored — query by numeric id field */
-    console.warn('No calloutFsId on thread — uploader may not receive notification');
+    /* calloutFsId not stored — search callouts collection for matching doc */
+    try{
+      var snap=await window._fsGetDocs(window._fsColl(fsDb(),'callouts'));
+      snap.forEach(function(d){
+        if(String(d.data().id)===String(thread.calloutId)){
+          window._fsUpdateDoc(d.ref,{feedback:editedFeedback,status:'Pending',managerReviewed:true,reviewedAt:reviewedAt});
+          /* Update in memory too */
+          var mc=callouts.find(function(c){return c._fsId===d.id;});
+          if(mc){mc.feedback=editedFeedback;mc.status='Pending';mc.managerReviewed=true;}
+        }
+      });
+    }catch(e){console.warn('fallback callout update failed',e);}
   }
   /* Mark review as approved — also add to dismissed set so snapshot won't re-add */
   if(!window._dismissedReviews)window._dismissedReviews=new Set();
@@ -7147,8 +7162,9 @@ function renderQualityPortal(){
     const canComplete=(cu.role==='manager'||(cu.role==='escalation'&&c.loggedBy===cu.nickname))&&c.status==='In Review';
     const ss=c.screenshot?'<img src="'+c.screenshot+'" class="qp-screenshot" alt="ss"/>':'';
     const critBadge=isCrit?'<div class="qp-crit-badge">&#128680; CRITICAL</div>':'';
+    var _ckey=c._fsId||String(c.id);
     let ackSect='';
-    if(canAck){ackSect='<div class="ack-wrap" onclick="event.stopPropagation()"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+c.id+'" placeholder="Describe your understanding..." onclick="event.stopPropagation()"></textarea></div><button class="btn btn-primary btn-sm" data-id="'+c.id+'" onclick="event.stopPropagation();ackCo(+this.dataset.id)">&#10003; Acknowledge</button> ';}
+    if(canAck){ackSect='<div class="ack-wrap" onclick="event.stopPropagation()"><div class="ack-label">Your Insight &amp; Commitment</div><textarea class="ack-ta" id="ack-'+_ckey+'" placeholder="Describe your understanding..." onclick="event.stopPropagation()"></textarea></div><button class="btn btn-primary btn-sm" data-id="'+_ckey+'" onclick="event.stopPropagation();ackCo(this.dataset.id)">&#10003; Acknowledge</button> ';}
     else if(c.insight){ackSect='<div class="insight-box"><div class="insight-lbl">&#10003; Uploader Insight</div><div class="insight-txt">'+c.insight+'</div></div>';}
     const completeBtn=canComplete?'<button class="btn btn-green btn-sm" data-id="'+c.id+'" onclick="completeCo(+this.dataset.id)">&#10003; Mark Completed</button>':'';
     return '<div class="qp-card'+(isCrit?' critical':'')+'" style="padding:10px 14px;cursor:pointer" onclick="toggleCalloutDetail('+c.id+')">'+critBadge
@@ -7168,7 +7184,8 @@ function toggleCalloutDetail(id){
 }
 
 function ackCo(id){
-  const c=callouts.find(x=>x.id===id);if(!c)return;
+  /* id may be _fsId string or numeric id */
+  const c=callouts.find(x=>x._fsId===String(id)||String(x.id)===String(id));if(!c)return;
   const el=G('ack-'+id);if(!el||!el.value.trim()){alert('Please add your insight and commitment.');return;}
   c.insight=el.value.trim();
   c.status='Acknowledged';
@@ -7196,7 +7213,7 @@ function ackCo(id){
   /* Update card in place */
   var ackWrap=el.closest('.ack-wrap');
   if(ackWrap){ackWrap.innerHTML='<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:4px">✓ Acknowledged — Awaiting Manager Review</div>';}
-  var ackBtn=document.querySelector('[data-id="'+id+'"].btn-primary');
+  var ackBtn=document.querySelector('[data-id="'+String(id)+'"].btn-primary');
   if(ackBtn)ackBtn.remove();
   updateMemberBell();
 }
