@@ -3291,9 +3291,16 @@ function annUpdateBadge(){
 }
 function deleteAnnouncement(id){
   if(!confirm('Delete this announcement?'))return;
-  var idx=mdAnnouncements.findIndex(function(a){return String(a.id)===String(id)||a.id==id;});
+  var rawId=String(id).replace(/^ann-/,'');
+  var idx=mdAnnouncements.findIndex(function(a){return a._fsId===rawId||String(a.id)===rawId||a._fsId===String(id)||String(a.id)===String(id);});
+  var fsDocId=idx>-1?(mdAnnouncements[idx]._fsId||rawId):rawId;
   if(idx>-1)mdAnnouncements.splice(idx,1);
-  if(fsDb()){try{window._fsGetDocs(window._fsColl(fsDb(),'announcements')).then(function(snap){snap.forEach(function(d){if(String(d.data().id)===String(id)||d.id===String(id))window._fsDeleteDoc(d.ref);});});}catch(e){}}
+  if(fsDb()){
+    try{window._fsDeleteDoc(window._fsDoc(fsDb(),'mdAnnouncements',fsDocId));}catch(e){}
+    try{window._fsGetDocs(window._fsColl(fsDb(),'mdAnnouncements')).then(function(snap){
+      snap.forEach(function(d){if(d.id===rawId||d.id===fsDocId||String(d.data().id)===rawId)window._fsDeleteDoc(d.ref);});
+    });}catch(e){}
+  }
   renderAnnouncements();
 }
 function _playAnnouncementSound(){
@@ -3376,7 +3383,7 @@ function deleteArticle(id){
   if(window.KB_ARTICLES){var bi=KB_ARTICLES.findIndex(match);if(bi>-1)KB_ARTICLES.splice(bi,1);}
   /* Try direct delete first using the ID as doc key (most reliable) */
   if(fsDb()){
-    ['announcements','articles'].forEach(function(col){
+    ['mdAnnouncements','articles'].forEach(function(col){
       /* Try all possible ID forms as direct doc keys */
       [String(id), rawId].forEach(function(tryId){
         if(tryId)try{window._fsDeleteDoc(window._fsDoc(fsDb(),col,tryId));}catch(e){}
@@ -3591,7 +3598,7 @@ function renderSpaceAnn(){
 function viewAnn(id){
   /* Strip prefix to get raw id, search all article stores */
   var rawId=String(id).replace(/^(ann|kb|tmpl|faq|template)-/,'');
-  var a=mdAnnouncements.find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
+  var a=mdAnnouncements.find(function(x){return x._fsId===rawId||String(x.id)===rawId||x._fsId===String(id)||String(x.id)===String(id);});
   if(!a&&window.KB_ARTICLES)a=(KB_ARTICLES||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
   if(!a&&window.mdArticles)a=(mdArticles||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
   if(!a)return;
@@ -3668,7 +3675,8 @@ function renderArticles(){
   });
   var items=[];
   (mdAnnouncements||[]).forEach(function(a){
-    items.push({id:'ann-'+a.id,type:'ann',title:a.title,body:a.body,author:a.author,date:a.postedAt,unseen:!annSeenIds.has(a.id)});
+    var annKey=a._fsId||String(a.id);
+    items.push({id:'ann-'+annKey,type:'ann',title:a.title,body:a.body,author:a.author,date:a.postedAt,unseen:!annSeenIds.has(annKey)});
   });
   var role=cu?cu.role:'uploader';
   /* Include user-created articles from Firestore 'articles' collection */
@@ -3875,10 +3883,14 @@ function submitAddArticle(){
       fsSaveAnnouncement(newAnn);
       renderAnnouncements();
       annUpdateBadge();
-    } else if(type==='kb'){
-      KB_ARTICLES.push({id:newId,title:title,body:body,role:'both'});
-    } else if(type==='tmpl'){
-      TEMPLATES.push({id:newId,title:title,body:body,category:'General'});
+    } else if(type==='kb'||type==='tmpl'||type==='faq'){
+      /* Save to Firestore articles collection */
+      var artId='art_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6));
+      var newArt={id:artId,title:title,body:body,category:type,role:'both',
+                  createdBy:cu.fullName,createdAt:new Date().toISOString()};
+      if(!window.mdArticles)window.mdArticles=[];
+      window.mdArticles.push(newArt);
+      if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',artId),newArt,{merge:true});}catch(e){console.warn('save article',e);}}
     }
   }
   G('add-article-modal').classList.remove('open');
