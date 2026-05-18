@@ -543,29 +543,43 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .main-brand-sub{font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
 
 /* ── AI ASSISTANT ── */
-.ai-panel{position:fixed;right:0;top:0;width:520px;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:600;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
-.ai-panel.open{transform:translateX(0);}
-.ai-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.ai-header-title{font-family:var(--font-d);font-size:14px;font-weight:700;color:var(--text);flex:1;}
-.ai-header-sub{font-size:10px;color:var(--muted);margin-top:1px;}
-.ai-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px;}
-.ai-close:hover{color:var(--text);}
-.ai-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
-.ai-msg{max-width:85%;font-size:12px;line-height:1.6;padding:10px 13px;border-radius:12px;}
-.ai-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-radius:12px 12px 3px 12px;}
-.ai-msg.assistant{align-self:flex-start;background:var(--bg3);color:var(--text);border-radius:12px 12px 12px 3px;}
-.ai-msg.thinking{align-self:flex-start;background:var(--bg3);color:var(--muted);font-style:italic;}
-.ai-input-wrap{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0;}
-.ai-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12px;font-family:var(--font-sans);outline:none;resize:none;max-height:80px;}
-.ai-input:focus{border-color:var(--accent);}
-.ai-send{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;flex-shrink:0;}
-.ai-send:hover{opacity:.85;}
-.ai-send:disabled{opacity:.4;cursor:not-allowed;}
+.ai-panel{position:fixed;right:20px;bottom:20px;top:auto;width:300px;height:440px;background:#111b21;border-radius:12px;overflow:hidden;z-index:600;display:flex;flex-direction:column;transform:translateY(calc(100% + 24px));transition:transform .25s ease;box-shadow:0 8px 32px rgba(0,0,0,.35);}
+.ai-panel.open{transform:translateY(0);}
+.ai-header{background:#202c33;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.ai-header-avatar{width:34px;height:34px;border-radius:50%;background:#128C7E;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ai-header-title{font-size:13px;font-weight:500;color:#e9edef;}
+.ai-header-sub{font-size:10px;color:#8696a0;}
+.ai-close{margin-left:auto;background:none;border:none;color:rgba(255,255,255,.4);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1;}
+.ai-close:hover{color:rgba(255,255,255,.8);}
+.ai-messages{flex:1;overflow-y:auto;padding:10px;background:#efeae2;display:flex;flex-direction:column;gap:6px;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;}
+.ai-msg{max-width:82%;font-size:13px;line-height:1.5;padding:6px 9px;position:relative;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;}
+.ai-msg.user{background:#dcf8c6;border-radius:8px 0 8px 8px;align-self:flex-end;color:#111;}
+.ai-msg.koby{background:#fff;border-radius:0 8px 8px 8px;align-self:flex-start;color:#111;display:flex;gap:5px;align-items:flex-end;}
+.ai-msg.koby .ai-bubble{flex:1;}
+.ai-msg-avatar{width:20px;height:20px;border-radius:50%;background:#128C7E;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;align-self:flex-end;}
+.ai-msg-time{font-size:9px;color:#999;text-align:right;margin-top:2px;}
+.ai-msg.user .ai-msg-time{text-align:right;}
+.ai-date-chip{text-align:center;margin:4px 0;}
+.ai-date-chip span{background:rgba(0,0,0,.1);border-radius:8px;padding:2px 8px;font-size:9px;color:#555;}
+.ai-disclaimer{padding:4px 10px;font-size:9px;color:#8696a0;text-align:center;background:#202c33;flex-shrink:0;}
+.ai-input-wrap{background:#202c33;padding:6px 10px;display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.ai-input{flex:1;background:#2a3942;border:none;border-radius:18px;padding:7px 12px;font-size:11px;color:#e9edef;resize:none;outline:none;font-family:var(--font-d);max-height:80px;line-height:1.4;}
+.ai-input::placeholder{color:#8696a0;}
+.ai-send{width:30px;height:30px;border-radius:50%;background:#128C7E;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:13px;}
+.ai-send:hover{background:#0d6b5e;}
+.ai-think{font-style:italic;color:#8696a0;font-size:10px;}
 .ai-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:599;display:none;}
 .ai-overlay.open{display:block;}
 /* Help icon in sidebar */
-.sb-help-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;cursor:pointer;color:var(--muted);border:1px solid var(--border);background:none;margin:0 auto;transition:all .18s;font-size:15px;font-weight:700;font-family:var(--font-d);}
-.sb-help-btn:hover{color:var(--text);border-color:var(--accent);background:rgba(139,45,255,.1);}
+.koby-fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:#128C7E;border:none;cursor:pointer;z-index:598;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.3);transition:transform .18s,background .18s;}
+.koby-fab:hover{background:#0d6b5e;transform:scale(1.08);}
+.koby-fab svg{width:26px;height:26px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.koby-fab-hidden{display:none;}
+.ai-input{flex:1;background:#2a3942;border:none;border-radius:18px;padding:7px 12px;font-size:13px;color:#e9edef;resize:none;outline:none;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;max-height:80px;line-height:1.5;}
+.ai-input::placeholder{color:#8696a0;}
+.ai-msg{max-width:82%;font-size:13px;line-height:1.5;padding:6px 9px;position:relative;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;}
+.ai-header-title{font-size:14px;font-weight:600;color:#e9edef;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;}
+.ai-header-sub{font-size:11px;color:#8696a0;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;}
 .ann-see-more-inline{color:var(--accent);font-weight:600;cursor:pointer;font-size:11px;white-space:nowrap;}
 .ann-see-more-inline:hover{text-decoration:underline;}
 
@@ -911,7 +925,6 @@ window.dispatchEvent(new Event('firebase-ready'));
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
 
-      <button class="sb-help-btn" onclick="openAI()" title="Ask Koby">?</button>
       <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
         <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
           <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -1345,6 +1358,7 @@ function fsStartRealtimeListeners(){
     if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
     if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
     if(G('daily-tbl'))renderDailyTbl();
+    if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
   }));
 
   /* perfData */
@@ -2594,6 +2608,7 @@ function buildUploaderDOM(){
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
       
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
@@ -2609,6 +2624,7 @@ function buildUploaderDOM(){
       </div>
       <div class="article-list" id="article-list"></div>
     </div>
+    <div class="lounge-pane" id="lounge-pane-my-team"></div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
     
@@ -2699,6 +2715,7 @@ function buildEscalationDOM(){
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
       
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
@@ -2714,6 +2731,7 @@ function buildEscalationDOM(){
       </div>
       <div class="article-list" id="article-list"></div>
     </div>
+    <div class="lounge-pane" id="lounge-pane-my-team"></div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
     
@@ -2732,6 +2750,7 @@ function buildManagerDOM(){
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
       
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
@@ -2750,6 +2769,7 @@ function buildManagerDOM(){
       </div>
       <div class="article-list" id="article-list"></div>
     </div>
+    <div class="lounge-pane" id="lounge-pane-my-team"></div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
     
@@ -3688,6 +3708,7 @@ function switchLoungeTab(tab, btn){
     if(active)active.classList.add('active');
   }
   if(tab==='my-space'){if(mgrSelectMode)mgrExitSelectMode();renderArticles();}
+  if(tab==='my-team')renderMyTeam();
 }
 
 var mgrSelectedArticles=new Set();
@@ -4806,15 +4827,25 @@ function openAI(){
   var overlay=G('ai-overlay');
   if(!panel)return;
   panel.classList.add('open');
-  overlay.classList.add('open');
   aiOpen=true;
+  var fab=G('koby-fab');if(fab)fab.style.display='none';
   var msgs=G('ai-messages');
-  var greeting=document.createElement('div');
-  greeting.className='ai-msg assistant';
-  greeting.textContent='Hey! I am Koby, your KB assistant. Ask me anything about uploading contracts, handling issues, or escalation procedures and I will walk you through it step by step.';
   msgs.innerHTML='';
-  msgs.appendChild(greeting);
+  msgs.innerHTML+=aiKobyBubble('Hey! Ask me anything about contracts, vendors, addresses, or escalation procedures. Fair warning: I might sneak in a pun. 🐸');
   setTimeout(function(){G('ai-input').focus();},300);
+}
+
+function aiTimestamp(){
+  var d=new Date();
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+function aiKobyBubble(text){
+  return '<div class="ai-msg koby"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble">'+text+'<div class="ai-msg-time">'+aiTimestamp()+'</div></div></div>';
+}
+
+function aiUserBubble(text){
+  return '<div class="ai-msg user">'+text+'<div class="ai-msg-time">'+aiTimestamp()+' ✓✓</div></div>';
 }
 
 function closeAI(){
@@ -4822,9 +4853,9 @@ function closeAI(){
   var overlay=G('ai-overlay');
   if(!panel)return;
   panel.classList.remove('open');
-  overlay.classList.remove('open');
   aiOpen=false;
   aiHistory=[];
+  var fab=G('koby-fab');if(fab)fab.style.display='flex';
 }
 
 async function sendAIMessage(){
@@ -4837,12 +4868,12 @@ async function sendAIMessage(){
   var msgs=G('ai-messages');
 
   // Add user message
-  msgs.innerHTML+='<div class="ai-msg user">'+text+'</div>';
+  msgs.innerHTML+=aiUserBubble(text);
   aiHistory.push({role:'user',content:text});
 
   // Add thinking indicator
   var thinkId='think-'+Date.now();
-  msgs.innerHTML+='<div class="ai-msg thinking" id="'+thinkId+'">Thinking...</div>';
+  msgs.innerHTML+='<div class="ai-msg koby" id="'+thinkId+'"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble ai-think">Thinking...</div></div>';
   msgs.scrollTop=msgs.scrollHeight;
 
   // Disable send
@@ -4891,16 +4922,13 @@ async function sendAIMessage(){
     // Replace thinking with reply
     var think=G(thinkId);
     if(think){
-      think.className='ai-msg assistant';
-      think.id='';
-      think.textContent=reply;
+      think.outerHTML=aiKobyBubble(reply);
       /* Reply rendered */
     }
   } catch(err){
     var think=G(thinkId);
     if(think){
-      think.className='ai-msg assistant';
-      think.textContent='Connection error. Please check your network and try again.';
+      think.outerHTML=aiKobyBubble('Connection error. Please check your network and try again.');
     }
   }
 
@@ -8025,21 +8053,27 @@ document.addEventListener('DOMContentLoaded',function(){
 </div>
 
 <!-- AI ASSISTANT OVERLAY -->
+<!-- KOBY FAB -->
+<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby">
+  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="#fff" stroke="none"/><circle cx="12" cy="10" r="1" fill="#fff" stroke="none"/><circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/></svg>
+</button>
+
 <div class="ai-overlay" id="ai-overlay" onclick="closeAI()"></div>
 
 <!-- AI ASSISTANT PANEL -->
 <div class="ai-panel" id="ai-panel">
   <div class="ai-header">
+    <div class="ai-header-avatar">🐸</div>
     <div>
-      <div class="ai-header-title">&#129302; Koby</div>
+      <div class="ai-header-title">Koby</div>
       <div class="ai-header-sub">Your KB assistant &mdash; Resets on close</div>
     </div>
     <button class="ai-close" onclick="closeAI()">&#x2715;</button>
   </div>
   <div class="ai-messages" id="ai-messages"></div>
-  <div style="padding:2px 16px 0;font-size:9px;color:var(--muted);opacity:.7;text-align:center">Koby is AI and can make mistakes. Please double-check responses.</div>
-    <div class="ai-input-wrap">
-    <textarea class="ai-input" id="ai-input" rows="1" placeholder="Ask Koby anything..." onkeydown="aiKeydown(event)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+  <div class="ai-disclaimer">Koby can make mistakes. Double-check important responses.</div>
+  <div class="ai-input-wrap">
+    <textarea class="ai-input" id="ai-input" rows="1" placeholder="Ask Koby anything..." onkeydown="aiKeydown(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
     <button class="ai-send" id="ai-send" onclick="sendAIMessage()">&#9658;</button>
   </div>
 </div>
