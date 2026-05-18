@@ -3900,20 +3900,31 @@ function submitAddArticle(){
 function viewArticle(id){
   var item=null;
   if(id.startsWith('ann-')){
-    var numId=parseInt(id.replace('ann-',''));
-    item=mdAnnouncements.find(function(a){return a.id===numId;});
-    if(item)annSeenIds.add(numId);
-    annUpdateBadge();
+    var annRawId=id.replace('ann-','');
+    item=mdAnnouncements.find(function(a){return a._fsId===annRawId||String(a.id)===annRawId;});
+    if(item){annSeenIds.add(item._fsId||String(item.id));annUpdateBadge();}
   } else if(id.startsWith('tmpl-')){
     var tmplId=parseInt(id.replace('tmpl-',''));
     var tmplItem=(TEMPLATES||[]).find(function(t){return t.id===tmplId;});
     if(tmplItem)item={title:tmplItem.title,body:tmplItem.body,
-      author:'Templates · '+tmplItem.category,postedAt:null,date:null,
+      author:'Templates · '+(tmplItem.category||'General'),postedAt:null,date:null,
       isTmpl:true,tmplId:tmplItem.id};
   } else if(id.startsWith('kb-')){
     var kbId=parseInt(id.replace('kb-',''));
     var kba=(KB_ARTICLES||[]).find(function(a){return a.id===kbId;});
     if(kba)item={title:kba.title,body:kba.body,author:'Knowledge Base',postedAt:null,date:null,kbId:kba.id};
+  } else {
+    var fsArt=(window.mdArticles||[]).find(function(a){return String(a.id)===String(id);});
+    if(fsArt){
+      var atype=fsArt.category||fsArt.type||'kb';
+      var authorLabel=atype==='tmpl'?'Template':atype==='faq'?'FAQ':'Knowledge Base';
+      item={title:fsArt.title,body:fsArt.body,
+            author:(fsArt.createdBy||authorLabel),
+            postedAt:fsArt.createdAt?new Date(fsArt.createdAt).getTime():null,
+            date:fsArt.createdAt?new Date(fsArt.createdAt).getTime():null,
+            isTmpl:atype==='tmpl',tmplId:atype==='tmpl'?id:null,
+            fsArtId:id,fsArtType:atype};
+    }
   }
   if(!item)return;
   _currentViewId=id;
@@ -3928,7 +3939,7 @@ function viewArticle(id){
     if(modalEl)modalEl.classList.add('modal-kb');
   } else {
     bodyEl.className='ann-modal-body';
-    bodyEl.textContent=item.body;
+    bodyEl.innerHTML=item.body||'';
     if(modalEl)modalEl.classList.remove('modal-kb');
   }
   var copyBtn=G('tmpl-modal-copy');
@@ -6648,6 +6659,14 @@ function renderTemplates(){
 }
 
 function copyTemplate(id, btn){
+  var fsT=(window.mdArticles||[]).find(function(x){return String(x.id)===String(id)&&(x.category==='tmpl'||x.type==='tmpl');});
+  if(fsT){
+    var bt=fsT.body.replace(/<img[^>]*>/gi,'[image]').replace(/<[^>]+>/g,'').trim();
+    navigator.clipboard.writeText(bt).then(function(){
+      if(btn){btn.textContent='\u2713 Copied';setTimeout(function(){btn.innerHTML='&#128203; Copy';},2000);}
+    }).catch(function(){});
+    return;
+  }
   var t=(TEMPLATES||[]).find(function(x){return x.id===id;});
   if(!t)return;
   /* Copy to clipboard */
