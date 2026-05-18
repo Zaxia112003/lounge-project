@@ -1577,6 +1577,8 @@ TEAM.forEach(m=>{store[m.nickname.toLowerCase()]={firstLogin:true,fullName:m.ful
 /* ── UTILS ── */
 
 const G=id=>document.getElementById(id);
+const htmlEsc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const stripTags=s=>String(s||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
 const fmtSecs=s=>{const m=Math.floor(s/60),sec=Math.floor(s%60);return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;};
 const todayStr=()=>new Date().toISOString().split('T')[0];
 const fmtDate=d=>{if(!d)return '';try{return new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'});}catch(e){return d;}};
@@ -2916,56 +2918,98 @@ function pwStartListeners(){
 }
 
 /* ── UPLOAD MODAL ── */
+window._pwFileQueue=[];
+
 function pwOpenUploadModal(){
-  window._pwUploadFile=null;
+  window._pwFileQueue=[];
   var err=G('pw-upload-err');if(err)err.textContent='';
   var cap=G('pw-upload-caption');if(cap)cap.value='';
-  var lbl=G('pw-drop-label');if(lbl)lbl.textContent='Drag & drop or click to browse';
+  var inp=G('pw-file-hidden');if(inp)inp.value='';
+  pwRenderQueue();
   var mo=G('modal-pw-upload');if(mo)mo.classList.add('open');
+}
+function pwRenderQueue(){
+  var lbl=G('pw-drop-label');
+  var list=G('pw-file-list');
+  if(!window._pwFileQueue||window._pwFileQueue.length===0){
+    if(lbl)lbl.textContent='Drag & drop or click to browse';
+    if(list)list.innerHTML='';
+    return;
+  }
+  if(lbl)lbl.textContent=window._pwFileQueue.length+' photo'+(window._pwFileQueue.length>1?'s':'')+' selected — click to add more';
+  if(list){
+    list.innerHTML=window._pwFileQueue.map(function(f,i){
+      return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;color:var(--text)">'
+        +'<span style="color:var(--accent)">✓</span>'
+        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+htmlEsc(f.name)+'</span>'
+        +'<span style="color:var(--muted);white-space:nowrap">'+(f.size/1024/1024).toFixed(1)+'MB</span>'
+        +'<span style="cursor:pointer;color:var(--muted);font-size:14px" data-qi="'+i+'" onclick="pwRemoveQueued(this)">×</span>'
+        +'</div>';
+    }).join('');
+  }
+}
+function pwRemoveQueued(el){
+  var i=parseInt(el.getAttribute('data-qi'));
+  if(!isNaN(i))window._pwFileQueue.splice(i,1);
+  pwRenderQueue();
 }
 function pwHandleDrop(e){
   e.preventDefault();
-  var file=e.dataTransfer?e.dataTransfer.files[0]:e.target.files[0];
-  if(file)pwSetUploadFile(file);
+  var files=e.dataTransfer?e.dataTransfer.files:e.target.files;
+  pwAddFiles(files);
 }
-function pwSetUploadFile(file){
-  var err=G('pw-upload-err');
-  if(!file)return;
-  if(!file.type.startsWith('image/')){if(err)err.textContent='Only image files accepted (JPG, PNG, WEBP, GIF).';return;}
-  if(file.size>PW_MAX_MB*1024*1024){if(err)err.textContent='File too large. Max '+PW_MAX_MB+'MB.';return;}
-  window._pwUploadFile=file;
-  if(err)err.textContent='';
-  var lbl=G('pw-drop-label');
-  if(lbl)lbl.textContent='✓ '+file.name+' ('+(file.size/1024/1024).toFixed(1)+'MB)';
+function pwAddFiles(files){
+  var err=G('pw-upload-err');if(err)err.textContent='';
+  var skipped=[];
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    if(!f.type.startsWith('image/')){skipped.push(f.name+' (not an image)');continue;}
+    if(f.size>PW_MAX_MB*1024*1024){skipped.push(f.name+' (over '+PW_MAX_MB+'MB)');continue;}
+    var dup=window._pwFileQueue.some(function(x){return x.name===f.name&&x.size===f.size;});
+    if(!dup)window._pwFileQueue.push(f);
+  }
+  if(skipped.length&&err)err.textContent='Skipped: '+skipped.join(', ');
+  pwRenderQueue();
 }
-function pwSubmit(inp){if(inp&&inp.files&&inp.files[0])pwSetUploadFile(inp.files[0]);}
+function pwSubmit(inp){
+  if(inp&&inp.files&&inp.files.length)pwAddFiles(inp.files);
+  if(inp)inp.value='';
+}
 
 async function pwSubmitFromModal(){
-  var file=window._pwUploadFile;
+  var queue=window._pwFileQueue;
   var err=G('pw-upload-err');
-  if(!file){if(err)err.textContent='Please select a photo first.';return;}
+  if(!queue||queue.length===0){if(err)err.textContent='Please select at least one photo.';return;}
   var caption=G('pw-upload-caption')?G('pw-upload-caption').value.trim():'';
-  var btn=G('pw-submit-btn');if(btn){btn.disabled=true;btn.textContent='Uploading...';}
-  try{
-    /* Upload to Firebase Storage */
-    var path='photos/pending/'+Date.now()+'_'+cu.nickname+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-    var storageRef=window._storageRef(window._storage,path);
-    await window._uploadBytes(storageRef,file);
-    var url=await window._getDownloadURL(storageRef);
-    /* Save metadata to Firestore photosPending */
-    await window._fsAddDoc(window._fsColl(window._db,'photosPending'),{
-      uploader:cu.nickname,uploaderFull:cu.fullName,
-      src:url,storagePath:path,caption:caption,
-      submittedAt:Date.now(),status:'pending'
-    });
-    var mo=G('modal-pw-upload');if(mo)mo.classList.remove('open');
-    window._pwUploadFile=null;
-    if(btn){btn.disabled=false;btn.textContent='Submit Photo';}
-    alert('Photo submitted! Awaiting manager approval.');
-  }catch(e){
-    console.error('pwSubmitFromModal',e);
-    if(err)err.textContent='Upload failed. Please try again.';
-    if(btn){btn.disabled=false;btn.textContent='Submit Photo';}
+  var btn=G('pw-submit-btn');
+  if(btn){btn.disabled=true;btn.textContent='Uploading 1 of '+queue.length+'...';}
+  var failed=[];
+  for(var i=0;i<queue.length;i++){
+    var file=queue[i];
+    if(btn)btn.textContent='Uploading '+(i+1)+' of '+queue.length+'...';
+    try{
+      var path='photos/pending/'+Date.now()+'_'+cu.nickname+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      var storageRef=window._storageRef(window._storage,path);
+      await window._uploadBytes(storageRef,file);
+      var url=await window._getDownloadURL(storageRef);
+      await window._fsAddDoc(window._fsColl(window._db,'photosPending'),{
+        uploader:cu.nickname,uploaderFull:cu.fullName,
+        src:url,storagePath:path,caption:caption,
+        submittedAt:Date.now(),status:'pending'
+      });
+    }catch(e){
+      console.error('pwSubmitFromModal file',i,e);
+      failed.push(file.name);
+    }
+  }
+  var uploaded=queue.length-failed.length;
+  window._pwFileQueue=[];
+  if(btn){btn.disabled=false;btn.textContent='Submit Photos';}
+  var mo=G('modal-pw-upload');if(mo)mo.classList.remove('open');
+  if(failed.length){
+    alert('Uploaded '+uploaded+'. Failed: '+failed.join(', '));
+  }else{
+    alert(uploaded+' photo'+(uploaded>1?'s':'')+' submitted! Awaiting manager approval.');
   }
 }
 
@@ -3729,9 +3773,9 @@ function renderArticles(){
       +chk
       +'<div style="flex:1;min-width:0">'
       +'<div class="article-card-top">'+badge+dot+'</div>'
-      +'<div class="article-card-title">'+(isManager?'<button data-artid="'+x.id+'" onclick="event.stopPropagation();artDelBtn(this)" style="float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px" title="Delete">&#128465;</button>':'')+x.title+'</div>'
-      +'<div class="article-card-preview">'+(x.body.length>120?x.body.slice(0,120)+'...':x.body)+'</div>'
-      +'<div class="article-card-meta">'+x.author+(x.date?(' &middot; '+timeAgo(new Date(x.date).toISOString())):'')+'</div>'
+      +'<div class="article-card-title">'+(isManager?'<button data-artid="'+x.id+'" onclick="event.stopPropagation();artDelBtn(this)" style="float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px" title="Delete">&#128465;</button>':'')+htmlEsc(x.title)+'</div>'
+      +'<div class="article-card-preview">'+(stripTags(x.body).length>120?htmlEsc(stripTags(x.body).slice(0,120))+'...':htmlEsc(stripTags(x.body)))+'</div>'
+      +'<div class="article-card-meta">'+htmlEsc(x.author)+(x.date?(' &middot; '+timeAgo(new Date(x.date).toISOString())):'')+'</div>'
       +'</div>'
       +'</div>';
   }).join('');
@@ -7562,10 +7606,11 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="pw-drop-label" id="pw-drop-label">Drag &amp; drop or click to browse</div>
       <div style="font-size:11px;color:var(--muted2);margin-top:8px;line-height:1.7">
         Accepted: JPG &middot; PNG &middot; WEBP &middot; GIF<br/>
-        Maximum size: <strong>5MB</strong>
+        Hold <strong>Ctrl</strong> or <strong>Shift</strong> to select multiple &middot; Max <strong>5MB</strong> each
       </div>
     </div>
-    <input type="file" id="pw-file-hidden" accept="image/*" style="display:none" onchange="pwSetUploadFile(this.files[0])"/>
+    <input type="file" id="pw-file-hidden" accept="image/*" multiple style="display:none" onchange="pwSubmit(this)"/>
+    <div id="pw-file-list" style="margin-top:6px;max-height:120px;overflow-y:auto"></div>
     <div class="err-msg" id="pw-upload-err" style="text-align:left;margin:8px 0 0"></div>
     <div class="form-group" style="margin-top:14px">
       <label class="form-label">Caption <span style="color:var(--muted);font-weight:400">(optional)</span></label>
@@ -7573,7 +7618,7 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="G('modal-pw-upload').classList.remove('open')">Cancel</button>
-      <button class="btn btn-primary" id="pw-submit-btn" onclick="pwSubmitFromModal()">Submit Photo</button>
+      <button class="btn btn-primary" id="pw-submit-btn" onclick="pwSubmitFromModal()">Submit Photos</button>
     </div>
   </div>
 </div>
