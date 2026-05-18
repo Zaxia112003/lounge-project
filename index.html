@@ -3816,8 +3816,8 @@ function mgrEditCurrent(){
   var aid=_currentViewId;
   var item=null,type='';
   if(aid.startsWith('ann-')){
-    var id=parseInt(aid.replace('ann-',''));
-    item=mdAnnouncements.find(function(a){return a.id===id;});
+    var annRaw=aid.replace('ann-','');
+    item=mdAnnouncements.find(function(a){return a._fsId===annRaw||String(a.id)===annRaw;});
     type='ann';
   } else if(aid.startsWith('kb-')){
     var id=parseInt(aid.replace('kb-',''));
@@ -3827,6 +3827,10 @@ function mgrEditCurrent(){
     var id=parseInt(aid.replace('tmpl-',''));
     item=TEMPLATES.find(function(t){return t.id===id;});
     type='tmpl';
+  } else {
+    /* Firestore article with art_ ID */
+    item=(window.mdArticles||[]).find(function(a){return String(a.id)===String(aid);});
+    if(item)type=item.category||item.type||'kb';
   }
   if(!item)return;
   G('modal-ann-view').classList.remove('open');
@@ -3863,9 +3867,9 @@ function submitAddArticle(){
   if(editAid){
     /* Edit existing */
     if(editAid.startsWith('ann-')){
-      var id=parseInt(editAid.replace('ann-',''));
-      var item=mdAnnouncements.find(function(a){return a.id===id;});
-      if(item){item.title=title;item.body=body;}
+      var annRaw=editAid.replace('ann-','');
+      var item=mdAnnouncements.find(function(a){return a._fsId===annRaw||String(a.id)===annRaw;});
+      if(item){item.title=title;item.body=body;fsSaveAnnouncement(item);}
     } else if(editAid.startsWith('kb-')){
       var id=parseInt(editAid.replace('kb-',''));
       var item=KB_ARTICLES.find(function(a){return a.id===id;});
@@ -3874,6 +3878,13 @@ function submitAddArticle(){
       var id=parseInt(editAid.replace('tmpl-',''));
       var item=TEMPLATES.find(function(t){return t.id===id;});
       if(item){item.title=title;item.body=body;}
+    } else {
+      /* Firestore article - update in mdArticles and Firestore */
+      var fsItem=(window.mdArticles||[]).find(function(a){return String(a.id)===String(editAid);});
+      if(fsItem){
+        fsItem.title=title;fsItem.body=body;
+        if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',String(editAid)),fsItem,{merge:true});}catch(e){}}
+      }
     }
   } else {
     var newId=nextId++;
