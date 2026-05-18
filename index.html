@@ -7969,7 +7969,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- ADD / EDIT ARTICLE MODAL -->
 <div class="modal-overlay" id="add-article-modal" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:92vw;width:92vw">
     <button class="modal-close" onclick="G('add-article-modal').classList.remove('open')">&#x2715;</button>
     <div class="modal-title" id="add-article-modal-title">Add Article</div>
     <div style="display:flex;flex-direction:column;gap:14px;margin-top:16px">
@@ -7999,7 +7999,7 @@ document.addEventListener('DOMContentLoaded',function(){
           <div class="fmt-sep"></div>
           <button title="Clear formatting" onclick="fmtDo('removeFormat')" onmousedown="event.preventDefault()">&#10005; Clear</button>
         </div>
-        <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none;border-radius:0 0 8px 8px" onpaste="handleArticlePaste(event,this)" onfocus="fmtSetTarget(this)" onkeyup="fmtUpdateState()" onmouseup="fmtUpdateState()"></div>
+        <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none;border-radius:0 0 8px 8px" onpaste="handleArticlePaste(event,this)" onfocus="fmtSetTarget(this)" onkeyup="fmtUpdateState()" onmouseup="fmtUpdateState()" onkeydown="event.stopPropagation()"></div>
         </div>
       </div>
       <div class="err-msg" id="add-article-err" style="text-align:left;margin:0"></div>
@@ -8090,7 +8090,7 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
       <div>
         <div class="kb-draft-label">Answer</div>
-        <div class="kb-draft-input" id="kb-draft-a" contenteditable="true" data-placeholder="Summarize the answer... (Ctrl+V to paste images)" style="min-height:80px;max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none" onpaste="handleArticlePaste(event,this)"></div>
+        <div class="kb-draft-input" id="kb-draft-a" contenteditable="true" data-placeholder="Summarize the answer... (Ctrl+V to paste images)" onkeydown="event.stopPropagation()" style="min-height:80px;max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none" onpaste="handleArticlePaste(event,this)"></div>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px;">
         <button class="btn btn-outline btn-sm" onclick="G('modal-kb-draft').classList.remove('open')">Cancel</button>
