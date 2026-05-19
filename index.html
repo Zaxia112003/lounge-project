@@ -622,7 +622,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .kc-dot.pass{background:#22c55e;}.kc-dot.fail{background:#ef4444;}.kc-dot.none{background:#6b7280;}
 .game-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:850;display:none;align-items:center;justify-content:center;}
 .game-modal-overlay.open{display:flex;}
-.game-modal-box{background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:0;width:min(560px,96vw);max-height:92vh;overflow-y:auto;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.8);}
+.game-modal-box{background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:0;width:min(640px,96vw);max-height:92vh;overflow-y:auto;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.8);}
 .game-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0;background:#0f1117;}
 .game-modal-header-title{font-size:15px;font-weight:700;color:#f1f5f9;font-family:var(--font-d);display:flex;align-items:center;gap:8px;}
 .game-modal-body{padding:16px 18px 18px;background:#0f1117;}
@@ -953,7 +953,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.41ae</div>
+    <div class="brand-sub">v.43ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1028,7 +1028,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.41ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.43ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -3412,7 +3412,7 @@ function renderMyDay(){
     +'<div class="sect-head" style="padding:11px 14px 10px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
     +'<span class="sect-title">&#127918; Games</span>'
-    +(cu&&cu.role==='uploader'?'<div id="credit-badge" style="display:none;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:default"></div>':'')
+    +(cu?'<div id="credit-badge" style="display:none;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:default"></div>':'')
     +'</div>'
     +'<div style="display:flex;align-items:center;gap:6px">'
     +'<span style="font-size:10px;color:var(--muted)">Solo &amp; Multiplayer</span>'
@@ -3746,9 +3746,15 @@ function gsFormat(gameId,score){
 
 /* ─── CREDITS SYSTEM ─── */
 var CREDITS_KEY='lp_credits_v1';
-var CREDITS_PER_UPLOADS=10; /* 1 credit per 10 uploads */
-var CREDITS_PER_WIN=2;      /* 2 credits for winning KB Quiz */
-var CREDITS_COST=1;         /* 1 credit per game play */
+var CREDITS_MAX=10;     /* hard cap — silent */
+var CREDITS_PER_WIN=2;  /* 2 credits for winning multiplayer */
+var CREDITS_COST=1;     /* 1 credit per game play */
+
+/* Upload threshold per role to earn 1 credit */
+function credUploadsPerCredit(role){
+  if(role==='uploader')return 10;
+  return 5; /* escalation + manager: 1 credit per 5 uploads */
+}
 
 function credLoad(){try{return JSON.parse(localStorage.getItem(CREDITS_KEY)||'{}')}catch(e){return {};}}
 function credSave(d){try{localStorage.setItem(CREDITS_KEY,JSON.stringify(d));}catch(e){}}
@@ -3756,24 +3762,33 @@ function credSave(d){try{localStorage.setItem(CREDITS_KEY,JSON.stringify(d));}ca
 function credGet(nick){
   if(!nick)nick=cu?cu.nickname:'';
   var d=credLoad();
-  return (d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''});
+  var today=getSydneyDate().toISOString().slice(0,10);
+  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+  /* Silent daily reset — new day = credits back to 0 */
+  if(state.lastCheckedDate&&state.lastCheckedDate!==today&&state.lastCheckedDate!==''){
+    state.credits=0;state.lastCheckedUploads=0;state.lastCheckedDate=today;
+    d[nick]=state;credSave(d);
+  }
+  return state;
 }
 
 function credRecalcFromUploads(){
-  /* Called on My Day load — uploaders only. Escalation team excluded. */
-  if(!cu||cu.role==='manager'||cu.role==='escalation')return;
+  if(!cu)return;
+  var role=cu.role||'uploader';
+  var threshold=credUploadsPerCredit(role);
   var nick=cu.nickname;
   var today=getSydneyDate().toISOString().slice(0,10);
   var d=credLoad();
-  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
-  /* If it's a new day, reset the upload counter */
+  var state=credGet(nick); /* uses credGet so daily reset fires first */
   if(state.lastCheckedDate!==today){state.lastCheckedUploads=0;state.lastCheckedDate=today;}
-  /* Get today's total uploads */
+  if((state.credits||0)>=CREDITS_MAX){
+    d[nick]=state;credSave(d);
+    updateCreditBadge();return; /* already at cap */
+  }
   var todayUploads=(perfData[nick]&&perfData[nick][today]&&perfData[nick][today].uploadsTotal)||0;
-  /* How many new credits earned since last check */
-  var prevBracket=Math.floor(state.lastCheckedUploads/CREDITS_PER_UPLOADS);
-  var newBracket=Math.floor(todayUploads/CREDITS_PER_UPLOADS);
-  var earned=newBracket-prevBracket;
+  var prevBracket=Math.floor(state.lastCheckedUploads/threshold);
+  var newBracket=Math.floor(todayUploads/threshold);
+  var earned=Math.min(newBracket-prevBracket, CREDITS_MAX-(state.credits||0));
   if(earned>0){
     state.credits=(state.credits||0)+earned;
     state.lastCheckedUploads=todayUploads;
@@ -3787,11 +3802,9 @@ function credRecalcFromUploads(){
 }
 
 function credSpend(nick){
-  /* Returns true if credit was spent, false if insufficient */
   if(!nick)nick=cu?cu.nickname:'';
-  if(cu&&(cu.role==='manager'||cu.role==='escalation'))return true; /* manager & escalation play free */
   var d=credLoad();
-  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+  var state=credGet(nick);
   if((state.credits||0)<CREDITS_COST)return false;
   state.credits-=CREDITS_COST;
   d[nick]=state;credSave(d);
@@ -3802,21 +3815,24 @@ function credSpend(nick){
 function credAward(nick,amount){
   if(!nick)nick=cu?cu.nickname:'';
   var d=credLoad();
-  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
-  state.credits=(state.credits||0)+amount;
+  var state=credGet(nick);
+  var prev=state.credits||0;
+  state.credits=Math.min(prev+amount, CREDITS_MAX); /* cap at 10 */
+  var actual=state.credits-prev;
   d[nick]=state;credSave(d);
   updateCreditBadge();
-  showCreditToast('+'+amount+' credit'+(amount>1?'s':'')+' for winning!');
+  if(actual>0)showCreditToast('+'+actual+' credit'+(actual>1?'s':'')+' for winning!');
 }
 
 function updateCreditBadge(){
   var el=G('credit-badge');if(!el)return;
-  if(!cu||cu.role==='manager'||cu.role==='escalation'){el.style.display='none';return;}
+  if(!cu){el.style.display='none';return;}
   var c=credGet(cu.nickname).credits||0;
-  el.textContent='🎮 '+c+' credit'+(c===1?'':'s');
+  var full=c>=CREDITS_MAX;
+  el.textContent=full?'🎮 Full':'🎮 '+c+' credit'+(c===1?'':'s');
   el.style.display='inline-flex';
-  el.style.background=c>0?'rgba(139,45,255,.15)':'rgba(100,116,139,.1)';
-  el.style.color=c>0?'var(--accent)':'var(--muted)';
+  el.style.background=full?'rgba(34,197,94,.15)':c>0?'rgba(139,45,255,.15)':'rgba(100,116,139,.1)';
+  el.style.color=full?'var(--green)':c>0?'var(--accent)':'var(--muted)';
 }
 
 function showCreditToast(msg){
@@ -3827,10 +3843,10 @@ function showCreditToast(msg){
   setTimeout(function(){t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(function(){t.remove();},400);},2500);
 }
 
+var _adminTestMode=false;
 function checkAndSpendCredit(gameId){
-  /* Returns true = okay to play, false = not enough credits */
-  if(!cu||cu.role==='manager')return true;
-  /* Escalation team uses credits too */
+  if(!cu)return false;
+  if(_adminTestMode)return true; /* admin test bypass */
   var c=credGet(cu.nickname).credits||0;
   if(c<CREDITS_COST){
     showNoCreditModal(gameId);
@@ -3840,19 +3856,9 @@ function checkAndSpendCredit(gameId){
 }
 
 function showNoCreditModal(gameId){
-  var d=credLoad()[cu?cu.nickname:''];
-  var todayUploads=0;
-  if(cu&&perfData[cu.nickname]){
-    var today=getSydneyDate().toISOString().slice(0,10);
-    todayUploads=(perfData[cu.nickname][today]&&perfData[cu.nickname][today].uploadsTotal)||0;
-  }
-  var next=CREDITS_PER_UPLOADS-((todayUploads)%CREDITS_PER_UPLOADS);
-  var msg=G('game-modal')&&G('game-modal').classList.contains('open')
-    ?null:null;
-  /* Show inline alert */
   var overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:900;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML='<div style="background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:28px 32px;max-width:340px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.8)">'
+  overlay.innerHTML='<div style="background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:28px 32px;max-width:300px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.8)">'
     +'<div style="font-size:32px;margin-bottom:12px">🎮</div>'
     +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Not enough credits</div>'
     +'<div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:20px">You need <strong style="color:#a78bfa">1 credit</strong> to play.</div>'
@@ -3863,17 +3869,15 @@ function showNoCreditModal(gameId){
 
 /* ─── GAMES DATA ─── */
 var GAMES=[
-  {id:'2048',        label:'2048',          emoji:'🔢',type:'single',desc:'Slide tiles, reach 2048',           metric:'high', coming:false},
-  {id:'snake',       label:'Snake',         emoji:'🐍',type:'single',desc:'Eat & grow without hitting',        metric:'high', coming:false},
-  {id:'minesweeper', label:'Minesweeper',   emoji:'💣',type:'single',desc:'Clear the board fastest',           metric:'low',  coming:false},
+  {id:'minesweeper', label:'Minesweeper',   emoji:'💣',type:'single',desc:'Clear the board — choose difficulty',metric:'low',  coming:false},
   {id:'wordguess',   label:'Word Guess',    emoji:'📝',type:'single',desc:'Guess the 5-letter word',           metric:'low',  coming:false},
   {id:'chess',       label:'Chess',         emoji:'♟️',type:'single',desc:'Play vs AI opponent',               metric:'high', coming:false},
   {id:'kbquizbattle',label:'KB Quiz Battle',emoji:'🧩',type:'multi', desc:'First to 10 correct answers wins',  metric:'high', coming:false},
-  {id:'uno',         label:'UNO',           emoji:'🃏',type:'multi', desc:'Classic card game — draw & match',  metric:'high', coming:true},
+  {id:'uno',         label:'UNO',           emoji:'🃏',type:'multi', desc:'Classic card game — draw & match',  metric:'high', coming:false},
 ];
 var MP_GAMES=[
   {id:'kbquizbattle',label:'KB Quiz Battle',emoji:'🧩',desc:'First to 10 correct answers wins',coming:false},
-  {id:'uno',label:'UNO',emoji:'🃏',desc:'Classic card game — draw, match & reverse',coming:true},
+  {id:'uno',label:'UNO',emoji:'🃏',desc:'Classic card game — draw, match & reverse',coming:false},
 ];
 
 function gamesScrollLeft(){var el=G('games-scroll-row');if(el)el.scrollBy({left:-170,behavior:'smooth'});}
@@ -3886,9 +3890,11 @@ function renderGamesGrid(){
     var badge=g.coming
       ?'<span class="game-badge-soon">SOON</span>'
       :(g.type==='multi'?'<span class="game-badge-multi">MULTI</span>':'<span class="game-badge-solo">SOLO</span>');
-    var top=g.coming?[]:gsTop3(g.id);
+    var top=g.coming||g.id==='chess'?[]:gsTop3(g.id);
     var scoreRows=g.coming
       ?'<div style="font-size:10px;color:var(--muted);padding-top:4px;font-style:italic">Coming soon</div>'
+      :g.id==='chess'
+      ?''
       :(top.length?top.map(function(r,i){
           var medals=['🥇','🥈','🥉'];
           return '<div class="game-tile-score-row">'
@@ -3982,10 +3988,12 @@ function openGame(id){
   else if(id==='wordguess')launchWordGuess(wrap);
   else if(id==='chess')launchChess(wrap);
   else if(id==='kbquizbattle')launchKBQuiz(wrap);
+  else if(id==='uno')unoInit(wrap);
 }
 function closeGame(){
   _removeGameKeys();
   if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
+  if(window._unoTimerInterval){clearInterval(window._unoTimerInterval);window._unoTimerInterval=null;}
   var m=G('game-modal');if(m)m.classList.remove('open');
   renderGamesGrid();
 }
@@ -4128,9 +4136,19 @@ function launchSnake(container){
 }
 
 /* ══ MINESWEEPER ══ */
-function launchMinesweeper(container){
-  var ROWS=9,COLS=9,MINES=10;
+var _msDifficulty='easy';
+var _MS_CONFIGS={
+  easy:  {rows:9, cols:9,  mines:10, label:'Easy · 9×9 · 10 mines'},
+  medium:{rows:16,cols:16, mines:40, label:'Medium · 16×16 · 40 mines'},
+  hard:  {rows:16,cols:30, mines:99, label:'Hard · 16×30 · 99 mines'}
+};
+function launchMinesweeper(container,diff){
+  if(diff)_msDifficulty=diff;
+  var cfg=_MS_CONFIGS[_msDifficulty];
+  var ROWS=cfg.rows,COLS=cfg.cols,MINES=cfg.mines;
   var board,revealed,flagged,gameOver,firstClick,startTime;
+  var cellSz=_msDifficulty==='hard'?20:_msDifficulty==='medium'?24:30;
+
   function newGame(){
     board=Array.from({length:ROWS},function(){return Array(COLS).fill(0)});
     revealed=Array.from({length:ROWS},function(){return Array(COLS).fill(false)});
@@ -4147,12 +4165,13 @@ function launchMinesweeper(container){
   function renderMS(){
     var grid=container.querySelector('.ms-grid');if(!grid)return;
     grid.innerHTML='';
+    var frag=document.createDocumentFragment();
     for(var r=0;r<ROWS;r++){
       var row=document.createElement('div');row.style.display='flex';
       for(var c=0;c<COLS;c++){
         var cell=document.createElement('div');
         var isRev=revealed[r][c],isFlag=flagged[r][c];
-        cell.style.cssText='width:30px;height:30px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:'+(isRev&&board[r][c]>0?'12px':'15px')+';border:1px solid '+(isRev?'#374151':'#4b5563')+';cursor:'+(gameOver||isRev?'default':'pointer')+';user-select:none;background:'+(isRev?(board[r][c]===-1?'#7f1d1d':'#1f2937'):'#374151');
+        cell.style.cssText='width:'+cellSz+'px;height:'+cellSz+'px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:'+(cellSz>24?'12px':'10px')+';border:1px solid '+(isRev?'#374151':'#4b5563')+';cursor:'+(gameOver||isRev?'default':'pointer')+';user-select:none;flex-shrink:0;background:'+(isRev?(board[r][c]===-1?'#7f1d1d':'#1f2937'):'#374151');
         if(isRev&&board[r][c]===-1)cell.textContent='💣';
         else if(isRev&&board[r][c]>0){cell.textContent=board[r][c];cell.style.color=NC[board[r][c]];cell.style.fontWeight='700';}
         else if(isFlag)cell.textContent='🚩';
@@ -4162,8 +4181,9 @@ function launchMinesweeper(container){
         })(r,c);
         row.appendChild(cell);
       }
-      grid.appendChild(row);
+      frag.appendChild(row);
     }
+    grid.appendChild(frag);
   }
   function msClick(r,c){
     if(gameOver||revealed[r][c]||flagged[r][c])return;
@@ -4184,7 +4204,20 @@ function launchMinesweeper(container){
     }
     renderMS();
   }
-  container.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;color:rgba(255,255,255,.5)">💣 '+MINES+' mines · 9×9</span><button onclick="launchMinesweeper(this.closest(\'.game-canvas-wrap\'))" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">New Game</button></div><div class="ms-grid" style="display:inline-flex;flex-direction:column;gap:1px;border-radius:6px;overflow:hidden"></div><div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:8px">Left-click to reveal · Right-click to flag</div>';
+
+  /* Difficulty buttons */
+  var diffBtns=['easy','medium','hard'].map(function(d){
+    var active=d===_msDifficulty;
+    return '<button onclick="launchMinesweeper(this.closest(\'.game-canvas-wrap\'),\''+d+'\')" '
+      +'style="font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid '+(active?'var(--accent)':'var(--border)')+';background:'+(active?'rgba(139,45,255,.15)':'var(--bg3)')+';color:'+(active?'var(--accent)':'var(--muted)')+';cursor:pointer;font-weight:'+(active?'700':'400')+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</button>';
+  }).join('');
+
+  container.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<div style="display:flex;gap:5px">'+diffBtns+'</div>'
+    +'<span style="font-size:10px;color:rgba(255,255,255,.4)">'+cfg.label+'</span>'
+    +'</div>'
+    +'<div class="ms-grid" style="display:inline-flex;flex-direction:column;gap:1px;border-radius:6px;overflow:hidden;max-width:100%;overflow-x:auto"></div>'
+    +'<div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:8px">Left-click to reveal · Right-click to flag</div>';
   newGame();
 }
 
@@ -4265,111 +4298,164 @@ function launchChess(container){
   var GLYPHS={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
   var VALS={p:100,n:320,b:330,r:500,q:900,k:20000};
   var board,selected,turn,lastFrom,lastTo,moveCount,gameOver,aiThinking;
+  /* Castling rights: [whiteKingside, whiteQueenside, blackKingside, blackQueenside] */
+  var castleRights,enPassantSq; /* enPassantSq = [r,c] or null */
 
   function isW(p){return p&&p!=' '&&p===p.toUpperCase();}
   function isB(p){return p&&p!=' '&&p===p.toLowerCase();}
   function sameC(a,b){return(isW(a)&&isW(b))||(isB(a)&&isB(b));}
-
   function copyBoard(b){return b.map(function(r){return r.slice();});}
 
-  function getRawMoves(b,r,c){
+  function getRawMoves(b,r,c,epSq,cr){
     var p=b[r][c];if(!p||p==' ')return[];
     var moves=[],low=p.toLowerCase();
-    var addIf=function(nr,nc){if(nr>=0&&nr<8&&nc>=0&&nc<8&&!sameC(p,b[nr][nc]))moves.push([nr,nc]);};
-    var slide=function(dr,dc){for(var i=1;i<8;i++){var nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=8||nc<0||nc>=8)break;if(sameC(p,b[nr][nc]))break;moves.push([nr,nc]);if(b[nr][nc]&&b[nr][nc]!=' ')break;}};
+    var addIf=function(nr,nc){if(nr>=0&&nr<8&&nc>=0&&nc<8&&!sameC(p,b[nr][nc]))moves.push([nr,nc,'normal']);};
+    var slide=function(dr,dc){for(var i=1;i<8;i++){var nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=8||nc<0||nc>=8)break;if(sameC(p,b[nr][nc]))break;moves.push([nr,nc,'normal']);if(b[nr][nc]&&b[nr][nc]!=' ')break;}};
     if(low==='p'){
       var dir=isW(p)?-1:1,start=isW(p)?6:1;
-      if(r+dir>=0&&r+dir<8&&b[r+dir][c]==' '){moves.push([r+dir,c]);if(r===start&&b[r+dir*2][c]==' ')moves.push([r+dir*2,c]);}
-      [[r+dir,c-1],[r+dir,c+1]].forEach(function(m){if(m[0]>=0&&m[0]<8&&m[1]>=0&&m[1]<8&&b[m[0]][m[1]]&&b[m[0]][m[1]]!=' '&&!sameC(p,b[m[0]][m[1]]))moves.push(m);});
+      if(r+dir>=0&&r+dir<8&&b[r+dir][c]==' '){moves.push([r+dir,c,'normal']);if(r===start&&b[r+dir*2][c]==' ')moves.push([r+dir*2,c,'normal']);}
+      [[r+dir,c-1],[r+dir,c+1]].forEach(function(m){
+        if(m[0]>=0&&m[0]<8&&m[1]>=0&&m[1]<8){
+          if(b[m[0]][m[1]]&&b[m[0]][m[1]]!=' '&&!sameC(p,b[m[0]][m[1]]))moves.push([m[0],m[1],'normal']);
+          /* En passant */
+          if(epSq&&m[0]===epSq[0]&&m[1]===epSq[1])moves.push([m[0],m[1],'enpassant']);
+        }
+      });
     }else if(low==='r'){slide(1,0);slide(-1,0);slide(0,1);slide(0,-1);}
     else if(low==='b'){slide(1,1);slide(1,-1);slide(-1,1);slide(-1,-1);}
     else if(low==='q'){slide(1,0);slide(-1,0);slide(0,1);slide(0,-1);slide(1,1);slide(1,-1);slide(-1,1);slide(-1,-1);}
     else if(low==='n'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(function(d){addIf(r+d[0],c+d[1]);});}
-    else if(low==='k'){[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(function(d){addIf(r+d[0],c+d[1]);});}
+    else if(low==='k'){
+      [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(function(d){addIf(r+d[0],c+d[1]);});
+      /* Castling */
+      if(cr){
+        var rank=isW(p)?7:0;
+        if(r===rank&&c===4){
+          /* Kingside */
+          var ksIdx=isW(p)?0:2;
+          if(cr[ksIdx]&&b[rank][5]==' '&&b[rank][6]==' '&&b[rank][7]===(isW(p)?'R':'r')){
+            moves.push([rank,6,'castle-k']);
+          }
+          /* Queenside */
+          var qsIdx=isW(p)?1:3;
+          if(cr[qsIdx]&&b[rank][3]==' '&&b[rank][2]==' '&&b[rank][1]==' '&&b[rank][0]===(isW(p)?'R':'r')){
+            moves.push([rank,2,'castle-q']);
+          }
+        }
+      }
+    }
     return moves;
   }
 
-  function kingPos(b,white){
-    var k=white?'K':'k';
-    for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(b[r][c]===k)return[r,c];
-    return null;
-  }
-  function isInCheck(b,white){
+  function kingPos(b,white){var k=white?'K':'k';for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(b[r][c]===k)return[r,c];return null;}
+
+  function isInCheck(b,white,epSq){
     var kp=kingPos(b,white);if(!kp)return true;
     for(var r=0;r<8;r++)for(var c=0;c<8;c++){
-      var p=b[r][c];
-      if(!p||p==' ')continue;
+      var p=b[r][c];if(!p||p==' ')continue;
       if(white?isW(p):isB(p))continue;
-      var mv=getRawMoves(b,r,c);
+      var mv=getRawMoves(b,r,c,epSq,null);
       if(mv.some(function(m){return m[0]===kp[0]&&m[1]===kp[1];}))return true;
     }
     return false;
   }
-  function getLegalMoves(b,r,c){
-    var raw=getRawMoves(b,r,c);
+
+  function applyMove(b,fr,fc,tr,tc,flag){
+    var nb=copyBoard(b);var p=nb[fr][fc];
+    nb[tr][tc]=p;nb[fr][fc]=' ';
+    if(flag==='enpassant'){var capR=isW(p)?tr+1:tr-1;nb[capR][tc]=' ';}
+    if(flag==='castle-k'){var rank=fr;nb[rank][5]=nb[rank][7];nb[rank][7]=' ';}
+    if(flag==='castle-q'){var rank=fr;nb[rank][3]=nb[rank][0];nb[rank][0]=' ';}
+    /* Promotion */
+    if(p==='P'&&tr===0)nb[tr][tc]='Q';
+    if(p==='p'&&tr===7)nb[tr][tc]='q';
+    return nb;
+  }
+
+  function getLegalMoves(b,r,c,epSq,cr){
+    var raw=getRawMoves(b,r,c,epSq,cr);
     var p=b[r][c];
     return raw.filter(function(m){
-      var nb=copyBoard(b);
-      nb[m[0]][m[1]]=nb[r][c];nb[r][c]=' ';
-      if(nb[m[0]][m[1]]==='P'&&m[0]===0)nb[m[0]][m[1]]='Q';
-      if(nb[m[0]][m[1]]==='p'&&m[0]===7)nb[m[0]][m[1]]='q';
-      return !isInCheck(nb,isW(p));
+      var nb=applyMove(b,r,c,m[0],m[1],m[2]);
+      /* For castling — king must not pass through check */
+      if(m[2]==='castle-k'){
+        var rank=r;
+        var mid=applyMove(b,r,c,rank,5,'normal');
+        if(isInCheck(mid,isW(p),null))return false;
+      }
+      if(m[2]==='castle-q'){
+        var rank=r;
+        var mid=applyMove(b,r,c,rank,3,'normal');
+        if(isInCheck(mid,isW(p),null))return false;
+      }
+      return !isInCheck(nb,isW(p),null);
     });
   }
-  function allLegal(b,white){
+
+  function allLegal(b,white,epSq,cr){
     var moves=[];
     for(var r=0;r<8;r++)for(var c=0;c<8;c++){
-      var p=b[r][c];
-      if(!p||p==' ')continue;
+      var p=b[r][c];if(!p||p==' ')continue;
       if(white?!isW(p):!isB(p))continue;
-      getLegalMoves(b,r,c).forEach(function(m){moves.push({fr:r,fc:c,tr:m[0],tc:m[1]});});
+      getLegalMoves(b,r,c,epSq,cr).forEach(function(m){moves.push({fr:r,fc:c,tr:m[0],tc:m[1],flag:m[2]});});
     }
     return moves;
   }
 
-  /* Material evaluation */
+  function updateCastleRights(cr,p,fr,fc){
+    var nr=cr.slice();
+    if(p==='K')nr[0]=nr[1]=false;
+    if(p==='k')nr[2]=nr[3]=false;
+    if(p==='R'&&fr===7&&fc===7)nr[0]=false;
+    if(p==='R'&&fr===7&&fc===0)nr[1]=false;
+    if(p==='r'&&fr===0&&fc===7)nr[2]=false;
+    if(p==='r'&&fr===0&&fc===0)nr[3]=false;
+    return nr;
+  }
+
+  function getEnPassantSq(p,fr,fc,tr){
+    if((p==='P'||p==='p')&&Math.abs(tr-fr)===2)return[(fr+tr)/2,fc];
+    return null;
+  }
+
+  /* Evaluation */
   function evaluate(b){
     var score=0;
     for(var r=0;r<8;r++)for(var c=0;c<8;c++){
       var p=b[r][c];if(!p||p==' ')continue;
       var v=VALS[p.toLowerCase()]||0;
-      score+=isW(p)?-v:v; /* AI is black — positive = good for black */
+      score+=isW(p)?-v:v;
     }
     return score;
   }
 
-  /* Minimax with alpha-beta, depth 3 */
-  function minimax(b,depth,alpha,beta,maximizing){
-    var moves=allLegal(b,!maximizing); /* maximizing=black's turn */
+  function minimax(b,depth,alpha,beta,maximizing,epSq,cr){
+    var white=!maximizing;
+    var moves=allLegal(b,!maximizing,epSq,cr);
     if(depth===0||!moves.length){
-      if(!moves.length){
-        if(isInCheck(b,maximizing))return maximizing?-99999:99999;
-        return 0; /* stalemate */
-      }
+      if(!moves.length){if(isInCheck(b,!maximizing,epSq))return maximizing?-99999:99999;return 0;}
       return evaluate(b);
     }
     if(maximizing){
       var best=-Infinity;
       for(var i=0;i<moves.length;i++){
-        var m=moves[i],nb=copyBoard(b);
-        nb[m.tr][m.tc]=nb[m.fr][m.fc];nb[m.fr][m.fc]=' ';
-        if(nb[m.tr][m.tc]==='p'&&m.tr===7)nb[m.tr][m.tc]='q';
-        var v=minimax(nb,depth-1,alpha,beta,false);
-        if(v>best)best=v;
-        if(best>alpha)alpha=best;
-        if(beta<=alpha)break;
+        var m=moves[i];
+        var nb=applyMove(b,m.fr,m.fc,m.tr,m.tc,m.flag);
+        var nep=getEnPassantSq(b[m.fr][m.fc],m.fr,m.fc,m.tr);
+        var ncr=updateCastleRights(cr,b[m.fr][m.fc],m.fr,m.fc);
+        var v=minimax(nb,depth-1,alpha,beta,false,nep,ncr);
+        if(v>best)best=v;alpha=Math.max(alpha,best);if(beta<=alpha)break;
       }
       return best;
     } else {
       var best=Infinity;
       for(var i=0;i<moves.length;i++){
-        var m=moves[i],nb=copyBoard(b);
-        nb[m.tr][m.tc]=nb[m.fr][m.fc];nb[m.fr][m.fc]=' ';
-        if(nb[m.tr][m.tc]==='P'&&m.tr===0)nb[m.tr][m.tc]='Q';
-        var v=minimax(nb,depth-1,alpha,beta,true);
-        if(v<best)best=v;
-        if(best<beta)beta=best;
-        if(beta<=alpha)break;
+        var m=moves[i];
+        var nb=applyMove(b,m.fr,m.fc,m.tr,m.tc,m.flag);
+        var nep=getEnPassantSq(b[m.fr][m.fc],m.fr,m.fc,m.tr);
+        var ncr=updateCastleRights(cr,b[m.fr][m.fc],m.fr,m.fc);
+        var v=minimax(nb,depth-1,alpha,beta,true,nep,ncr);
+        if(v<best)best=v;beta=Math.min(beta,best);if(beta<=alpha)break;
       }
       return best;
     }
@@ -4377,37 +4463,31 @@ function launchChess(container){
 
   function aiMove(){
     if(gameOver||turn!=='b')return;
-    aiThinking=true;
-    gmSetScore('AI thinking… · Move '+moveCount);
+    aiThinking=true;gmSetScore('AI thinking… · Move '+moveCount);
     setTimeout(function(){
-      var moves=allLegal(board,false);
+      var moves=allLegal(board,false,enPassantSq,castleRights);
       if(!moves.length){
-        if(isInCheck(board,false)){endGame('White wins by checkmate! 🏆');}
-        else{endGame('Stalemate — draw!');}
-        return;
+        endGame(isInCheck(board,false,enPassantSq)?'White wins by checkmate! 🏆':'Stalemate — draw!');return;
       }
       var best=null,bestVal=-Infinity;
       moves.forEach(function(m){
-        var nb=copyBoard(board);
-        nb[m.tr][m.tc]=nb[m.fr][m.fc];nb[m.fr][m.fc]=' ';
-        if(nb[m.tr][m.tc]==='p'&&m.tr===7)nb[m.tr][m.tc]='q';
-        var v=minimax(nb,2,-Infinity,Infinity,false);
+        var nb=applyMove(board,m.fr,m.fc,m.tr,m.tc,m.flag);
+        var nep=getEnPassantSq(board[m.fr][m.fc],m.fr,m.fc,m.tr);
+        var ncr=updateCastleRights(castleRights,board[m.fr][m.fc],m.fr,m.fc);
+        var v=minimax(nb,2,-Infinity,Infinity,false,nep,ncr);
         if(v>bestVal){bestVal=v;best=m;}
       });
       if(best){
         lastFrom=[best.fr,best.fc];lastTo=[best.tr,best.tc];
-        board[best.tr][best.tc]=board[best.fr][best.fc];
-        board[best.fr][best.fc]=' ';
-        if(board[best.tr][best.tc]==='p'&&best.tr===7)board[best.tr][best.tc]='q';
+        enPassantSq=getEnPassantSq(board[best.fr][best.fc],best.fr,best.fc,best.tr);
+        castleRights=updateCastleRights(castleRights,board[best.fr][best.fc],best.fr,best.fc);
+        board=applyMove(board,best.fr,best.fc,best.tr,best.tc,best.flag);
         moveCount++;turn='w';aiThinking=false;
-        /* Check if player is now in check/checkmate */
-        var playerMoves=allLegal(board,true);
+        var playerMoves=allLegal(board,true,enPassantSq,castleRights);
         if(!playerMoves.length){
-          if(isInCheck(board,true)){endGame('Black wins by checkmate!');}
-          else{endGame('Stalemate — draw!');}
-          return;
+          endGame(isInCheck(board,true,enPassantSq)?'Black wins by checkmate!':'Stalemate — draw!');return;
         }
-        var inCheck=isInCheck(board,true);
+        var inCheck=isInCheck(board,true,enPassantSq);
         gmSetScore('Your turn (White) · Move '+moveCount+(inCheck?' · ⚠️ Check!':''));
         render();
       }
@@ -4415,8 +4495,7 @@ function launchChess(container){
   }
 
   function endGame(msg){
-    gameOver=true;
-    gmSetScore(msg);
+    gameOver=true;gmSetScore(msg);
     var el=container.querySelector('.chess-board');
     if(el){
       var ov=document.createElement('div');
@@ -4429,21 +4508,24 @@ function launchChess(container){
 
   function init(){
     board=INIT.map(function(row){return row.split('');});
-    selected=null;turn='w';lastFrom=null;lastTo=null;moveCount=0;gameOver=false;aiThinking=false;
+    selected=null;turn='w';lastFrom=null;lastTo=null;moveCount=0;
+    gameOver=false;aiThinking=false;
+    castleRights=[true,true,true,true];enPassantSq=null;
     render();gmSetScore('Your turn — you are White');
   }
 
   function render(){
     var el=container.querySelector('.chess-board');if(!el)return;
     el.innerHTML='';
-    var legalSet=new Set();
-    if(selected)getLegalMoves(board,selected[0],selected[1]).forEach(function(m){legalSet.add(m[0]+','+m[1]);});
+    var legalSet={};
+    var legalMoves=selected?getLegalMoves(board,selected[0],selected[1],enPassantSq,castleRights):[];
+    legalMoves.forEach(function(m){legalSet[m[0]+','+m[1]]=m[2];});
     for(var r=0;r<8;r++)for(var c=0;c<8;c++){
       var sq=document.createElement('div');
       sq.className='chess-sq '+((r+c)%2===0?'light':'dark');
       sq.style.width='38px';sq.style.height='38px';
       if(selected&&selected[0]===r&&selected[1]===c)sq.classList.add('selected');
-      if(legalSet.has(r+','+c))sq.classList.add('legal');
+      if(legalSet[r+','+c]!==undefined)sq.classList.add('legal');
       if(lastFrom&&lastFrom[0]===r&&lastFrom[1]===c)sq.classList.add('last-move');
       if(lastTo&&lastTo[0]===r&&lastTo[1]===c)sq.classList.add('last-move');
       var p=board[r][c];
@@ -4462,18 +4544,15 @@ function launchChess(container){
     if(gameOver||aiThinking||turn!=='w')return;
     var p=board[r][c];
     if(selected){
-      var moves=getLegalMoves(board,selected[0],selected[1]);
-      var ok=moves.some(function(m){return m[0]===r&&m[1]===c;});
-      if(ok){
+      var moves=getLegalMoves(board,selected[0],selected[1],enPassantSq,castleRights);
+      var move=moves.find(function(m){return m[0]===r&&m[1]===c;});
+      if(move){
         lastFrom=selected.slice();lastTo=[r,c];
-        board[r][c]=board[selected[0]][selected[1]];
-        board[selected[0]][selected[1]]=' ';
-        if(board[r][c]==='P'&&r===0)board[r][c]='Q'; /* pawn promotion */
+        enPassantSq=getEnPassantSq(board[selected[0]][selected[1]],selected[0],selected[1],r);
+        castleRights=updateCastleRights(castleRights,board[selected[0]][selected[1]],selected[0],selected[1]);
+        board=applyMove(board,selected[0],selected[1],r,c,move[2]);
         selected=null;moveCount++;turn='b';
-        /* Check player gave check to AI */
-        render();
-        setTimeout(aiMove,300);
-        return;
+        render();setTimeout(aiMove,300);return;
       }
       selected=null;
     }
@@ -4482,13 +4561,14 @@ function launchChess(container){
   }
 
   container.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
-    +'<span style="font-size:10px;color:rgba(255,255,255,.5)">♟️ You are White · AI plays Black</span>'
+    +'<span style="font-size:10px;color:rgba(255,255,255,.5)">♟️ You are White · AI plays Black · Castling &amp; en passant enabled</span>'
     +'<button onclick="launchChess(this.closest(\'.game-canvas-wrap\'))" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#94a3b8;cursor:pointer">New Game</button>'
     +'</div>'
     +'<div class="chess-board" style="max-width:320px;margin:0 auto"></div>'
     +'<div style="font-size:10px;color:rgba(255,255,255,.4);text-align:center;margin-top:10px">Click piece → green squares = legal moves → click to move</div>';
   init();
 }
+
 
 
 
@@ -4684,21 +4764,24 @@ function renderMgrKpiCard(){
   var monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var monthLabel=monthNames[now.getMonth()]+' '+now.getFullYear();
 
-  /* Compute directly — same logic as My Hub grand totals for this month */
-  var y=now.getFullYear(),m=now.getMonth();
-  var fromDate=new Date(y,m,1).toISOString().slice(0,10);
-  var toDate=new Date(y,m+1,0).toISOString().slice(0,10);
-  function inMonth(d){return d>=fromDate&&d<=toDate;}
+  /* Use identical date filter logic as My Hub "This Month" filter */
+  var rsMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+  rsMonth.setHours(0,0,0,0);
+  function inMonth(dateStr){
+    if(!dateStr)return false;
+    try{var d=new Date(dateStr.slice(0,10)+'T00:00:00');return d>=rsMonth;}
+    catch(e){return false;}
+  }
 
-  /* Uploader grand totals (matches My Hub Uploaders section) */
+  /* Uploader grand totals — mirrors My Hub Uploaders grand total row */
   var uploaders=TEAM.filter(function(t){return t.role&&t.role.toLowerCase()==='uploader';});
   var uplRows=uploaders.map(function(t){
     var nick=t.nickname;
     var days=Object.keys(perfData[nick]||{}).filter(function(d){return inMonth(d);});
     var tot=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
     var avg=days.length?tot/days.length:null;
-    var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth((c.date||'').slice(0,10));}).length;
-    var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth((c.date||'').slice(0,10))&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
+    var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth(c.date);}).length;
+    var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
     var qScore=tot>0?((tot-errs-qEsc)/tot*100):null;
     return{tot:tot,avg:avg,qEsc:qEsc,qScore:qScore};
   });
@@ -4708,17 +4791,18 @@ function renderMgrKpiCard(){
   var gtUplQArr=uplRows.filter(function(r){return r.qScore!==null;});
   var gtUplQ=gtUplQArr.length?(gtUplQArr.reduce(function(s,r){return s+r.qScore;},0)/gtUplQArr.length):null;
 
-  /* Escalation grand total uploads only (added to total) */
+  /* Escalation total uploads (added to grand total only) */
   var escalators=TEAM.filter(function(t){return t.role&&t.role.toLowerCase()==='escalation';});
   var escUplTotal=escalators.reduce(function(s,t){
     var nick=t.nickname;
-    return s+Object.keys(perfData[nick]||{}).filter(function(d){return inMonth(d);}).reduce(function(ss,d){return ss+(perfData[nick][d].uploadsTotal||0);},0);
+    return s+Object.keys(perfData[nick]||{}).filter(function(d){return inMonth(d);})
+      .reduce(function(ss,d){return ss+(perfData[nick][d].uploadsTotal||0);},0);
   },0);
 
   var totalUploads=gtUplTotal+escUplTotal;
 
-  /* SLA this month */
-  var slaInMonth=(slaLog||[]).filter(function(e){return inMonth((e.date||'').slice(0,10));});
+  /* SLA — same filter */
+  var slaInMonth=(slaLog||[]).filter(function(e){return inMonth(e.date);});
   var avgSLA=slaInMonth.length?(slaInMonth.reduce(function(s,e){return s+(e.pct||0);},0)/slaInMonth.length):null;
 
   var qColor=gtUplQ!==null?(gtUplQ>=95?'var(--green)':gtUplQ>=80?'var(--amber)':'var(--red)'):'var(--muted)';
@@ -4741,6 +4825,673 @@ function renderMgrKpiCard(){
     +kpiTile('✅', gtUplQ!==null?gtUplQ.toFixed(1)+'%':'—', 'Quality %', qColor)
     +kpiTile('🎯', avgSLA!==null?avgSLA.toFixed(1)+'%':'—', 'Esc. SLA %', slaColor)
     +'</div>';
+}
+
+
+/* ══ UNO MULTIPLAYER ══ */
+/* ══════════════════════════════════════════════════
+   UNO — Full multiplayer via Firestore
+   ══════════════════════════════════════════════════ */
+
+/* ─── UNO CSS (injected once) ─── */
+(function injectUNOCSS(){
+  if(G('uno-styles'))return;
+  var s=document.createElement('style');s.id='uno-styles';
+  s.textContent=[
+    '.uno-wrap{padding:0;background:#0f1117;color:#f1f5f9;border-radius:10px;font-family:var(--font-d);min-height:420px;}',
+    '.uno-lobby{padding:18px;}',
+    '.uno-title{font-size:16px;font-weight:700;margin-bottom:4px;}',
+    '.uno-sub{font-size:11px;color:#94a3b8;margin-bottom:16px;}',
+    '.uno-seats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}',
+    '.uno-seat{border:1.5px dashed rgba(255,255,255,.18);border-radius:10px;padding:12px 8px;text-align:center;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;transition:all .15s;}',
+    '.uno-seat.empty{cursor:pointer;}.uno-seat.empty:hover{border-color:#a78bfa;border-style:solid;}',
+    '.uno-seat.taken{border-style:solid;border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.04);}',
+    '.uno-seat.mine{border-style:solid;border-color:#7c3aed;background:rgba(124,58,237,.12);}',
+    '.uno-seat.ready{border-color:#22c55e;background:rgba(34,197,94,.08);}',
+    '.uno-av{width:34px;height:34px;border-radius:50%;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}',
+    '.uno-seat-name{font-size:11px;font-weight:600;color:#f1f5f9;}',
+    '.uno-seat-sub{font-size:9px;color:#64748b;}',
+    '.uno-seat-empty-icon{font-size:24px;color:#334155;}',
+    '.uno-audience{border-top:1px solid rgba(255,255,255,.06);padding:10px 18px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}',
+    '.uno-aud-chip{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:3px 8px;font-size:10px;color:#94a3b8;}',
+    '.uno-btn{padding:9px 22px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;}',
+    '.uno-btn-primary{background:#7c3aed;color:#fff;}',
+    '.uno-btn-primary:hover{background:#6d28d9;}',
+    '.uno-btn-secondary{background:rgba(255,255,255,.07);color:#94a3b8;border:1px solid rgba(255,255,255,.1);}',
+    '.uno-btn-secondary:hover{background:rgba(255,255,255,.12);}',
+    '.uno-btn-danger{background:#991b1b;color:#fca5a5;}',
+    '.uno-btn-sm{padding:5px 12px;font-size:11px;border-radius:6px;}',
+    /* game table */
+    '.uno-table{padding:14px;display:flex;flex-direction:column;gap:10px;}',
+    '.uno-timer-bar{height:3px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;}',
+    '.uno-timer-fill{height:100%;border-radius:2px;transition:width 1s linear;background:#22c55e;}',
+    '.uno-timer-fill.warn{background:#f59e0b;}.uno-timer-fill.danger{background:#ef4444;}',
+    '.uno-opponents{display:flex;justify-content:space-around;}',
+    '.uno-opp{text-align:center;padding:6px;}',
+    '.uno-opp.active-turn{background:rgba(124,58,237,.15);border-radius:8px;}',
+    '.uno-mini-cards{display:flex;gap:1px;justify-content:center;margin-bottom:3px;flex-wrap:wrap;}',
+    '.uno-mini{width:10px;height:16px;border-radius:2px;background:#4c1d95;border:1px solid #5b21b6;}',
+    '.uno-opp-name{font-size:10px;color:#94a3b8;}',
+    '.uno-opp-count{font-size:9px;color:#64748b;}',
+    '.uno-opp-uno{color:#ef4444;font-weight:700;font-size:9px;}',
+    '.uno-center{display:flex;align-items:center;justify-content:center;gap:20px;}',
+    '.uno-card{width:48px;height:68px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;border:2px solid rgba(0,0,0,.2);position:relative;flex-shrink:0;cursor:default;user-select:none;}',
+    '.uno-card-label{position:absolute;top:3px;left:5px;font-size:8px;font-weight:700;opacity:.85;}',
+    '.uno-card-label-br{position:absolute;bottom:3px;right:5px;font-size:8px;font-weight:700;opacity:.85;transform:rotate(180deg);}',
+    '.uno-card.red{background:#dc2626;color:#fff;}.uno-card.blue{background:#2563eb;color:#fff;}',
+    '.uno-card.green{background:#16a34a;color:#fff;}.uno-card.yellow{background:#d97706;color:#fff;}',
+    '.uno-card.wild{background:linear-gradient(135deg,#dc2626 25%,#16a34a 25% 50%,#2563eb 50% 75%,#d97706 75%);color:#fff;}',
+    '.uno-card.back{background:#4c1d95;color:#a78bfa;}',
+    '.uno-color-dot{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.2);}',
+    '.uno-hand{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;padding:6px 0;}',
+    '.uno-hand-card{width:44px;height:62px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;border:2px solid rgba(0,0,0,.2);cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative;flex-shrink:0;}',
+    '.uno-hand-card:hover{transform:translateY(-10px);}',
+    '.uno-hand-card.playable{box-shadow:0 0 0 2px #a78bfa;}',
+    '.uno-hand-card.not-playable{opacity:.45;cursor:default;}.uno-hand-card.not-playable:hover{transform:none;}',
+    '.uno-action-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}',
+    '.uno-btn-uno{background:#dc2626;color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}',
+    '.uno-btn-catch{background:#d97706;color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}',
+    '.uno-stack-badge{background:#7c3aed;color:#fff;font-size:9px;font-weight:700;position:absolute;top:-4px;right:-4px;border-radius:10px;padding:1px 5px;}',
+    /* color picker overlay */
+    '.uno-color-picker{position:absolute;inset:0;background:rgba(0,0,0,.8);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10;}',
+    '.uno-color-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}',
+    '.uno-color-btn{width:60px;height:60px;border-radius:10px;border:none;cursor:pointer;font-size:11px;font-weight:700;color:#fff;transition:transform .1s;}',
+    '.uno-color-btn:hover{transform:scale(1.08);}',
+    /* result overlay */
+    '.uno-result{position:absolute;inset:0;background:rgba(0,0,0,.82);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:10;padding:20px;text-align:center;}',
+    '.uno-result-emoji{font-size:44px;}',
+    '.uno-result-title{font-size:18px;font-weight:700;color:#f1f5f9;}',
+    '.uno-result-sub{font-size:12px;color:#94a3b8;}',
+    '.uno-credit-box{background:rgba(124,58,237,.15);border:1px solid #7c3aed;border-radius:8px;padding:8px 16px;font-size:11px;color:#a78bfa;font-weight:600;}',
+    /* turn indicator */
+    '.uno-turn{text-align:center;font-size:11px;font-weight:600;color:#a78bfa;padding:4px 0;}',
+    '.uno-log{font-size:10px;color:#64748b;text-align:center;min-height:14px;}'
+  ].join('');
+  document.head.appendChild(s);
+})();
+
+/* ─── Card definitions ─── */
+var UNO_COLORS=['red','blue','green','yellow'];
+var UNO_COLOR_HEX={red:'#dc2626',blue:'#2563eb',green:'#16a34a',yellow:'#d97706'};
+var UNO_AV_COLORS=['rgba(167,139,250,.3)','rgba(52,211,153,.3)','rgba(251,146,60,.3)','rgba(96,165,250,.3)'];
+var UNO_AV_TEXT=['#a78bfa','#34d399','#fb923c','#60a5fa'];
+
+function unoBuildDeck(){
+  var deck=[];
+  UNO_COLORS.forEach(function(c){
+    deck.push({color:c,value:'0',display:'0'});
+    ['1','2','3','4','5','6','7','8','9','Skip','Reverse','+2'].forEach(function(v){
+      deck.push({color:c,value:v,display:v});
+      deck.push({color:c,value:v,display:v});
+    });
+  });
+  for(var i=0;i<4;i++){
+    deck.push({color:'wild',value:'wild',display:'W'});
+    deck.push({color:'wild',value:'+4',display:'+4'});
+  }
+  return deck;
+}
+
+function unoShuffle(arr){
+  var a=arr.slice();
+  for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}
+  return a;
+}
+
+function unoDeal(deck,numPlayers){
+  var d=unoShuffle(deck);
+  var hands=[];
+  for(var i=0;i<numPlayers;i++)hands.push([]);
+  for(var c=0;c<7;c++)for(var p=0;p<numPlayers;p++)hands[p].push(d.pop());
+  /* First discard — skip wilds */
+  var top;
+  do{top=d.pop();if(top.color==='wild')d.unshift(top);}while(top.color==='wild');
+  return{hands:hands,draw:d,discard:[top]};
+}
+
+/* ─── UNO Room State (Firestore path: uno_room/main) ─── */
+var _unoUnsub=null;
+var _unoTimerInterval=null;
+var _unoContainer=null;
+var _unoState=null; /* local copy of Firestore state */
+var _unoMyNick='';
+
+function unoRoomRef(){return window._fsDoc(fsDb(),'uno_room','main');}
+
+async function unoInit(container){
+  _unoContainer=container;
+  _unoMyNick=cu?cu.nickname:'';
+  container.innerHTML='<div class="uno-wrap" id="uno-root" style="position:relative"><div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px">Connecting to UNO room...</div></div>';
+  /* Subscribe to room state */
+  if(_unoUnsub){_unoUnsub();_unoUnsub=null;}
+  _unoUnsub=window._fsOnSnapshot(unoRoomRef(),function(snap){
+    if(!snap.exists()){
+      unoInitRoom();
+    } else {
+      _unoState=snap.data();
+      unoRender();
+    }
+  });
+}
+
+async function unoInitRoom(){
+  var emptyRoom={
+    seats:[null,null,null,null], /* each: {nick,fullName,avIdx} or null */
+    audience:[], /* [{nick,fullName}] */
+    phase:'lobby', /* lobby | playing | ended */
+    hands:{}, /* nick -> [{color,value,display}] */
+    draw:[], discard:[],
+    currentColor:'',
+    currentTurn:0, /* index into activePlayers */
+    activePlayers:[], /* ordered nicks */
+    direction:1, /* 1=clockwise -1=counter */
+    stackCount:0, /* pending draw stack */
+    unoCallers:{}, /* nick -> true (said uno) */
+    lastAction:'',
+    turnStart:0, /* epoch ms */
+    winner:''
+  };
+  await window._fsSetDoc(unoRoomRef(),emptyRoom);
+}
+
+/* ─── Room updates ─── */
+async function unoUpdate(patch){
+  await window._fsUpdateDoc(unoRoomRef(),patch);
+}
+
+/* ─── SEAT LOGIC ─── */
+async function unoTakeSeat(seatIdx){
+  if(!_unoState)return;
+  if(_unoState.phase!=='lobby')return;
+  /* Spend credit */
+  if(!checkAndSpendCredit('uno'))return;
+  var seats=_unoState.seats.slice();
+  if(seats[seatIdx]!==null)return; /* already taken */
+  /* Check not already seated */
+  if(seats.some(function(s){return s&&s.nick===_unoMyNick;}))return;
+  /* Remove from audience if present */
+  var aud=(_unoState.audience||[]).filter(function(a){return a.nick!==_unoMyNick;});
+  var avIdx=seatIdx;
+  seats[seatIdx]={nick:_unoMyNick,fullName:cu?cu.fullName:_unoMyNick,avIdx:avIdx,ready:false};
+  await unoUpdate({seats:seats,audience:aud});
+}
+
+async function unoJoinAudience(){
+  if(!_unoState)return;
+  /* No credit cost for audience */
+  var aud=_unoState.audience||[];
+  if(aud.some(function(a){return a.nick===_unoMyNick;}))return;
+  aud=aud.concat([{nick:_unoMyNick,fullName:cu?cu.fullName:_unoMyNick}]);
+  await unoUpdate({audience:aud});
+}
+
+async function unoStandUp(){
+  if(!_unoState)return;
+  var seats=_unoState.seats.slice();
+  var seatIdx=seats.findIndex(function(s){return s&&s.nick===_unoMyNick;});
+  if(seatIdx<0)return;
+  seats[seatIdx]=null;
+  /* If game is playing, void hand and promote first audience member */
+  var patch={seats:seats};
+  if(_unoState.phase==='playing'){
+    var hands=Object.assign({},_unoState.hands);
+    delete hands[_unoMyNick];
+    var active=(_unoState.activePlayers||[]).filter(function(n){return n!==_unoMyNick;});
+    patch.hands=hands;patch.activePlayers=active;
+    /* Promote first audience member */
+    var aud=(_unoState.audience||[]).slice();
+    if(aud.length>0){
+      var promoted=aud.shift();
+      seats[seatIdx]=promoted;
+      patch.seats=seats;patch.audience=aud;
+      /* Give promoted player remaining hand or 7 fresh */
+      hands[promoted.nick]=[];
+      for(var i=0;i<7;i++)hands[promoted.nick].push(patch.draw?patch.draw.pop():_unoState.draw[_unoState.draw.length-1-i]);
+      patch.hands=hands;active.push(promoted.nick);patch.activePlayers=active;
+    }
+    patch.lastAction=(cu?cu.fullName:_unoMyNick)+' stood up mid-game';
+  }
+  await unoUpdate(patch);
+}
+
+/* ─── START GAME ─── */
+async function unoStartGame(){
+  if(!_unoState)return;
+  var filledSeats=_unoState.seats.filter(Boolean);
+  if(filledSeats.length<2){alert('Need at least 2 players to start!');return;}
+  var deck=unoBuildDeck();
+  var result=unoDeal(deck,filledSeats.length);
+  var hands={};
+  filledSeats.forEach(function(s,i){hands[s.nick]=result.hands[i];});
+  var activePlayers=filledSeats.map(function(s){return s.nick;});
+  await unoUpdate({
+    phase:'playing',
+    hands:hands,
+    draw:result.draw,
+    discard:result.discard,
+    currentColor:result.discard[result.discard.length-1].color,
+    currentTurn:0,
+    activePlayers:activePlayers,
+    direction:1,
+    stackCount:0,
+    unoCallers:{},
+    lastAction:'Game started! '+activePlayers[0]+' goes first.',
+    turnStart:Date.now(),
+    winner:''
+  });
+}
+
+/* ─── PLAY A CARD ─── */
+function unoCanPlay(card,topCard,currentColor,stackCount){
+  if(stackCount>0){
+    /* Must stack or draw */
+    if(topCard.value==='+2')return card.value==='+2';
+    if(topCard.value==='+4')return card.value==='+4';
+  }
+  if(card.color==='wild')return true;
+  if(card.color===currentColor)return true;
+  if(card.value===topCard.value)return true;
+  return false;
+}
+
+async function unoPlayCard(cardIdx,chosenColor){
+  if(!_unoState||_unoState.phase!=='playing')return;
+  var active=_unoState.activePlayers;
+  var myTurnIdx=_unoState.currentTurn%active.length;
+  if(active[myTurnIdx]!==_unoMyNick)return;
+
+  var hand=(_unoState.hands[_unoMyNick]||[]).slice();
+  var card=hand[cardIdx];
+  var topCard=_unoState.discard[_unoState.discard.length-1];
+
+  if(!unoCanPlay(card,topCard,_unoState.currentColor,_unoState.stackCount)){return;}
+
+  /* Remove card from hand */
+  hand.splice(cardIdx,1);
+
+  var discard=_unoState.discard.slice();
+  discard.push(card);
+  var draw=_unoState.draw.slice();
+  var direction=_unoState.direction;
+  var stackCount=_unoState.stackCount||0;
+  var newColor=card.color==='wild'?(chosenColor||'red'):card.color;
+  var hands=Object.assign({},_unoState.hands);
+  hands[_unoMyNick]=hand;
+  var currentTurn=_unoState.currentTurn;
+  var lastAction=_unoMyNick+' played '+card.display+(card.color!=='wild'?' ('+card.color+')':'');
+
+  /* Check win */
+  if(hand.length===0){
+    credAward(_unoMyNick,2);
+    await unoUpdate({hands:hands,discard:discard,draw:draw,phase:'ended',winner:_unoMyNick,lastAction:_unoMyNick+' wins! 🎉',currentColor:newColor});
+    return;
+  }
+
+  /* Apply card effect */
+  var nextTurn=currentTurn;
+  if(card.value==='Skip'){
+    nextTurn=(currentTurn+direction*2+active.length*10)%active.length;
+    lastAction+=' → '+active[(currentTurn+direction+active.length*10)%active.length]+' skipped!';
+  } else if(card.value==='Reverse'){
+    direction=-direction;
+    nextTurn=(currentTurn+direction+active.length*10)%active.length;
+    lastAction+=' → Direction reversed!';
+  } else if(card.value==='+2'){
+    stackCount+=2;
+    nextTurn=(currentTurn+direction+active.length*10)%active.length;
+  } else if(card.value==='+4'){
+    stackCount+=4;
+    nextTurn=(currentTurn+direction+active.length*10)%active.length;
+    lastAction+=' → Color: '+newColor;
+  } else if(card.value==='wild'){
+    nextTurn=(currentTurn+direction+active.length*10)%active.length;
+    lastAction+=' → Color: '+newColor;
+  } else {
+    nextTurn=(currentTurn+direction+active.length*10)%active.length;
+  }
+
+  /* UNO flag */
+  var unoCallers=Object.assign({},_unoState.unoCallers||{});
+  delete unoCallers[_unoMyNick]; /* reset after playing */
+
+  await unoUpdate({
+    hands:hands,discard:discard,draw:draw,
+    currentColor:newColor,currentTurn:nextTurn,
+    direction:direction,stackCount:stackCount,
+    unoCallers:unoCallers,lastAction:lastAction,
+    turnStart:Date.now()
+  });
+}
+
+/* ─── DRAW CARD(S) ─── */
+async function unoDrawCards(){
+  if(!_unoState||_unoState.phase!=='playing')return;
+  var active=_unoState.activePlayers;
+  var myTurnIdx=_unoState.currentTurn%active.length;
+  if(active[myTurnIdx]!==_unoMyNick)return;
+
+  var draw=_unoState.draw.slice();
+  var discard=_unoState.discard.slice();
+  var stackCount=_unoState.stackCount||0;
+  var count=stackCount>0?stackCount:1;
+  var hand=(_unoState.hands[_unoMyNick]||[]).slice();
+
+  for(var i=0;i<count;i++){
+    if(draw.length===0){draw=unoShuffle(discard.slice(0,-1));discard=[discard[discard.length-1]];}
+    hand.push(draw.pop());
+  }
+
+  var hands=Object.assign({},_unoState.hands);
+  hands[_unoMyNick]=hand;
+  var nextTurn=(_unoState.currentTurn+_unoState.direction+active.length*10)%active.length;
+  var unoCallers=Object.assign({},_unoState.unoCallers||{});
+  delete unoCallers[_unoMyNick];
+
+  await unoUpdate({
+    hands:hands,draw:draw,discard:discard,stackCount:0,
+    currentTurn:nextTurn,unoCallers:unoCallers,
+    lastAction:_unoMyNick+' drew '+count+' card'+(count>1?'s':''),
+    turnStart:Date.now()
+  });
+}
+
+/* ─── CALL UNO ─── */
+async function unoCallUno(){
+  if(!_unoState)return;
+  var unoCallers=Object.assign({},_unoState.unoCallers||{});
+  unoCallers[_unoMyNick]=true;
+  await unoUpdate({unoCallers:unoCallers,lastAction:_unoMyNick+' says UNO!'});
+}
+
+/* ─── CATCH UNO ─── */
+async function unoCatchUno(targetNick){
+  if(!_unoState)return;
+  var hand=(_unoState.hands[targetNick]||[]).slice();
+  if(hand.length!==1)return;
+  var unoCallers=_unoState.unoCallers||{};
+  if(unoCallers[targetNick])return; /* they already called it */
+  /* Target draws 1 penalty card */
+  var draw=_unoState.draw.slice();
+  var discard=_unoState.discard.slice();
+  if(draw.length===0){draw=unoShuffle(discard.slice(0,-1));discard=[discard[discard.length-1]];}
+  hand.push(draw.pop());
+  var hands=Object.assign({},_unoState.hands);
+  hands[targetNick]=hand;
+  await unoUpdate({hands:hands,draw:draw,discard:discard,
+    lastAction:_unoMyNick+' caught '+targetNick+' without UNO! They draw 1.'});
+}
+
+/* ─── AUTO PLAY (timer expires) ─── */
+async function unoAutoPlay(){
+  if(!_unoState||_unoState.phase!=='playing')return;
+  var active=_unoState.activePlayers;
+  var myTurnIdx=_unoState.currentTurn%active.length;
+  if(active[myTurnIdx]!==_unoMyNick)return;
+  var hand=_unoState.hands[_unoMyNick]||[];
+  var topCard=_unoState.discard[_unoState.discard.length-1];
+  var playable=hand.findIndex(function(c){return unoCanPlay(c,topCard,_unoState.currentColor,_unoState.stackCount);});
+  if(playable>=0){
+    var card=hand[playable];
+    var color=card.color==='wild'?UNO_COLORS[Math.floor(Math.random()*4)]:card.color;
+    await unoPlayCard(playable,color);
+  } else {
+    await unoDrawCards();
+  }
+}
+
+/* ─── LEAVE ROOM ─── */
+async function unoLeaveRoom(){
+  if(_unoState&&_unoState.phase==='playing'){await unoStandUp();}
+  else if(_unoState){
+    /* Remove from seats */
+    var seats=_unoState.seats.slice();
+    var si=seats.findIndex(function(s){return s&&s.nick===_unoMyNick;});
+    if(si>=0){seats[si]=null;await unoUpdate({seats:seats});}
+    /* Remove from audience */
+    var aud=(_unoState.audience||[]).filter(function(a){return a.nick!==_unoMyNick;});
+    await unoUpdate({audience:aud});
+  }
+  if(_unoUnsub){_unoUnsub();_unoUnsub=null;}
+  if(_unoTimerInterval){clearInterval(_unoTimerInterval);_unoTimerInterval=null;}
+  closeGame();
+}
+
+/* ─── RENDER ─── */
+function unoRender(){
+  var root=G('uno-root');if(!root||!_unoState)return;
+  root.style.position='relative';
+  if(_unoState.phase==='lobby')unoRenderLobby(root);
+  else if(_unoState.phase==='playing')unoRenderGame(root);
+  else if(_unoState.phase==='ended')unoRenderEnded(root);
+  unoStartTimerUI();
+}
+
+function unoAv(nick,idx){
+  var i=idx||0;
+  var initials=(nick||'?').slice(0,1).toUpperCase();
+  return '<div class="uno-av" style="background:'+UNO_AV_COLORS[i%4]+';color:'+UNO_AV_TEXT[i%4]+'">'+initials+'</div>';
+}
+
+function unoRenderLobby(root){
+  var seats=_unoState.seats;
+  var aud=_unoState.audience||[];
+  var isSat=seats.some(function(s){return s&&s.nick===_unoMyNick;});
+  var isAud=aud.some(function(a){return a.nick===_unoMyNick;});
+  var seatsHTML=seats.map(function(s,i){
+    if(!s){
+      if(isSat||isAud)return '<div class="uno-seat taken" style="opacity:.5"><div class="uno-seat-empty-icon">🪑</div><div class="uno-seat-sub">Seat '+(i+1)+'</div></div>';
+      return '<div class="uno-seat empty" onclick="unoTakeSeat('+i+')">'
+        +'<div class="uno-seat-empty-icon">🪑</div>'
+        +'<div class="uno-seat-sub">Seat '+(i+1)+' — click to sit</div>'
+        +'</div>';
+    }
+    var mine=s.nick===_unoMyNick;
+    return '<div class="uno-seat '+(mine?'mine':'taken')+'">'
+      +unoAv(s.nick,i)
+      +'<div class="uno-seat-name">'+htmlEsc(s.fullName||s.nick)+'</div>'
+      +'<div class="uno-seat-sub">Seat '+(i+1)+(mine?' · You':'')+'</div>'
+      +(mine?'<button class="uno-btn uno-btn-secondary uno-btn-sm" onclick="unoStandUp()" style="margin-top:4px">Stand up</button>':'')
+      +'</div>';
+  }).join('');
+
+  var audHTML=aud.length?aud.map(function(a){
+    return '<div class="uno-aud-chip">'+unoAv(a.nick,3)+htmlEsc(a.fullName||a.nick)+'</div>';
+  }).join(''):'<span style="font-size:10px;color:#475569">No one watching yet</span>';
+
+  var filledCount=seats.filter(Boolean).length;
+  var isManager=cu&&cu.role==='manager';
+  var controlsHTML='';
+  if(!isSat&&!isAud){
+    controlsHTML='<div style="padding:14px 0 0;display:flex;gap:8px;justify-content:center">'
+      +'<button class="uno-btn uno-btn-secondary" onclick="unoJoinAudience()">👀 Watch for free</button>'
+      +'</div>';
+  } else if(isSat){
+    controlsHTML='<div style="padding:14px 0 0;display:flex;gap:8px;justify-content:center">'
+      +(isManager||filledCount>=2?'<button class="uno-btn uno-btn-primary" onclick="unoStartGame()">▶ Start Game</button>':'')
+      +'</div>';
+  }
+
+  root.innerHTML='<div class="uno-wrap"><div class="uno-lobby">'
+    +'<div class="uno-title">🃏 UNO — The Lounge</div>'
+    +'<div class="uno-sub">Pick a seat to play · 1 credit to join · Winner earns 2 credits</div>'
+    +'<div class="uno-seats">'+seatsHTML+'</div>'
+    +controlsHTML
+    +'</div>'
+    +'<div class="uno-audience">'
+    +'<span style="font-size:10px;font-weight:600;color:#475569;margin-right:6px">👀 Watching:</span>'
+    +audHTML
+    +'</div>'
+    +'<div style="padding:10px 18px;border-top:1px solid rgba(255,255,255,.06)">'
+    +'<button class="uno-btn uno-btn-secondary uno-btn-sm" onclick="unoLeaveRoom()">← Leave room</button>'
+    +'</div>'
+    +'</div>';
+}
+
+function unoRenderGame(root){
+  var s=_unoState;
+  var active=s.activePlayers||[];
+  var myTurnIdx=s.currentTurn%active.length;
+  var myTurn=active[myTurnIdx]===_unoMyNick;
+  var topCard=s.discard[s.discard.length-1];
+  var myHand=s.hands[_unoMyNick]||[];
+  var isPlayer=active.indexOf(_unoMyNick)>=0;
+
+  /* Opponents */
+  var opponents=active.filter(function(n){return n!==_unoMyNick;});
+  var oppsHTML=opponents.map(function(nick){
+    var hand=s.hands[nick]||[];
+    var isTheirTurn=active[myTurnIdx]===nick;
+    var calledUno=(s.unoCallers||{})[nick];
+    var minis=hand.map(function(){return '<div class="uno-mini"></div>';}).join('');
+    return '<div class="uno-opp'+(isTheirTurn?' active-turn':'')+'">'
+      +'<div class="uno-mini-cards">'+minis+'</div>'
+      +'<div class="uno-opp-name">'+htmlEsc(nick)+(isTheirTurn?' ⟳':'')+'</div>'
+      +(hand.length===1?'<div class="uno-opp-uno">'+(calledUno?'UNO!':'⚠ no UNO!')+'</div>':'<div class="uno-opp-count">'+hand.length+' cards</div>')
+      +(hand.length===1&&!calledUno&&isPlayer?'<button class="uno-btn uno-btn-sm" style="background:#d97706;color:#fff;border:none;margin-top:4px;cursor:pointer" onclick="unoCatchUno(\''+nick+'\')">Catch!</button>':'')
+      +'</div>';
+  }).join('');
+
+  /* Color dot */
+  var colorDot='<div class="uno-color-dot" style="background:'+((UNO_COLOR_HEX[s.currentColor])||'#6b7280')+'"></div>';
+
+  /* Timer bar */
+  var elapsed=Date.now()-(s.turnStart||Date.now());
+  var remaining=Math.max(0,15000-elapsed);
+  var pct=Math.round((remaining/15000)*100);
+  
+  var timerClass2=pct>50?'':pct>20?'warn':'danger';
+
+  /* Draw card display */
+  var topDisplay=topCard.value==='wild'||topCard.value==='+4'?topCard.display:topCard.display;
+  var topColorClass=topCard.color==='wild'?'wild':topCard.color;
+
+  /* My hand */
+  var handHTML='';
+  if(isPlayer){
+    handHTML=myHand.map(function(card,i){
+      var playable=myTurn&&unoCanPlay(card,topCard,s.currentColor,s.stackCount);
+      var cls='uno-hand-card '+(card.color==='wild'?'wild':card.color)+' '+(playable?'playable':'not-playable');
+      var isWild=card.color==='wild';
+      return '<div class="'+cls+'" onclick="'+(playable?(isWild?'unoPickColor('+i+')':'unoPlayCard('+i+',\'\')'):'')+'"">'
+        +'<div class="uno-card-label">'+htmlEsc(card.display)+'</div>'
+        +htmlEsc(card.display)
+        +(s.stackCount>0&&(card.value==='+2'||card.value==='+4')?'<div class="uno-stack-badge">STACK</div>':'')
+        +'</div>';
+    }).join('');
+  } else {
+    handHTML='<div style="font-size:11px;color:#64748b;text-align:center;padding:8px">You\'re watching this game</div>';
+  }
+
+  /* Stack notice */
+  var stackNotice=s.stackCount>0?'<div style="font-size:11px;color:#f59e0b;text-align:center;font-weight:600">⚡ Stack: +'+s.stackCount+' pending!</div>':'';
+
+  root.innerHTML='<div class="uno-wrap" style="position:relative"><div class="uno-table">'
+    /* timer */
+    +'<div class="uno-timer-bar"><div id="uno-timer-fill" class="uno-timer-fill" style="width:'+pct+'%"></div></div>'
+    /* opponents */
+    +'<div class="uno-opponents">'+oppsHTML+'</div>'
+    /* center */
+    +'<div class="uno-center">'
+    +'<div style="text-align:center"><div style="font-size:9px;color:#64748b;margin-bottom:4px">DRAW</div>'
+    +'<div class="uno-card back" style="cursor:'+(myTurn&&(!s.stackCount||true)?'pointer':'default')+'" onclick="'+(myTurn?'unoDrawCards()':'')+'">'
+    +'<div style="font-size:10px">🃏</div>'
+    +'<div style="font-size:9px;color:#a78bfa;margin-top:2px">'+s.draw.length+'</div>'
+    +'</div></div>'
+    +'<div style="text-align:center"><div style="font-size:9px;color:#64748b;margin-bottom:4px">DISCARD</div>'
+    +'<div class="uno-card '+topColorClass+'"><div class="uno-card-label">'+htmlEsc(topDisplay)+'</div>'+htmlEsc(topDisplay)+'</div></div>'
+    +colorDot
+    +'</div>'
+    /* turn + stack */
+    +'<div class="uno-turn">'+(myTurn?'✦ Your turn':'Waiting for '+active[myTurnIdx])+'</div>'
+    +stackNotice
+    /* log */
+    +'<div class="uno-log">'+htmlEsc(s.lastAction||'')+'</div>'
+    /* hand */
+    +'<div style="font-size:9px;color:#64748b;text-align:center">Your hand ('+myHand.length+')</div>'
+    +'<div class="uno-hand">'+handHTML+'</div>'
+    /* actions */
+    +(isPlayer?'<div class="uno-action-row">'
+      +(myHand.length===1?'<button class="uno-btn-uno" onclick="unoCallUno()">UNO!</button>':'')
+      +'<button class="uno-btn uno-btn-secondary uno-btn-sm" onclick="unoStandUp()">Stand up</button>'
+      +'</div>':'')
+    +'</div>'
+    /* color picker placeholder */
+    +'<div id="uno-color-picker" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.85);border-radius:10px;flex-direction:column;align-items:center;justify-content:center;gap:14px">'
+    +'<div style="font-size:14px;font-weight:600;color:#f1f5f9">Choose a color</div>'
+    +'<div class="uno-color-grid">'
+    +UNO_COLORS.map(function(c){
+      return '<button class="uno-color-btn" style="background:'+UNO_COLOR_HEX[c]+'" onclick="unoPlayCard(window._unoWildIdx,\''+c+'\')">'+c+'</button>';
+    }).join('')
+    +'</div>'
+    +'</div>'
+    +'</div>';
+}
+
+window.unoPickColor=function(cardIdx){
+  window._unoWildIdx=cardIdx;
+  var picker=G('uno-color-picker');
+  if(picker)picker.style.display='flex';
+};
+
+function unoRenderEnded(root){
+  var s=_unoState;
+  var iWon=s.winner===_unoMyNick;
+  var isPlayer=(s.activePlayers||[]).indexOf(_unoMyNick)>=0;
+  root.innerHTML='<div class="uno-wrap"><div class="uno-result" style="position:static;background:transparent;min-height:360px">'
+    +'<div class="uno-result-emoji">'+(iWon?'🏆':'😅')+'</div>'
+    +'<div class="uno-result-title">'+(iWon?'You won!':htmlEsc(s.winner)+' wins!')+'</div>'
+    +'<div class="uno-result-sub">'+htmlEsc(s.lastAction||'')+'</div>'
+    +(iWon?'<div class="uno-credit-box">🎮 +2 credits added to your balance</div>':'')
+    +(isPlayer&&!iWon&&(credGet(_unoMyNick).credits||0)>=1?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (−1 credit)</button>':'')
+    +(isPlayer&&!iWon&&(credGet(_unoMyNick).credits||0)<1?'<div style="font-size:11px;color:#ef4444">No credits left — moved to audience</div>':'')
+    +(iWon?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (−1 credit)</button>':'')
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'
+    +'<button class="uno-btn uno-btn-secondary" onclick="unoWatchAfterGame()">Stay & watch</button>'
+    +'<button class="uno-btn uno-btn-secondary" onclick="unoLeaveRoom()">Leave room</button>'
+    +'</div>'
+    +'</div></div>';
+}
+
+async function unoReplay(){
+  if(!checkAndSpendCredit('uno'))return;
+  /* Re-join as seated player */
+  var seats=(_unoState&&_unoState.seats||[null,null,null,null]).slice();
+  var emptyIdx=seats.findIndex(function(s){return !s;});
+  if(emptyIdx<0){await unoJoinAudience();return;}
+  seats[emptyIdx]={nick:_unoMyNick,fullName:cu?cu.fullName:_unoMyNick,avIdx:emptyIdx};
+  var aud=(_unoState.audience||[]).filter(function(a){return a.nick!==_unoMyNick;});
+  await unoUpdate({phase:'lobby',seats:seats,audience:aud,winner:'',hands:{},draw:[],discard:[],activePlayers:[],lastAction:'',stackCount:0,unoCallers:{},currentTurn:0});
+}
+
+async function unoWatchAfterGame(){
+  var seats=(_unoState&&_unoState.seats||[]).slice();
+  var si=seats.findIndex(function(s){return s&&s.nick===_unoMyNick;});
+  if(si>=0){seats[si]=null;}
+  var aud=(_unoState&&_unoState.audience||[]).filter(function(a){return a.nick!==_unoMyNick;});
+  aud.push({nick:_unoMyNick,fullName:cu?cu.fullName:_unoMyNick});
+  await unoUpdate({seats:seats,audience:aud});
+}
+
+/* ─── Timer UI ─── */
+function unoStartTimerUI(){
+  if(_unoTimerInterval)clearInterval(_unoTimerInterval);
+  if(!_unoState||_unoState.phase!=='playing')return;
+  _unoTimerInterval=setInterval(function(){
+    var fill=G('uno-timer-fill');if(!fill)return;
+    var elapsed=Date.now()-((_unoState&&_unoState.turnStart)||Date.now());
+    var remaining=Math.max(0,15000-elapsed);
+    var pct=Math.round((remaining/15000)*100);
+    fill.style.width=pct+'%';
+    fill.className='uno-timer-fill'+(pct<=20?' danger':pct<=50?' warn':'');
+    /* Auto-play when timer expires */
+    if(remaining===0){
+      clearInterval(_unoTimerInterval);
+      _unoTimerInterval=null;
+      var active=(_unoState&&_unoState.activePlayers)||[];
+      var myTurnIdx=(_unoState&&_unoState.currentTurn||0)%active.length;
+      if(active[myTurnIdx]===_unoMyNick)unoAutoPlay();
+    }
+  },500);
 }
 
 
@@ -6478,6 +7229,19 @@ async function sendAIMessage(){
   var input=G('ai-input');
   var text=input.value.trim();
   if(!text)return;
+
+  /* Silent admin test mode toggle */
+  if(text.trim()==='112003'){
+    _adminTestMode=!_adminTestMode;
+    input.value='';input.style.height='auto';
+    var msgs=G('ai-messages');
+    if(msgs){
+      msgs.innerHTML+='<div class="ai-msg koby"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble">'+(_adminTestMode?'🔓 Test mode on — games are free.':'🔒 Test mode off.')+'</div></div>';
+      msgs.scrollTop=msgs.scrollHeight;
+      updateCreditBadge();
+    }
+    return;
+  }
 
   /* KC/Quiz topic guard — detect copy-pasted quiz questions */
   var hasOptions=/\b[A-D]\.\s/.test(text);
