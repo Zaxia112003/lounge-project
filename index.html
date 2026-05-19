@@ -595,6 +595,31 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .fmt-toolbar .fmt-sep{width:1px;background:var(--border);margin:2px 3px;}
 .game-hover-card{transition:border-color .15s;}
 .game-hover-card:hover{border-color:var(--accent) !important;}
+.kc-banner{display:none;align-items:center;gap:10px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:9px 16px;margin-bottom:14px;font-size:12px;color:#fca5a5;font-weight:500;}
+.kc-banner.show{display:flex;}
+.kc-banner strong{color:#ef4444;}
+.kc-banner-link{margin-left:auto;font-size:11px;font-weight:600;color:#f87171;cursor:pointer;white-space:nowrap;text-decoration:underline;}
+.kc-question-wrap{padding:4px 0 10px;}
+.kc-progress{height:4px;border-radius:4px;background:var(--bg3);margin-bottom:14px;overflow:hidden;}
+.kc-progress-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .4s;}
+.kc-opt{width:100%;text-align:left;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;cursor:pointer;margin-bottom:6px;font-family:var(--font-d);transition:border-color .15s;line-height:1.4;}
+.kc-opt:hover{border-color:var(--accent);}
+.kc-opt.correct{background:rgba(34,197,94,.15);border-color:#22c55e;color:#86efac;cursor:default;}
+.kc-opt.wrong{background:rgba(239,68,68,.12);border-color:#ef4444;color:#fca5a5;cursor:default;}
+.kc-opt.dim{opacity:.4;cursor:default;}
+.kc-feedback{margin-top:4px;padding:10px 14px;border-radius:8px;font-size:11px;line-height:1.5;margin-bottom:8px;}
+.kc-feedback.pass{background:rgba(34,197,94,.1);border:1px solid #166534;color:#86efac;}
+.kc-feedback.fail{background:rgba(239,68,68,.08);border:1px solid #7f1d1d;color:#fca5a5;}
+.kc-result-card{text-align:center;padding:24px 16px;}
+.kc-score-ring{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;margin:0 auto 12px;border:4px solid;}
+.kc-score-ring.pass{border-color:#22c55e;color:#22c55e;background:rgba(34,197,94,.1);}
+.kc-score-ring.fail{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08);}
+/* Manager KC results table */
+.kc-mgr-row{display:grid;grid-template-columns:140px 80px 80px 80px 1fr;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;}
+.kc-mgr-row:last-child{border-bottom:none;}
+.kc-mgr-hdr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
+.kc-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;}
+.kc-dot.pass{background:#22c55e;}.kc-dot.fail{background:#ef4444;}.kc-dot.none{background:#6b7280;}
 .game-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:850;display:none;align-items:center;justify-content:center;}
 .game-modal-overlay.open{display:flex;}
 .game-modal-box{background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:0;width:min(560px,96vw);max-height:92vh;overflow-y:auto;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.8);}
@@ -928,7 +953,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.40ae</div>
+    <div class="brand-sub">v.41ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1003,7 +1028,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.40ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.41ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -2683,6 +2708,10 @@ function buildUploaderDOM(){
       <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
       
     </div>
+    <div class="kc-banner" id="kc-banner">
+      <span>🧠 <strong>Knowledge Check due this week</strong> — complete it before Friday EOD</span>
+      <span class="kc-banner-link" onclick="document.querySelector('.lounge-tab[data-tab=my-day]').click();setTimeout(function(){var el=G('kc-tile-body');if(el)el.scrollIntoView({behavior:'smooth'});},300)">Take it now →</span>
+    </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
     <div class="lounge-pane" id="lounge-pane-my-space">
       <div class="article-toolbar">
@@ -2790,6 +2819,10 @@ function buildEscalationDOM(){
       <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
       
     </div>
+    <div class="kc-banner" id="kc-banner">
+      <span>🧠 <strong>Knowledge Check due this week</strong> — complete it before Friday EOD</span>
+      <span class="kc-banner-link" onclick="document.querySelector('.lounge-tab[data-tab=my-day]').click();setTimeout(function(){var el=G('kc-tile-body');if(el)el.scrollIntoView({behavior:'smooth'});},300)">Take it now →</span>
+    </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
     <div class="lounge-pane" id="lounge-pane-my-space">
       <div class="article-toolbar">
@@ -2824,6 +2857,10 @@ function buildManagerDOM(){
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
       <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
       
+    </div>
+    <div class="kc-banner" id="kc-banner">
+      <span>🧠 <strong>Knowledge Check due this week</strong> — complete it before Friday EOD</span>
+      <span class="kc-banner-link" onclick="document.querySelector('.lounge-tab[data-tab=my-day]').click();setTimeout(function(){var el=G('kc-tile-body');if(el)el.scrollIntoView({behavior:'smooth'});},300)">Take it now →</span>
     </div>
     <div class="lounge-pane active" id="lounge-pane-my-day" style="margin-top:0"></div>
     <div class="lounge-pane" id="lounge-pane-my-space">
@@ -3386,18 +3423,16 @@ function renderMyDay(){
     +'<div class="games-scroll-row" id="games-scroll-row"></div>'
 
     +'</div>'
-    /* Knowledge Check — Coming Soon */
-    +'<div class="sect" style="padding:0">'
-    +'<div class="sect-head" style="padding:11px 14px 10px">'
-    +'<span class="sect-title">&#129504; Knowledge Check</span>'
-    +'<span style="font-size:9px;background:rgba(139,45,255,.15);color:var(--accent);border-radius:4px;padding:2px 8px;font-weight:700;letter-spacing:.5px">COMING SOON</span>'
-    +'</div>'
-    +'<div style="padding:14px;text-align:center">'
-    +'<div style="font-size:18px;margin-bottom:5px">🧠</div>'
-    +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Weekly Knowledge Check</div>'
-    +'<div style="font-size:11px;color:var(--muted)">Launching soon — stay tuned!</div>'
-    +'</div>'
-    +'</div>';
+    /* Knowledge Check — Live */
+    +(cu&&cu.role!=='manager'
+      ?'<div class="sect" style="padding:0">'
+        +'<div class="sect-head" style="padding:11px 14px 10px">'
+        +'<span class="sect-title">&#129504; Knowledge Check</span>'
+        +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
+        +'</div>'
+        +'<div id="kc-tile-body"></div>'
+        +'</div>'
+      :'');
   var _prevAnnCount=mdAnnouncements.length;
   renderAnnouncements();
   renderGamesGrid();
@@ -3405,6 +3440,7 @@ function renderMyDay(){
   if(isManager)renderMgrKpiCard();
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
+  if(cu&&cu.role!=='manager'){setTimeout(function(){renderKCTile();kcUpdateBanner();},50);}
   startClock();
   /* Start wall slideshow autoplay */
   setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},500);
@@ -4707,6 +4743,323 @@ function renderMgrKpiCard(){
     +'</div>';
 }
 
+
+/* ══════════════════════════════════════════════════
+   KNOWLEDGE CHECK SYSTEM
+   ══════════════════════════════════════════════════ */
+var KC_KEY='lp_kc_v1';
+var KC_PASS_PCT=80;
+var KC_Q_COUNT=10;
+
+/* Returns ISO week string: "2026-W20" */
+function kcWeekId(){
+  var d=getSydneyDate();
+  var jan1=new Date(d.getFullYear(),0,1);
+  var week=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+  return d.getFullYear()+'-W'+String(week).padStart(2,'0');
+}
+
+function kcLoad(){try{return JSON.parse(localStorage.getItem(KC_KEY)||'{}')}catch(e){return {};}}
+function kcSave(d){try{localStorage.setItem(KC_KEY,JSON.stringify(d));}catch(e){}}
+
+/* Returns player state for current week */
+function kcGetState(nick){
+  if(!nick)nick=cu?cu.nickname:'';
+  var all=kcLoad();
+  var week=kcWeekId();
+  if(!all[nick])all[nick]={};
+  if(!all[nick][week])all[nick][week]={attempts:[],completed:false};
+  return all[nick][week];
+}
+
+function kcSaveState(nick,state){
+  if(!nick)nick=cu?cu.nickname:'';
+  var all=kcLoad();
+  var week=kcWeekId();
+  if(!all[nick])all[nick]={};
+  all[nick][week]=state;
+  kcSave(all);
+}
+
+/* Can this player take the KC this week? */
+function kcCanPlay(nick){
+  if(!nick)nick=cu?cu.nickname:'';
+  var s=kcGetState(nick);
+  if(s.completed)return false;               /* already passed */
+  if(s.attempts.length===0)return true;      /* no attempts yet */
+  if(s.attempts.length===1){
+    var first=s.attempts[0];
+    var pct=Math.round((first.score/KC_Q_COUNT)*100);
+    if(pct>=KC_PASS_PCT)return false;        /* passed first try */
+    return true;                              /* failed — retake unlocked */
+  }
+  return false;                               /* used both attempts */
+}
+
+/* Did they complete this week? (pass OR used both attempts) */
+function kcIsCompleted(nick){
+  if(!nick)nick=cu?cu.nickname:'';
+  var s=kcGetState(nick);
+  if(s.completed)return true;
+  if(s.attempts.length>=2)return true;       /* used retake — done regardless */
+  if(s.attempts.length===1){
+    var pct=Math.round((s.attempts[0].score/KC_Q_COUNT)*100);
+    if(pct>=KC_PASS_PCT)return true;
+  }
+  return false;
+}
+
+/* ── BANNER ── */
+function kcUpdateBanner(){
+  var banner=G('kc-banner');if(!banner)return;
+  if(!cu||cu.role==='manager'){banner.classList.remove('show');return;}
+  if(kcIsCompleted(cu.nickname)){banner.classList.remove('show');return;}
+  banner.classList.add('show');
+}
+
+/* ── MY DAY KC TILE ── */
+function renderKCTile(){
+  var el=G('kc-tile-body');if(!el)return;
+  if(!cu||cu.role==='manager'){el.innerHTML='';return;}
+  var nick=cu.nickname;
+  var s=kcGetState(nick);
+  var canPlay=kcCanPlay(nick);
+  var completed=kcIsCompleted(nick);
+  var week=kcWeekId();
+
+  if(completed){
+    /* Show result summary */
+    var last=s.attempts[s.attempts.length-1];
+    var pct=Math.round((last.score/KC_Q_COUNT)*100);
+    var passed=pct>=KC_PASS_PCT;
+    el.innerHTML='<div style="padding:14px;text-align:center">'
+      +'<div class="kc-score-ring '+(passed?'pass':'fail')+'" style="margin:0 auto 10px">'+pct+'%</div>'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+(passed?'✓ Passed this week!':'✗ Not passed this week')+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+last.score+'/'+KC_Q_COUNT+' correct · Attempt '+s.attempts.length+'</div>'
+      +'<button onclick="kcShowBreakdown()" style="font-size:11px;padding:5px 14px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">View breakdown</button>'
+      +'</div>';
+  } else if(canPlay){
+    var attemptLabel=s.attempts.length===0?'Start Quiz':'Retake Quiz';
+    var subLabel=s.attempts.length===0?'10 questions · Passing: 80%':'You did not pass. 1 retake available.';
+    el.innerHTML='<div style="padding:14px;text-align:center">'
+      +'<div style="font-size:20px;margin-bottom:8px">🧠</div>'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly Knowledge Check</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">'+subLabel+'</div>'
+      +'<button onclick="kcStartQuiz()" style="padding:8px 22px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer">'+attemptLabel+'</button>'
+      +'</div>';
+  } else {
+    /* No attempts left, not passed */
+    el.innerHTML='<div style="padding:14px;text-align:center">'
+      +'<div style="font-size:20px;margin-bottom:8px">📋</div>'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">No attempts remaining</div>'
+      +'<div style="font-size:11px;color:var(--muted)">Resets Sunday. Keep studying!</div>'
+      +'</div>';
+  }
+}
+
+/* ── RUN THE QUIZ ── */
+var _kcSession=null; /* {questions:[], answers:[], qIdx:0} */
+
+function kcStartQuiz(){
+  /* Pick 10 random questions */
+  var pool=KB_QUESTIONS.slice().sort(function(){return Math.random()-.5;}).slice(0,KC_Q_COUNT);
+  _kcSession={questions:pool,answers:[],qIdx:0};
+  kcRenderQuestion();
+}
+
+function kcRenderQuestion(){
+  var el=G('kc-tile-body');if(!el||!_kcSession)return;
+  var qi=_kcSession.qIdx;
+  var q=_kcSession.questions[qi];
+  var letters=['A','B','C','D'];
+  var progress=Math.round((qi/KC_Q_COUNT)*100);
+
+  el.innerHTML='<div style="padding:12px 14px">'
+    +'<div class="kc-progress"><div class="kc-progress-fill" style="width:'+progress+'%"></div></div>'
+    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">'+q.cat+' · Q'+(qi+1)+'/'+KC_Q_COUNT+'</div>'
+    +'<div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.5;margin-bottom:12px">'+q.q+'</div>'
+    +'<div id="kc-opts"></div>'
+    +'<div id="kc-fb"></div>'
+    +'</div>';
+
+  var opts=G('kc-opts');
+  q.opts.forEach(function(o,i){
+    var btn=document.createElement('button');
+    btn.className='kc-opt';
+    btn.innerHTML='<strong style="color:var(--muted);margin-right:6px">'+letters[i]+'.</strong>'+o;
+    btn.addEventListener('click',function(){kcAnswer(i);});
+    opts.appendChild(btn);
+  });
+}
+
+function kcAnswer(chosen){
+  if(!_kcSession)return;
+  var qi=_kcSession.qIdx;
+  var q=_kcSession.questions[qi];
+  var correct=chosen===q.ans;
+  _kcSession.answers.push({qId:q.id,chosen:chosen,correct:correct,cat:q.cat});
+
+  /* Style buttons */
+  var btns=G('kc-opts').querySelectorAll('.kc-opt');
+  btns.forEach(function(b,i){
+    b.classList.remove('kc-opt'); /* disable hover */
+    if(i===q.ans)b.className='kc-opt correct';
+    else if(i===chosen&&!correct)b.className='kc-opt wrong';
+    else b.className='kc-opt dim';
+  });
+
+  var fb=G('kc-fb');
+  if(fb){
+    fb.innerHTML='<div class="kc-feedback '+(correct?'pass':'fail')+'">'
+      +(correct?'<strong>✓ Correct!</strong> ':'<strong>✗ Incorrect.</strong> ')
+      +q.exp+'</div>'
+      +'<div style="text-align:right;margin-top:6px">'
+      +(qi+1<KC_Q_COUNT
+        ?'<button onclick="kcNextQ()" style="padding:6px 16px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer">Next →</button>'
+        :'<button onclick="kcFinish()" style="padding:6px 16px;border-radius:7px;border:none;background:var(--accent);color:#fff;font-size:11px;font-weight:600;cursor:pointer">See Results</button>')
+      +'</div>';
+  }
+}
+
+function kcNextQ(){
+  if(!_kcSession)return;
+  _kcSession.qIdx++;
+  kcRenderQuestion();
+}
+
+function kcFinish(){
+  if(!_kcSession)return;
+  var score=_kcSession.answers.filter(function(a){return a.correct;}).length;
+  var pct=Math.round((score/KC_Q_COUNT)*100);
+  var passed=pct>=KC_PASS_PCT;
+  var nick=cu?cu.nickname:'';
+  var s=kcGetState(nick);
+  s.attempts.push({
+    score:score,
+    pct:pct,
+    passed:passed,
+    week:kcWeekId(),
+    date:getSydneyDate().toISOString().slice(0,10),
+    answers:_kcSession.answers
+  });
+  if(passed)s.completed=true;
+  kcSaveState(nick,s);
+  _kcSession=null;
+  kcUpdateBanner();
+  renderKCTile();
+}
+
+function kcShowBreakdown(){
+  var nick=cu?cu.nickname:'';
+  var s=kcGetState(nick);
+  var last=s.attempts[s.attempts.length-1];
+  if(!last||!last.answers)return;
+  var letters=['A','B','C','D'];
+  var rows=last.answers.map(function(a,i){
+    var q=KB_QUESTIONS.find(function(x){return x.id===a.qId;});
+    var icon=a.correct?'✓':'✗';
+    var color=a.correct?'var(--green)':'var(--red)';
+    if(!q)return '';
+    return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px">'
+      +'<div style="display:flex;align-items:flex-start;gap:8px">'
+      +'<span style="color:'+color+';font-weight:700;font-size:13px;flex-shrink:0">'+icon+'</span>'
+      +'<div>'
+      +'<div style="font-weight:600;color:var(--text);margin-bottom:3px">'+q.q+'</div>'
+      +'<div style="color:var(--muted)">Your answer: <span style="color:'+color+'">'+letters[a.chosen]+'. '+q.opts[a.chosen]+'</span></div>'
+      +(a.correct?'':'<div style="color:var(--green)">Correct: '+letters[q.ans]+'. '+q.opts[q.ans]+'</div>')
+      +'</div></div></div>';
+  }).join('');
+
+  var modal=G('modal-kc-breakdown');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='modal-kc-breakdown';
+    modal.className='modal-overlay';
+    modal.innerHTML='<div class="modal" style="max-width:560px;padding:0">'
+      +'<div class="modal-header" style="padding:16px 20px"><span class="modal-title">📋 Knowledge Check Breakdown</span>'
+      +'<button class="modal-close" onclick="G(\'modal-kc-breakdown\').classList.remove(\'open\')">&times;</button></div>'
+      +'<div id="kc-breakdown-body" style="max-height:480px;overflow-y:auto"></div>'
+      +'</div>';
+    document.body.appendChild(modal);
+  }
+  G('kc-breakdown-body').innerHTML=rows;
+  modal.classList.add('open');
+}
+
+/* ── MANAGER KC VIEW ── */
+function kcGetAllResults(){
+  var all=kcLoad();
+  var week=kcWeekId();
+  var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
+  return members.map(function(m){
+    var nick=m.nickname;
+    var ws=(all[nick]&&all[nick][week])||{attempts:[],completed:false};
+    var attempts=ws.attempts||[];
+    var best=attempts.length?attempts.reduce(function(b,a){return a.score>b.score?a:b;}):null;
+    return {nick:nick,fullName:m.fullName,role:m.role,attempts:attempts,best:best,completed:kcIsCompleted(nick)};
+  });
+}
+
+function renderMgrKCResults(container){
+  if(!container)return;
+  var results=kcGetAllResults();
+  var week=kcWeekId();
+  var letters=['A','B','C','D'];
+
+  var rows=results.map(function(r){
+    var statusDot,statusLabel;
+    if(r.best){
+      var passed=r.best.pct>=KC_PASS_PCT;
+      statusDot='<span class="kc-dot '+(passed?'pass':'fail')+'"></span>';
+      statusLabel=passed?'<span style="color:var(--green)">Passed</span>':'<span style="color:var(--red)">Not passed</span>';
+    } else {
+      statusDot='<span class="kc-dot none"></span>';
+      statusLabel='<span style="color:var(--muted)">Not taken</span>';
+    }
+    var scoreStr=r.best?r.best.score+'/'+KC_Q_COUNT+' ('+r.best.pct+'%)':'—';
+    var attempts=r.attempts.length+'/2';
+
+    /* Breakdown expand */
+    var breakdownId='kcbr-'+r.nick;
+    var breakdown='';
+    if(r.best&&r.best.answers){
+      breakdown='<div id="'+breakdownId+'" style="display:none;grid-column:1/-1;padding:10px 14px 4px;background:var(--bg3);border-top:1px solid var(--border)">'
+        +r.best.answers.map(function(a){
+          var q=KB_QUESTIONS.find(function(x){return x.id===a.qId;});
+          if(!q)return '';
+          return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:8px;align-items:flex-start">'
+            +'<span style="color:'+(a.correct?'var(--green)':'var(--red)')+';font-weight:700;flex-shrink:0">'+(a.correct?'✓':'✗')+'</span>'
+            +'<div><div style="color:var(--text)">'+q.q+'</div>'
+            +(a.correct?'':'<div style="color:var(--red);margin-top:2px">Answered: '+letters[a.chosen]+' · Correct: '+letters[q.ans]+'</div>')
+            +'</div></div>';
+        }).join('')
+        +'</div>';
+    }
+
+    return '<div class="kc-mgr-row" onclick="var el=G(\''+breakdownId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'" style="cursor:'+(r.best?'pointer':'default')+';flex-wrap:wrap">'
+      +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,24)+'<span style="font-weight:600">'+r.fullName+'</span></div>'
+      +'<div>'+statusDot+statusLabel+'</div>'
+      +'<div style="color:var(--text);font-weight:600">'+scoreStr+'</div>'
+      +'<div style="color:var(--muted)">'+attempts+' attempts</div>'
+      +'<div style="color:var(--muted);font-size:10px">'+(r.best?r.best.date:'—')+'</div>'
+      +'</div>'
+      +breakdown;
+  }).join('');
+
+  var done=results.filter(function(r){return r.completed;}).length;
+  container.innerHTML='<div class="sect" style="padding:0">'
+    +'<div class="sect-head" style="padding:12px 16px">'
+    +'<span class="sect-title">🧠 Knowledge Check — '+week+'</span>'
+    +'<span style="font-size:11px;color:var(--muted)">'+done+'/'+results.length+' completed</span>'
+    +'</div>'
+    +'<div class="kc-mgr-row kc-mgr-hdr">'
+    +'<div>Member</div><div>Status</div><div>Best Score</div><div>Attempts</div><div>Date</div>'
+    +'</div>'
+    +rows
+    +'</div>';
+}
+
+
 function renderAnnouncements(){
   var el=G('ann-list');if(!el)return;
   var sorted=mdAnnouncements.slice().sort(function(a,b){return b.postedAt-a.postedAt;});
@@ -5433,8 +5786,10 @@ function renderManagerHub(){
     +'<button class="sub-tab active" onclick="switchMgrHubTab(\'performance\',this)">&#9989; Performance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'quality\',this)">&#128203; Quality</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
+    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kc\',this)">&#129504; Knowledge Check</button>'
     +'</div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
+    +'<div id="mgr-hub-pane-kc" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-quality" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-attendance" class="mgr-hub-pane"></div>';
 
@@ -5469,6 +5824,7 @@ function switchMgrHubTab(tab,btn){
     });
   },50);}
   else if(tab==='attendance')renderMgrHubAttendance();
+  else if(tab==='kc')renderMgrKCResults(G('mgr-hub-pane-kc'));
 }
 
 function mgrHubFilter(btn){
@@ -6122,6 +6478,21 @@ async function sendAIMessage(){
   var input=G('ai-input');
   var text=input.value.trim();
   if(!text)return;
+
+  /* KC/Quiz topic guard — detect copy-pasted quiz questions */
+  var hasOptions=/\b[A-D]\.\s/.test(text);
+  var hasKCTerms=/what do you do|flag to escalation|do not upload|vendor nature|section 32|S32|equivalent agenc|AKA address|uploader.*contract|submission shows/i.test(text);
+  if(hasOptions&&hasKCTerms){
+    input.value='';
+    input.style.height='auto';
+    var msgs=G('ai-messages');
+    if(msgs){
+      msgs.innerHTML+='<div class="ai-msg koby"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble">That looks like a Knowledge Check or Quiz question — I can\'t help with those! That\'s for you to work through. 🧠 Ask me something else!</div></div>';
+      msgs.scrollTop=msgs.scrollHeight;
+    }
+    return;
+  }
+
   input.value='';
   input.style.height='auto';
 
