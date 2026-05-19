@@ -953,7 +953,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.44ae</div>
+    <div class="brand-sub">v.45ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1028,7 +1028,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.44ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.45ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -2668,11 +2668,17 @@ function clearNotifs(){notifications=[];renderNotifs();}
 
 /* ── BUILD MAIN ── */
 function buildMain(){
-  /* Auto-purge announcements older than 15 days */
-  var cutoff=Date.now()-(15*24*60*60*1000);
-  var warnCutoff=Date.now()-(14*24*60*60*1000); /* expiring within 24hrs */
-  var expiring=mdAnnouncements.filter(function(a){return a.postedAt<=warnCutoff&&a.postedAt>cutoff;});
-  mdAnnouncements=mdAnnouncements.filter(function(a){return a.postedAt>cutoff;});
+  /* Auto-purge announcements past their expiresAt — fallback to 15 days if not set */
+  var fallbackCutoff=Date.now()-(15*24*60*60*1000);
+  var warnCutoff=Date.now()+(24*60*60*1000); /* expiring within 24hrs */
+  var expiring=mdAnnouncements.filter(function(a){
+    var exp=a.expiresAt||(a.postedAt+(15*24*60*60*1000));
+    return exp>Date.now()&&exp<=warnCutoff;
+  });
+  mdAnnouncements=mdAnnouncements.filter(function(a){
+    var exp=a.expiresAt||(a.postedAt+(15*24*60*60*1000));
+    return exp>Date.now();
+  });
   /* Send mailbox notification to manager for announcements expiring within 24hrs */
   if(expiring.length&&cu&&cu.role==='manager'){
     var names=expiring.map(function(a){return '"'+a.title+'"';}).join(', ');
@@ -6334,7 +6340,51 @@ function openAddArticleModal(editType, editItem, editAid){
   }
   G('add-article-err').textContent='';
   G('add-article-modal').dataset.editAid=editAid||'';
+  /* Reset expiry to 1 week default */
+  window._annExpiresAt=Date.now()+(7*24*60*60*1000);
+  annToggleExpiry(typeSelect.value);
+  annHighlightExpBtn('ann-exp-1w');
+  var disp=G('ann-exp-display');if(disp)disp.textContent='1 week from now';
   G('add-article-modal').classList.add('open');
+}
+
+function annToggleExpiry(type){
+  var row=G('ann-expiry-row');
+  if(row)row.style.display=type==='ann'?'flex':'none';
+}
+
+function annSetExpiry(n,unit){
+  var customDate=G('ann-exp-custom-date');
+  var disp=G('ann-exp-display');
+  if(unit==='custom'){
+    if(customDate)customDate.style.display='inline-block';
+    annHighlightExpBtn('ann-exp-custom');
+    return;
+  }
+  if(customDate)customDate.style.display='none';
+  if(unit==='pick'){
+    var val=customDate?customDate.value:'';
+    if(!val)return;
+    window._annExpiresAt=new Date(val+'T23:59:59').getTime();
+    if(disp)disp.textContent=new Date(window._annExpiresAt).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+    annHighlightExpBtn('ann-exp-custom');
+    return;
+  }
+  /* day-based */
+  window._annExpiresAt=Date.now()+(n*24*60*60*1000);
+  var labels={1:'1 day from now',7:'1 week from now',30:'1 month from now'};
+  var btnIds={1:'ann-exp-1d',7:'ann-exp-1w',30:'ann-exp-1m'};
+  if(disp)disp.textContent=labels[n]||n+' days from now';
+  annHighlightExpBtn(btnIds[n]);
+}
+
+function annHighlightExpBtn(activeId){
+  ['ann-exp-1d','ann-exp-1w','ann-exp-1m','ann-exp-custom'].forEach(function(id){
+    var btn=G(id);if(!btn)return;
+    btn.style.background=id===activeId?'var(--accent)':'';
+    btn.style.color=id===activeId?'#fff':'';
+    btn.style.borderColor=id===activeId?'var(--accent)':'';
+  });
 }
 
 function submitAddArticle(){
@@ -6369,7 +6419,8 @@ function submitAddArticle(){
   } else {
     var newId=nextId++;
     if(type==='ann'){
-      var newAnn={id:newId,title:title,body:body,author:cu.fullName,postedAt:Date.now(),audience:'both'};
+      var expiresAt=window._annExpiresAt||(Date.now()+(7*24*60*60*1000));
+      var newAnn={id:newId,title:title,body:body,author:cu.fullName,postedAt:Date.now(),audience:'both',expiresAt:expiresAt};
       mdAnnouncements.unshift(newAnn);
       fsSaveAnnouncement(newAnn);
       renderAnnouncements();
@@ -10473,12 +10524,23 @@ document.addEventListener('DOMContentLoaded',function(){
     <div style="display:flex;flex-direction:column;gap:14px;margin-top:16px">
       <div>
         <label class="form-label">Category</label>
-        <select class="form-input" id="add-article-type" style="background:var(--bg3);color:var(--text);border-color:var(--border)">
+        <select class="form-input" id="add-article-type" style="background:var(--bg3);color:var(--text);border-color:var(--border)" onchange="annToggleExpiry(this.value)">
           <option value="ann">&#128226; Announcement</option>
           <option value="kb">&#128218; Knowledge Base</option>
           <option value="tmpl">&#128196; Template</option>
           <option value="faq">&#10067; FAQ</option>
         </select>
+      </div>
+      <div id="ann-expiry-row" style="display:flex;flex-direction:column;gap:6px">
+        <label class="form-label">Valid until</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" class="btn btn-outline btn-sm" onclick="annSetExpiry(1,'day')" id="ann-exp-1d">1 Day</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="annSetExpiry(7,'day')" id="ann-exp-1w">1 Week</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="annSetExpiry(30,'day')" id="ann-exp-1m">1 Month</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="annSetExpiry(0,'custom')" id="ann-exp-custom">Custom</button>
+          <input type="date" id="ann-exp-custom-date" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);outline:none" onchange="annSetExpiry(0,'pick')"/>
+        </div>
+        <div style="font-size:10px;color:var(--muted)" id="ann-exp-label">Expires: <strong id="ann-exp-display">1 week from now</strong></div>
       </div>
       <div>
         <label class="form-label">Title</label>
