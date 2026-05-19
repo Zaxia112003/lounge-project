@@ -385,8 +385,8 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .tab-badge.show{display:flex;}
 
 /* ── PHOTO WALL ── */
-.pw-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;}
-.pw-stage{position:relative;height:200px;background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.pw-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:0;}
+.pw-stage{position:relative;height:260px;background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .pw-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s ease;}
 .pw-img.active{opacity:1;}
 .pw-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);gap:10px;}
@@ -544,7 +544,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .main-brand-sub{font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
 
 /* ── AI ASSISTANT ── */
-.ai-panel{position:fixed;right:20px;bottom:20px;top:auto;width:300px;height:440px;background:#111b21;border-radius:12px;overflow:hidden;z-index:600;display:flex;flex-direction:column;transform:translateY(calc(100% + 24px));transition:transform .25s ease;box-shadow:0 8px 32px rgba(0,0,0,.35);}
+.ai-panel{position:fixed;right:20px;bottom:20px;top:auto;width:420px;height:580px;background:#111b21;border-radius:12px;overflow:hidden;z-index:600;display:flex;flex-direction:column;transform:translateY(calc(100% + 24px));transition:transform .25s ease;box-shadow:0 8px 32px rgba(0,0,0,.35);}
 .ai-panel.open{transform:translateY(0);}
 .ai-header{background:#202c33;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
 .ai-header-avatar{width:34px;height:34px;border-radius:50%;background:#128C7E;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
@@ -593,6 +593,55 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .fmt-toolbar button:hover{background:var(--bg2);border-color:var(--border);color:var(--text);}
 .fmt-toolbar button.active{background:rgba(139,45,255,.12);border-color:var(--accent);color:var(--accent);}
 .fmt-toolbar .fmt-sep{width:1px;background:var(--border);margin:2px 3px;}
+.game-hover-card{transition:border-color .15s;}
+.game-hover-card:hover{border-color:var(--accent) !important;}
+.game-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:850;display:none;align-items:center;justify-content:center;}
+.game-modal-overlay.open{display:flex;}
+.game-modal-box{background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:0;width:min(560px,96vw);max-height:92vh;overflow-y:auto;position:relative;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.8);}
+.game-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.1);flex-shrink:0;background:#0f1117;}
+.game-modal-header-title{font-size:15px;font-weight:700;color:#f1f5f9;font-family:var(--font-d);display:flex;align-items:center;gap:8px;}
+.game-modal-body{padding:16px 18px 18px;background:#0f1117;}
+.game-canvas-wrap{background:#111827;border-radius:10px;padding:12px;margin-bottom:12px;}
+.game-score-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.game-score-pill{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:3px 10px;font-size:11px;color:#94a3b8;}
+.game-score-pill strong{color:#f1f5f9;font-weight:600;}
+.games-scroll-row{display:flex;gap:10px;padding:12px 14px;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:none;}
+.games-scroll-row::-webkit-scrollbar{display:none;}
+.game-tile{flex:0 0 150px;border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .15s,transform .12s;background:var(--bg2);user-select:none;}
+.game-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
+.game-tile-icon{font-size:24px;margin-bottom:6px;}
+.game-tile-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.game-tile-desc{font-size:10px;color:var(--muted);margin-bottom:8px;}
+.game-tile-scores{border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;}
+.game-tile-score-row{display:flex;align-items:center;gap:5px;font-size:10px;}
+.game-tile-score-rank{width:14px;flex-shrink:0;}
+.game-tile-score-name{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.game-tile-score-val{color:var(--text);font-weight:600;}
+.game-badge-solo{font-size:9px;background:rgba(34,197,94,.15);color:var(--green);border-radius:4px;padding:1px 6px;font-weight:700;}
+.game-badge-multi{font-size:9px;background:rgba(139,45,255,.15);color:var(--accent);border-radius:4px;padding:1px 6px;font-weight:700;}
+.game-badge-soon{font-size:9px;background:rgba(245,158,11,.15);color:var(--amber);border-radius:4px;padding:1px 6px;font-weight:700;}
+.game-tile.tile-soon{opacity:.65;cursor:default;}
+.game-tile.tile-soon:hover{border-color:var(--border);transform:none;}
+/* Chess board */
+.chess-board{display:grid;grid-template-columns:repeat(8,1fr);border:2px solid var(--border2);border-radius:4px;overflow:hidden;max-width:320px;margin:0 auto;}
+.chess-sq{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;position:relative;transition:background .1s;}
+.chess-sq.light{background:#f0d9b5;}
+.chess-sq.dark{background:#b58863;}
+.chess-sq.selected{background:#f6f669!important;outline:2px inset rgba(0,0,0,.2);}
+.chess-sq.legal{background:#cdd16f!important;}
+.chess-sq.last-move{background:rgba(205,210,106,.6)!important;}
+/* Multiplayer section */
+.mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0;}
+.mp-tile{border:1px solid var(--border);border-radius:12px;padding:12px;position:relative;overflow:hidden;background:var(--bg2);}
+.mp-tile:not(.mp-soon){cursor:pointer;transition:border-color .15s;}
+.mp-tile:not(.mp-soon):hover{border-color:var(--accent);}
+.mp-soon-strip{position:absolute;top:10px;right:-20px;background:rgba(245,158,11,.2);color:var(--amber);font-size:8px;font-weight:700;padding:2px 24px;transform:rotate(30deg);letter-spacing:.8px;}
+.mp-icon{font-size:22px;margin-bottom:6px;}
+.mp-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.mp-desc{font-size:10px;color:var(--muted);line-height:1.5;}
+.mp-avatars{display:flex;align-items:center;gap:-3px;margin-top:8px;}
+.mp-av{width:20px;height:20px;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--bg1);margin-right:-4px;}
+.mp-live{font-size:9px;color:var(--green);font-weight:600;margin-left:10px;}
 .fmt-link-popover{position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;width:300px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none;}
 .fmt-link-popover.open{display:block;}
 .fmt-link-popover label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
@@ -879,7 +928,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.34ae</div>
+    <div class="brand-sub">v.39ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -954,7 +1003,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.34ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.39ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -1369,6 +1418,7 @@ function fsStartRealtimeListeners(){
     if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
     if(G('daily-tbl'))renderDailyTbl();
     if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
+    if(G('mgr-kpi-card'))renderMgrKpiCard();
   }));
 
   /* perfData */
@@ -1380,6 +1430,7 @@ function fsStartRealtimeListeners(){
     });
     if(G('kpi-grid'))renderDashboard();
     if(G('team-tbl'))renderTeamOverview();
+    if(G('mgr-kpi-card'))renderMgrKpiCard();
   }));
 
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'avatars'),function(snap){
@@ -1710,6 +1761,7 @@ function handleLogin(){
 
 function goDash(){
   G('pg-login').classList.remove('active');
+  var kfab=G('koby-fab');if(kfab)kfab.style.display='flex';
   G('pg-dash').classList.add('active');
   /* Apply saved theme */
   if(settings.theme)setTheme(settings.theme,null);
@@ -3287,6 +3339,7 @@ function renderMyDay(){
     +'<div><div style="font-size:15px;font-weight:600;color:var(--muted);font-family:var(--font-d)">'+dateStr+'</div>'
     +'<div style="font-size:13px;color:var(--muted2);margin-top:2px;font-family:var(--font-d)" id="my-day-clock">'+clockStr+'</div>'
     +'</div>'
+    +(cu&&cu.role!=='manager'?'<div id="credit-badge" style="display:none;align-items:center;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;cursor:default"></div>':'')
     +reviewBtn
     +'</div></div>'
     +'<div class="sect ann-board"'+(cu&&cu.role==='manager'?' style="display:none"':'')+'>'
@@ -3296,15 +3349,16 @@ function renderMyDay(){
     +'</div>'
     +'<div class="ann-list" id="ann-list"></div>'
     +'</div>'
-    +'<div style="display:flex;gap:16px;align-items:stretch;margin-top:0">'
-    /* LEFT — Team Photos (50%) */
-    +'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'
-    +'<div class="sect pw-wrap" style="flex:1">'
+    /* Manager KPI Quick-Glance */
+    +(isManager
+      ?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>'
+      :'')
+    /* Team Photos — full width, fixed height */
+    +'<div class="sect pw-wrap" style="margin-bottom:14px">'
     +'<div class="sect-head">'
     +'<span class="sect-title">&#128247; Team Photos</span>'
     +'<div style="display:flex;gap:8px;align-items:center">'
     +'<span style="font-size:10px;color:var(--muted)">'+pwPinned().length+'/'+PW_MAX_PINNED+' on wall</span>'
-    +''
     +'<button class="btn btn-outline btn-sm" onclick="pwOpenUploadModal()">+ Add Photo</button>'
     +'</div></div>'
     +pwRenderSlideshow()
@@ -3316,28 +3370,38 @@ function renderMyDay(){
     +(pwPhotos.length>0?'<a class="pw-gallery-link" onclick="pwOpenGallery()">Open Gallery &#8594;</a>':'')
     +'</div>'
     +'</div>'
+    /* Games — full width, solo + multiplayer merged */
+    +'<div class="sect" style="padding:0;margin-bottom:14px">'
+    +'<div class="sect-head" style="padding:11px 14px 10px">'
+    +'<span class="sect-title">&#127918; Games</span>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<span style="font-size:10px;color:var(--muted)">Solo &amp; Multiplayer</span>'
+    +'<button onclick="gamesScrollLeft()" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center">&#8592;</button>'
+    +'<button onclick="gamesScrollRight()" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center">&#8594;</button>'
     +'</div>'
-    /* RIGHT — Awards carousel (50%) — all roles */
-    +(cu
-      ?'<div style="flex:1;min-width:0;display:flex;flex-direction:column">'
-        +'<div class="sect" style="padding:0;flex:1">'
-        +'<div class="sect-head" style="padding:14px 16px 10px">'
-        +'<span class="sect-title">&#127942; Awards</span>'
-        +'<div style="display:flex;align-items:center;gap:6px">'
-        +'<button class="btn btn-outline btn-sm" onclick="awardsCarouselPrev()" style="padding:2px 8px">&#8592;</button>'
-        +'<span id="awards-carousel-idx" style="font-size:10px;color:var(--muted)">1 / 4</span>'
-        +'<button class="btn btn-outline btn-sm" onclick="awardsCarouselNext()" style="padding:2px 8px">&#8594;</button>'
-        +'</div>'
-        +'</div>'
-        +'<div id="awards-grid" style="padding:0 16px 16px"></div>'
-        +'</div>'
-        +'</div>'
-      :'')
+    +'</div>'
+    +'<div class="games-scroll-row" id="games-scroll-row"></div>'
+
+    +'</div>'
+    /* Knowledge Check — Coming Soon */
+    +'<div class="sect" style="padding:0">'
+    +'<div class="sect-head" style="padding:11px 14px 10px">'
+    +'<span class="sect-title">&#129504; Knowledge Check</span>'
+    +'<span style="font-size:9px;background:rgba(139,45,255,.15);color:var(--accent);border-radius:4px;padding:2px 8px;font-weight:700;letter-spacing:.5px">COMING SOON</span>'
+    +'</div>'
+    +'<div style="padding:14px;text-align:center">'
+    +'<div style="font-size:18px;margin-bottom:5px">🧠</div>'
+    +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">Weekly Knowledge Check</div>'
+    +'<div style="font-size:11px;color:var(--muted)">Launching soon — stay tuned!</div>'
+    +'</div>'
     +'</div>';
   var _prevAnnCount=mdAnnouncements.length;
   renderAnnouncements();
+  renderGamesGrid();
   if(mdAnnouncements.length>0&&_prevAnnCount===0){_playAnnouncementSound();}
-  renderAwards();
+  if(isManager)renderMgrKpiCard();
+  credRecalcFromUploads();
+  setTimeout(updateCreditBadge,100);
   startClock();
   /* Start wall slideshow autoplay */
   setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},500);
@@ -3524,6 +3588,1113 @@ function deleteArticle(id){
   }
   renderArticles();renderAnnouncements();
 }
+/* ══════════════════════════════════════════════════
+   GAMES — Solo tiles + Multiplayer section
+   ══════════════════════════════════════════════════ */
+var KB_QUESTIONS=[
+  {id:1,cat:"Address",q:"The submission shows the address as 10 Smith Street but the contract reads 10 Smith St. What do you do?",opts:["Do not upload. Flag to escalation.","Proceed as normal — it is the same address.","Contact the agent before doing anything.","Upload and leave a note for tagging."],ans:1,exp:"Different street designator formats (Street vs St) represent the same address. Proceed normally."},
+  {id:2,cat:"Address",q:"The submission shows unit 5/10 Smith Street but the contract shows Unit 5, 10 Smith Street. What do you do?",opts:["Do not upload — the address is different.","Proceed — different format, same address.","Flag to escalation.","Ask the agent to resubmit."],ans:1,exp:"Different format, same address. Proceed."},
+  {id:3,cat:"Address",q:"The submission shows 12A Smith Street but the contract shows 12 Smith Street. What do you do?",opts:["Proceed — minor difference.","Do not upload. Flag to escalation.","Upload with a note for tagging.","Contact the agent to confirm."],ans:1,exp:"The unit/lot detail differs. Flag to escalation."},
+  {id:4,cat:"Address",q:"A submission comes in for Lot 5, 10 Smith Street but the contract says 5/10 Smith Street. What do you do?",opts:["Do not upload — lot numbers are not unit numbers.","Flag to escalation immediately.","Proceed — these are different formats of the same address.","Check with your manager first."],ans:2,exp:"Lot 5 and 5/10 are the same address in different formats. Proceed."},
+  {id:5,cat:"Address",q:"The contract address shows 10-12 Smith Street (dashed block) but the submission only shows 10 Smith Street. What is the correct handling?",opts:["Proceed — dashes are common in addresses.","Flag to escalation.","Do not upload and send a new request.","Proceed — lot 10 falls within the range 10-12."],ans:3,exp:"Lot 10 falls within the stated range 10-12. Proceed as the address is covered by the block range."},
+  {id:6,cat:"Address",q:"The submission shows Lot __, 7 Smith Street (no lot number filled in). What do you do?",opts:["Proceed — lot number is optional.","Flag to escalation.","Upload with a note about the blank lot number.","Do not upload. Flag to escalation."],ans:3,exp:"A blank lot number in the submission cannot be processed. Flag to escalation."},
+  {id:7,cat:"Address",q:"A submission comes in for 12 Smith Road but the contract says 12 Smith Avenue. What do you do?",opts:["Proceed — if it shows the same location.","Do not upload. Flag to escalation.","Upload with a note for tagging.","Contact the agent to confirm."],ans:0,exp:"Proceed if it shows the same location. We escalate only if the addresses show a different location from each other."},
+  {id:10,cat:"Address",q:"The submission shows Unit 2, 10 Smith Street but the contract shows 2/10 Smith Street. What do you do?",opts:["Flag to escalation — the addresses don't match.","Proceed — same address, different format.","Upload and note the discrepancy.","Ask the agent to resubmit with the correct format."],ans:1,exp:"Unit 2 and 2/10 are the same address in different formats. Proceed."},
+  {id:11,cat:"Address",q:"The submission shows 10 Smith Street but the contract shows 10 Smythe Street. What do you do?",opts:["Proceed — minor spelling variation.","Flag to escalation.","Upload with a note.","Contact the agent for clarification."],ans:1,exp:"Different street names are different addresses. Flag to escalation."},
+  {id:12,cat:"Address",q:"A contract has an accessory unit (e.g. granny flat) listed in the address. The submission doesn\'t include it. What do you do?",opts:["Proceed — the submission is not required to include the accessory unit.","Flag to escalation.","Upload with a note for tagging.","Contact the agent before uploading."],ans:0,exp:"Submissions are not required to include accessory units. Proceed with or without it."},
+  {id:13,cat:"Address",q:"The submission shows Suite 5, Level 2, 10 Smith Street but the contract shows Level 2, 10 Smith Street with no suite number. What do you do?",opts:["Proceed — similar enough address.","Flag to escalation.","Upload with a note.","Do not upload."],ans:1,exp:"Missing suite number on the contract is an address discrepancy. Flag to escalation."},
+  {id:14,cat:"Address",q:"You receive a submission for 10 Smith Street, Suburb VIC 3000 but the contract is for 10 Smith Street, Suburban VIC 3001. What do you do?",opts:["Proceed — same street, close postcodes but still okay.","Flag to escalation.","Upload with a note.","Contact the agent."],ans:1,exp:"Different suburb/postcode means a different address. Flag to escalation."},
+  {id:15,cat:"Address",q:"The submission says Drive but the contract says Close. What do you do?",opts:["Proceed — if it shows the same location.","Flag to escalation.","Upload with a note for tagging.","Ask the agent before proceeding."],ans:0,exp:"Proceed if both show the same location. We escalate only if the addresses point to different locations."},
+  {id:16,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robbi Test. What do you do?",opts:["Do not upload. Flag to escalation.","Proceed and leave a note for tagging.","Ask the agent to correct the name.","Flag to escalation."],ans:1,exp:"Minor spelling variation (Robbie vs Robbi). Proceed with a note for tagging."},
+  {id:17,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robert Test. What do you do?",opts:["Proceed — Robert and Robbie are the same person.","Upload with a note for tagging.","Flag to escalation.","Proceed — minor difference."],ans:2,exp:"Entirely different names. Flag to escalation."},
+  {id:18,cat:"Vendor Name",q:"The submission shows Rob Test but the contract shows Robbie Test. What do you do?",opts:["Proceed and leave a note.","Upload and flag to escalation.","Do not upload. Flag to escalation.","Proceed — Rob is a common nickname for Robbie."],ans:1,exp:"Nicknames: upload first, then flag to escalation."},
+  {id:19,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robbie Jonathon Test (with a middle name). What do you do?",opts:["Do not upload — the names don't match.","Proceed without the middle name and leave a note for tagging.","Flag to escalation — middle name mismatch.","Upload and flag to escalation."],ans:1,exp:"It is okay to proceed without a middle name. Leave a note for tagging."},
+  {id:20,cat:"Vendor Name",q:"The submission shows Robbie Joseph Test but the contract shows Robbie Jonathon Test. What do you do?",opts:["Proceed — middle names often vary.","Leave a note and proceed.","Flag to escalation — middle names are different.","Upload and ask the agent."],ans:2,exp:"Different middle names require escalation."},
+  {id:21,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robbie Test-Contract (hyphenated last name). What do you do?",opts:["Proceed if the contract last name is present in the submission.","Do not upload. Flag to escalation.","Proceed if the submission last name is present in the hyphenated contract name.","Upload and contact the agent."],ans:2,exp:"Proceed if the submission last name (Test) is present within the hyphenated contract name (Test-Contract). Leave a note."},
+  {id:22,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robbie Contract (Formerly known as Robbie Test). What do you do?",opts:["Do not upload — names are different.","Apply the same handling as hyphenated last names.","Flag to escalation.","Proceed — clearly same person."],ans:1,exp:"AKA/Formerly Known: proceed if the submission name is present in the AKA name. Same logic as hyphenated last names. Leave a note."},
+  {id:23,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robbie Contract with no reference to \'formerly known as.\' The email on the contract is robbietest@agency.com. What do you do?",opts:["Flag to escalation — names are completely different.","Proceed — the email contains an indication of the former last name. Leave a note.","Confirm with team lead.","Upload and ask the agent to clarify."],ans:1,exp:"If the email contains an indication of the former last name, proceed with a note."},
+  {id:24,cat:"Vendor Name",q:"The submission shows Robbie Test but the contract shows Robbie Contract with no email hint and no other indicators. What do you do?",opts:["Proceed — likely same person.","Flag to escalation — none of the proceed conditions are met.","Upload with a note for tagging.","Ask the agent before uploading."],ans:1,exp:"None of the proceed conditions are met. Flag to escalation."},
+  {id:"24b",cat:"Vendor Name",q:"Any of these are conditions we can base on to proceed with a vendor who has a different last name EXCEPT one. Which is the exception?",opts:["There is a note on the submission informing us about a last name change.","There is an indication on the contract that the last name is 'formerly known as'.","Both last names were mentioned in key pages of the contract (e.g. S32, COS, Particulars of Sale).","The vendor email address contains an indication of the former last name."],ans:2,exp:"We cannot base on whether both last names appear somewhere in the contract. We still base accuracy on the match between submission and contract."},
+  {id:25,cat:"Vendor Name",q:"A vendor solicitor is signing the Section 32 on behalf of the vendor. What is the correct handling?",opts:["Do not upload — solicitors cannot sign.","Flag to escalation.","Okay to proceed. Leave a note for tagging.","Upload and contact the agent."],ans:2,exp:"Vendor solicitor signing S32: okay to proceed. Leave a note for tagging."},
+  {id:26,cat:"Vendor Name",q:"The submission shows two vendors but the contract only shows one. What do you do?",opts:["Proceed — note with 2 vendors as per the submission.","Flag to escalation.","Reach out to agent.","Do not upload and request a new submission."],ans:0,exp:"We can proceed if the submission has more vendors than the contract (2 to 1). Note to proceed with 2 vendors. We flag only if the contract has more vendors than the submission (1 to 2)."},
+  {id:27,cat:"Vendor Name",q:"The submission shows Robbie Test and Sam Test but the contract only shows Sam Test. What do you do?",opts:["Proceed — Sam Test is on both.","Do not upload — missing vendor.","Flag to escalation.","Upload and note that we can proceed with 2 vendors."],ans:3,exp:"Submission has more vendors than contract. Upload and note that we proceed with 2 vendors."},
+  {id:28,cat:"Vendor Name",q:"The submission has a vendor named A & B Pty Ltd but the contract shows A and B Pty Ltd. What do you do?",opts:["Flag to escalation — company names don't match.","Edit the vendor name on dashboard following the contract format.","Upload with a note for tagging.","Contact the agent to confirm."],ans:2,exp:"Minor formatting difference in company name. Proceed with a note for tagging."},
+  {id:29,cat:"Vendor Name",q:"The contract has a vendor name spelled completely differently from the submission with no similarity at all. What do you do?",opts:["Proceed — agent likely knows the vendor.","Upload with a note.","Flag to escalation.","Contact the agent before uploading."],ans:2,exp:"Entirely different names. Flag to escalation."},
+  {id:30,cat:"Vendor Name",q:"You see a submission where the vendor\'s email address is different from what appears on the contract. The names match perfectly. What do you do?",opts:["Proceed — email addresses can be amended.","Flag to escalation — email mismatch is a vendor detail issue.","Upload with a note for tagging.","Contact the agent directly."],ans:0,exp:"Email addresses can be amended and do not necessarily require escalation."},
+  {id:31,cat:"File",q:"A submission comes in but the attached PDF is missing the Contract of Sale pages. What do you do?",opts:["Upload anyway — the Section 32 is complete.","DO NOT UPLOAD. Flag to escalation.","Upload and ask the agent to send the missing pages.","Upload then flag to escalation with internal notes."],ans:1,exp:"Missing key pages: DO NOT UPLOAD. Flag to escalation."},
+  {id:32,cat:"File",q:"A submission comes in with the wrong file attached (it\'s a different property\'s contract). What do you do?",opts:["Upload and note it's the wrong file.","Contact the agent to send the correct file.","DO NOT UPLOAD. Flag to escalation.","Upload — the listing will still be created correctly."],ans:2,exp:"Wrong file: DO NOT UPLOAD. Flag to escalation."},
+  {id:33,cat:"File",q:"An agent submits two separate PDF files — one for the Contract of Sale and one for the Section 32. What do you do?",opts:["Merge them and upload.","Upload both separately.","DO NOT UPLOAD. Flag to escalation.","Upload the Contract of Sale only."],ans:2,exp:"Separate files: DO NOT UPLOAD. Flag to escalation. The team cannot legally merge documents."},
+  {id:34,cat:"File",q:"The contract PDF is submitted but the vendor signing fields are blank (no vendor/purchaser details filled in). What do you do?",opts:["Proceed as usual — fields will be tagged anyway.","DO NOT UPLOAD. Flag to escalation.","Tag the contract first then upload.","Contact the agent to fill in the fields."],ans:0,exp:"Blank vendor fields are okay. The fields will be filled in during tagging. Proceed as usual."},
+  {id:35,cat:"File",q:"The submission has the vendor names hardcoded into the purchaser signing field instead of the vendor field. What do you do?",opts:["DO NOT UPLOAD. Flag to escalation.","Upload as-is — the system will sort it.","Can be uploaded. Flag to escalation.","Contact the agent to resubmit."],ans:2,exp:"Vendor details hardcoded to purchaser field: CAN be uploaded. Flag to escalation."},
+  {id:36,cat:"File",q:"The Section 32 is extremely long with many extra pages making it oversized. What do you do?",opts:["DO NOT UPLOAD. Request a trimmed version.","Can be uploaded. Flag to escalation.","DO NOT UPLOAD. Flag to escalation.","Upload — file size isn't your concern."],ans:1,exp:"Oversized S32: CAN be uploaded. Flag to escalation."},
+  {id:37,cat:"File",q:"A submitted PDF file is 156MB. What do you do?",opts:["Proceed and upload normally — it is within the limit.","Upload is not possible. Flag to escalation.","DO NOT UPLOAD. Contact the agent.","Compress the file and then upload."],ans:0,exp:"The maximum file size is 157MB. 156MB is within the limit. Upload normally."},
+  {id:39,cat:"File",q:"The submission is missing Form 2 but contains the Contract of Sale and Section 32. What do you do?",opts:["Proceed — the contract can still be uploaded without Form 2.","Upload — Form 2 can be added later.","DO NOT UPLOAD. Flag to escalation.","Upload and note the missing Form 2."],ans:0,exp:"Form 2 is for QLD. If the contract has a Section 32, it is a VIC contract. Proceed as usual."},
+  {id:42,cat:"File",q:"A file is submitted at 156MB. What do you do?",opts:["Upload is not possible — it exceeds the limit.","Proceed and upload normally.","Flag to escalation before uploading.","Compress the file first."],ans:1,exp:"156MB is under the 157MB limit. Proceed normally."},
+  {id:43,cat:"File",q:"Which of the following file issues CAN be uploaded before flagging to escalation?",opts:["Missing key pages","Wrong file attached","Vendor details hardcoded to purchaser field","None of the above"],ans:2,exp:"Vendor hardcoded to purchaser field can be uploaded first, then flagged. All others cannot be uploaded."},
+  {id:44,cat:"File",q:"Which of the following file issues CANNOT be uploaded at all?",opts:["Missing S32","File over 156MB","Oversized S32","Both A and B"],ans:0,exp:"Missing S32 (missing key pages) = DO NOT UPLOAD. Oversized S32 can still be uploaded then flagged."},
+  {id:45,cat:"File",q:"A PDF opens fine but only contains blank pages after the first page. What do you do?",opts:["Upload — the first page is readable.","DO NOT UPLOAD. Flag to escalation.","Upload and note the blank pages.","Request a new file before flagging."],ans:1,exp:"Effectively missing key pages. DO NOT UPLOAD. Flag to escalation."},
+  {id:46,cat:"Nature Matrix",q:"The submission shows Self and the contract confirms Self. The vendor details match. What do you do?",opts:["Proceed.","Flag to escalation — always verify nature.","Proceed if vendor details are correct.","Upload with a note."],ans:2,exp:"Self/Self with matching details: proceed."},
+  {id:47,cat:"Nature Matrix",q:"The submission shows Self but the contract shows Executor. What do you do?",opts:["Do not proceed. Flag to escalation.","Follow the details as per the contract. Pass to escalation (Estate Signer Missing).","Proceed — Self and Executor are interchangeable.","Contact the agent."],ans:1,exp:"Self/Executor: follow contract details, pass to escalation with the Estate Signer Missing flag."},
+  {id:49,cat:"Nature Matrix",q:"The submission shows Self but the contract shows POA (Company). What do you do?",opts:["Follow the contract and note it.","Do not proceed — flag to escalation.","Proceed — company is an extension of self.","Upload and ask the agent."],ans:1,exp:"Self/POA(Company): do not proceed. Flag to escalation (Vendors Do Not Match Contract)."},
+  {id:50,cat:"Nature Matrix",q:"The submission shows Self but the contract shows Director of Company. What do you do?",opts:["Proceed if the company name is on the submission.","Do not proceed. Flag to escalation.","Upload with a note for tagging.","Proceed — common situation."],ans:1,exp:"Self/Director: do not proceed. Flag to escalation."},
+  {id:51,cat:"Nature Matrix",q:"The submission shows Self but the contract shows Trustee. What do you do?",opts:["Do not proceed. Flag to escalation.","Proceed if the trust name matches.","Upload with a note.","Contact the agent for clarity."],ans:0,exp:"Self/Trustee: do not proceed. Flag to escalation."},
+  {id:52,cat:"Nature Matrix",q:"The submission shows POA (Individual) but the contract shows Self. The representative is on the contract but the represented individual is NOT. What do you do?",opts:["Proceed — POA and Self are interchangeable.","Flag to escalation.","Upload — it's the POA's name that matters.","Do not upload and wait for the agent."],ans:1,exp:"When the represented individual is NOT on the contract, flag to escalation."},
+  {id:55,cat:"Nature Matrix",q:"The submission shows Executor and the contract shows Legal Representative. What do you do?",opts:["Flag to escalation.","Do not upload.","These are interchangeable — proceed.","Upload with a note."],ans:2,exp:"Executor/Legal Representative: interchangeable. Proceed."},
+  {id:56,cat:"Nature Matrix",q:"The submission shows Executor and the contract shows Administrator. What do you do?",opts:["Flag to escalation.","These are interchangeable — proceed.","Do not upload.","Ask the agent which is correct."],ans:1,exp:"Executor/Administrator: interchangeable. Proceed."},
+  {id:57,cat:"Nature Matrix",q:"The submission shows Director of Company and the contract shows Director of Company but the company name is incorrect. What do you do?",opts:["Proceed — the nature matches.","Flag to escalation.","Upload with a note.","Contact the agent to confirm the company."],ans:1,exp:"Incorrect company name is a flag condition for Director/Director."},
+  {id:58,cat:"Nature Matrix",q:"The submission shows POA (Individual) but the contract shows Executor. What is the correct handling?",opts:["Do not proceed. Flag to escalation.","Proceed if represented individual is on the contract.","These are interchangeable — proceed.","Upload and contact the agent."],ans:2,exp:"POA(Individual)/Executor: interchangeable. Proceed if represented individual is on the contract."},
+  {id:59,cat:"Nature Matrix",q:"The submission shows Self but the vendor details on the contract are completely different (wrong name, wrong email). What do you do?",opts:["Proceed — Self/Self nature matches.","Flag to escalation — vendor details are different.","Upload with a note.","Contact the agent."],ans:1,exp:"Self/Self but details are different: flag to escalation."},
+  {id:60,cat:"Nature Matrix",q:"A submission has two vendors — one is Self and one is Director of Company. The contract matches the same combination. What do you do?",opts:["Flag to escalation — mixed natures require review.","Proceed if all details match for each nature type.","Do not upload.","Upload only after escalation approves."],ans:1,exp:"Each vendor is assessed individually against the matrix. If all match, proceed."},
+  {id:61,cat:"Listing",q:"An agent sends a new upload but marks it as an updated submission and no existing ticket can be found. What do you do?",opts:["Treat it as an update — follow the agent's label.","Check the AU queue — the parent ticket might be there.","Do not upload — agent must resubmit correctly.","Flag to escalation immediately."],ans:1,exp:"If no ticket is found, check the AU queue. Flag to escalation if the listing is non-existent."},
+  {id:64,cat:"Listing",q:"The submission is for a property whose auction date has already passed. What do you do?",opts:["Do not upload — the auction has passed.","Upload then flag to escalation.","Proceed normally — the contract is still valid.","Upload and notify the agent."],ans:1,exp:"Passed auction date: upload then flag to escalation. The agent needs to decide on a new auction date or proceed with sales."},
+  {id:65,cat:"Listing",q:"You receive a new upload submission but find one CRM listing and one pre-listing for the same property. Which do you use?",opts:["Use the pre-listing.","Use the CRM listing.","Use whichever was created most recently.","Flag to escalation."],ans:1,exp:"One CRM + one pre-listing: always use the CRM listing."},
+  {id:66,cat:"Listing",q:"There is no existing listing at all for the submitted property. What do you do?",opts:["Create a new listing and upload.","Flag to escalation — listing must exist before uploading.","Do not upload — wait for the agent.","Upload under a similar listing if one exists."],ans:0,exp:"No existing listing: proceed to create a new listing."},
+  {id:67,cat:"Listing",q:"You find two CRM listings for the same property. Which do you use?",opts:["Use the older listing for continuity.","Use the most recently created CRM listing.","Flag to escalation — two listings shouldn't exist.","Use the one with more data filled in."],ans:1,exp:"Two or more CRM listings: use the most recently created one."},
+  {id:68,cat:"Listing",q:"You find a submission and there is only one pre-listing available (no CRM listing). What do you do?",opts:["Upload to the pre-listing.","Create a new CRM listing.","Flag to escalation.","Do not upload until a CRM listing is created."],ans:0,exp:"Only one pre-listing: use the pre-listing."},
+  {id:69,cat:"Listing",q:"A listing has Authorities Enabled marked as DO NOT PROCEED. What do you do?",opts:["Proceed — contracts and authorities are separate.","Flag to escalation — DO NOT PROCEED is a stop flag.","Upload anyway and note the flag.","Contact the agent."],ans:1,exp:"DO NOT PROCEED flag on Authorities Enabled: flag to escalation."},
+  {id:70,cat:"Listing",q:"You receive a contract upload and notice the property has been marked as Sold in the system. What do you do?",opts:["Proceed — Sold properties can still have contract changes.","Flag to escalation — they will ask if the agent wants to reverse the sale.","Do not upload and wait for the agent.","Contact the agent directly."],ans:1,exp:"Property marked as Sold: flag to escalation. Escalation will use the Similar Listing / Property Marked as Sold template to check with the agent."},
+  {id:73,cat:"Equivalent Agency",q:"You receive a submission from Ray White Upper North Shore but the equivalent agency shown is Ray White Hornsby. What do you do?",opts:["Proceed — same Ray White network.","Do not proceed without approval. Flag to escalation.","Proceed and note the equivalent agency.","Contact the agent to use the correct agency."],ans:1,exp:"Equivalent agencies: DO NOT PROCEED without approval. Flag to escalation."},
+  {id:74,cat:"Equivalent Agency",q:"A submission comes from Marshall White Stonnington and the listed equivalent is Marshall White Armadale. What do you do?",opts:["Proceed — same Marshall White brand.","DO NOT PROCEED. Flag to escalation.","Upload and note the agency relationship.","It depends on the contract value."],ans:1,exp:"Equivalent agencies always require approval. Flag to escalation."},
+  {id:79,cat:"Equivalent Agency",q:"What is the rule when you encounter an equivalent or affiliated agency on a submission?",opts:["Always proceed — equivalent agencies are approved by default.","DO NOT PROCEED without approval. Flag to escalation.","Proceed if they are in the same city.","Proceed if both agencies are from the same brand."],ans:1,exp:"The rule is clear: DO NOT PROCEED with an equivalent/affiliated agency without approval."},
+  {id:82,cat:"Equivalent Agency",q:"You notice the submission agency is affiliated with another agency in the system but approval hasn\'t been given. You\'re in a rush. What do you do?",opts:["Proceed quickly — the approval can come later.","DO NOT PROCEED. Flag and wait for approval.","Proceed and send an email to the manager.","Upload and mark as pending."],ans:1,exp:"No exceptions. DO NOT PROCEED without approval, regardless of time pressure."},
+  {id:83,cat:"Process",q:"When you leave a note on the dashboard, what is its purpose?",opts:["To inform the client directly.","To flag the agent about issues in the contract.","To inform the tagging team.","To document your shift activity."],ans:2,exp:"Notes on the dashboard are for the tagging team."},
+  {id:84,cat:"Process",q:"When a contract has issues that need actioning, who handles it next?",opts:["The uploader resolves it.","The manager resolves it directly.","The escalation team takes over and contacts the agent.","The agent is contacted directly by the uploader."],ans:2,exp:"The escalation team handles agent communication after flagging."},
+  {id:87,cat:"Process",q:"Which of the following issues does the uploader handle by uploading first, then flagging?",opts:["Missing key pages","File too large","Vendor details hardcoded to purchaser field","Wrong file attached"],ans:2,exp:"Vendor hardcoded to purchaser field: upload first, then flag to escalation."},
+  {id:88,cat:"Process",q:"Which of the following issues requires DO NOT UPLOAD before flagging to escalation?",opts:["Oversized S32","Vendor hardcoded to purchaser field","Wrong file attached","Self/Executor nature mismatch"],ans:2,exp:"Wrong file attached: DO NOT UPLOAD. Flag to escalation."},
+  {id:89,cat:"Process",q:"A vendor name has a minor spelling variation (e.g., Robbi vs Robbie). You proceed and leave a note. What is the note for?",opts:["To inform Robbie of the uploading details.","To inform the tagging team of the exact name on the contract.","To document the decision for your manager.","To let the escalation team know."],ans:1,exp:"Notes are for the tagging team so they know the exact name as it appears on the contract."},
+  {id:90,cat:"Process",q:"What does the interchangeable symbol (⇌) mean in the Vendor Nature Matrix?",opts:["The natures are opposite and require escalation.","The natures can appear in either position (submission or contract) and the handling is the same.","The natures are identical.","One nature overrides the other."],ans:1,exp:"⇌ means the natures are interchangeable — either can appear on the submission or contract side and the process remains the same."},
+  {id:91,cat:"Process",q:"What should you check when handling a Director of Company / Trustee combination?",opts:["The agent's license number.","Look for 'atf', 'trusted', or 'as trustee for' in the name strip.","The trust deed document.","The property valuation."],ans:1,exp:"Verify the company name in the name strip. Look for \'atf\' or \'as trustee for\' keywords."},
+  {id:94,cat:"Process",q:"What is the maximum file size that can be uploaded to the system?",opts:["145MB","153MB","157MB","200MB"],ans:2,exp:"The maximum file size is 157MB. Files under this threshold can be uploaded."},
+  {id:99,cat:"Process",q:"A vendor has a nickname (e.g., submission says Rob but contract says Robbie). What is the process?",opts:["Do not upload — names don't match.","Upload only if the escalation team approves first.","Upload and then flag to escalation.","Flag to escalation only, do not upload."],ans:2,exp:"Nicknames: upload first, then flag to escalation."},
+  {id:100,cat:"Process",q:"Which is the complete and correct process for handling a submission with missing key pages?",opts:["Upload the partial document, flag to escalation, and leave a note.","DO NOT UPLOAD. Flag to escalation. Escalation team will contact the agent.","Contact the agent directly and wait for the corrected file.","Upload, contact the agent, and log the issue."],ans:1,exp:"Missing key pages: DO NOT UPLOAD. Flag to escalation. The escalation team handles agent communication."},
+];
+var KB_Q_TOTAL=KB_QUESTIONS.length;
+
+/* ─── Score storage helpers ─── */
+var GAME_SCORES_KEY='lp_game_scores_v1';
+function gsLoad(){try{return JSON.parse(localStorage.getItem(GAME_SCORES_KEY)||'{}')}catch(e){return {};}}
+function gsSave(d){try{localStorage.setItem(GAME_SCORES_KEY,JSON.stringify(d));}catch(e){}}
+function gsRecord(gameId,score,metric){
+  /* metric: 'high' (higher=better) or 'low' (lower=better, e.g. time) */
+  if(!cu)return;
+  var d=gsLoad();
+  if(!d[gameId])d[gameId]=[];
+  var nick=cu.nickname;
+  var existing=d[gameId].find(function(r){return r.nick===nick;});
+  var better=!existing||(metric==='low'?score<existing.score:score>existing.score);
+  if(better){
+    if(existing)existing.score=score;
+    else d[gameId].push({nick:nick,score:score});
+    gsSave(d);
+    renderGamesGrid();
+  }
+}
+function gsTop3(gameId){
+  var d=gsLoad();
+  var arr=d[gameId]||[];
+  return arr.slice().sort(function(a,b){
+    /* minesweeper lower=better, others higher=better */
+    return gameId==='minesweeper'?a.score-b.score:b.score-a.score;
+  }).slice(0,3);
+}
+function gsFormat(gameId,score){
+  if(gameId==='minesweeper')return score+'s';
+  if(gameId==='snake')return score+' pts';
+  if(gameId==='wordguess')return score+' tries';
+  if(gameId==='kbquizbattle')return score+'/15 correct';
+  return score.toLocaleString();
+}
+
+/* ─── CREDITS SYSTEM ─── */
+var CREDITS_KEY='lp_credits_v1';
+var CREDITS_PER_UPLOADS=10; /* 1 credit per 10 uploads */
+var CREDITS_PER_WIN=2;      /* 2 credits for winning KB Quiz */
+var CREDITS_COST=1;         /* 1 credit per game play */
+
+function credLoad(){try{return JSON.parse(localStorage.getItem(CREDITS_KEY)||'{}')}catch(e){return {};}}
+function credSave(d){try{localStorage.setItem(CREDITS_KEY,JSON.stringify(d));}catch(e){}}
+
+function credGet(nick){
+  if(!nick)nick=cu?cu.nickname:'';
+  var d=credLoad();
+  return (d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''});
+}
+
+function credRecalcFromUploads(){
+  /* Called on My Day load — checks today's uploads and awards credits */
+  if(!cu||cu.role==='manager')return;
+  var nick=cu.nickname;
+  var today=getSydneyDate().toISOString().slice(0,10);
+  var d=credLoad();
+  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+  /* If it's a new day, reset the upload counter */
+  if(state.lastCheckedDate!==today){state.lastCheckedUploads=0;state.lastCheckedDate=today;}
+  /* Get today's total uploads */
+  var todayUploads=(perfData[nick]&&perfData[nick][today]&&perfData[nick][today].uploadsTotal)||0;
+  /* How many new credits earned since last check */
+  var prevBracket=Math.floor(state.lastCheckedUploads/CREDITS_PER_UPLOADS);
+  var newBracket=Math.floor(todayUploads/CREDITS_PER_UPLOADS);
+  var earned=newBracket-prevBracket;
+  if(earned>0){
+    state.credits=(state.credits||0)+earned;
+    state.lastCheckedUploads=todayUploads;
+    d[nick]=state;credSave(d);
+    showCreditToast('+'+earned+' credit'+(earned>1?'s':'')+' earned! ('+todayUploads+' uploads today)');
+  } else {
+    state.lastCheckedUploads=Math.max(state.lastCheckedUploads,todayUploads);
+    d[nick]=state;credSave(d);
+  }
+  updateCreditBadge();
+}
+
+function credSpend(nick){
+  /* Returns true if credit was spent, false if insufficient */
+  if(!nick)nick=cu?cu.nickname:'';
+  if(cu&&cu.role==='manager')return true; /* manager plays free */
+  var d=credLoad();
+  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+  if((state.credits||0)<CREDITS_COST)return false;
+  state.credits-=CREDITS_COST;
+  d[nick]=state;credSave(d);
+  updateCreditBadge();
+  return true;
+}
+
+function credAward(nick,amount){
+  if(!nick)nick=cu?cu.nickname:'';
+  var d=credLoad();
+  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+  state.credits=(state.credits||0)+amount;
+  d[nick]=state;credSave(d);
+  updateCreditBadge();
+  showCreditToast('+'+amount+' credit'+(amount>1?'s':'')+' for winning!');
+}
+
+function updateCreditBadge(){
+  var el=G('credit-badge');if(!el)return;
+  if(!cu||cu.role==='manager'){el.style.display='none';return;}
+  var c=credGet(cu.nickname).credits||0;
+  el.textContent='🎮 '+c+' credit'+(c===1?'':'s');
+  el.style.display='inline-flex';
+  el.style.background=c>0?'rgba(139,45,255,.15)':'rgba(100,116,139,.1)';
+  el.style.color=c>0?'var(--accent)':'var(--muted)';
+}
+
+function showCreditToast(msg){
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:80px;right:24px;background:#1e1b4b;color:#a78bfa;border:1px solid #7c3aed;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:600;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,.4);animation:fadeUp .3s ease;pointer-events:none';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(function(){t.remove();},400);},2500);
+}
+
+function checkAndSpendCredit(gameId){
+  /* Returns true = okay to play, false = not enough credits */
+  if(!cu||cu.role==='manager')return true;
+  /* Escalation team uses credits too */
+  var c=credGet(cu.nickname).credits||0;
+  if(c<CREDITS_COST){
+    showNoCreditModal(gameId);
+    return false;
+  }
+  return credSpend(cu.nickname);
+}
+
+function showNoCreditModal(gameId){
+  var d=credLoad()[cu?cu.nickname:''];
+  var todayUploads=0;
+  if(cu&&perfData[cu.nickname]){
+    var today=getSydneyDate().toISOString().slice(0,10);
+    todayUploads=(perfData[cu.nickname][today]&&perfData[cu.nickname][today].uploadsTotal)||0;
+  }
+  var next=CREDITS_PER_UPLOADS-((todayUploads)%CREDITS_PER_UPLOADS);
+  var msg=G('game-modal')&&G('game-modal').classList.contains('open')
+    ?null:null;
+  /* Show inline alert */
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:900;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML='<div style="background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:28px 32px;max-width:340px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.8)">'
+    +'<div style="font-size:32px;margin-bottom:12px">🎮</div>'
+    +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Not enough credits</div>'
+    +'<div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:20px">You need <strong style="color:#a78bfa">1 credit</strong> to play.<br>You earn 1 credit every <strong style="color:#a78bfa">10 uploads</strong>.<br><br>'+(next<10?'Upload <strong style="color:#4ade80">'+next+' more</strong> contract'+(next===1?'':'s')+' today to earn your next credit!':'Process contracts to earn credits.')+'</div>'
+    +'<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="padding:9px 24px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Got it</button>'
+    +'</div>';
+  document.body.appendChild(overlay);
+}
+
+/* ─── GAMES DATA ─── */
+var GAMES=[
+  {id:'2048',        label:'2048',          emoji:'🔢',type:'single',desc:'Slide tiles, reach 2048',           metric:'high', coming:false},
+  {id:'snake',       label:'Snake',         emoji:'🐍',type:'single',desc:'Eat & grow without hitting',        metric:'high', coming:false},
+  {id:'minesweeper', label:'Minesweeper',   emoji:'💣',type:'single',desc:'Clear the board fastest',           metric:'low',  coming:false},
+  {id:'wordguess',   label:'Word Guess',    emoji:'📝',type:'single',desc:'Guess the 5-letter word',           metric:'low',  coming:false},
+  {id:'chess',       label:'Chess',         emoji:'♟️',type:'single',desc:'Play vs AI opponent',               metric:'high', coming:false},
+  {id:'kbquizbattle',label:'KB Quiz Battle',emoji:'🧩',type:'multi', desc:'First to 10 correct answers wins',  metric:'high', coming:false},
+  {id:'uno',         label:'UNO',           emoji:'🃏',type:'multi', desc:'Classic card game — draw & match',  metric:'high', coming:true},
+];
+var MP_GAMES=[
+  {id:'kbquizbattle',label:'KB Quiz Battle',emoji:'🧩',desc:'First to 10 correct answers wins',coming:false},
+  {id:'uno',label:'UNO',emoji:'🃏',desc:'Classic card game — draw, match & reverse',coming:true},
+];
+
+function gamesScrollLeft(){var el=G('games-scroll-row');if(el)el.scrollBy({left:-170,behavior:'smooth'});}
+function gamesScrollRight(){var el=G('games-scroll-row');if(el)el.scrollBy({left:170,behavior:'smooth'});}
+
+/* ─── RENDER SOLO TILE ROW ─── */
+function renderGamesGrid(){
+  var el=G('games-scroll-row');if(!el)return;
+  el.innerHTML=GAMES.map(function(g){
+    var badge=g.coming
+      ?'<span class="game-badge-soon">SOON</span>'
+      :(g.type==='multi'?'<span class="game-badge-multi">MULTI</span>':'<span class="game-badge-solo">SOLO</span>');
+    var top=g.coming?[]:gsTop3(g.id);
+    var scoreRows=g.coming
+      ?'<div style="font-size:10px;color:var(--muted);padding-top:4px;font-style:italic">Coming soon</div>'
+      :(top.length?top.map(function(r,i){
+          var medals=['🥇','🥈','🥉'];
+          return '<div class="game-tile-score-row">'
+            +'<span class="game-tile-score-rank">'+medals[i]+'</span>'
+            +'<span class="game-tile-score-name">'+htmlEsc(r.nick)+'</span>'
+            +'<span class="game-tile-score-val">'+gsFormat(g.id,r.score)+'</span>'
+            +'</div>';
+        }).join('')
+        :'<div style="font-size:10px;color:var(--muted);padding-top:4px;font-style:italic">No scores yet</div>');
+    return '<div class="game-tile'+(g.coming?' tile-soon':'')+'" data-gameid="'+g.id+'">'
+      +'<div class="game-tile-icon">'+g.emoji+'</div>'
+      +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">'
+      +'<span class="game-tile-name">'+g.label+'</span>'
+      +badge
+      +'</div>'
+      +'<div class="game-tile-desc">'+g.desc+'</div>'
+      +'<div class="game-tile-scores">'+scoreRows+'</div>'
+      +'</div>';
+  }).join('');
+  el.querySelectorAll('[data-gameid]:not(.tile-soon)').forEach(function(card){
+    card.addEventListener('click',function(){openGame(card.dataset.gameid);});
+  });
+}
+
+/* ─── RENDER MULTIPLAYER GRID ─── */
+function renderMpGrid(){
+  var el=G('mp-grid');if(!el)return;
+  el.innerHTML=MP_GAMES.map(function(g){
+    var avColors=['#CECBF6:#3C3489','#9FE1CB:#085041','#F5C4B3:#712B13','#B5D4F4:#0C447C'];
+    var names=cu?TEAM.filter(function(m){return m.nickname!==cu.nickname&&m.role!=='manager';}).slice(0,3):[];
+    var avs=names.map(function(m,i){
+      var c=avColors[i%avColors.length].split(':');
+      return '<div class="mp-av" style="background:'+c[0]+';color:'+c[1]+'">'+m.nickname.slice(0,1).toUpperCase()+'</div>';
+    }).join('');
+    return '<div class="mp-tile'+(g.coming?' mp-soon':'')+'" '+(g.coming?'':'style="cursor:pointer" onclick="openGame(\''+g.id+'\')"')+'>'
+      +(g.coming?'<div class="mp-soon-strip">SOON</div>':'')
+      +'<div class="mp-icon">'+g.emoji+'</div>'
+      +'<div class="mp-name">'+g.label+'<span class="game-badge-multi" style="margin-left:5px">MULTI</span></div>'
+      +'<div class="mp-desc">'+g.desc+'</div>'
+      +(avs?'<div class="mp-avatars">'+avs+'</div>':'')
+      +'</div>';
+  }).join('');
+}
+
+/* ─── GAME MODAL OPENER ─── */
+/* Track active keydown handlers so we can remove on close */
+var _gameKeyHandlers=[];
+function _addGameKey(fn){
+  /* Wrap to stop propagation so portal nav doesn't fire while game is open */
+  var wrapped=function(e){
+    var modal=G('game-modal');
+    if(modal&&modal.classList.contains('open')){
+      e.stopImmediatePropagation();
+      fn(e);
+    }
+  };
+  document.addEventListener('keydown',wrapped,true); /* capture phase */
+  _gameKeyHandlers.push(wrapped);
+}
+function _removeGameKeys(){_gameKeyHandlers.forEach(function(fn){document.removeEventListener('keydown',fn,true);});_gameKeyHandlers=[];}
+
+function openGame(id){
+  var modal=G('game-modal');
+  var titleEl=G('game-modal-title');
+  var body=G('game-modal-body');
+  if(!modal||!titleEl||!body)return;
+  /* Credit check — manager exempt */
+  if(!checkAndSpendCredit(id))return;
+  _removeGameKeys();
+  if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
+  var g=GAMES.find(function(x){return x.id===id;})||MP_GAMES.find(function(x){return x.id===id;});
+  if(!g)return;
+  /* Score bar for solo games */
+  var scoreBar='';
+  if(g.type==='single'||id==='kbquizbattle'){
+    var top=gsTop3(id);
+    var best=top[0]?('<strong>'+htmlEsc(top[0].nick)+'</strong> '+gsFormat(id,top[0].score)):'No scores yet';
+    var bestLabel=id==='kbquizbattle'?'Best score:':'Best:';
+    scoreBar='<div class="game-score-bar" id="gm-score-bar">'
+      +'<span class="game-score-pill" id="gm-cur-score">'+(id==='kbquizbattle'?'Q 1/15 · Score: 0':'Score: <strong>—</strong>')+'</span>'
+      +'<span class="game-score-pill">'+bestLabel+' '+best+'</span>'
+      +'</div>';
+  }
+  titleEl.innerHTML=g.emoji+' '+g.label;
+  body.innerHTML=scoreBar+'<div class="game-canvas-wrap" id="gm-canvas-wrap"></div>';
+  var wrap=body.querySelector('#gm-canvas-wrap');
+  modal.classList.add('open');
+  if(id==='2048')launch2048(wrap);
+  else if(id==='snake')launchSnake(wrap);
+  else if(id==='minesweeper')launchMinesweeper(wrap);
+  else if(id==='wordguess')launchWordGuess(wrap);
+  else if(id==='chess')launchChess(wrap);
+  else if(id==='kbquizbattle')launchKBQuiz(wrap);
+}
+function closeGame(){
+  _removeGameKeys();
+  if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
+  var m=G('game-modal');if(m)m.classList.remove('open');
+  renderGamesGrid();
+}
+function gmSetScore(val){var el=G('gm-cur-score');if(el)el.innerHTML='Score: <strong>'+val+'</strong>';}
+
+function g2048NewGame(){var w=G('game-modal-body');if(w)launch2048(w.querySelector('.game-canvas-wrap'));}
+function g2048KeepGoing(){var ov=document.querySelector('.g2048-overlay');if(ov)ov.remove();}
+
+/* ══ 2048 ══ */
+function launch2048(container){
+  var SIZE=4;
+  var board,score;
+  function newBoard(){board=Array.from({length:SIZE},function(){return Array(SIZE).fill(0)});score=0;addTile();addTile();gmSetScore(0);}
+  function addTile(){
+    var empty=[];
+    for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++)if(!board[r][c])empty.push([r,c]);
+    if(!empty.length)return;
+    var pos=empty[Math.floor(Math.random()*empty.length)];
+    board[pos[0]][pos[1]]=Math.random()<0.9?2:4;
+  }
+  function slide(row){
+    var a=row.filter(Boolean),s=0;
+    for(var i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;s+=a[i];a.splice(i+1,1);i++;}}
+    while(a.length<SIZE)a.push(0);
+    score+=s;return a;
+  }
+  function move(dir){
+    var prev=JSON.stringify(board);
+    if(dir==='left'){for(var r=0;r<SIZE;r++)board[r]=slide(board[r]);}
+    else if(dir==='right'){for(var r=0;r<SIZE;r++)board[r]=slide(board[r].slice().reverse()).reverse();}
+    else if(dir==='up'){for(var c=0;c<SIZE;c++){var col=board.map(function(r){return r[c];});col=slide(col);board.forEach(function(r,i){r[c]=col[i];});}}
+    else if(dir==='down'){for(var c=0;c<SIZE;c++){var col=board.map(function(r){return r[c];});col=slide(col.slice().reverse()).reverse();board.forEach(function(r,i){r[c]=col[i];});}}
+    if(JSON.stringify(board)!==prev){addTile();}
+    gmSetScore(score.toLocaleString());
+    render2048();
+    /* Check win — found 2048 tile */
+    var won=false;
+    outer2:for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++){if(board[r][c]===2048){won=true;break outer2;}}
+    if(won){
+      gsRecord('2048',score,'high');
+      _removeGameKeys();
+      setTimeout(function(){
+        var wrap=document.querySelector('.game-canvas-wrap');
+        if(!wrap)return;
+        var overlay=document.createElement('div');
+        overlay.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.75);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10;';
+        overlay.innerHTML='<div style="font-size:32px">🏆</div>'
+          +'<div style="font-size:20px;font-weight:700;color:#fbbf24;font-family:var(--font-d)">You reached 2048!</div>'
+          +'<div style="font-size:13px;color:#94a3b8">Score: '+score.toLocaleString()+'</div>'
+          +'<div style="display:flex;gap:8px;margin-top:4px">'
+          +'<button onclick="g2048NewGame()" style="padding:8px 18px;border-radius:8px;border:none;background:rgba(255,255,255,.1);color:#f1f5f9;font-size:12px;cursor:pointer">New Game</button>'
+          +'<button onclick="g2048KeepGoing()" style="padding:8px 18px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;cursor:pointer">Keep Going</button>'
+          +'</div>';
+        overlay.className='g2048-overlay';
+        wrap.style.position='relative';
+        wrap.appendChild(overlay);
+      },100);
+      return;
+    }
+    /* Check game over */
+    var over=true;
+    outer:for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++){
+      if(!board[r][c]){over=false;break outer;}
+      if(c<SIZE-1&&board[r][c]===board[r][c+1]){over=false;break outer;}
+      if(r<SIZE-1&&board[r][c]===board[r+1][c]){over=false;break outer;}
+    }
+    if(over){gsRecord('2048',score,'high');setTimeout(function(){alert('Game Over! Score: '+score.toLocaleString());},80);}
+  }
+  var COLORS={'2':'#eee4da','4':'#ede0c8','8':'#f2b179','16':'#f59563','32':'#f67c5f','64':'#f65e3b','128':'#edcf72','256':'#edcc61','512':'#edc850','1024':'#edc53f','2048':'#edc22e'};
+  function render2048(){
+    var grid=container.querySelector('.g2048-grid');if(!grid)return;
+    grid.innerHTML=board.map(function(row){return row.map(function(v){
+      var bg=COLORS[v]||'#3c3a32';
+      var fc=v<=4?'#776e65':'#f9f6f2';
+      var fs=v>999?'14px':v>99?'18px':v>9?'20px':'24px';
+      return '<div style="background:'+bg+';color:'+fc+';border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:'+fs+';font-weight:700;height:60px;font-family:var(--font-d)">'+(v||'')+'</div>';
+    }).join('');}).join('');
+  }
+  container.innerHTML='<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button onclick="launch2048(this.closest(\'.game-canvas-wrap\'))" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">New Game</button></div><div class="g2048-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:#bbada0;padding:8px;border-radius:8px"></div><div style="font-size:10px;color:rgba(255,255,255,.5);text-align:center;margin-top:8px">Arrow keys to move</div>';
+  newBoard();render2048();
+  _addGameKey(function(e){
+    var map={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+    if(map[e.key]){e.preventDefault();move(map[e.key]);}
+  });
+}
+
+/* ══ SNAKE ══ */
+function launchSnake(container){
+  var SZ=18,GRID=20;
+  container.innerHTML='<canvas id="snake-canvas" width="'+(SZ*GRID)+'" height="'+(SZ*GRID)+'" style="border-radius:6px;display:block;margin:0 auto;max-width:100%"></canvas><div style="font-size:10px;color:rgba(255,255,255,.5);text-align:center;margin-top:8px">Arrow keys · Space to start/pause</div><div style="display:flex;justify-content:center;margin-top:8px;gap:4px;flex-direction:column;align-items:center"><div><button data-wgk="up" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px">↑</button></div><div style="display:flex;gap:4px"><button data-wgk="left" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px">←</button><button data-wgk="down" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px">↓</button><button data-wgk="right" style="padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px">→</button></div></div>';
+  var canvas=G('snake-canvas');var ctx=canvas.getContext('2d');
+  var snake,dir,food,sc,running,paused;
+  function init(){
+    snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+    dir={x:1,y:0};food=rndFood();sc=0;running=false;paused=true;
+    render();
+    ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
+    ctx.fillText('Press Space or ↑ to start',canvas.width/2,canvas.height/2);
+    gmSetScore(0);
+  }
+  function rndFood(){var x,y,ok;do{x=Math.floor(Math.random()*GRID);y=Math.floor(Math.random()*GRID);ok=!snake.some(function(s){return s.x===x&&s.y===y;});}while(!ok);return{x:x,y:y};}
+  function setDir(dx,dy){if(Math.abs(dx)===Math.abs(dir.x)||Math.abs(dy)===Math.abs(dir.y))return;dir={x:dx,y:dy};if(paused){paused=false;if(!running)startSnake();}}
+  function startSnake(){running=true;if(window._snakeInterval)clearInterval(window._snakeInterval);window._snakeInterval=setInterval(function(){if(!paused)tick();},130);}
+  function tick(){
+    var head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+    if(head.x<0||head.x>=GRID||head.y<0||head.y>=GRID||snake.some(function(s){return s.x===head.x&&s.y===head.y;})){
+      clearInterval(window._snakeInterval);window._snakeInterval=null;running=false;
+      gsRecord('snake',sc,'high');
+      render();ctx.fillStyle='rgba(239,68,68,.9)';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
+      ctx.fillText('Game Over! Score: '+sc,canvas.width/2,canvas.height/2);
+      ctx.font='11px sans-serif';ctx.fillStyle='rgba(255,255,255,.6)';
+      ctx.fillText('Close & reopen to play again',canvas.width/2,canvas.height/2+20);
+      return;
+    }
+    snake.unshift(head);
+    if(head.x===food.x&&head.y===food.y){sc++;food=rndFood();gmSetScore(sc+' pts');}
+    else snake.pop();
+    render();
+  }
+  function render(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='#16213e';ctx.fillRect(0,0,canvas.width,canvas.height);
+    snake.forEach(function(s,i){ctx.fillStyle=i===0?'#4ade80':'#22c55e';ctx.beginPath();ctx.roundRect(s.x*SZ+1,s.y*SZ+1,SZ-2,SZ-2,4);ctx.fill();});
+    ctx.fillStyle='#f87171';ctx.beginPath();ctx.arc(food.x*SZ+SZ/2,food.y*SZ+SZ/2,SZ/2-2,0,Math.PI*2);ctx.fill();
+  }
+  /* on-screen buttons */
+  container.querySelectorAll('[data-wgk]').forEach(function(b){
+    b.addEventListener('click',function(){
+      var k=b.dataset.wgk;
+      if(k==='up')setDir(0,-1);else if(k==='down')setDir(0,1);else if(k==='left')setDir(-1,0);else if(k==='right')setDir(1,0);
+      if(paused){paused=false;if(!running)startSnake();}
+    });
+  });
+  _addGameKey(function(e){
+    var map={ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1}};
+    if(map[e.key]){e.preventDefault();var d=map[e.key];if(!(d.x===-dir.x&&d.y===-dir.y)){dir=d;if(paused){paused=false;if(!running)startSnake();}}}
+    if(e.key===' '){e.preventDefault();paused=!paused;if(!running&&!paused)startSnake();}
+  });
+  init();
+}
+
+/* ══ MINESWEEPER ══ */
+function launchMinesweeper(container){
+  var ROWS=9,COLS=9,MINES=10;
+  var board,revealed,flagged,gameOver,firstClick,startTime;
+  function newGame(){
+    board=Array.from({length:ROWS},function(){return Array(COLS).fill(0)});
+    revealed=Array.from({length:ROWS},function(){return Array(COLS).fill(false)});
+    flagged=Array.from({length:ROWS},function(){return Array(COLS).fill(false)});
+    gameOver=false;firstClick=true;startTime=null;renderMS();gmSetScore('—');
+  }
+  function placeMines(sr,sc){
+    var placed=0;
+    while(placed<MINES){var r=Math.floor(Math.random()*ROWS),c=Math.floor(Math.random()*COLS);if(board[r][c]===-1)continue;if(Math.abs(r-sr)<=1&&Math.abs(c-sc)<=1)continue;board[r][c]=-1;placed++;}
+    for(var r=0;r<ROWS;r++)for(var c=0;c<COLS;c++){if(board[r][c]===-1)continue;var cnt=0;for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++){var nr=r+dr,nc=c+dc;if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS&&board[nr][nc]===-1)cnt++;}board[r][c]=cnt;}
+  }
+  function reveal(r,c){if(r<0||r>=ROWS||c<0||c>=COLS||revealed[r][c]||flagged[r][c])return;revealed[r][c]=true;if(board[r][c]===0){for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++)reveal(r+dr,c+dc);}}
+  var NC=['','#3b82f6','#22c55e','#ef4444','#7c3aed','#b91c1c','#0891b2','#374151','#6b7280'];
+  function renderMS(){
+    var grid=container.querySelector('.ms-grid');if(!grid)return;
+    grid.innerHTML='';
+    for(var r=0;r<ROWS;r++){
+      var row=document.createElement('div');row.style.display='flex';
+      for(var c=0;c<COLS;c++){
+        var cell=document.createElement('div');
+        var isRev=revealed[r][c],isFlag=flagged[r][c];
+        cell.style.cssText='width:30px;height:30px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:'+(isRev&&board[r][c]>0?'12px':'15px')+';border:1px solid '+(isRev?'#374151':'#4b5563')+';cursor:'+(gameOver||isRev?'default':'pointer')+';user-select:none;background:'+(isRev?(board[r][c]===-1?'#7f1d1d':'#1f2937'):'#374151');
+        if(isRev&&board[r][c]===-1)cell.textContent='💣';
+        else if(isRev&&board[r][c]>0){cell.textContent=board[r][c];cell.style.color=NC[board[r][c]];cell.style.fontWeight='700';}
+        else if(isFlag)cell.textContent='🚩';
+        (function(rr,cc){
+          cell.addEventListener('click',function(){msClick(rr,cc);});
+          cell.addEventListener('contextmenu',function(e){e.preventDefault();if(gameOver||revealed[rr][cc])return;flagged[rr][cc]=!flagged[rr][cc];renderMS();});
+        })(r,c);
+        row.appendChild(cell);
+      }
+      grid.appendChild(row);
+    }
+  }
+  function msClick(r,c){
+    if(gameOver||revealed[r][c]||flagged[r][c])return;
+    if(firstClick){firstClick=false;startTime=Date.now();placeMines(r,c);}
+    if(board[r][c]===-1){
+      revealed[r][c]=true;gameOver=true;
+      for(var mr=0;mr<ROWS;mr++)for(var mc=0;mc<COLS;mc++)if(board[mr][mc]===-1)revealed[mr][mc]=true;
+      renderMS();setTimeout(function(){alert('💥 Mine hit! Try again.');},80);return;
+    }
+    reveal(r,c);
+    var unrevealed=0;for(var mr=0;mr<ROWS;mr++)for(var mc=0;mc<COLS;mc++)if(!revealed[mr][mc]&&board[mr][mc]!==-1)unrevealed++;
+    if(!unrevealed){
+      gameOver=true;
+      var elapsed=Math.round((Date.now()-startTime)/1000);
+      gmSetScore(elapsed+'s');
+      gsRecord('minesweeper',elapsed,'low');
+      setTimeout(function(){alert('🎉 Cleared in '+elapsed+'s!');},80);
+    }
+    renderMS();
+  }
+  container.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:11px;color:rgba(255,255,255,.5)">💣 '+MINES+' mines · 9×9</span><button onclick="launchMinesweeper(this.closest(\'.game-canvas-wrap\'))" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">New Game</button></div><div class="ms-grid" style="display:inline-flex;flex-direction:column;gap:1px;border-radius:6px;overflow:hidden"></div><div style="font-size:10px;color:rgba(255,255,255,.5);margin-top:8px">Left-click to reveal · Right-click to flag</div>';
+  newGame();
+}
+
+/* ══ WORD GUESS ══ */
+function launchWordGuess(container){
+  var WORDS=['AUDIT','CLAIM','DRAFT','LEASE','LEGAL','TITLE','BUYER','OFFER','PRICE','AGENT','BLOCK','LODGE','LOANS','RATES','SALES','TERMS','TRUST','UNITS','YIELD','BONDS','CODES','DEEDS','ENTRY','FUNDS','GRANT','JOINT','MATCH','NOTED','ORDER','QUERY','RULES','SIGNS','TAXES','USAGE','VALUE','WAIVE','ZONES','ACRES','BENCH','CHAIN','DEPOT','ERROR','FENCE','GRADE','PROXY','ASSET','BRIEF','COURT','DELAY','ESCRO'];
+  var answer=WORDS[Math.floor(Math.random()*WORDS.length)];
+  var guesses=[],current='',MAX=6,done=false;
+  var LETS=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+  function renderWG(){
+    var grid=container.querySelector('.wg-grid');
+    var kbd=container.querySelector('.wg-kbd');
+    if(!grid||!kbd)return;
+    var rows='';
+    for(var i=0;i<MAX;i++){
+      var guess=guesses[i]||'';
+      var isActive=i===guesses.length&&!done;
+      var disp=isActive?current:guess;
+      rows+='<div style="display:flex;gap:4px;margin-bottom:4px">';
+      for(var j=0;j<5;j++){
+        var ch=disp[j]||'';
+        var bg='var(--bg3)';var bc='var(--border)';var fc='var(--text)';
+        if(guess&&guess[j]){
+          if(guess[j]===answer[j]){bg='#166534';bc='#166534';fc='#dcfce7';}
+          else if(answer.indexOf(guess[j])>=0){bg='#854d0e';bc='#854d0e';fc='#fef9c3';}
+          else{bg='#1f2937';bc='#374151';fc='#6b7280';}
+        }
+        rows+='<div style="width:42px;height:42px;border:2px solid '+bc+';border-radius:4px;background:'+bg+';color:'+fc+';display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;font-family:var(--font-d)">'+ch+'</div>';
+      }
+      rows+='</div>';
+    }
+    grid.innerHTML=rows;
+    /* keyboard */
+    var used={};
+    guesses.forEach(function(g){g.split('').forEach(function(ch,j){
+      if(g[j]===answer[j])used[ch]='green';
+      else if(answer.indexOf(ch)>=0&&used[ch]!=='green')used[ch]='amber';
+      else if(!used[ch])used[ch]='grey';
+    });});
+    var rows2=[['Q','W','E','R','T','Y','U','I','O','P'],['A','S','D','F','G','H','J','K','L'],['ENTER','Z','X','C','V','B','N','M','⌫']];
+    kbd.innerHTML=rows2.map(function(row){
+      return '<div style="display:flex;gap:3px;justify-content:center;margin-bottom:3px">'+row.map(function(k){
+        var bg=used[k]==='green'?'#166534':used[k]==='amber'?'#854d0e':used[k]==='grey'?'#1f2937':'var(--bg3)';
+        var fc=used[k]?'rgba(255,255,255,.85)':'var(--text)';
+        var w=k.length>1?'54px':'34px';
+        return '<button data-wgk="'+k+'" style="width:'+w+';height:34px;border-radius:4px;border:1px solid var(--border);background:'+bg+';color:'+fc+';font-size:'+(k.length>1?'8px':'12px')+';font-weight:700;cursor:pointer;font-family:var(--font-d)">'+k+'</button>';
+      }).join('')+'</div>';
+    }).join('');
+    kbd.querySelectorAll('[data-wgk]').forEach(function(b){b.addEventListener('click',function(){wgKey(b.dataset.wgk);});});
+  }
+  function wgKey(k){
+    if(done)return;
+    var msg=container.querySelector('.wg-msg');
+    if(k==='⌫'){current=current.slice(0,-1);}
+    else if(k==='ENTER'){
+      if(current.length!==5){if(msg)msg.textContent='Need 5 letters';setTimeout(function(){if(msg)msg.textContent='';},900);return;}
+      guesses.push(current);
+      if(current===answer){done=true;var tries=guesses.length;gmSetScore(tries+' tries');gsRecord('wordguess',tries,'low');if(msg)msg.textContent='🎉 Got it in '+tries+'!';}
+      else if(guesses.length>=MAX){done=true;if(msg)msg.textContent='The word was: '+answer;}
+      else{if(msg)msg.textContent='';}
+      current='';
+    }else{if(current.length<5&&k.length===1)current+=k;}
+    renderWG();
+  }
+  _addGameKey(function(e){
+    if(done)return;
+    if(e.key==='Backspace'){e.preventDefault();wgKey('⌫');}
+    else if(e.key==='Enter'){e.preventDefault();wgKey('ENTER');}
+    else if(/^[a-zA-Z]$/.test(e.key)){e.preventDefault();wgKey(e.key.toUpperCase());}
+  });
+  container.innerHTML='<div class="wg-msg" style="text-align:center;font-size:11px;color:var(--accent);min-height:16px;margin-bottom:6px"></div><div class="wg-grid" style="display:flex;flex-direction:column;align-items:center;margin-bottom:10px"></div><div class="wg-kbd" style="max-width:340px;margin:0 auto"></div><div style="font-size:10px;color:rgba(255,255,255,.5);text-align:center;margin-top:8px">🟩 Right spot · 🟨 Wrong spot · ⬛ Not in word</div>';
+  renderWG();
+}
+
+/* ══ CHESS (1v1 local / vs computer) ══ */
+function launchChess(container){
+  var INIT=['rnbqkbnr','pppppppp','        ','        ','        ','        ','PPPPPPPP','RNBQKBNR'];
+  var GLYPHS={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+  var VALS={p:100,n:320,b:330,r:500,q:900,k:20000};
+  var board,selected,turn,lastFrom,lastTo,moveCount,gameOver,aiThinking;
+
+  function isW(p){return p&&p!=' '&&p===p.toUpperCase();}
+  function isB(p){return p&&p!=' '&&p===p.toLowerCase();}
+  function sameC(a,b){return(isW(a)&&isW(b))||(isB(a)&&isB(b));}
+
+  function copyBoard(b){return b.map(function(r){return r.slice();});}
+
+  function getRawMoves(b,r,c){
+    var p=b[r][c];if(!p||p==' ')return[];
+    var moves=[],low=p.toLowerCase();
+    var addIf=function(nr,nc){if(nr>=0&&nr<8&&nc>=0&&nc<8&&!sameC(p,b[nr][nc]))moves.push([nr,nc]);};
+    var slide=function(dr,dc){for(var i=1;i<8;i++){var nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=8||nc<0||nc>=8)break;if(sameC(p,b[nr][nc]))break;moves.push([nr,nc]);if(b[nr][nc]&&b[nr][nc]!=' ')break;}};
+    if(low==='p'){
+      var dir=isW(p)?-1:1,start=isW(p)?6:1;
+      if(r+dir>=0&&r+dir<8&&b[r+dir][c]==' '){moves.push([r+dir,c]);if(r===start&&b[r+dir*2][c]==' ')moves.push([r+dir*2,c]);}
+      [[r+dir,c-1],[r+dir,c+1]].forEach(function(m){if(m[0]>=0&&m[0]<8&&m[1]>=0&&m[1]<8&&b[m[0]][m[1]]&&b[m[0]][m[1]]!=' '&&!sameC(p,b[m[0]][m[1]]))moves.push(m);});
+    }else if(low==='r'){slide(1,0);slide(-1,0);slide(0,1);slide(0,-1);}
+    else if(low==='b'){slide(1,1);slide(1,-1);slide(-1,1);slide(-1,-1);}
+    else if(low==='q'){slide(1,0);slide(-1,0);slide(0,1);slide(0,-1);slide(1,1);slide(1,-1);slide(-1,1);slide(-1,-1);}
+    else if(low==='n'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(function(d){addIf(r+d[0],c+d[1]);});}
+    else if(low==='k'){[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(function(d){addIf(r+d[0],c+d[1]);});}
+    return moves;
+  }
+
+  function kingPos(b,white){
+    var k=white?'K':'k';
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(b[r][c]===k)return[r,c];
+    return null;
+  }
+  function isInCheck(b,white){
+    var kp=kingPos(b,white);if(!kp)return true;
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+      var p=b[r][c];
+      if(!p||p==' ')continue;
+      if(white?isW(p):isB(p))continue;
+      var mv=getRawMoves(b,r,c);
+      if(mv.some(function(m){return m[0]===kp[0]&&m[1]===kp[1];}))return true;
+    }
+    return false;
+  }
+  function getLegalMoves(b,r,c){
+    var raw=getRawMoves(b,r,c);
+    var p=b[r][c];
+    return raw.filter(function(m){
+      var nb=copyBoard(b);
+      nb[m[0]][m[1]]=nb[r][c];nb[r][c]=' ';
+      if(nb[m[0]][m[1]]==='P'&&m[0]===0)nb[m[0]][m[1]]='Q';
+      if(nb[m[0]][m[1]]==='p'&&m[0]===7)nb[m[0]][m[1]]='q';
+      return !isInCheck(nb,isW(p));
+    });
+  }
+  function allLegal(b,white){
+    var moves=[];
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+      var p=b[r][c];
+      if(!p||p==' ')continue;
+      if(white?!isW(p):!isB(p))continue;
+      getLegalMoves(b,r,c).forEach(function(m){moves.push({fr:r,fc:c,tr:m[0],tc:m[1]});});
+    }
+    return moves;
+  }
+
+  /* Material evaluation */
+  function evaluate(b){
+    var score=0;
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+      var p=b[r][c];if(!p||p==' ')continue;
+      var v=VALS[p.toLowerCase()]||0;
+      score+=isW(p)?-v:v; /* AI is black — positive = good for black */
+    }
+    return score;
+  }
+
+  /* Minimax with alpha-beta, depth 3 */
+  function minimax(b,depth,alpha,beta,maximizing){
+    var moves=allLegal(b,!maximizing); /* maximizing=black's turn */
+    if(depth===0||!moves.length){
+      if(!moves.length){
+        if(isInCheck(b,maximizing))return maximizing?-99999:99999;
+        return 0; /* stalemate */
+      }
+      return evaluate(b);
+    }
+    if(maximizing){
+      var best=-Infinity;
+      for(var i=0;i<moves.length;i++){
+        var m=moves[i],nb=copyBoard(b);
+        nb[m.tr][m.tc]=nb[m.fr][m.fc];nb[m.fr][m.fc]=' ';
+        if(nb[m.tr][m.tc]==='p'&&m.tr===7)nb[m.tr][m.tc]='q';
+        var v=minimax(nb,depth-1,alpha,beta,false);
+        if(v>best)best=v;
+        if(best>alpha)alpha=best;
+        if(beta<=alpha)break;
+      }
+      return best;
+    } else {
+      var best=Infinity;
+      for(var i=0;i<moves.length;i++){
+        var m=moves[i],nb=copyBoard(b);
+        nb[m.tr][m.tc]=nb[m.fr][m.fc];nb[m.fr][m.fc]=' ';
+        if(nb[m.tr][m.tc]==='P'&&m.tr===0)nb[m.tr][m.tc]='Q';
+        var v=minimax(nb,depth-1,alpha,beta,true);
+        if(v<best)best=v;
+        if(best<beta)beta=best;
+        if(beta<=alpha)break;
+      }
+      return best;
+    }
+  }
+
+  function aiMove(){
+    if(gameOver||turn!=='b')return;
+    aiThinking=true;
+    gmSetScore('AI thinking… · Move '+moveCount);
+    setTimeout(function(){
+      var moves=allLegal(board,false);
+      if(!moves.length){
+        if(isInCheck(board,false)){endGame('White wins by checkmate! 🏆');}
+        else{endGame('Stalemate — draw!');}
+        return;
+      }
+      var best=null,bestVal=-Infinity;
+      moves.forEach(function(m){
+        var nb=copyBoard(board);
+        nb[m.tr][m.tc]=nb[m.fr][m.fc];nb[m.fr][m.fc]=' ';
+        if(nb[m.tr][m.tc]==='p'&&m.tr===7)nb[m.tr][m.tc]='q';
+        var v=minimax(nb,2,-Infinity,Infinity,false);
+        if(v>bestVal){bestVal=v;best=m;}
+      });
+      if(best){
+        lastFrom=[best.fr,best.fc];lastTo=[best.tr,best.tc];
+        board[best.tr][best.tc]=board[best.fr][best.fc];
+        board[best.fr][best.fc]=' ';
+        if(board[best.tr][best.tc]==='p'&&best.tr===7)board[best.tr][best.tc]='q';
+        moveCount++;turn='w';aiThinking=false;
+        /* Check if player is now in check/checkmate */
+        var playerMoves=allLegal(board,true);
+        if(!playerMoves.length){
+          if(isInCheck(board,true)){endGame('Black wins by checkmate!');}
+          else{endGame('Stalemate — draw!');}
+          return;
+        }
+        var inCheck=isInCheck(board,true);
+        gmSetScore('Your turn (White) · Move '+moveCount+(inCheck?' · ⚠️ Check!':''));
+        render();
+      }
+    },80);
+  }
+
+  function endGame(msg){
+    gameOver=true;
+    gmSetScore(msg);
+    var el=container.querySelector('.chess-board');
+    if(el){
+      var ov=document.createElement('div');
+      ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.75);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:10;';
+      ov.innerHTML='<div style="font-size:16px;font-weight:700;color:#f1f5f9;text-align:center">'+msg+'</div>'
+        +'<button onclick="launchChess(this.closest(\'.game-canvas-wrap\'))" style="padding:7px 18px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;cursor:pointer">New Game</button>';
+      el.style.position='relative';el.appendChild(ov);
+    }
+  }
+
+  function init(){
+    board=INIT.map(function(row){return row.split('');});
+    selected=null;turn='w';lastFrom=null;lastTo=null;moveCount=0;gameOver=false;aiThinking=false;
+    render();gmSetScore('Your turn — you are White');
+  }
+
+  function render(){
+    var el=container.querySelector('.chess-board');if(!el)return;
+    el.innerHTML='';
+    var legalSet=new Set();
+    if(selected)getLegalMoves(board,selected[0],selected[1]).forEach(function(m){legalSet.add(m[0]+','+m[1]);});
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+      var sq=document.createElement('div');
+      sq.className='chess-sq '+((r+c)%2===0?'light':'dark');
+      sq.style.width='38px';sq.style.height='38px';
+      if(selected&&selected[0]===r&&selected[1]===c)sq.classList.add('selected');
+      if(legalSet.has(r+','+c))sq.classList.add('legal');
+      if(lastFrom&&lastFrom[0]===r&&lastFrom[1]===c)sq.classList.add('last-move');
+      if(lastTo&&lastTo[0]===r&&lastTo[1]===c)sq.classList.add('last-move');
+      var p=board[r][c];
+      if(p&&p!=' '){
+        sq.textContent=GLYPHS[p]||p;
+        sq.style.fontSize='22px';sq.style.lineHeight='1';sq.style.fontWeight='900';
+        if(isW(p)){sq.style.color='#fff';sq.style.textShadow='-1px -1px 0 #222,1px -1px 0 #222,-1px 1px 0 #222,1px 1px 0 #222';}
+        else{sq.style.color='#111';sq.style.textShadow='-1px -1px 0 #eee,1px -1px 0 #eee,-1px 1px 0 #eee,1px 1px 0 #eee';}
+      }
+      (function(rr,cc){sq.addEventListener('click',function(){chessClick(rr,cc);});})(r,c);
+      el.appendChild(sq);
+    }
+  }
+
+  function chessClick(r,c){
+    if(gameOver||aiThinking||turn!=='w')return;
+    var p=board[r][c];
+    if(selected){
+      var moves=getLegalMoves(board,selected[0],selected[1]);
+      var ok=moves.some(function(m){return m[0]===r&&m[1]===c;});
+      if(ok){
+        lastFrom=selected.slice();lastTo=[r,c];
+        board[r][c]=board[selected[0]][selected[1]];
+        board[selected[0]][selected[1]]=' ';
+        if(board[r][c]==='P'&&r===0)board[r][c]='Q'; /* pawn promotion */
+        selected=null;moveCount++;turn='b';
+        /* Check player gave check to AI */
+        render();
+        setTimeout(aiMove,300);
+        return;
+      }
+      selected=null;
+    }
+    if(p&&p!=' '&&isW(p))selected=[r,c];
+    render();
+  }
+
+  container.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<span style="font-size:10px;color:rgba(255,255,255,.5)">♟️ You are White · AI plays Black</span>'
+    +'<button onclick="launchChess(this.closest(\'.game-canvas-wrap\'))" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#94a3b8;cursor:pointer">New Game</button>'
+    +'</div>'
+    +'<div class="chess-board" style="max-width:320px;margin:0 auto"></div>'
+    +'<div style="font-size:10px;color:rgba(255,255,255,.4);text-align:center;margin-top:10px">Click piece → green squares = legal moves → click to move</div>';
+  init();
+}
+
+
+
+/* ══ KB QUIZ BATTLE ══ */
+function launchKBQuiz(container){
+  var pool=KB_QUESTIONS.slice().sort(function(){return Math.random()-.5;});
+  var qIdx=0,score=0,answered=false,totalQ=Math.min(pool.length,15);
+  var letters=['A','B','C','D'];
+
+  function renderQ(){
+    if(qIdx>=totalQ){renderResult();return;}
+    var q=pool[qIdx];
+    answered=false;
+    gmSetScore('Q '+(qIdx+1)+'/'+totalQ+' · Score: '+score);
+    var progress=Math.round((qIdx/totalQ)*100);
+    var opts=q.opts.map(function(o,i){
+      return '<button data-idx="'+i+'" style="width:100%;text-align:left;padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#f1f5f9;font-size:12px;cursor:pointer;margin-bottom:6px;font-family:var(--font-d);transition:border-color .15s;line-height:1.4">'
+        +'<strong style="color:#94a3b8;margin-right:6px">'+letters[i]+'.</strong>'+o
+        +'</button>';
+    }).join('');
+
+    container.innerHTML=
+      '<div style="background:rgba(255,255,255,.05);border-radius:6px;height:4px;margin-bottom:14px;overflow:hidden">'
+      +'<div style="height:100%;width:'+progress+'%;background:var(--accent);transition:width .4s;border-radius:6px"></div>'
+      +'</div>'
+      +'<div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">'+q.cat+'</div>'
+      +'<div style="font-size:14px;font-weight:600;color:#f1f5f9;line-height:1.5;margin-bottom:14px">'+q.q+'</div>'
+      +'<div id="kbq-opts">'+opts+'</div>'
+      +'<div id="kbq-fb" style="min-height:50px;margin-top:4px"></div>';
+
+    container.querySelectorAll('[data-idx]').forEach(function(btn){
+      btn.addEventListener('mouseover',function(){if(!answered)btn.style.borderColor='var(--accent)';});
+      btn.addEventListener('mouseout',function(){if(!answered)btn.style.borderColor='rgba(255,255,255,.12)';});
+      btn.addEventListener('click',function(){answerQ(parseInt(btn.dataset.idx),q);});
+    });
+  }
+
+  function answerQ(chosen,q){
+    if(answered)return;
+    answered=true;
+    var correct=chosen===q.ans;
+    if(correct)score++;
+    gmSetScore('Q '+(qIdx+1)+'/'+totalQ+' · Score: '+score);
+    container.querySelectorAll('[data-idx]').forEach(function(btn){
+      btn.style.cursor='default';
+      var i=parseInt(btn.dataset.idx);
+      if(i===q.ans){btn.style.background='rgba(34,197,94,.2)';btn.style.borderColor='#22c55e';btn.style.color='#86efac';}
+      else if(i===chosen&&!correct){btn.style.background='rgba(239,68,68,.15)';btn.style.borderColor='#ef4444';btn.style.color='#fca5a5';}
+      else{btn.style.opacity='.45';}
+    });
+    var fb=G('kbq-fb');
+    if(fb){
+      fb.innerHTML='<div style="padding:10px 14px;border-radius:8px;background:'+(correct?'rgba(34,197,94,.12)':'rgba(239,68,68,.1)')+';border:1px solid '+(correct?'#166534':'#7f1d1d')+';margin-top:2px">'
+        +'<div style="font-size:12px;font-weight:700;color:'+(correct?'#86efac':'#fca5a5')+';margin-bottom:4px">'+(correct?'✓ Correct!':'✗ Incorrect')+'</div>'
+        +'<div style="font-size:11px;color:#94a3b8;line-height:1.5">'+q.exp+'</div>'
+        +'</div>'
+        +'<div style="text-align:right;margin-top:10px">'
+        +(qIdx+1<totalQ
+          ?'<button onclick="kbqNext()" style="padding:7px 18px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer">Next →</button>'
+          :'<button onclick="kbqNext()" style="padding:7px 18px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer">See Results</button>')
+        +'</div>';
+    }
+  }
+
+  function renderResult(){
+    var pct=Math.round((score/totalQ)*100);
+    var grade=pct>=90?'🏆 Excellent!':pct>=75?'🎉 Great job!':pct>=60?'👍 Good effort!':'📚 Keep studying!';
+    var color=pct>=90?'#4ade80':pct>=75?'#a78bfa':pct>=60?'#fbbf24':'#f87171';
+    gmSetScore('Final: '+score+'/'+totalQ);
+    gsRecord('kbquizbattle',score,'high');
+    /* Award bonus credits for high scores */
+    if(pct>=75)credAward(cu?cu.nickname:'',CREDITS_PER_WIN);
+    container.innerHTML=
+      '<div style="text-align:center;padding:20px 10px">'
+      +'<div style="font-size:36px;margin-bottom:10px">'+grade+'</div>'
+      +'<div style="font-size:48px;font-weight:700;color:'+color+';font-family:var(--font-d);line-height:1">'+pct+'%</div>'
+      +'<div style="font-size:13px;color:#94a3b8;margin-top:6px">'+score+' correct out of '+totalQ+' questions</div>'
+      +'<div style="display:flex;gap:8px;justify-content:center;margin-top:20px">'
+      +'<button onclick="launchKBQuiz(this.closest(\'.game-canvas-wrap\'))" style="padding:9px 22px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Play Again</button>'
+      +'</div>'
+      +'</div>';
+  }
+
+  window.kbqNext=function(){qIdx++;renderQ();};
+  renderQ();
+}
+
+/* ══════════════════════════════════════════════════
+   KNOWLEDGE CHECK — AI-generated MCQ from KB
+   ══════════════════════════════════════════════════ */
+var _kcLoading=false;
+function kcGenerate(){
+  var el=G('kc-container');
+  var btn=G('kc-gen-btn');
+  if(!el||_kcLoading)return;
+  _kcLoading=true;
+  if(btn){btn.disabled=true;btn.textContent='⏳ Generating...';}
+  el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:16px 0;text-align:center">Generating question from Knowledge Base...</div>';
+
+  /* Build a compact KB summary to feed to Claude */
+  var kbTexts=[];
+  (window.mdArticles||[]).filter(function(a){return a.category==='kb'||a.category==='template';}).forEach(function(a){
+    if(a.title)kbTexts.push('TOPIC: '+a.title+(a.body?' SUMMARY: '+a.body.replace(/<[^>]*>/g,'').slice(0,300):''));
+  });
+  (window.KB_ARTICLES||[]).forEach(function(a){
+    if(a.q)kbTexts.push('TOPIC: '+a.q+(a.a?' ANSWER: '+a.a.slice(0,300):''));
+  });
+  if(kbTexts.length===0){kbTexts.push('Vendor names with different spellings should be escalated. AKA addresses require checking. Contracts with missing pages need flagging. Equivalent agencies must be approved. File size over 157MB cannot be uploaded.');}
+
+  var prompt='You are a quiz generator for a real estate contracts processing team. Based on these Knowledge Base topics: '+kbTexts.slice(0,8).join(' --- ')+' Generate ONE multiple-choice question to test team knowledge. Return ONLY valid JSON (no markdown, no backticks) in this exact format: {"question":"...","options":["A. ...","B. ...","C. ...","D. ..."],"answer":"A","explanation":"..."} The answer field must be only the letter (A, B, C, or D). Make the question practical and scenario-based.';
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})
+  }).then(function(r){return r.json();}).then(function(data){
+    var txt=(data.content&&data.content[0]&&data.content[0].text)||'';
+    var parsed;
+    try{
+      var clean=txt.replace(/```json|```/g,'').trim();
+      parsed=JSON.parse(clean);
+    } catch(e){parsed=null;}
+    _kcLoading=false;
+    if(btn){btn.disabled=false;btn.textContent='↺ New Question';}
+    if(!parsed||!parsed.question){
+      el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Could not generate question. Try again.</div>';
+      return;
+    }
+    kcRender(parsed);
+  }).catch(function(){
+    _kcLoading=false;
+    if(btn){btn.disabled=false;btn.textContent='↺ New Question';}
+    el.innerHTML='<div style="font-size:12px;color:var(--red);padding:8px 0">Connection error. Check network.</div>';
+  });
+}
+var _kcCurrentQ=null;
+function kcRender(q){
+  _kcCurrentQ=q;
+  var el=G('kc-container');if(!el)return;
+  var letters=['A','B','C','D'];
+  el.innerHTML='<div style="padding:4px 0 10px">'
+    +'<div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.5;margin-bottom:12px">'+htmlEsc(q.question)+'</div>'
+    +'<div id="kc-options" style="display:flex;flex-direction:column;gap:6px"></div>'
+    +'<div id="kc-feedback" style="margin-top:10px;min-height:32px"></div>'
+    +'</div>';
+  var opts=el.querySelector('#kc-options');
+  q.options.forEach(function(opt,i){
+    var btn=document.createElement('button');
+    btn.textContent=opt;
+    btn.dataset.letter=letters[i];
+    btn.style.cssText='text-align:left;padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;cursor:pointer;transition:all .15s;width:100%;font-family:var(--font-d);';
+    btn.addEventListener('mouseover',function(){if(!btn.dataset.answered)btn.style.borderColor='var(--accent)';});
+    btn.addEventListener('mouseout',function(){if(!btn.dataset.answered)btn.style.borderColor='var(--border)';});
+    btn.addEventListener('click',function(){kcAnswer(btn.dataset.letter,q.answer,q.explanation,opts);});
+    opts.appendChild(btn);
+  });
+}
+function kcAnswer(chosen,correct,explanation,container){
+  var btns=container.querySelectorAll('button[data-letter]');
+  btns.forEach(function(b){
+    b.style.cursor='default';
+    b.dataset.answered='1';
+    b.onmouseover=null;b.onmouseout=null;
+    if(b.dataset.letter===correct){
+      b.style.background='rgba(34,197,94,.18)';
+      b.style.borderColor='var(--green)';
+      b.style.color='var(--green)';
+    } else if(b.dataset.letter===chosen&&chosen!==correct){
+      b.style.background='rgba(239,68,68,.15)';
+      b.style.borderColor='var(--red)';
+      b.style.color='var(--red)';
+    }
+  });
+  var fb=G('kc-feedback');
+  if(fb){
+    var correct_=chosen===correct;
+    fb.innerHTML='<div style="font-size:12px;padding:10px 12px;border-radius:8px;background:'+(correct_?'rgba(34,197,94,.12)':'rgba(239,68,68,.1)')+';border:1px solid '+(correct_?'var(--green)':'var(--red)')+';">'
+      +(correct_?'<strong style="color:var(--green)">✓ Correct!</strong> ':'<strong style="color:var(--red)">✗ Incorrect.</strong> ')
+      +'<span style="color:var(--text)">'+explanation+'</span>'
+      +'</div>';
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   MANAGER KPI QUICK-GLANCE (This Month)
+   ══════════════════════════════════════════════════ */
+function renderMgrKpiCard(){
+  var el=G('mgr-kpi-card');if(!el)return;
+  var now=getSydneyDate();
+  var monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var monthLabel=monthNames[now.getMonth()]+' '+now.getFullYear();
+  var y=now.getFullYear(),m=now.getMonth();
+  /* Date boundary for this month */
+  var fromDate=new Date(y,m,1).toISOString().slice(0,10);
+  var toDate=new Date(y,m+1,0).toISOString().slice(0,10);
+  function inMonth(dateStr){if(!dateStr)return false;var d=dateStr.slice(0,10);return d>=fromDate&&d<=toDate;}
+
+  /* Total uploads this month — uploaders + escalation team */
+  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
+  var escalators=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
+  var allContributors=uploaders.concat(escalators);
+  var totalUploads=0,totalDays=0,errorCount=0,qualEscCount=0;
+  uploaders.forEach(function(member){
+    var nick=member.nickname;
+    var days=Object.keys(perfData[nick]||{}).filter(inMonth);
+    days.forEach(function(d){totalUploads+=(perfData[nick][d].uploadsTotal||0);});
+    totalDays+=days.length;
+    errorCount+=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
+    qualEscCount+=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth(c.date);}).length;
+  });
+  /* Add escalation team uploads to total (they process contracts too) */
+  escalators.forEach(function(member){
+    var nick=member.nickname;
+    var days=Object.keys(perfData[nick]||{}).filter(inMonth);
+    days.forEach(function(d){totalUploads+=(perfData[nick][d].uploadsTotal||0);});
+  });
+  var avgDaily=totalDays>0?(totalUploads/totalDays):0;
+  var qualPct=totalUploads>0?((totalUploads-errorCount-qualEscCount)/totalUploads*100):null;
+  /* SLA this month */
+  var slaInMonth=(slaLog||[]).filter(function(e){return inMonth(e.date);});
+  var avgSLA=slaInMonth.length?(slaInMonth.reduce(function(s,e){return s+(e.pct||0);},0)/slaInMonth.length):null;
+
+  var qColor=qualPct!==null?(qualPct>=95?'var(--green)':qualPct>=80?'var(--amber)':'var(--red)'):'var(--muted)';
+  var slaColor=avgSLA!==null?(avgSLA>=75?'var(--green)':'var(--red)'):'var(--muted)';
+
+  function kpiTile(emoji,val,label,color){
+    return '<div style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;">'
+      +'<div style="font-size:11px;margin-bottom:6px">'+emoji+'</div>'
+      +'<div style="font-size:22px;font-weight:700;color:'+(color||'var(--text)')+';font-family:var(--font-d);line-height:1">'+val+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:4px;font-weight:600;letter-spacing:.5px;text-transform:uppercase">'+label+'</div>'
+      +'</div>';
+  }
+
+  el.innerHTML='<div class="sect-head" style="padding:12px 16px 10px">'
+    +'<span class="sect-title">&#128200; Monthly KPI — '+monthLabel+'</span>'
+    +''
+    +'</div>'
+    +'<div style="display:flex;gap:10px;padding:0 14px 16px;flex-wrap:wrap">'
+    +kpiTile('📤', totalUploads.toLocaleString(), 'Total Uploads', 'var(--text)')
+    +kpiTile('📊', avgDaily>0?avgDaily.toFixed(1):'—', 'Avg Daily (ADU)', 'var(--text)')
+    +kpiTile('✅', qualPct!==null?qualPct.toFixed(1)+'%':'—', 'Quality %', qColor)
+    +kpiTile('🎯', avgSLA!==null?avgSLA.toFixed(1)+'%':'—', 'Esc. SLA %', slaColor)
+    +'</div>';
+}
+
 function renderAnnouncements(){
   var el=G('ann-list');if(!el)return;
   var sorted=mdAnnouncements.slice().sort(function(a,b){return b.postedAt-a.postedAt;});
@@ -7978,10 +9149,6 @@ document.addEventListener('DOMContentLoaded',function(){
         <span id="member-profile-shift" style="font-size:12px;color:var(--text)"></span>
       </div>
     </div>
-    <div>
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px">&#127942; Awards History</div>
-      <div id="member-profile-awards"></div>
-    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="G('modal-member-profile').classList.remove('open')">Close</button>
     </div>
@@ -8144,7 +9311,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- AI ASSISTANT OVERLAY -->
 <!-- KOBY FAB -->
-<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby">
+<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby" style="display:none">
   <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="#fff" stroke="none"/><circle cx="12" cy="10" r="1" fill="#fff" stroke="none"/><circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/></svg>
 </button>
 
@@ -8383,6 +9550,16 @@ document.addEventListener('DOMContentLoaded',function(){
       <button class="btn btn-outline" onclick="G('modal-faq-approval').classList.remove('open')">Cancel</button>
       <button class="btn btn-primary" onclick="approveFAQSave()">&#10003; Save to FAQs</button>
     </div>
+  </div>
+</div>
+<!-- GAME MODAL -->
+<div class="game-modal-overlay" id="game-modal" onclick="if(event.target===this)closeGame()">
+  <div class="game-modal-box">
+    <div class="game-modal-header">
+      <span class="game-modal-header-title" id="game-modal-title">Game</span>
+      <button onclick="closeGame()" style="background:none;border:none;width:28px;height:28px;border-radius:6px;cursor:pointer;color:var(--muted);font-size:15px;display:flex;align-items:center;justify-content:center;transition:background .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">&#x2715;</button>
+    </div>
+    <div class="game-modal-body" id="game-modal-body"></div>
   </div>
 </div>
 </body>
