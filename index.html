@@ -3747,6 +3747,7 @@ function renderArticles(){
     if(atype==='tmpl')atype='template';
     if(atype==='faq')atype='kb';
     if(atype==='ann'||atype==='announcement')return; /* announcements shown separately */
+    if(atype==='template'&&role==='uploader')return; /* templates hidden from uploaders */
     items.push({id:a.id,type:atype,title:a.title,body:a.body,author:a.createdBy||a.author||'',date:a.createdAt?new Date(a.createdAt).getTime():0,unseen:false,role:a.role||'both'});
   });
   (KB_ARTICLES||[]).forEach(function(a){
