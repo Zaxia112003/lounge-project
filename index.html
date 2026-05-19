@@ -1382,7 +1382,13 @@ function fsStartRealtimeListeners(){
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'articles'),function(snap){
     if(!window.mdArticles)window.mdArticles=[];
     window.mdArticles.length=0;
-    snap.forEach(function(d){window.mdArticles.push(Object.assign({id:d.id},d.data()));});
+    snap.forEach(function(d){
+      var data=Object.assign({id:d.id},d.data());
+      /* Migrate legacy category values */
+      if(data.category==='tmpl'){data.category='template';window._fsSetDoc(window._fsDoc(fsDb(),'articles',d.id),{category:'template'},{merge:true});}
+      if(data.category==='faq'){data.category='kb';window._fsSetDoc(window._fsDoc(fsDb(),'articles',d.id),{category:'kb'},{merge:true});}
+      window.mdArticles.push(data);
+    });
     /* Merge ann-type articles into mdAnnouncements so they appear in My Day */
     var annFromArticles=window.mdArticles.filter(function(a){
       return a.category==='ann'||a.type==='ann'||a.category==='announcement';
@@ -3955,7 +3961,8 @@ function submitAddArticle(){
     } else if(type==='kb'||type==='tmpl'||type==='faq'){
       /* Save to Firestore articles collection */
       var artId='art_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6));
-      var newArt={id:artId,title:title,body:body,category:type,role:'both',
+      var saveCategory=type==='tmpl'?'template':type==='faq'?'kb':type;
+      var newArt={id:artId,title:title,body:body,category:saveCategory,role:'both',
                   createdBy:cu.fullName,createdAt:new Date().toISOString()};
       if(!window.mdArticles)window.mdArticles=[];
       window.mdArticles.push(newArt);
