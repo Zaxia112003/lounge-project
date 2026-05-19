@@ -928,7 +928,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.39ae</div>
+    <div class="brand-sub">v.40ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1003,7 +1003,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.39ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.40ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -3339,7 +3339,7 @@ function renderMyDay(){
     +'<div><div style="font-size:15px;font-weight:600;color:var(--muted);font-family:var(--font-d)">'+dateStr+'</div>'
     +'<div style="font-size:13px;color:var(--muted2);margin-top:2px;font-family:var(--font-d)" id="my-day-clock">'+clockStr+'</div>'
     +'</div>'
-    +(cu&&cu.role!=='manager'?'<div id="credit-badge" style="display:none;align-items:center;font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;cursor:default"></div>':'')
+
     +reviewBtn
     +'</div></div>'
     +'<div class="sect ann-board"'+(cu&&cu.role==='manager'?' style="display:none"':'')+'>'
@@ -3373,7 +3373,10 @@ function renderMyDay(){
     /* Games — full width, solo + multiplayer merged */
     +'<div class="sect" style="padding:0;margin-bottom:14px">'
     +'<div class="sect-head" style="padding:11px 14px 10px">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
     +'<span class="sect-title">&#127918; Games</span>'
+    +(cu&&cu.role==='uploader'?'<div id="credit-badge" style="display:none;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:default"></div>':'')
+    +'</div>'
     +'<div style="display:flex;align-items:center;gap:6px">'
     +'<span style="font-size:10px;color:var(--muted)">Solo &amp; Multiplayer</span>'
     +'<button onclick="gamesScrollLeft()" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center">&#8592;</button>'
@@ -3721,8 +3724,8 @@ function credGet(nick){
 }
 
 function credRecalcFromUploads(){
-  /* Called on My Day load — checks today's uploads and awards credits */
-  if(!cu||cu.role==='manager')return;
+  /* Called on My Day load — uploaders only. Escalation team excluded. */
+  if(!cu||cu.role==='manager'||cu.role==='escalation')return;
   var nick=cu.nickname;
   var today=getSydneyDate().toISOString().slice(0,10);
   var d=credLoad();
@@ -3750,7 +3753,7 @@ function credRecalcFromUploads(){
 function credSpend(nick){
   /* Returns true if credit was spent, false if insufficient */
   if(!nick)nick=cu?cu.nickname:'';
-  if(cu&&cu.role==='manager')return true; /* manager plays free */
+  if(cu&&(cu.role==='manager'||cu.role==='escalation'))return true; /* manager & escalation play free */
   var d=credLoad();
   var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
   if((state.credits||0)<CREDITS_COST)return false;
@@ -3772,7 +3775,7 @@ function credAward(nick,amount){
 
 function updateCreditBadge(){
   var el=G('credit-badge');if(!el)return;
-  if(!cu||cu.role==='manager'){el.style.display='none';return;}
+  if(!cu||cu.role==='manager'||cu.role==='escalation'){el.style.display='none';return;}
   var c=credGet(cu.nickname).credits||0;
   el.textContent='🎮 '+c+' credit'+(c===1?'':'s');
   el.style.display='inline-flex';
@@ -3816,7 +3819,7 @@ function showNoCreditModal(gameId){
   overlay.innerHTML='<div style="background:#0f1117;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:28px 32px;max-width:340px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.8)">'
     +'<div style="font-size:32px;margin-bottom:12px">🎮</div>'
     +'<div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:8px">Not enough credits</div>'
-    +'<div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:20px">You need <strong style="color:#a78bfa">1 credit</strong> to play.<br>You earn 1 credit every <strong style="color:#a78bfa">10 uploads</strong>.<br><br>'+(next<10?'Upload <strong style="color:#4ade80">'+next+' more</strong> contract'+(next===1?'':'s')+' today to earn your next credit!':'Process contracts to earn credits.')+'</div>'
+    +'<div style="font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:20px">You need <strong style="color:#a78bfa">1 credit</strong> to play.</div>'
     +'<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="padding:9px 24px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Got it</button>'
     +'</div>';
   document.body.appendChild(overlay);
@@ -4636,43 +4639,53 @@ function kcAnswer(chosen,correct,explanation,container){
 /* ══════════════════════════════════════════════════
    MANAGER KPI QUICK-GLANCE (This Month)
    ══════════════════════════════════════════════════ */
+/* Shared KPI cache — populated by renderMgrHubPerformance when filter=month */
+var _kpiCache=null;
+
 function renderMgrKpiCard(){
   var el=G('mgr-kpi-card');if(!el)return;
   var now=getSydneyDate();
   var monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var monthLabel=monthNames[now.getMonth()]+' '+now.getFullYear();
+
+  /* Compute directly — same logic as My Hub grand totals for this month */
   var y=now.getFullYear(),m=now.getMonth();
-  /* Date boundary for this month */
   var fromDate=new Date(y,m,1).toISOString().slice(0,10);
   var toDate=new Date(y,m+1,0).toISOString().slice(0,10);
-  function inMonth(dateStr){if(!dateStr)return false;var d=dateStr.slice(0,10);return d>=fromDate&&d<=toDate;}
+  function inMonth(d){return d>=fromDate&&d<=toDate;}
 
-  /* Total uploads this month — uploaders + escalation team */
-  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
-  var escalators=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
-  var allContributors=uploaders.concat(escalators);
-  var totalUploads=0,totalDays=0,errorCount=0,qualEscCount=0;
-  uploaders.forEach(function(member){
-    var nick=member.nickname;
-    var days=Object.keys(perfData[nick]||{}).filter(inMonth);
-    days.forEach(function(d){totalUploads+=(perfData[nick][d].uploadsTotal||0);});
-    totalDays+=days.length;
-    errorCount+=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
-    qualEscCount+=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth(c.date);}).length;
+  /* Uploader grand totals (matches My Hub Uploaders section) */
+  var uploaders=TEAM.filter(function(t){return t.role&&t.role.toLowerCase()==='uploader';});
+  var uplRows=uploaders.map(function(t){
+    var nick=t.nickname;
+    var days=Object.keys(perfData[nick]||{}).filter(function(d){return inMonth(d);});
+    var tot=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+    var avg=days.length?tot/days.length:null;
+    var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth((c.date||'').slice(0,10));}).length;
+    var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth((c.date||'').slice(0,10))&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
+    var qScore=tot>0?((tot-errs-qEsc)/tot*100):null;
+    return{tot:tot,avg:avg,qEsc:qEsc,qScore:qScore};
   });
-  /* Add escalation team uploads to total (they process contracts too) */
-  escalators.forEach(function(member){
-    var nick=member.nickname;
-    var days=Object.keys(perfData[nick]||{}).filter(inMonth);
-    days.forEach(function(d){totalUploads+=(perfData[nick][d].uploadsTotal||0);});
-  });
-  var avgDaily=totalDays>0?(totalUploads/totalDays):0;
-  var qualPct=totalUploads>0?((totalUploads-errorCount-qualEscCount)/totalUploads*100):null;
+  var gtUplTotal=uplRows.reduce(function(s,r){return s+r.tot;},0);
+  var gtUplAvgArr=uplRows.filter(function(r){return r.avg!==null;});
+  var gtUplAvg=gtUplAvgArr.length?(gtUplAvgArr.reduce(function(s,r){return s+r.avg;},0)/gtUplAvgArr.length):null;
+  var gtUplQArr=uplRows.filter(function(r){return r.qScore!==null;});
+  var gtUplQ=gtUplQArr.length?(gtUplQArr.reduce(function(s,r){return s+r.qScore;},0)/gtUplQArr.length):null;
+
+  /* Escalation grand total uploads only (added to total) */
+  var escalators=TEAM.filter(function(t){return t.role&&t.role.toLowerCase()==='escalation';});
+  var escUplTotal=escalators.reduce(function(s,t){
+    var nick=t.nickname;
+    return s+Object.keys(perfData[nick]||{}).filter(function(d){return inMonth(d);}).reduce(function(ss,d){return ss+(perfData[nick][d].uploadsTotal||0);},0);
+  },0);
+
+  var totalUploads=gtUplTotal+escUplTotal;
+
   /* SLA this month */
-  var slaInMonth=(slaLog||[]).filter(function(e){return inMonth(e.date);});
+  var slaInMonth=(slaLog||[]).filter(function(e){return inMonth((e.date||'').slice(0,10));});
   var avgSLA=slaInMonth.length?(slaInMonth.reduce(function(s,e){return s+(e.pct||0);},0)/slaInMonth.length):null;
 
-  var qColor=qualPct!==null?(qualPct>=95?'var(--green)':qualPct>=80?'var(--amber)':'var(--red)'):'var(--muted)';
+  var qColor=gtUplQ!==null?(gtUplQ>=95?'var(--green)':gtUplQ>=80?'var(--amber)':'var(--red)'):'var(--muted)';
   var slaColor=avgSLA!==null?(avgSLA>=75?'var(--green)':'var(--red)'):'var(--muted)';
 
   function kpiTile(emoji,val,label,color){
@@ -4685,12 +4698,11 @@ function renderMgrKpiCard(){
 
   el.innerHTML='<div class="sect-head" style="padding:12px 16px 10px">'
     +'<span class="sect-title">&#128200; Monthly KPI — '+monthLabel+'</span>'
-    +''
     +'</div>'
     +'<div style="display:flex;gap:10px;padding:0 14px 16px;flex-wrap:wrap">'
     +kpiTile('📤', totalUploads.toLocaleString(), 'Total Uploads', 'var(--text)')
-    +kpiTile('📊', avgDaily>0?avgDaily.toFixed(1):'—', 'Avg Daily (ADU)', 'var(--text)')
-    +kpiTile('✅', qualPct!==null?qualPct.toFixed(1)+'%':'—', 'Quality %', qColor)
+    +kpiTile('📊', gtUplAvg!==null?gtUplAvg.toFixed(1):'—', 'Avg Daily (ADU)', 'var(--text)')
+    +kpiTile('✅', gtUplQ!==null?gtUplQ.toFixed(1)+'%':'—', 'Quality %', qColor)
     +kpiTile('🎯', avgSLA!==null?avgSLA.toFixed(1)+'%':'—', 'Esc. SLA %', slaColor)
     +'</div>';
 }
