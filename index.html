@@ -645,6 +645,10 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .game-badge-solo{font-size:9px;background:rgba(34,197,94,.15);color:var(--green);border-radius:4px;padding:1px 6px;font-weight:700;}
 .game-badge-multi{font-size:9px;background:rgba(139,45,255,.15);color:var(--accent);border-radius:4px;padding:1px 6px;font-weight:700;}
 .game-badge-soon{font-size:9px;background:rgba(245,158,11,.15);color:var(--amber);border-radius:4px;padding:1px 6px;font-weight:700;}
+.ms-diff-pill{font-size:8px;font-weight:700;border-radius:10px;padding:1px 6px;flex-shrink:0;}
+.ms-diff-easy{background:rgba(34,197,94,.15);color:var(--green);}
+.ms-diff-medium{background:rgba(245,158,11,.15);color:var(--amber);}
+.ms-diff-hard{background:rgba(239,68,68,.12);color:var(--red);}
 .game-tile.tile-soon{opacity:.65;cursor:default;}
 .game-tile.tile-soon:hover{border-color:var(--border);transform:none;}
 /* Chess board */
@@ -3717,10 +3721,13 @@ var KB_Q_TOTAL=KB_QUESTIONS.length;
 
 /* ─── Score storage helpers ─── */
 var GAME_SCORES_KEY='lp_game_scores_v1';
+var UNO_STREAK_KEY='lp_uno_streak_v1';
+var MS_SCORES_KEY='lp_ms_scores_v1';
+
 function gsLoad(){try{return JSON.parse(localStorage.getItem(GAME_SCORES_KEY)||'{}')}catch(e){return {};}}
 function gsSave(d){try{localStorage.setItem(GAME_SCORES_KEY,JSON.stringify(d));}catch(e){}}
+
 function gsRecord(gameId,score,metric){
-  /* metric: 'high' (higher=better) or 'low' (lower=better, e.g. time) */
   if(!cu)return;
   var d=gsLoad();
   if(!d[gameId])d[gameId]=[];
@@ -3730,24 +3737,75 @@ function gsRecord(gameId,score,metric){
   if(better){
     if(existing)existing.score=score;
     else d[gameId].push({nick:nick,score:score});
-    gsSave(d);
-    renderGamesGrid();
+    gsSave(d);renderGamesGrid();
   }
 }
-function gsTop3(gameId){
+
+/* Top 1 scorer for a game */
+function gsTop1(gameId){
   var d=gsLoad();
-  var arr=d[gameId]||[];
-  return arr.slice().sort(function(a,b){
-    /* minesweeper lower=better, others higher=better */
-    return gameId==='minesweeper'?a.score-b.score:b.score-a.score;
-  }).slice(0,3);
+  var arr=(d[gameId]||[]).slice().sort(function(a,b){
+    return gameId==='wordguess'?a.score-b.score:b.score-a.score;
+  });
+  return arr[0]||null;
 }
-function gsFormat(gameId,score){
+
+function gsFormat(gameId,score,diff){
   if(gameId==='minesweeper')return score+'s';
-  if(gameId==='snake')return score+' pts';
   if(gameId==='wordguess')return score+' tries';
-  if(gameId==='kbquizbattle')return score+'/15 correct';
+  if(gameId==='kbquizbattle')return score+'/15';
   return score.toLocaleString();
+}
+
+/* ── Minesweeper per-difficulty scores ── */
+function gsMsLoad(){try{return JSON.parse(localStorage.getItem(MS_SCORES_KEY)||'{}')}catch(e){return {};}}
+function gsMsSave(d){try{localStorage.setItem(MS_SCORES_KEY,JSON.stringify(d));}catch(e){}}
+
+function gsMsRecord(diff,elapsed){
+  if(!cu)return;
+  var d=gsMsLoad();
+  if(!d[diff])d[diff]=[];
+  var nick=cu.nickname;
+  var existing=d[diff].find(function(r){return r.nick===nick;});
+  if(!existing||elapsed<existing.score){
+    if(existing)existing.score=elapsed;
+    else d[diff].push({nick:nick,score:elapsed});
+    gsMsSave(d);renderGamesGrid();
+  }
+}
+
+function gsMsTop1(diff){
+  var d=gsMsLoad();
+  var arr=(d[diff]||[]).slice().sort(function(a,b){return a.score-b.score;});
+  return arr[0]||null;
+}
+
+/* ── UNO win streak ── */
+function unoStreakLoad(){try{return JSON.parse(localStorage.getItem(UNO_STREAK_KEY)||'{}')}catch(e){return {};}}
+function unoStreakSave(d){try{localStorage.setItem(UNO_STREAK_KEY,JSON.stringify(d));}catch(e){}}
+
+function unoRecordWin(nick){
+  var d=unoStreakLoad();
+  if(!d[nick])d[nick]={streak:0,best:0};
+  d[nick].streak=(d[nick].streak||0)+1;
+  if(d[nick].streak>d[nick].best)d[nick].best=d[nick].streak;
+  unoStreakSave(d);renderGamesGrid();
+}
+
+function unoRecordLoss(nick){
+  var d=unoStreakLoad();
+  if(!d[nick])return;
+  d[nick].streak=0;
+  unoStreakSave(d);
+}
+
+function unoTopStreak(){
+  var d=unoStreakLoad();
+  var best=null;
+  Object.keys(d).forEach(function(nick){
+    if(!best||d[nick].best>best.score)best={nick:nick,score:d[nick].best,current:d[nick].streak};
+  });
+  return best;
 }
 
 /* ─── CREDITS SYSTEM ─── */
@@ -3883,30 +3941,93 @@ var MP_GAMES=[
   {id:'uno',label:'UNO',emoji:'🃏',desc:'Classic card game — draw, match & reverse',coming:false},
 ];
 
-function gamesScrollLeft(){var el=G('games-scroll-row');if(el)el.scrollBy({left:-170,behavior:'smooth'});}
-function gamesScrollRight(){var el=G('games-scroll-row');if(el)el.scrollBy({left:170,behavior:'smooth'});}
+/* MS carousel state */
+var _msDiffIdx=0;
+var _msDiffs=[
+  {key:'easy',  label:'Easy',   cls:'ms-easy-badge'},
+  {key:'medium',label:'Medium', cls:'ms-med-badge'},
+  {key:'hard',  label:'Hard',   cls:'ms-hard-badge'}
+];
+function gamesScrollLeft(){var el=G('games-scroll-row');if(el)el.scrollBy({left:-180,behavior:'smooth'});}
+function gamesScrollRight(){var el=G('games-scroll-row');if(el)el.scrollBy({left:180,behavior:'smooth'});}
+function msTileNav(dir){
+  _msDiffIdx=(_msDiffIdx+dir+3)%3;
+  updateMsTile();
+}
+function updateMsTile(){
+  var diff=_msDiffs[_msDiffIdx];
+  var badge=G('ms-tile-badge');
+  var nameEl=G('ms-tile-name');
+  var valEl=G('ms-tile-val');
+  var avEl2=G('ms-tile-av');
+  if(!badge)return;
+  var top=gsMsTop1(diff.key);
+  badge.textContent=diff.label;
+  badge.className='ms-diff-pill ms-diff-'+diff.key;
+  if(top){
+    if(avEl2){avEl2.style.display='flex';avEl2.textContent=top.nick.slice(0,1).toUpperCase();}
+    if(nameEl)nameEl.textContent=top.nick;
+    if(valEl){valEl.textContent=top.score+'s';valEl.style.fontStyle='normal';valEl.style.color='var(--text)';}
+  } else {
+    if(avEl2)avEl2.style.display='none';
+    if(nameEl)nameEl.textContent='';
+    if(valEl){valEl.textContent='No scores yet';valEl.style.fontStyle='italic';valEl.style.color='var(--muted)';}
+  }
+}
 
-/* ─── RENDER SOLO TILE ROW ─── */
 function renderGamesGrid(){
   var el=G('games-scroll-row');if(!el)return;
+  var avColors=['#CECBF6:#3C3489','#9FE1CB:#085041','#F5C4B3:#712B13','#B5D4F4:#0C447C','#C0DD97:#27500A'];
+
+  function miniAv(nick,idx){
+    var c=avColors[(idx||0)%avColors.length].split(':');
+    return '<div style="width:18px;height:18px;border-radius:50%;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:'+c[0]+';color:'+c[1]+'">'+nick.slice(0,1).toUpperCase()+'</div>';
+  }
+
+  function scoreFooter(g){
+    if(g.coming)return '<div class="game-tile-scores"><div style="font-size:10px;color:var(--muted);font-style:italic">Coming soon</div></div>';
+    if(g.id==='chess')return ''; /* no score */
+    if(g.id==='minesweeper'){
+      /* Carousel footer — rendered separately after innerHTML */
+      return '<div class="game-tile-scores" id="ms-tile-score">'
+        +'<div style="display:flex;align-items:center;gap:4px">'
+        +'<button onclick="event.stopPropagation();msTileNav(-1)" style="width:16px;height:16px;border-radius:3px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:10px;display:flex;align-items:center;justify-content:center;padding:0">&#8592;</button>'
+        +'<span class="ms-diff-pill ms-diff-easy" id="ms-tile-badge">Easy</span>'
+        +'<div id="ms-tile-av" style="width:16px;height:16px;border-radius:50%;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;background:#CECBF6;color:#3C3489"></div>'
+        +'<span class="game-tile-score-name" id="ms-tile-name" style="flex:1"></span>'
+        +'<span class="game-tile-score-val" id="ms-tile-val"></span>'
+        +'<button onclick="event.stopPropagation();msTileNav(1)" style="width:16px;height:16px;border-radius:3px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:10px;display:flex;align-items:center;justify-content:center;padding:0">&#8594;</button>'
+        +'</div>'
+        +'</div>';
+    }
+    if(g.id==='uno'){
+      var top=unoTopStreak();
+      if(!top)return '<div class="game-tile-scores"><div style="font-size:10px;color:var(--muted);font-style:italic">No games yet</div></div>';
+      return '<div class="game-tile-scores">'
+        +'<div class="game-tile-score-row">'
+        +'<span class="game-tile-score-rank">🏆</span>'
+        +miniAv(top.nick,0)
+        +'<span class="game-tile-score-name">'+htmlEsc(top.nick)+'</span>'
+        +'<span class="game-tile-score-val">'+top.score+'W streak</span>'
+        +'</div></div>';
+    }
+    /* All other games — top 1 only */
+    var top=gsTop1(g.id);
+    if(!top)return '<div class="game-tile-scores"><div style="font-size:10px;color:var(--muted);font-style:italic">No scores yet</div></div>';
+    var avIdx=0;
+    return '<div class="game-tile-scores">'
+      +'<div class="game-tile-score-row">'
+      +'<span class="game-tile-score-rank">🥇</span>'
+      +miniAv(top.nick,avIdx)
+      +'<span class="game-tile-score-name">'+htmlEsc(top.nick)+'</span>'
+      +'<span class="game-tile-score-val">'+gsFormat(g.id,top.score)+'</span>'
+      +'</div></div>';
+  }
+
   el.innerHTML=GAMES.map(function(g){
     var badge=g.coming
       ?'<span class="game-badge-soon">SOON</span>'
       :(g.type==='multi'?'<span class="game-badge-multi">MULTI</span>':'<span class="game-badge-solo">SOLO</span>');
-    var top=g.coming||g.id==='chess'?[]:gsTop3(g.id);
-    var scoreRows=g.coming
-      ?'<div style="font-size:10px;color:var(--muted);padding-top:4px;font-style:italic">Coming soon</div>'
-      :g.id==='chess'
-      ?''
-      :(top.length?top.map(function(r,i){
-          var medals=['🥇','🥈','🥉'];
-          return '<div class="game-tile-score-row">'
-            +'<span class="game-tile-score-rank">'+medals[i]+'</span>'
-            +'<span class="game-tile-score-name">'+htmlEsc(r.nick)+'</span>'
-            +'<span class="game-tile-score-val">'+gsFormat(g.id,r.score)+'</span>'
-            +'</div>';
-        }).join('')
-        :'<div style="font-size:10px;color:var(--muted);padding-top:4px;font-style:italic">No scores yet</div>');
     return '<div class="game-tile'+(g.coming?' tile-soon':'')+'" data-gameid="'+g.id+'">'
       +'<div class="game-tile-icon">'+g.emoji+'</div>'
       +'<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">'
@@ -3914,12 +4035,16 @@ function renderGamesGrid(){
       +badge
       +'</div>'
       +'<div class="game-tile-desc">'+g.desc+'</div>'
-      +'<div class="game-tile-scores">'+scoreRows+'</div>'
+      +scoreFooter(g)
       +'</div>';
   }).join('');
+
   el.querySelectorAll('[data-gameid]:not(.tile-soon)').forEach(function(card){
     card.addEventListener('click',function(){openGame(card.dataset.gameid);});
   });
+
+  /* Init MS carousel */
+  updateMsTile();
 }
 
 /* ─── RENDER MULTIPLAYER GRID ─── */
@@ -3973,8 +4098,8 @@ function openGame(id){
   /* Score bar for solo games */
   var scoreBar='';
   if(g.type==='single'||id==='kbquizbattle'){
-    var top=gsTop3(id);
-    var best=top[0]?('<strong>'+htmlEsc(top[0].nick)+'</strong> '+gsFormat(id,top[0].score)):'No scores yet';
+    var topOne=id==='minesweeper'?gsMsTop1(_msDifficulty):gsTop1(id);
+    var best=topOne?('<strong>'+htmlEsc(topOne.nick)+'</strong> '+gsFormat(id,topOne.score)):'No scores yet';
     var bestLabel=id==='kbquizbattle'?'Best score:':'Best:';
     scoreBar='<div class="game-score-bar" id="gm-score-bar">'
       +'<span class="game-score-pill" id="gm-cur-score">'+(id==='kbquizbattle'?'Q 1/15 · Score: 0':'Score: <strong>—</strong>')+'</span>'
@@ -4262,7 +4387,7 @@ function launchMinesweeper(container,diff){
       gameOver=true;
       var elapsed=Math.round((Date.now()-startTime)/1000);
       gmSetScore(elapsed+'s');
-      gsRecord('minesweeper',elapsed,'low');
+      gsMsRecord(_msDifficulty,elapsed);
       SFX.msWin();setTimeout(function(){alert('🎉 Cleared in '+elapsed+'s!');},80);
     }
     renderMS();
@@ -5191,7 +5316,7 @@ async function unoPlayCard(cardIdx,chosenColor){
 
   /* Check win */
   if(hand.length===0){
-    SFX.unoWin();credAward(_unoMyNick,2);
+    SFX.unoWin();credAward(_unoMyNick,2);unoRecordWin(_unoMyNick);
     await unoUpdate({hands:hands,discard:discard,draw:draw,phase:'ended',winner:_unoMyNick,lastAction:_unoMyNick+' wins! 🎉',currentColor:newColor});
     return;
   }
@@ -5507,6 +5632,7 @@ window.unoPickColor=function(cardIdx){
 function unoRenderEnded(root){
   var s=_unoState;
   var iWon=s.winner===_unoMyNick;
+  if(!iWon&&_unoMyNick&&s.winner)unoRecordLoss(_unoMyNick);
   var isPlayer=(s.activePlayers||[]).indexOf(_unoMyNick)>=0;
   root.innerHTML='<div class="uno-wrap"><div class="uno-result" style="position:static;background:transparent;min-height:360px">'
     +'<div class="uno-result-emoji">'+(iWon?'🏆':'😅')+'</div>'
