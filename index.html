@@ -593,6 +593,15 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .fmt-toolbar button:hover{background:var(--bg2);border-color:var(--border);color:var(--text);}
 .fmt-toolbar button.active{background:rgba(139,45,255,.12);border-color:var(--accent);color:var(--accent);}
 .fmt-toolbar .fmt-sep{width:1px;background:var(--border);margin:2px 3px;}
+.fmt-link-popover{position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;width:300px;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none;}
+.fmt-link-popover.open{display:block;}
+.fmt-link-popover label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px;}
+.fmt-link-popover input{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);outline:none;margin-bottom:10px;}
+.fmt-link-popover input:focus{border-color:var(--accent);}
+.fmt-link-popover .fp-row{display:flex;gap:8px;justify-content:flex-end;}
+.fmt-link-popover .fp-row button{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid var(--border);}
+.fmt-link-popover .fp-insert{background:var(--accent);color:#fff;border-color:var(--accent);}
+.fmt-link-popover .fp-cancel{background:none;color:var(--muted);}
 .fmt-body-wrap .form-input{border-radius:0 0 8px 8px !important;}
 .kb-modal-body table{border-spacing:0;border-collapse:collapse;width:100%;margin-bottom:16px;font-size:11px;}
 .kb-modal-body td,.kb-modal-body th{border:1px solid var(--border);padding:5px 7px;vertical-align:top;color:var(--text);}
@@ -3402,6 +3411,59 @@ function fmtUpdateState(){
   var states={0:document.queryCommandState('bold'),1:document.queryCommandState('italic'),2:document.queryCommandState('underline')};
   btns.forEach(function(b,i){if(i<3)b.classList.toggle('active',!!states[i]);});
 }
+var _fmtLinkSel=null,_fmtLinkRange=null;
+function fmtLinkOpen(evt){
+  evt.preventDefault();
+  var sel=window.getSelection();
+  var selectedText=sel&&sel.toString().trim();
+  if(sel&&sel.rangeCount){_fmtLinkRange=sel.getRangeAt(0).cloneRange();}
+  var pop=G('fmt-link-pop');if(!pop)return;
+  G('fmt-link-text').value=selectedText||'';
+  G('fmt-link-url').value='';
+  /* Position near button */
+  var btn=evt.currentTarget;
+  var rect=btn.getBoundingClientRect();
+  pop.style.top=(rect.bottom+6)+'px';
+  pop.style.left=Math.min(rect.left, window.innerWidth-316)+'px';
+  pop.classList.add('open');
+  setTimeout(function(){
+    var f=G('fmt-link-text');
+    if(f.value)G('fmt-link-url').focus();
+    else f.focus();
+  },60);
+}
+function fmtLinkClose(){
+  var pop=G('fmt-link-pop');if(pop)pop.classList.remove('open');
+  _fmtLinkRange=null;
+}
+function fmtLinkInsert(){
+  var url=(G('fmt-link-url').value||'').trim();
+  var txt=(G('fmt-link-text').value||'').trim();
+  if(!url){G('fmt-link-url').focus();return;}
+  if(!/^https?:\/\//i.test(url))url='https://'+url;
+  if(!txt)txt=url;
+  var a=document.createElement('a');
+  a.href=url;a.textContent=txt;a.target='_blank';a.rel='noopener noreferrer';
+  a.style.cssText='color:var(--accent);text-decoration:underline;';
+  var body=G('add-article-body-inp');if(!body)return;
+  body.focus();
+  if(_fmtLinkRange){
+    var sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_fmtLinkRange);
+    _fmtLinkRange.deleteContents();
+    _fmtLinkRange.insertNode(a);
+    var r=document.createRange();r.setStartAfter(a);r.collapse(true);
+    sel.removeAllRanges();sel.addRange(r);
+  } else {
+    body.appendChild(a);
+  }
+  fmtLinkClose();
+}
+document.addEventListener('click',function(e){
+  var pop=G('fmt-link-pop');
+  if(pop&&pop.classList.contains('open')&&!pop.contains(e.target)&&!e.target.closest('[onclick*="fmtLinkOpen"]'))fmtLinkClose();
+});
 function handleArticlePaste(event, el){
   var items=event.clipboardData&&event.clipboardData.items;
   if(!items)return;
@@ -3999,7 +4061,7 @@ function viewArticle(id){
             author:(fsArt.createdBy||authorLabel),
             postedAt:fsArt.createdAt?new Date(fsArt.createdAt).getTime():null,
             date:fsArt.createdAt?new Date(fsArt.createdAt).getTime():null,
-            isTmpl:atype==='tmpl',tmplId:atype==='tmpl'?id:null,
+            isTmpl:(atype==='tmpl'||atype==='template'),tmplId:(atype==='tmpl'||atype==='template')?id:null,
             fsArtId:id,fsArtType:atype};
     }
   }
@@ -4021,7 +4083,7 @@ function viewArticle(id){
   }
   var copyBtn=G('tmpl-modal-copy');
   if(copyBtn){
-    if(item.isTmpl&&item.tmplId){copyBtn.style.display='';_currentTmplId=item.tmplId;}
+    if(item.isTmpl){copyBtn.style.display='';_currentTmplId=item.tmplId;}
     else{copyBtn.style.display='none';_currentTmplId=null;}
   }
   /* Manager edit button */
@@ -6725,7 +6787,7 @@ function renderTemplates(){
 }
 
 function copyTemplate(id, btn){
-  var fsT=(window.mdArticles||[]).find(function(x){return String(x.id)===String(id)&&(x.category==='tmpl'||x.type==='tmpl');});
+  var fsT=(window.mdArticles||[]).find(function(x){return String(x.id)===String(id)&&(x.category==='tmpl'||x.category==='template'||x.type==='tmpl'||x.type==='template');});
   if(fsT){
     var bt=fsT.body.replace(/<img[^>]*>/gi,'[image]').replace(/<[^>]+>/g,'').trim();
     navigator.clipboard.writeText(bt).then(function(){
@@ -8054,6 +8116,19 @@ document.addEventListener('DOMContentLoaded',function(){
           <button title="Red text" onclick="fmtDo('redtext')" onmousedown="event.preventDefault()" style="color:#ef4444">&#9632; Red</button>
           <div class="fmt-sep"></div>
           <button title="Clear formatting" onclick="fmtDo('removeFormat')" onmousedown="event.preventDefault()">&#10005; Clear</button>
+          <div class="fmt-sep"></div>
+          <button title="Insert link" onclick="fmtLinkOpen(event)" onmousedown="event.preventDefault()">&#128279; Link</button>
+        </div>
+        <!-- Link popover -->
+        <div class="fmt-link-popover" id="fmt-link-pop">
+          <label>Display text</label>
+          <input type="text" id="fmt-link-text" placeholder="e.g. Click here">
+          <label>URL</label>
+          <input type="text" id="fmt-link-url" placeholder="https://...">
+          <div class="fp-row">
+            <button class="fp-cancel" onclick="fmtLinkClose()">Cancel</button>
+            <button class="fp-insert" onclick="fmtLinkInsert()">Insert Link</button>
+          </div>
         </div>
         <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none;border-radius:0 0 8px 8px" onpaste="handleArticlePaste(event,this)" onfocus="fmtSetTarget(this)" onkeyup="fmtUpdateState()" onmouseup="fmtUpdateState()" onkeydown="event.stopPropagation()"></div>
         </div>
