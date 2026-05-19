@@ -603,7 +603,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .kc-progress{height:4px;border-radius:4px;background:var(--bg3);margin-bottom:14px;overflow:hidden;}
 .kc-progress-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .4s;}
 .kc-opt{width:100%;text-align:left;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:12px;cursor:pointer;margin-bottom:6px;font-family:var(--font-d);transition:border-color .15s;line-height:1.4;}
-.kc-opt:hover{border-color:var(--accent);}
+.kc-opt:hover:not([style*="pointer-events: none"]):not([style*="pointer-events:none"]){border-color:var(--accent);}
 .kc-opt.correct{background:rgba(34,197,94,.15);border-color:#22c55e;color:#86efac;cursor:default;}
 .kc-opt.wrong{background:rgba(239,68,68,.12);border-color:#ef4444;color:#fca5a5;cursor:default;}
 .kc-opt.dim{opacity:.4;cursor:default;}
@@ -957,7 +957,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.45ae</div>
+    <div class="brand-sub">v.46ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1032,7 +1032,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.45ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.46ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -2672,6 +2672,8 @@ function clearNotifs(){notifications=[];renderNotifs();}
 
 /* ── BUILD MAIN ── */
 function buildMain(){
+  /* Subscribe to KC results from Firestore so all devices stay in sync */
+  kcSubscribe();
   /* Auto-purge announcements past their expiresAt — fallback to 15 days if not set */
   var fallbackCutoff=Date.now()-(15*24*60*60*1000);
   var warnCutoff=Date.now()+(24*60*60*1000); /* expiring within 24hrs */
@@ -4921,11 +4923,12 @@ function kcRender(q){
 function kcAnswer(chosen,correct,explanation,container){
   var correct_=(chosen===correct);
   correct_?SFX.kcCorrect():SFX.kcWrong();
+  /* Lock entire options container immediately */
+  container.style.pointerEvents='none';
   var btns=container.querySelectorAll('button[data-letter]');
   btns.forEach(function(b){
     b.style.cursor='default';
-    b.dataset.answered='1';
-    b.onmouseover=null;b.onmouseout=null;
+    b.style.transition='none';
     if(b.dataset.letter===correct){
       b.style.background='rgba(34,197,94,.18)';
       b.style.borderColor='var(--green)';
@@ -4934,11 +4937,12 @@ function kcAnswer(chosen,correct,explanation,container){
       b.style.background='rgba(239,68,68,.15)';
       b.style.borderColor='var(--red)';
       b.style.color='var(--red)';
+    } else {
+      b.style.opacity='.4';
     }
   });
   var fb=G('kc-feedback');
   if(fb){
-    var correct_=chosen===correct;
     fb.innerHTML='<div style="font-size:12px;padding:10px 12px;border-radius:8px;background:'+(correct_?'rgba(34,197,94,.12)':'rgba(239,68,68,.1)')+';border:1px solid '+(correct_?'var(--green)':'var(--red)')+';">'
       +(correct_?'<strong style="color:var(--green)">✓ Correct!</strong> ':'<strong style="color:var(--red)">✗ Incorrect.</strong> ')
       +'<span style="color:var(--text)">'+explanation+'</span>'
@@ -5695,7 +5699,7 @@ function unoStartTimerUI(){
 /* ══════════════════════════════════════════════════
    KNOWLEDGE CHECK SYSTEM
    ══════════════════════════════════════════════════ */
-var KC_KEY='lp_kc_v1';
+var KC_KEY='lp_kc_v1'; /* kept for legacy fallback */
 var KC_PASS_PCT=80;
 var KC_Q_COUNT=10;
 
@@ -5707,26 +5711,57 @@ function kcWeekId(){
   return d.getFullYear()+'-W'+String(week).padStart(2,'0');
 }
 
-function kcLoad(){try{return JSON.parse(localStorage.getItem(KC_KEY)||'{}')}catch(e){return {};}}
-function kcSave(d){try{localStorage.setItem(KC_KEY,JSON.stringify(d));}catch(e){}}
+/* ── Firestore KC helpers ── */
+/* Doc path: kc_results / {nick}_{week} */
+function kcFsId(nick,week){return (nick||'')+'_'+(week||kcWeekId());}
 
-/* Returns player state for current week */
 function kcGetState(nick){
   if(!nick)nick=cu?cu.nickname:'';
-  var all=kcLoad();
+  /* Read from in-memory cache _kcCache */
   var week=kcWeekId();
-  if(!all[nick])all[nick]={};
-  if(!all[nick][week])all[nick][week]={attempts:[],completed:false};
-  return all[nick][week];
+  if(window._kcCache&&window._kcCache[nick]&&window._kcCache[nick][week])
+    return window._kcCache[nick][week];
+  return {attempts:[],completed:false};
 }
 
-function kcSaveState(nick,state){
+async function kcSaveState(nick,state){
   if(!nick)nick=cu?cu.nickname:'';
-  var all=kcLoad();
   var week=kcWeekId();
-  if(!all[nick])all[nick]={};
-  all[nick][week]=state;
-  kcSave(all);
+  /* Write to Firestore */
+  if(fsDb()){
+    try{
+      var docId=kcFsId(nick,week);
+      await window._fsSetDoc(window._fsDoc(fsDb(),'kc_results',docId),
+        {nick:nick,week:week,state:state},{merge:true});
+    }catch(e){console.warn('KC save error',e);}
+  }
+  /* Also update local cache immediately */
+  if(!window._kcCache)window._kcCache={};
+  if(!window._kcCache[nick])window._kcCache[nick]={};
+  window._kcCache[nick][week]=state;
+}
+
+/* Subscribe to KC results — called after login */
+var _kcUnsub=null;
+function kcSubscribe(){
+  if(_kcUnsub){_kcUnsub();_kcUnsub=null;}
+  if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
+  window._kcCache={};
+  _kcUnsub=window._fsOnSnapshot(window._fsColl(fsDb(),'kc_results'),function(snap){
+    window._kcCache={};
+    snap.forEach(function(d){
+      var data=d.data();
+      if(!data.nick||!data.week||!data.state)return;
+      if(!window._kcCache[data.nick])window._kcCache[data.nick]={};
+      window._kcCache[data.nick][data.week]=data.state;
+    });
+    /* Refresh UI */
+    if(typeof kcUpdateBanner==='function')kcUpdateBanner();
+    if(typeof renderKCTile==='function'&&cu&&cu.role!=='manager')renderKCTile();
+    /* Refresh manager KC tab if open */
+    var kcPane=G('mgr-hub-pane-kc');
+    if(kcPane&&kcPane.classList.contains('active'))renderMgrKCResults(kcPane);
+  });
 }
 
 /* Can this player take the KC this week? */
@@ -5848,10 +5883,12 @@ function kcAnswer(chosen){
   correct?SFX.kcCorrect():SFX.kcWrong();
   _kcSession.answers.push({qId:q.id,chosen:chosen,correct:correct,cat:q.cat});
 
-  /* Style buttons */
-  var btns=G('kc-opts').querySelectorAll('.kc-opt');
+  /* Lock entire options container immediately */
+  var optsContainer=G('kc-opts');
+  optsContainer.style.pointerEvents='none';
+  var btns=optsContainer.querySelectorAll('.kc-opt');
   btns.forEach(function(b,i){
-    b.classList.remove('kc-opt'); /* disable hover */
+    b.style.cursor='default';
     if(i===q.ans)b.className='kc-opt correct';
     else if(i===chosen&&!correct)b.className='kc-opt wrong';
     else b.className='kc-opt dim';
@@ -5876,7 +5913,7 @@ function kcNextQ(){
   kcRenderQuestion();
 }
 
-function kcFinish(){
+async function kcFinish(){
   if(!_kcSession)return;
   var score=_kcSession.answers.filter(function(a){return a.correct;}).length;
   var pct=Math.round((score/KC_Q_COUNT)*100);
@@ -5892,7 +5929,7 @@ function kcFinish(){
     answers:_kcSession.answers
   });
   if(passed)s.completed=true;
-  kcSaveState(nick,s);
+  await kcSaveState(nick,s);
   _kcSession=null;
   kcUpdateBanner();
   renderKCTile();
@@ -5937,12 +5974,12 @@ function kcShowBreakdown(){
 
 /* ── MANAGER KC VIEW ── */
 function kcGetAllResults(){
-  var all=kcLoad();
+  var cache=window._kcCache||{};
   var week=kcWeekId();
   var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
   return members.map(function(m){
     var nick=m.nickname;
-    var ws=(all[nick]&&all[nick][week])||{attempts:[],completed:false};
+    var ws=(cache[nick]&&cache[nick][week])||{attempts:[],completed:false};
     var attempts=ws.attempts||[];
     var best=attempts.length?attempts.reduce(function(b,a){return a.score>b.score?a:b;}):null;
     return {nick:nick,fullName:m.fullName,role:m.role,attempts:attempts,best:best,completed:kcIsCompleted(nick)};
