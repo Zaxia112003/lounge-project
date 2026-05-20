@@ -1741,6 +1741,7 @@ function initNickListener(){
 }
 /* ── ADMIN OVERRIDE CODE ── */
 var ADMIN_CODE='112003';
+var _adminTestMode=false; /* toggled via Koby — type 112003 to enable/disable */
 
 function handleLogin(){
   var raw=G('inp-nick').value.trim();
@@ -6060,7 +6061,8 @@ function renderMgrKCResults(container){
           +'<span style="color:'+(a.correct?'var(--green)':'var(--red)')+';font-weight:700;flex-shrink:0;width:14px">'+(a.correct?'✓':'✗')+'</span>'
           +'<div style="flex:1;min-width:0">'
           +'<div style="color:var(--text);margin-bottom:2px">'+q.q+'</div>'
-          +(a.correct?'':'<div style="color:var(--red);font-size:10px">Answered: '+letters[a.chosen]+' · Correct: '+letters[q.ans]+'</div>')
+          +(a.correct?'':'<div style="color:var(--red);font-size:10px;margin-top:3px">Answered: '+letters[a.chosen]+' — '+q.opts[a.chosen]+'</div>'
+            +'<div style="color:var(--green);font-size:10px;margin-top:2px">Correct: '+letters[q.ans]+' — '+q.opts[q.ans]+'</div>')
           +'</div></div>';
       }).join('');
       breakdown='<div id="'+breakdownId+'" style="display:none;grid-column:1/-1;padding:8px 14px 10px;background:var(--bg3);border-top:1px solid var(--border)">'
