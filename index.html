@@ -5473,6 +5473,15 @@ async function unoDrawCards(){
   });
 }
 
+async function unoForceEnd(){
+  if(!_unoState)return;
+  await unoUpdate({
+    phase:'ended',winner:'',
+    lastAction:'Game ended by manager.',
+    activePlayers:[],hands:{}
+  });
+}
+
 /* ─── CALL UNO ─── */
 async function unoCallUno(){
   if(!_unoState)return;
@@ -5540,6 +5549,11 @@ async function unoLeaveRoom(){
 function unoRender(){
   var root=G('uno-root');if(!root||!_unoState)return;
   root.style.position='relative';
+  /* Auto-end if playing with no active players */
+  if(_unoState.phase==='playing'&&(!_unoState.activePlayers||_unoState.activePlayers.length===0)){
+    unoUpdate({phase:'ended',winner:'',lastAction:'Game ended — no players remaining.'});
+    return;
+  }
   if(_unoState.phase==='lobby')unoRenderLobby(root);
   else if(_unoState.phase==='playing')unoRenderGame(root);
   else if(_unoState.phase==='ended')unoRenderEnded(root);
@@ -5693,7 +5707,9 @@ function unoRenderGame(root){
     +(isPlayer?'<div class="uno-action-row">'
       +(myHand.length===1?'<button class="uno-btn-uno" onclick="unoCallUno()">UNO!</button>':'')
       +'<button class="uno-btn uno-btn-secondary uno-btn-sm" onclick="unoStandUp()">Stand up</button>'
+      +(cu&&cu.role==='manager'?'<button class="uno-btn uno-btn-sm" style="background:#7f1d1d;color:#fca5a5;border:none" onclick="unoForceEnd()">⏹ Force End</button>':'')
       +'</div>':'')
+    +(cu&&cu.role==='manager'&&!isPlayer?'<div class="uno-action-row"><button class="uno-btn uno-btn-sm" style="background:#7f1d1d;color:#fca5a5;border:none" onclick="unoForceEnd()">⏹ Force End Game</button></div>':'')
     +'</div>'
     /* color picker placeholder */
     +'<div id="uno-color-picker" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.85);border-radius:10px;flex-direction:column;align-items:center;justify-content:center;gap:14px">'
