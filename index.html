@@ -6050,30 +6050,33 @@ function renderMgrKCResults(container){
     var attempts=r.attempts.length+'/2';
 
     /* Breakdown expand */
-    var breakdownId='kcbr-'+r.nick;
+    var breakdownId='kcbr-'+r.nick.replace(/\s+/g,'_');
     var breakdown='';
-    if(r.best&&r.best.answers){
-      breakdown='<div id="'+breakdownId+'" style="display:none;grid-column:1/-1;padding:10px 14px 4px;background:var(--bg3);border-top:1px solid var(--border)">'
-        +r.best.answers.map(function(a){
-          var q=KB_QUESTIONS.find(function(x){return x.id===a.qId;});
-          if(!q)return '';
-          return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:8px;align-items:flex-start">'
-            +'<span style="color:'+(a.correct?'var(--green)':'var(--red)')+';font-weight:700;flex-shrink:0">'+(a.correct?'✓':'✗')+'</span>'
-            +'<div><div style="color:var(--text)">'+q.q+'</div>'
-            +(a.correct?'':'<div style="color:var(--red);margin-top:2px">Answered: '+letters[a.chosen]+' · Correct: '+letters[q.ans]+'</div>')
-            +'</div></div>';
-        }).join('')
+    if(r.best&&r.best.answers&&r.best.answers.length){
+      var answerRows=r.best.answers.map(function(a){
+        var q=KB_QUESTIONS.find(function(x){return String(x.id)===String(a.qId);});
+        if(!q)return '<div style="padding:6px 0;font-size:11px;color:var(--muted)">Question data unavailable</div>';
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:8px;align-items:flex-start">'
+          +'<span style="color:'+(a.correct?'var(--green)':'var(--red)')+';font-weight:700;flex-shrink:0;width:14px">'+(a.correct?'✓':'✗')+'</span>'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="color:var(--text);margin-bottom:2px">'+q.q+'</div>'
+          +(a.correct?'':'<div style="color:var(--red);font-size:10px">Answered: '+letters[a.chosen]+' · Correct: '+letters[q.ans]+'</div>')
+          +'</div></div>';
+      }).join('');
+      breakdown='<div id="'+breakdownId+'" style="display:none;grid-column:1/-1;padding:8px 14px 10px;background:var(--bg3);border-top:1px solid var(--border)">'
+        +answerRows
         +'</div>';
     }
 
-    return '<div class="kc-mgr-row" onclick="var el=G(\''+breakdownId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'" style="cursor:'+(r.best?'pointer':'default')+';flex-wrap:wrap">'
+    return '<div class="kc-mgr-row" style="cursor:'+(r.best&&r.best.answers&&r.best.answers.length?'pointer':'default')+';flex-wrap:wrap" '
+      +(r.best&&r.best.answers&&r.best.answers.length?'onclick="var el=G(\''+breakdownId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"':'')+'>'
       +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,24)+'<span style="font-weight:600">'+r.fullName+'</span></div>'
       +'<div>'+statusDot+statusLabel+'</div>'
       +'<div style="color:var(--text);font-weight:600">'+scoreStr+'</div>'
       +'<div style="color:var(--muted)">'+attempts+' attempts</div>'
       +'<div style="color:var(--muted);font-size:10px">'+(r.best?r.best.date:'—')+'</div>'
-      +'</div>'
-      +breakdown;
+      +breakdown
+      +'</div>';
   }).join('');
 
   var done=results.filter(function(r){return r.completed;}).length;
