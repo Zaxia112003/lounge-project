@@ -922,7 +922,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 /* ══ QUALITY TAB ══ */
 .qual-bar-chart{display:flex;align-items:flex-end;gap:8px;height:140px;padding:0 0 6px;}
 .qual-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;}
-.qual-bar{border-radius:4px 4px 0 0;width:100%;min-height:3px;transition:height .3s;}
+.qual-bar{border-radius:6px;width:100%;height:8px;min-height:4px;}
 .qual-bar-val{font-size:12px;font-weight:600;color:var(--text);}
 .qual-bar-name{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center;}
 .qual-err-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;}
@@ -5031,7 +5031,7 @@ function launchSolitaire(container){
   var _solStart=Date.now();
 
   function render(){
-    var cw=52,ch=72,ov=22;
+    var cw=52,ch=72,ov=16;
     var cs='width:'+cw+'px;height:'+ch+'px;border-radius:6px;border:1px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;user-select:none;position:relative;display:flex;flex-direction:column;justify-content:flex-start;padding:3px 4px;';
     var back='background:#4c1d95;color:#a78bfa;align-items:center;justify-content:center;font-size:20px;';
     var empty='background:rgba(255,255,255,.04);border:1.5px dashed rgba(255,255,255,.12);cursor:default;align-items:center;justify-content:center;color:rgba(255,255,255,.12);font-size:11px;';
@@ -6339,7 +6339,8 @@ function renderMgrHubQuality(){
   function inRange(d){if(!d)return false;var s=d.slice(0,10);return s>=fromD&&s<=toD;}
 
   /* Gather error data from callouts */
-  var uploaders=TEAM.filter(function(t){return t.role==='uploader';});
+  var _qMF=window.mgrQMemberFilter||'';
+  var uploaders=TEAM.filter(function(t){return t.role==='uploader'&&(!_qMF||t.nickname===_qMF);});
   var errTypes={};
   (typeof ERROR_CATEGORIES!=='undefined'?ERROR_CATEGORIES:[]).forEach(function(c){errTypes[c]=0;});
   var memberErrors={};
@@ -6404,7 +6405,7 @@ function renderMgrHubQuality(){
     var col=errs===0?'#1dd17a':errs<=2?'#97c459':errs<=5?'#ef9f27':'#f09595';
     return '<div class="qual-bar-wrap">'
       +'<div class="qual-bar-val" style="cursor:'+(errs>0?'pointer':'default')+';color:'+(errs>0?'var(--accent)':'var(--muted)')+';text-decoration:'+(errs>0?'underline':'none')+'" '+(errs>0?'onclick="openQualMemberErrors(\''+t.nickname+'\',\''+t.fullName+'\')"':'')+'>'+errs+'</div>'
-      +'<div class="qual-bar" style="height:'+Math.max(pct,4)+'%;background:'+col+'"></div>'
+      +'<div class="qual-bar" style="height:'+Math.max(pct,8)+'%;min-height:8px;background:'+col+'"></div>'
       +'<div class="qual-bar-name">'+htmlEsc(t.nickname.split(' ')[0])+'</div>'
       +'</div>';
   }).join('');
@@ -6428,7 +6429,18 @@ function renderMgrHubQuality(){
     +'<button class="filter-pill'+(mqdFilter==='quarter'?' active':'')+'" data-qf="quarter">This Quarter</button>'
     +'<button class="filter-pill'+(mqdFilter==='year'?' active':'')+'" data-qf="year">This Year</button>'
     +'</div>';
-  pane.innerHTML='<div style="padding:0 0 16px">'+qFilterBar
+  /* Member filter */
+  var _qMembers=TEAM.filter(function(t){return t.role==='uploader';});
+  var _qMemberFilter=window.mgrQMemberFilter||'';
+  var qMemberBar='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+    +'<span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Member:</span>'
+    +'<select id="qual-member-filter" onchange="window.mgrQMemberFilter=this.value;renderMgrHubQuality()" style="font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'
+    +'<option value="">All Members</option>'
+    +_qMembers.map(function(m){return '<option value="'+m.nickname+'"'+(_qMemberFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';}).join('')
+    +'</select>'
+    +(_qMemberFilter?'<button onclick="window.mgrQMemberFilter=\'\';renderMgrHubQuality()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">✕ Clear</button>':'')
+    +'</div>';
+  pane.innerHTML='<div style="padding:0 0 16px">'+qFilterBar+qMemberBar
     /* KPI row */
     +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'
     +'<div class="kpi-card" style="text-align:center">'
@@ -7992,14 +8004,19 @@ function openQualMemberErrors(nick,fullName){
     var typePill=c.type==='qesc'
       ?'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:#FCEBEB;color:#791F1F">Escalation</span>'
       :'<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:#FAEEDA;color:#633806">Error</span>';
+    var stColor={Pending:'#EF9F27',Acknowledged:'#22c55e','In Review':'#a78bfa',Completed:'#22c55e'}[c.status]||'#94a3b8';
+    var stPill='<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+stColor+'22;color:'+stColor+'">'+htmlEsc(c.status||'Pending')+'</span>';
+    var ssHTML=c.screenshot?'<div style="margin-top:6px"><img src="'+c.screenshot+'" style="max-width:100%;border-radius:6px;max-height:120px;object-fit:cover;cursor:pointer" onclick="window.open(\''+c.screenshot+'\')"/></div>':'';
+    var remarkHTML=(c.insight&&c.insight.trim())?'<div style="margin-top:5px;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:11px;color:var(--muted)">💬 '+htmlEsc(c.insight)+'</div>':'';
     return '<div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-      +typePill
+      +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
+      +typePill+' '+stPill
       +(c.category?'<span style="font-size:10px;color:var(--muted)">'+htmlEsc(c.category)+'</span>':'')
       +'<span style="font-size:10px;color:var(--muted);margin-left:auto">'+c.date+'</span>'
       +'</div>'
       +'<div style="color:var(--text);font-weight:600;margin-bottom:2px">'+htmlEsc(c.address||'—')+'</div>'
       +'<div style="color:var(--muted)">'+htmlEsc(c.feedback||'—')+'</div>'
+      +ssHTML+remarkHTML
       +'</div>';
   }).join('')
   :'<div style="padding:16px;color:var(--muted);font-size:12px">No errors in this period.</div>';
@@ -9319,6 +9336,9 @@ function openMgrWrite(){
   fillAward('quarter','mw-qm-1','mw-qm-2','mw-qm-3');
   switchMgrWriteTab('mw-detail',G('mgr-write-overlay').querySelector('.dl-tab[data-tab="mw-detail"]'));
   G('mgr-write-overlay').classList.add('open');
+  /* Populate all category dropdowns */
+  var _catOpts='<option value="">— Select category —</option>'+(typeof ERROR_CATEGORIES!=='undefined'?ERROR_CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join(''):'');
+  ['mw-err-cat','mw-qesc-cat','qscore-cat','qesc-cat','qscore-cat2'].forEach(function(id){var el=G(id);if(el)el.innerHTML=_catOpts;});
 }
 
 function closeMgrWrite(){G('mgr-write-overlay').classList.remove('open');}
@@ -9333,12 +9353,12 @@ function switchMgrWriteTab(tab,btn){
 }
 
 async function mwSubmitError(){
-  var upl=G('mw-err-upl').value,addr=G('mw-err-addr').value.trim(),date=G('mw-err-date').value,desc=G('mw-err-desc').value.trim();
+  var upl=G('mw-err-upl').value,addr=G('mw-err-addr').value.trim(),date=G('mw-err-date').value,desc=G('mw-err-desc').value.trim(),mwErrCat=G('mw-err-cat')?G('mw-err-cat').value:'Others';
   var msg=G('mw-err-msg');msg.textContent='';
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-err-file').files[0]?await uploadScreenshot(G('mw-err-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
-  var newCallout={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  var newCallout={id:nextId++,type:'qscore',uploader:upl,category:mwErrCat||'Others',address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
   callouts.push(newCallout);
   fsSaveCallout(newCallout);
   pushNotif('📋','Contract error logged for '+uplMem.fullName+': "'+addr+'".','qscore');
@@ -9473,7 +9493,7 @@ function mgrDeleteTimerSession(fsId,nick){
   openMgrTimerLog(nick);if(typeof renderMgrHubPerformance==='function')renderMgrHubPerformance();
 }
 async function mwSubmitQEsc(){
-  var member=G('mw-qesc-upl').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim();
+  var member=G('mw-qesc-upl').value,addr=G('mw-qesc-addr').value.trim(),date=G('mw-qesc-date').value,desc=G('mw-qesc-desc').value.trim(),mwQescCat=G('mw-qesc-cat')?G('mw-qesc-cat').value:'Others';
   var msg=G('mw-qesc-msg');msg.textContent='';
   if(!member||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-qesc-file').files[0]?await uploadScreenshot(G('mw-qesc-file').files[0]):null;
@@ -9481,8 +9501,8 @@ async function mwSubmitQEsc(){
   var isEsc=mem.role&&mem.role.toLowerCase()==='escalation';
   var meta={address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString()};
   var co=isEsc
-    ?Object.assign({},meta,{id:nextId++,type:'qesc_esc',uploader:member,escalationMember:member,status:'Pending',insight:'',escThread:true})
-    :Object.assign({},meta,{id:nextId++,type:'qesc',uploader:member,escalationMember:'',status:'Pending',insight:''});
+    ?Object.assign({},meta,{id:nextId++,type:'qesc_esc',uploader:member,escalationMember:member,status:'Pending',insight:'',escThread:true,category:mwQescCat||'Others'})
+    :Object.assign({},meta,{id:nextId++,type:'qesc',uploader:member,escalationMember:'',status:'Pending',insight:'',category:mwQescCat||'Others'});
   callouts.push(co);fsSaveCallout(co);
   if(typeof sendManagerDirectNotif==='function')sendManagerDirectNotif(co);
   updateMemberBell();
@@ -9539,6 +9559,9 @@ function openDailyLog(){
   var errMsg=G('qscore-err-msg');if(errMsg)errMsg.textContent='';
   /* Reset to first tab */
   switchDailyLogTab('error', document.querySelector('.dl-tab[data-tab="error"]'));
+  /* Populate all category dropdowns */
+  var _catOpts='<option value="">— Select category —</option>'+(typeof ERROR_CATEGORIES!=='undefined'?ERROR_CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join(''):'');
+  ['mw-err-cat','mw-qesc-cat','qscore-cat','qesc-cat','qscore-cat2'].forEach(function(id){var el=G(id);if(el)el.innerHTML=_catOpts;});
   initDailyLog();
   G('daily-log-overlay').classList.add('open');
 }
@@ -9554,7 +9577,7 @@ async function submitQScoreFromOverlay(){
   var _files2=Array.from(G('qscore-file2').files);var ss=null;
   if(_files2.length>0){var _urls=await Promise.all(_files2.map(function(f){return uploadScreenshot(f);}));ss=_urls.filter(Boolean).join('||');}
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
-  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
+  var newCo={id:nextId++,type:'qscore',uploader:upl,category:cat2||'Others',address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCo);
   /* Save callout and wait for Firestore ID before sending review notif */
   if(fsDb()){
@@ -11082,6 +11105,7 @@ document.addEventListener('DOMContentLoaded',function(){
             <input class="form-input" id="mw-err-addr" placeholder="e.g. 45 Oak Ave Coburg 3058 VIC"/></div>
           <div class="form-group"><label class="form-label">Date</label>
             <input class="form-input" id="mw-err-date" type="date"/></div>
+<div class="form-group"><label class="form-label">Category</label><select class="form-input" id="mw-err-cat" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— Select category —</option></select></div>
           <div class="form-group"><label class="form-label">Error Description</label>
             <textarea class="form-input" id="mw-err-desc" rows="3" placeholder="Describe the error found..."></textarea></div>
           <div class="form-group">
@@ -11125,6 +11149,7 @@ document.addEventListener('DOMContentLoaded',function(){
             <input class="form-input" id="mw-qesc-addr" placeholder="e.g. 45 Oak Ave Coburg 3058 VIC"/></div>
           <div class="form-group"><label class="form-label">Date</label>
             <input class="form-input" id="mw-qesc-date" type="date"/></div>
+<div class="form-group"><label class="form-label">Category</label><select class="form-input" id="mw-qesc-cat" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— Select category —</option></select></div>
           <div class="form-group"><label class="form-label">Issue Description</label>
             <textarea class="form-input" id="mw-qesc-desc" rows="3" placeholder="Describe the critical issue..."></textarea></div>
           <div class="form-group">
@@ -11231,6 +11256,7 @@ document.addEventListener('DOMContentLoaded',function(){
           </div>
           <div class="form-group"><label class="form-label">Property Address / Contract ID</label><input class="form-input" id="qscore-addr2" placeholder="e.g. 45 Oak Ave Coburg 3058 VIC"/></div>
           <div class="form-group"><label class="form-label">Date</label><input class="form-input" id="qscore-date2" type="date"/></div>
+<div class="form-group"><label class="form-label">Category</label><select class="form-input" id="qscore-cat2" style="background:var(--bg3);color:var(--text);border-color:var(--border)"><option value="">— Select category —</option></select></div>
           <div class="form-group"><label class="form-label">Error Description</label><textarea class="form-input" id="qscore-err2" rows="3" placeholder="Describe the error found..."></textarea></div>
           <div class="form-group">
             <label class="form-label">Screenshot <span style="color:var(--muted);font-weight:400">(optional)</span></label>
