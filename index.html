@@ -11,7 +11,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#07080f;--bg2:#0e1020;--bg3:#13152a;
-  --border:rgba(255,255,255,0.09);--border2:rgba(255,255,255,0.15);
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
   --text:#e8eaf6;--muted:rgba(232,234,246,0.45);--muted2:rgba(232,234,246,0.22);
   --pink:#f72b6e;--purple:#8b2dff;--blue:#2d7fff;--teal:#00d4b4;--amber:#ffb830;
   --red:#ff3d3d;--green:#1dd17a;--orange:#ff7a30;
@@ -216,7 +216,7 @@ body{min-height:100vh;font-family:var(--font-b);background:var(--bg);color:var(-
 
 /* KPI CARDS */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:22px;}
-.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 16px 14px;position:relative;overflow:hidden;transition:border-color .2s;}
+.kpi-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:20px 16px 16px;position:relative;overflow:hidden;transition:border-color .2s;}
 .kpi-card:hover{border-color:var(--border2);}
 .kpi-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad);}
 .kpi-label{font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
@@ -231,13 +231,13 @@ body{min-height:100vh;font-family:var(--font-b);background:var(--bg);color:var(-
 .prog-bar{height:100%;border-radius:99px;transition:width .5s ease;}
 
 /* SECTION */
-.sect{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;}
-.sect-head{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.sect-title{font-family:var(--font-d);font-size:14px;font-weight:700;letter-spacing:.3px;color:var(--text);}
+.sect{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;margin-bottom:20px;}
+.sect-head{padding:14px 18px 13px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:space-between;}
+.sect-title{font-family:var(--font-d);font-size:13px;font-weight:600;letter-spacing:.2px;color:var(--text);}
 
 /* TABLES */
 table{width:100%;border-collapse:collapse;}
-th{padding:10px 16px;text-align:left;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+th{padding:10px 16px;text-align:left;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.04);}
 td{padding:11px 16px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04);}
 tr:last-child td{border-bottom:none;}
 tr:hover td{background:rgba(255,255,255,.02);}
@@ -317,7 +317,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative;animation:fadeUp .3s ease both;}
+.modal{background:var(--bg2);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;position:relative;animation:fadeUp .3s ease both;}
 .modal-title{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:.3px;color:var(--text);margin-bottom:4px;}
 .modal-sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
 .modal-close{position:absolute;top:16px;right:16px;background:var(--bg3);border:none;color:var(--muted);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
@@ -424,7 +424,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .gallery-btn.del:hover{background:rgba(255,61,61,.1);}
 .pin-badge{position:absolute;top:6px;right:6px;background:rgba(139,45,255,.8);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;font-family:var(--font-d);letter-spacing:.4px;}
 /* Pending photos modal */
-.pending-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.pending-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);}
 .pending-row:last-child{border-bottom:none;}
 .pending-thumb{width:54px;height:54px;border-radius:8px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;}
 .pending-info{flex:1;min-width:0;}
@@ -445,7 +445,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .ann-unread-badge{display:none;background:var(--pink,#f72b6e);color:#fff;font-size:9px;font-weight:700;font-family:var(--font-d);padding:2px 7px;border-radius:99px;letter-spacing:.3px;margin-left:auto;}
 .ann-unread-badge.show{display:inline-flex;align-items:center;}
 .ann-list{display:flex;flex-direction:column;}
-.ann-card{padding:14px 16px;border-bottom:1px solid var(--border);position:relative;transition:background .15s;}
+.ann-card{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.04);position:relative;transition:background .15s;}
 .ann-card:last-child{border-bottom:none;}
 .ann-card.unread{background:rgba(139,45,255,.05);}
 .ann-card.unread::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:0 2px 2px 0;}
@@ -499,7 +499,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .ann-modal-meta{font-size:11px;color:var(--muted);margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
 .ann-modal-body{font-size:13px;color:var(--text);line-height:1.8;white-space:pre-wrap;}
 /* Space ann list */
-.space-ann-card{padding:16px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s;}
+.space-ann-card{padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .15s;}
 .space-ann-card:last-child{border-bottom:none;}
 .space-ann-card:hover{background:rgba(139,45,255,.04);}
 .space-ann-card-title{font-family:var(--font-d);font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px;display:flex;align-items:center;gap:8px;}
@@ -632,7 +632,8 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .game-score-pill strong{color:#f1f5f9;font-weight:600;}
 .games-scroll-row{display:flex;gap:10px;padding:12px 14px;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:none;}
 .games-scroll-row::-webkit-scrollbar{display:none;}
-.game-tile{flex:0 0 150px;border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .15s,transform .12s;background:var(--bg2);user-select:none;display:flex;flex-direction:column;justify-content:space-between;}
+.game-tile{flex:0 0 150px;border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .15s,transform .12s;background:var(--bg2);user-select:none;display:flex;flex-direction:column;justify-content:space-between;min-height:140px;}
+.game-tile:hover{border-color:var(--accent);transform:translateY(-2px);}
 .game-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
 .game-tile-icon{font-size:24px;margin-bottom:6px;}
 .game-tile-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
@@ -864,7 +865,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 /* ── ATTENDANCE CALENDAR GRID ── */
 #mgr-hub-pane-attendance table{border-collapse:collapse;}
 #mgr-hub-pane-attendance td,#mgr-hub-pane-attendance th{border:1px solid var(--border);}
-.team-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;cursor:pointer;transition:all .2s;min-width:90px;}
+.team-card{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:14px;cursor:pointer;transition:all .2s;min-width:90px;}
 .team-card:hover{border-color:var(--accent);background:rgba(139,45,255,.08);transform:translateY(-2px);}
 .team-card-name{font-size:11px;font-weight:700;font-family:var(--font-d);color:var(--text);text-align:center;}
 .team-card-role{font-size:9px;color:var(--muted);text-align:center;}
@@ -895,7 +896,41 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .dl-tab.active{background:rgba(139,45,255,.16);color:var(--text);border:1px solid rgba(139,45,255,.28);}
 .dl-pane{flex:1;overflow-y:auto;padding:20px 24px;}
 .dl-section{display:none;}
-.dl-section.active{display:block;}</style>
+.dl-section.active{display:block;}
+/* ══ MOOD CHECK-IN ══ */
+.mood-tile{padding:14px 16px;}
+.mood-options{display:flex;gap:8px;justify-content:center;margin:10px 0 6px;}
+.mood-btn{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.mood-btn:hover{border-color:var(--accent);background:rgba(139,45,255,.12);transform:scale(1.1);}
+.mood-btn.selected{border-color:var(--accent);background:rgba(139,45,255,.18);}
+.mood-done-wrap{text-align:center;padding:8px 0;animation:fadeUp .3s ease both;}
+.mood-bar-wrap{padding:10px 16px 12px;}
+.mood-dist-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin-bottom:6px;}
+.mood-dist-seg{border-radius:2px;}
+.mood-legend{display:flex;gap:10px;flex-wrap:wrap;}
+.mood-leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);}
+.mood-leg-dot{width:7px;height:7px;border-radius:50%;}
+
+/* ══ STATUS INDICATOR ══ */
+.status-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.status-online{background:#1dd17a;}.status-break{background:#ffb830;}.status-focus{background:#ff3d3d;}.status-offline{background:rgba(232,234,246,.25);}
+.status-picker{display:flex;gap:6px;flex-wrap:wrap;padding:10px 0;}
+.status-opt{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:12px;color:var(--text);transition:all .15s;}
+.status-opt:hover{border-color:var(--accent);}
+.status-opt.active{border-color:var(--accent);background:rgba(139,45,255,.12);}
+
+/* ══ QUALITY TAB ══ */
+.qual-bar-chart{display:flex;align-items:flex-end;gap:6px;height:90px;padding:0 0 4px;}
+.qual-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;}
+.qual-bar{border-radius:4px 4px 0 0;width:100%;min-height:3px;transition:height .3s;}
+.qual-bar-val{font-size:9px;color:var(--muted);}
+.qual-bar-name{font-size:9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;text-align:center;}
+.qual-err-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;}
+.qual-err-row:last-child{border-bottom:none;}
+.qual-err-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.qual-err-count{margin-left:auto;font-weight:700;color:var(--text);}
+.qual-trend{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid rgba(255,255,255,.04);font-size:11px;color:var(--muted);}
+</style>
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -2675,6 +2710,7 @@ function clearNotifs(){notifications=[];renderNotifs();}
 function buildMain(){
   /* Subscribe to all Firestore game data collections */
   gameDataSubscribe();
+  statusSubscribe();
   /* Subscribe to KC results — retry after 2s to ensure fsDb is ready */
   kcSubscribe();
   setTimeout(function(){if(!window._kcCache||Object.keys(window._kcCache).length===0)kcSubscribe();},2000);
@@ -3440,14 +3476,23 @@ function renderMyDay(){
 
     +'</div>'
     /* Knowledge Check — Live */
+    /* Knowledge Check + Mood Check-In — side by side */
     +(cu&&cu.role!=='manager'
-      ?'<div class="sect" style="padding:0">'
-        +'<div class="sect-head" style="padding:11px 14px 10px">'
-        +'<span class="sect-title">&#129504; Knowledge Check</span>'
-        +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
+      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+        +'<div class="sect" style="padding:0">'
+          +'<div class="sect-head" style="padding:11px 14px 10px">'
+          +'<span class="sect-title">&#129504; Knowledge Check</span>'
+          +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
+          +'</div>'
+          +'<div id="kc-tile-body"></div>'
         +'</div>'
-        +'<div id="kc-tile-body"></div>'
+        +'<div class="sect" id="mood-tile-wrap" style="padding:0">'
+          +'<div class="sect-head" style="padding:11px 14px 10px">'
+          +'<span class="sect-title">&#128578; How are you?</span>'
+          +'</div>'
+          +'<div id="mood-tile-body"></div>'
         +'</div>'
+      +'</div>'
       :'');
   var _prevAnnCount=mdAnnouncements.length;
   renderAnnouncements();
@@ -3456,7 +3501,7 @@ function renderMyDay(){
   if(isManager)renderMgrKpiCard();
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
-  if(cu&&cu.role!=='manager'){setTimeout(function(){renderKCTile();kcUpdateBanner();},50);}
+  if(cu&&cu.role!=='manager'){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();},50);}
   startClock();
   /* Start wall slideshow autoplay */
   setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},500);
@@ -3985,6 +4030,7 @@ var GAMES=[
   {id:'minesweeper', label:'Minesweeper',   emoji:'💣',type:'single',desc:'Clear the board — choose difficulty',metric:'low',  coming:false},
   {id:'wordguess',   label:'Word Guess',    emoji:'📝',type:'single',desc:'Guess the 5-letter word',           metric:'low',  coming:false},
   {id:'chess',       label:'Chess',         emoji:'♟️',type:'single',desc:'Play vs AI opponent',               metric:'high', coming:false},
+  {id:'solitaire',   label:'Solitaire',     emoji:'🂡',type:'single',desc:'Classic Klondike card game',        metric:'low',  coming:false},
   {id:'kbquizbattle',label:'KB Quiz Battle',emoji:'🧩',type:'multi', desc:'First to 10 correct answers wins',  metric:'high', coming:false},
   {id:'uno',         label:'UNO',           emoji:'🃏',type:'multi', desc:'Classic card game — draw & match',  metric:'high', coming:false},
 ];
@@ -4169,6 +4215,7 @@ function openGame(id){
   else if(id==='chess')launchChess(wrap);
   else if(id==='kbquizbattle')launchKBQuiz(wrap);
   else if(id==='uno')unoInit(wrap);
+  else if(id==='solitaire')launchSolitaire(wrap);
 }
 function closeGame(){
   _removeGameKeys();
@@ -4822,6 +4869,247 @@ function launchChess(container){
 
 
 
+
+/* ══ SOLITAIRE (Klondike) ══ */
+function launchSolitaire(container){
+  var SUITS=['♠','♥','♦','♣'];
+  var VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  var RED=['♥','♦'];
+  function isRed(s){return RED.indexOf(s)>=0;}
+  function cardVal(v){return VALS.indexOf(v);}
+  function newDeck(){
+    var d=[];
+    SUITS.forEach(function(s){VALS.forEach(function(v){d.push({s:s,v:v,face:false});});});
+    for(var i=d.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=d[i];d[i]=d[j];d[j]=t;}
+    return d;
+  }
+  function canStack(top,bot){
+    /* top card goes ON bot — different color, top is one less than bot */
+    if(!top||!bot)return false;
+    return isRed(top.s)!==isRed(bot.s)&&cardVal(top.v)===cardVal(bot.v)-1;
+  }
+  function canFoundation(card,pile){
+    if(pile.length===0)return card.v==='A';
+    var t=pile[pile.length-1];
+    return t.s===card.s&&cardVal(card.v)===cardVal(t.v)+1;
+  }
+
+  var stock,waste,foundation,tableau,moves,gameOver;
+  var selected=null; /* {type:'tableau'|'waste', col, idx, cards:[]} */
+
+  function newGame(){
+    var deck=newDeck();
+    stock=[];waste=[];
+    foundation=[[],[],[],[]];
+    tableau=[[],[],[],[],[],[],[]];
+    for(var i=0;i<7;i++)for(var j=i;j<7;j++){var c=deck.pop();c.face=(j===i);tableau[j].push(c);}
+    stock=deck;moves=0;gameOver=false;selected=null;
+    render();gmSetScore('—');
+  }
+
+  function flipTop(col){if(tableau[col].length>0&&!tableau[col][tableau[col].length-1].face)tableau[col][tableau[col].length-1].face=true;}
+
+  function tryFoundation(card,type,col,idx){
+    for(var fi=0;fi<4;fi++){
+      if(canFoundation(card,foundation[fi])&&(foundation[fi].length===0||foundation[fi][0].s===card.s)){
+        foundation[fi].push(card);
+        if(type==='waste')waste.pop();
+        else if(type==='tableau'){tableau[col].splice(idx,1);flipTop(col);}
+        moves++;selected=null;checkWin();render();return true;
+      }
+    }
+    return false;
+  }
+
+  function tryTableauMove(cards,toCol){
+    /* Can the bottom card of 'cards' stack onto top of toCol? */
+    var card=cards[0];
+    var toTop=tableau[toCol].length>0?tableau[toCol][tableau[toCol].length-1]:null;
+    if(toTop&&!toTop.face)return false;
+    if(toTop&&!canStack(card,toTop))return false;
+    if(!toTop&&card.v!=='K')return false; /* only K can go to empty col */
+    cards.forEach(function(c){tableau[toCol].push(c);});
+    return true;
+  }
+
+  function handleWasteClick(){
+    if(gameOver)return;
+    if(!waste.length)return;
+    var card=waste[waste.length-1];
+    if(selected){selected=null;render();return;}
+    /* Try foundation first */
+    if(tryFoundation(card,'waste',-1,-1))return;
+    /* Select it */
+    selected={type:'waste',col:-1,idx:waste.length-1,cards:[card]};
+    render();
+  }
+
+  function handleTableauClick(ci,ri){
+    if(gameOver)return;
+    var card=tableau[ci][ri];
+    if(!card||!card.face)return;
+
+    if(selected){
+      /* Try to place selected cards here */
+      if(selected.type==='tableau'&&selected.col===ci&&selected.idx===ri){
+        selected=null;render();return;
+      }
+      if(tryTableauMove(selected.cards,ci)){
+        /* Remove from source */
+        if(selected.type==='waste'){waste.pop();}
+        else if(selected.type==='tableau'){
+          tableau[selected.col].splice(selected.idx);
+          flipTop(selected.col);
+        }
+        moves++;selected=null;render();return;
+      }
+      /* Can't place — re-select this card instead */
+      selected=null;
+    }
+
+    /* Try foundation auto-move for last card */
+    if(ri===tableau[ci].length-1){
+      if(tryFoundation(card,'tableau',ci,ri))return;
+    }
+
+    /* Select card(s) — pick up from ri to end of column */
+    var cards=tableau[ci].slice(ri);
+    selected={type:'tableau',col:ci,idx:ri,cards:cards};
+    render();
+  }
+
+  function handleEmptyColClick(ci){
+    if(!selected)return;
+    if(tryTableauMove(selected.cards,ci)){
+      if(selected.type==='waste'){waste.pop();}
+      else if(selected.type==='tableau'){tableau[selected.col].splice(selected.idx);flipTop(selected.col);}
+      moves++;selected=null;render();
+    }
+  }
+
+  function handleFoundationClick(fi){
+    if(!selected||selected.cards.length!==1)return;
+    var card=selected.cards[0];
+    if(canFoundation(card,foundation[fi])&&(foundation[fi].length===0||foundation[fi][0].s===card.s)){
+      foundation[fi].push(card);
+      if(selected.type==='waste')waste.pop();
+      else if(selected.type==='tableau'){tableau[selected.col].splice(selected.idx,1);flipTop(selected.col);}
+      moves++;selected=null;checkWin();render();
+    }
+  }
+
+  function drawStock(){
+    if(gameOver)return;
+    selected=null;
+    if(stock.length===0){stock=waste.slice().reverse();waste=[];stock.forEach(function(c){c.face=false;});}
+    else{var c=stock.pop();c.face=true;waste.push(c);}
+    moves++;render();
+  }
+
+  function checkWin(){
+    if(foundation.every(function(f){return f.length===13;})){
+      gameOver=true;
+      var elapsed=Math.round((Date.now()-_solStart)/1000);
+      gmSetScore(moves+' moves · '+elapsed+'s');
+      gsRecord('solitaire',moves,'low');
+    }
+  }
+
+  var _solStart=Date.now();
+
+  function render(){
+    var cw=52,ch=72,ov=22;
+    var cs='width:'+cw+'px;height:'+ch+'px;border-radius:6px;border:1px solid rgba(255,255,255,.15);cursor:pointer;flex-shrink:0;user-select:none;position:relative;display:flex;flex-direction:column;justify-content:flex-start;padding:3px 4px;';
+    var back='background:#4c1d95;color:#a78bfa;align-items:center;justify-content:center;font-size:20px;';
+    var empty='background:rgba(255,255,255,.04);border:1.5px dashed rgba(255,255,255,.12);cursor:default;align-items:center;justify-content:center;color:rgba(255,255,255,.12);font-size:11px;';
+
+    function rc(c,hi){
+      var bg=isRed(c.s)?'#fff':'#1a1a2e';
+      var col=isRed(c.s)?'#dc2626':'#e8eaf6';
+      var selBorder=hi?'border:2px solid #a78bfa;box-shadow:0 0 0 2px rgba(167,139,250,.4);':'';
+      return '<div style="'+cs+'background:'+bg+';color:'+col+';'+selBorder+'">'
+        +'<div style="font-size:10px;font-weight:700;line-height:1.1">'+c.v+'</div>'
+        +'<div style="font-size:13px;line-height:1">'+c.s+'</div>'
+        +'</div>';
+    }
+    function rb(hi){
+      var selBorder=hi?'border:2px solid #a78bfa;':'';
+      return '<div style="'+cs+back+selBorder+'">🂠</div>';
+    }
+
+    /* Set globals */
+    window.solitaireDrawStock=drawStock;
+    window.solitaireNewGame=newGame;
+    window.solitaireWaste=handleWasteClick;
+    window.solitaireTab=handleTableauClick;
+    window.solitaireEmptyCol=handleEmptyColClick;
+    window.solitaireFnd=handleFoundationClick;
+
+    /* Stock */
+    var stockHTML=stock.length>0?'<div onclick="solitaireDrawStock()" style="'+cs+back+'cursor:pointer">🂠</div>'
+      :'<div onclick="solitaireDrawStock()" style="'+cs+empty+';cursor:pointer">↺</div>';
+
+    /* Waste */
+    var wasteSeleted=selected&&selected.type==='waste';
+    var wasteHTML=waste.length>0?'<div onclick="solitaireWaste()" style="cursor:pointer">'+rc(waste[waste.length-1],wasteSeleted)+'</div>'
+      :'<div style="'+cs+empty+'"></div>';
+
+    /* Foundation */
+    var fndHTML=foundation.map(function(f,fi){
+      var top=f.length>0?f[f.length-1]:null;
+      return '<div onclick="solitaireFnd('+fi+')" style="cursor:pointer">'
+        +(top?rc(top,false):'<div style="'+cs+empty+'">'+SUITS[fi]+'</div>')
+        +'</div>';
+    }).join('');
+
+    var topRow='<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap">'
+      +'<div style="display:flex;gap:6px">'
+      +stockHTML+wasteHTML
+      +'</div>'
+      +'<div style="flex:1;min-width:8px"></div>'
+      +'<div style="display:flex;gap:6px">'+fndHTML+'</div>'
+      +'</div>';
+
+    /* Tableau */
+    var tabHTML='<div style="display:flex;gap:6px;align-items:flex-start">'
+      +tableau.map(function(col,ci){
+        if(col.length===0){
+          return '<div onclick="solitaireEmptyCol('+ci+')" style="'+cs+empty+';height:'+ch+'px;cursor:pointer">K</div>';
+        }
+        var colH=ch+(col.length-1)*ov;
+        var stack='<div style="position:relative;width:'+cw+'px;height:'+colH+'px;flex-shrink:0">';
+        col.forEach(function(card,ri){
+          var isSel=selected&&selected.type==='tableau'&&selected.col===ci&&ri>=selected.idx;
+          var top=(ri*ov)+'px';
+          if(!card.face){
+            stack+='<div style="position:absolute;top:'+top+';left:0;z-index:'+ri+';'+cs+back+'width:'+cw+'px;height:'+ch+'px"></div>';
+          } else {
+            stack+='<div style="position:absolute;top:'+top+';left:0;z-index:'+ri+';cursor:pointer;width:'+cw+'px" onclick="solitaireTab('+ci+','+ri+')">'
+              +rc(card,isSel)+'</div>';
+          }
+        });
+        stack+='</div>';
+        return stack;
+      }).join('')
+      +'</div>';
+
+    var barHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+      +'<button onclick="solitaireNewGame()" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">New Game</button>'
+      +'<span style="font-size:11px;color:var(--muted)">Moves: '+moves+(selected?' · Card selected':'')+'</span>'
+      +'</div>';
+
+    var winHTML=gameOver?'<div style="position:absolute;inset:0;background:rgba(0,0,0,.8);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:10">'
+      +'<div style="font-size:32px">🎉</div>'
+      +'<div style="font-size:16px;font-weight:700;color:var(--text)">You win in '+moves+' moves!</div>'
+      +'<button onclick="solitaireNewGame()" style="padding:8px 20px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600">Play again</button>'
+      +'</div>':'';
+
+    container.innerHTML='<div style="position:relative;overflow:hidden">'+barHTML+topRow+tabHTML+winHTML+'</div>';
+    _solStart=_solStart||Date.now();
+  }
+
+  newGame();
+}
 
 /* ══ KB QUIZ BATTLE ══ */
 function launchKBQuiz(container){
@@ -5578,6 +5866,7 @@ async function unoLeaveRoom(){
 /* ─── RENDER ─── */
 function unoRender(){
   var root=G('uno-root');if(!root||!_unoState)return;
+  unoCheckInvite(_unoState);
   root.style.position='relative';
   /* Auto-end if playing with no active players — fire write but still render */
   if(_unoState.phase==='playing'&&(!_unoState.activePlayers||_unoState.activePlayers.length===0)){
@@ -5864,6 +6153,312 @@ function unoStartTimerUI(){
 
 
 /* ══════════════════════════════════════════════════
+   MOOD CHECK-IN
+   ══════════════════════════════════════════════════ */
+var MOOD_KEY='lp_mood_v1';
+var MOOD_EMOJIS=['😄','🙂','😐','😔','😞'];
+var MOOD_LABELS=['Great','Good','Okay','Struggling','Rough day'];
+var MOOD_COLORS=['#1dd17a','#4ade80','#ffb830','#ff7a30','#ff3d3d'];
+
+function moodTodayKey(){return getSydneyDate().toISOString().slice(0,10);}
+
+function moodGetToday(){
+  try{var d=JSON.parse(localStorage.getItem(MOOD_KEY)||'{}');return d[moodTodayKey()];}catch(e){return null;}
+}
+
+function moodSaveToday(idx){
+  try{
+    var d=JSON.parse(localStorage.getItem(MOOD_KEY)||'{}');
+    d[moodTodayKey()]=idx;
+    localStorage.setItem(MOOD_KEY,JSON.stringify(d));
+    /* Write aggregate to Firestore */
+    if(fsDb()){
+      var todayKey=moodTodayKey();
+      var docRef=window._fsDoc(fsDb(),'moodLog',todayKey);
+      window._fsGetDoc(docRef).then(function(snap){
+        var data=snap.exists()?snap.data():{counts:[0,0,0,0,0],total:0};
+        data.counts[idx]=(data.counts[idx]||0)+1;
+        data.total=(data.total||0)+1;
+        return window._fsSetDoc(docRef,data,{merge:true});
+      }).catch(function(e){console.warn('mood save',e);});
+    }
+  }catch(e){}
+}
+
+function moodLoadAggregate(cb){
+  if(!fsDb()){cb(null);return;}
+  var todayKey=moodTodayKey();
+  window._fsGetDoc(window._fsDoc(fsDb(),'moodLog',todayKey))
+    .then(function(snap){cb(snap.exists()?snap.data():null);})
+    .catch(function(){cb(null);});
+}
+
+function renderMoodTile(){
+  var el=G('mood-tile-body');if(!el)return;
+  if(!cu||cu.role==='manager'){el.innerHTML='';return;}
+  var existing=moodGetToday();
+  if(existing!==null&&existing!==undefined){
+    el.innerHTML=''; return; /* already responded — hide tile */
+  }
+  el.innerHTML='<div class="mood-tile">'
+    +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">How are you today?</div>'
+    +'<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Anonymous · resets daily</div>'
+    +'<div class="mood-options">'
+    +MOOD_EMOJIS.map(function(e,i){
+      return '<button class="mood-btn" title="'+MOOD_LABELS[i]+'" onclick="moodRespond('+i+')">'+e+'</button>';
+    }).join('')
+    +'</div>'
+    +'</div>';
+}
+
+function moodRespond(idx){
+  moodSaveToday(idx);
+  var el=G('mood-tile-body');if(!el)return;
+  el.innerHTML='<div class="mood-done-wrap" style="padding:14px 16px;text-align:center">'
+    +'<div style="font-size:22px;margin-bottom:6px">'+MOOD_EMOJIS[idx]+'</div>'
+    +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">'+MOOD_LABELS[idx]+'!</div>'
+    +'<div style="font-size:11px;color:var(--muted)">Thanks! See you tomorrow 👋</div>'
+    +'</div>';
+  /* Fade out after 2.5s */
+  setTimeout(function(){
+    var wrap=el.parentElement;
+    if(wrap){wrap.style.transition='opacity .5s,max-height .5s';wrap.style.opacity='0';wrap.style.maxHeight='0';wrap.style.overflow='hidden';wrap.style.marginBottom='0';}
+  },2500);
+}
+
+function renderMgrMoodCard(){
+  var el=G('mgr-mood-card');if(!el)return;
+  moodLoadAggregate(function(data){
+    if(!data||!data.total){
+      el.innerHTML='<div style="padding:12px 16px;font-size:11px;color:var(--muted)">No check-ins yet today.</div>';
+      return;
+    }
+    var counts=data.counts||[0,0,0,0,0];
+    var total=data.total||1;
+    var barHTML=counts.map(function(c,i){
+      var pct=Math.round((c/total)*100);
+      return '<div class="mood-dist-seg" style="background:'+MOOD_COLORS[i]+';width:'+pct+'%;min-width:'+(c>0?4:0)+'px"></div>';
+    }).join('');
+    var legendHTML=MOOD_EMOJIS.map(function(e,i){
+      return '<div class="mood-leg-item"><div class="mood-leg-dot" style="background:'+MOOD_COLORS[i]+'"></div>'+e+' '+counts[i]+'</div>';
+    }).join('');
+    el.innerHTML='<div class="mood-bar-wrap">'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:6px">'+data.total+' check-ins today</div>'
+      +'<div class="mood-dist-bar">'+barHTML+'</div>'
+      +'<div class="mood-legend">'+legendHTML+'</div>'
+      +'</div>';
+  });
+}
+
+/* ══════════════════════════════════════════════════
+   STATUS INDICATOR
+   ══════════════════════════════════════════════════ */
+var STATUS_OPTS=[
+  {key:'online', label:'Available', cls:'status-online', emoji:'🟢'},
+  {key:'break',  label:'On break',  cls:'status-break',  emoji:'🟡'},
+  {key:'focus',  label:'Focus mode',cls:'status-focus',  emoji:'🔴'},
+  {key:'offline',label:'Offline',   cls:'status-offline',emoji:'⚫'},
+];
+
+function statusGet(nick){
+  if(!nick)nick=cu?cu.nickname:'';
+  try{var d=JSON.parse(localStorage.getItem('lp_status_v1')||'{}');return d[nick]||'online';}catch(e){return 'online';}
+}
+
+function statusSet(nick,key){
+  if(!nick)nick=cu?cu.nickname:'';
+  try{var d=JSON.parse(localStorage.getItem('lp_status_v1')||'{}');d[nick]=key;localStorage.setItem('lp_status_v1',JSON.stringify(d));}catch(e){}
+  /* Write to Firestore */
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'playerStatus',nick),{nick:nick,status:key,updated:Date.now()},{merge:true}).catch(function(e){});
+}
+
+function statusDotHTML(key,size){
+  var sz=size||9;
+  var map={online:'#1dd17a',break:'#ffb830',focus:'#ff3d3d',offline:'rgba(232,234,246,.25)'};
+  return '<span style="display:inline-block;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+(map[key]||map.online)+';flex-shrink:0"></span>';
+}
+
+var _statusCache={};
+function statusSubscribe(){
+  if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
+  window._fsOnSnapshot(window._fsColl(fsDb(),'playerStatus'),function(snap){
+    snap.forEach(function(d){var data=d.data();_statusCache[data.nick]=data.status||'online';});
+    /* Refresh team page if open */
+    var teamPane=G('lounge-pane-my-team');
+    if(teamPane&&teamPane.classList.contains('active'))renderTeam();
+  });
+}
+
+function renderStatusPicker(){
+  var el=G('my-status-picker');if(!el)return;
+  var current=statusGet(cu?cu.nickname:'');
+  el.innerHTML='<div class="status-picker">'
+    +STATUS_OPTS.map(function(s){
+      return '<div class="status-opt'+(s.key===current?' active':'')+'" onclick="statusSet(\''+(cu?cu.nickname:'')+'\',\''+s.key+'\');renderStatusPicker();renderTeam()">'
+        +statusDotHTML(s.key,8)+s.label+'</div>';
+    }).join('')
+    +'</div>';
+}
+
+/* ══════════════════════════════════════════════════
+   QUALITY TAB
+   ══════════════════════════════════════════════════ */
+function renderMgrHubQuality(){
+  var pane=G('mgr-hub-pane-quality');if(!pane)return;
+
+  /* Get date filter from existing hub filter bar */
+  var from=G('hub-from')?G('hub-from').value:'';
+  var to=G('hub-to')?G('hub-to').value:'';
+  var now=getSydneyDate();
+  if(!from){var ms=new Date(now.getFullYear(),now.getMonth(),1);from=ms.toISOString().slice(0,10);}
+  if(!to){to=now.toISOString().slice(0,10);}
+
+  function inRange(d){return d>=from&&d<=to;}
+
+  /* Gather error data from callouts */
+  var uploaders=TEAM.filter(function(t){return t.role==='uploader';});
+  var errTypes={Address:0,Vendor:0,File:0,'Nature Matrix':0,Listing:0,Other:0};
+  var memberErrors={};
+
+  uploaders.forEach(function(t){
+    var nick=t.nickname;
+    memberErrors[nick]=0;
+    (callouts||[]).forEach(function(c){
+      if(c.uploader!==nick)return;
+      if(!inRange((c.date||'').slice(0,10)))return;
+      if(c.type!=='qscore'&&c.type!=='qesc')return;
+      if(c.status==='pending_review'||c.status==='discarded')return;
+      memberErrors[nick]++;
+      var cat=c.category||'Other';
+      if(errTypes[cat]!==undefined)errTypes[cat]++;else errTypes.Other++;
+    });
+  });
+
+  /* Total uploads in range */
+  var totalUpl=0,totalErrs=0;
+  uploaders.forEach(function(t){
+    var nick=t.nickname;
+    Object.keys(perfData[nick]||{}).forEach(function(d){
+      if(!inRange(d))return;
+      totalUpl+=(perfData[nick][d].uploadsTotal||0);
+    });
+    totalErrs+=memberErrors[nick];
+  });
+
+  var qualPct=totalUpl>0?((totalUpl-totalErrs)/totalUpl*100):null;
+  var worstMember=Object.keys(memberErrors).reduce(function(a,b){return memberErrors[a]>=memberErrors[b]?a:b;},'');
+
+  /* Last month comparison */
+  var prevFrom=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,10);
+  var prevTo=new Date(now.getFullYear(),now.getMonth(),0).toISOString().slice(0,10);
+  function inPrev(d){return d>=prevFrom&&d<=prevTo;}
+  var prevErrs=0;
+  uploaders.forEach(function(t){
+    (callouts||[]).forEach(function(c){
+      if(c.uploader!==t.nickname)return;
+      if(!inPrev((c.date||'').slice(0,10)))return;
+      if(c.type!=='qscore'&&c.type!=='qesc')return;
+      if(c.status==='pending_review'||c.status==='discarded')return;
+      prevErrs++;
+    });
+  });
+  var trendDiff=totalErrs-prevErrs;
+  var trendHTML=prevErrs>0
+    ?(trendDiff<0?'<span style="color:var(--green)">↓ '+Math.abs(trendDiff)+' errors vs last month — good trend</span>'
+      :trendDiff>0?'<span style="color:var(--red)">↑ '+trendDiff+' more errors vs last month</span>'
+      :'<span style="color:var(--muted)">Same as last month</span>')
+    :'<span style="color:var(--muted)">No previous data</span>';
+
+  /* Bar chart */
+  var maxErr=Math.max(1,Math.max.apply(null,uploaders.map(function(t){return memberErrors[t.nickname]||0;})));
+  var barColors=['#f09595','#f09595','#f09595','#ef9f27','#97c459','#97c459','#97c459'];
+  var sortedMembers=uploaders.slice().sort(function(a,b){return (memberErrors[b.nickname]||0)-(memberErrors[a.nickname]||0);});
+  var barHTML=sortedMembers.map(function(t,i){
+    var errs=memberErrors[t.nickname]||0;
+    var pct=Math.round((errs/maxErr)*100);
+    var col=errs===0?'#1dd17a':errs<=2?'#97c459':errs<=5?'#ef9f27':'#f09595';
+    return '<div class="qual-bar-wrap">'
+      +'<div class="qual-bar-val">'+errs+'</div>'
+      +'<div class="qual-bar" style="height:'+Math.max(pct,4)+'%;background:'+col+'"></div>'
+      +'<div class="qual-bar-name">'+htmlEsc(t.nickname.split(' ')[0])+'</div>'
+      +'</div>';
+  }).join('');
+
+  /* Error type breakdown */
+  var errTypeHTML=Object.keys(errTypes).filter(function(k){return errTypes[k]>0;}).sort(function(a,b){return errTypes[b]-errTypes[a];}).map(function(k){
+    var col={Address:'#FCEBEB:#791F1F',Vendor:'#EEEDFE:#3C3489',File:'#FAEEDA:#633806','Nature Matrix':'#E1F5EE:#085041',Listing:'#E6F1FB:#0C447C',Other:'#F1EFE8:#444441'}[k]||'#F1EFE8:#444441';
+    var parts=col.split(':');
+    return '<div class="qual-err-row">'
+      +'<span class="qual-err-badge" style="background:'+parts[0]+';color:'+parts[1]+'">'+k+'</span>'
+      +'<span style="color:var(--text);font-size:12px">'+k+' error</span>'
+      +'<span class="qual-err-count">'+errTypes[k]+'</span>'
+      +'</div>';
+  }).join('');
+
+  pane.innerHTML='<div style="padding:0 0 16px">'
+    /* KPI row */
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'
+    +'<div class="kpi-card" style="text-align:center">'
+      +'<div class="kpi-val" style="color:'+(qualPct>=95?'var(--green)':qualPct>=80?'var(--amber)':'var(--red)')+'">'+( qualPct!==null?qualPct.toFixed(1)+'%':'—')+'</div>'
+      +'<div class="kpi-lbl">Team quality</div>'
+    +'</div>'
+    +'<div class="kpi-card" style="text-align:center">'
+      +'<div class="kpi-val" style="color:'+(totalErrs===0?'var(--green)':totalErrs<=10?'var(--amber)':'var(--red)')+'">'+totalErrs+'</div>'
+      +'<div class="kpi-lbl">Total errors</div>'
+    +'</div>'
+    +'<div class="kpi-card" style="text-align:center">'
+      +'<div class="kpi-val" style="font-size:14px">'+htmlEsc(worstMember.split(' ')[0]||'—')+'</div>'
+      +'<div class="kpi-lbl">Most errors</div>'
+    +'</div>'
+    +'</div>'
+    /* Bar chart */
+    +'<div class="sect">'
+    +'<div class="sect-head"><span class="sect-title">Errors per member</span></div>'
+    +'<div style="padding:14px 16px 10px">'
+    +'<div class="qual-bar-chart" style="border-bottom:1px solid rgba(255,255,255,.06)">'+barHTML+'</div>'
+    +'</div>'
+    +'</div>'
+    /* Error types */
+    +(errTypeHTML?'<div class="sect"><div class="sect-head"><span class="sect-title">Error types</span></div><div style="padding:4px 16px 8px">'+errTypeHTML+'</div></div>':'')
+    /* Trend */
+    +'<div class="qual-trend"><span>vs last month</span>'+trendHTML+'</div>'
+    +'</div>';
+}
+
+/* ══════════════════════════════════════════════════
+   UNO INVITE NOTIFICATION
+   ══════════════════════════════════════════════════ */
+var _lastUnoPhase=null;
+function unoCheckInvite(state){
+  if(!state||!cu||cu.role==='manager')return;
+  var seats=state.seats||[];
+  var isSeated=seats.some(function(s){return s&&s.nick===cu.nickname;});
+  var isAud=(state.audience||[]).some(function(a){return a.nick===cu.nickname;});
+  /* Show toast when game transitions lobby→playing and player is not in room */
+  if(state.phase==='playing'&&_lastUnoPhase==='lobby'&&!isSeated&&!isAud){
+    var players=seats.filter(Boolean).map(function(s){return s.fullName||s.nick;});
+    showUnoInviteToast(players);
+  }
+  _lastUnoPhase=state.phase;
+}
+
+function showUnoInviteToast(players){
+  var existing=G('uno-invite-toast');if(existing)existing.remove();
+  var t=document.createElement('div');
+  t.id='uno-invite-toast';
+  t.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a0533;border:1px solid rgba(139,45,255,.4);border-radius:12px;padding:12px 18px;z-index:800;display:flex;align-items:center;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:fadeUp .3s ease both;max-width:320px;cursor:pointer;';
+  t.innerHTML='<div style="font-size:20px">🃏</div>'
+    +'<div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">UNO game started!</div>'
+    +'<div style="font-size:11px;color:var(--muted)">'+htmlEsc(players.slice(0,2).join(', '))+(players.length>2?' +'+( players.length-2)+' more':'')+'</div></div>'
+    +'<button style="font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid rgba(139,45,255,.5);background:rgba(139,45,255,.2);color:#c084fc;cursor:pointer;white-space:nowrap" onclick="openGame(\'uno\')">Join →</button>';
+  t.addEventListener('click',function(e){if(e.target.tagName!=='BUTTON')t.remove();});
+  document.body.appendChild(t);
+  setTimeout(function(){if(t.parentNode){t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(function(){t.remove();},400);}},8000);
+}
+
+
+
+/* ══════════════════════════════════════════════════
    KNOWLEDGE CHECK SYSTEM
    ══════════════════════════════════════════════════ */
 var KC_KEY='lp_kc_v1'; /* kept for legacy fallback */
@@ -6115,14 +6710,23 @@ async function kcFinish(){
   renderKCTile();
 }
 
-function kcShowBreakdown(){
+async function kcShowBreakdown(){
   var nick=cu?cu.nickname:'';
+  /* Read directly from Firestore to avoid cache miss */
   var s=kcGetState(nick);
-  var last=s.attempts[s.attempts.length-1];
+  if(!s.attempts||!s.attempts.length){
+    if(fsDb()){
+      try{
+        var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'kc_results',kcFsId(nick,kcWeekId())));
+        if(snap.exists())s=snap.data().state||s;
+      }catch(e){}
+    }
+  }
+  var last=s.attempts&&s.attempts[s.attempts.length-1];
   if(!last||!last.answers)return;
   var letters=['A','B','C','D'];
-  var rows=last.answers.map(function(a,i){
-    var q=KB_QUESTIONS.find(function(x){return x.id===a.qId;});
+  var rows=last.answers.map(function(a){
+    var q=KB_QUESTIONS.find(function(x){return String(x.id)===String(a.qId);});
     var icon=a.correct?'✓':'✗';
     var color=a.correct?'var(--green)':'var(--red)';
     if(!q)return '';
@@ -6148,7 +6752,7 @@ function kcShowBreakdown(){
       +'</div>';
     document.body.appendChild(modal);
   }
-  G('kc-breakdown-body').innerHTML=rows;
+  G('kc-breakdown-body').innerHTML=rows||'<div style="padding:16px;color:var(--muted);font-size:12px">No breakdown available.</div>';
   modal.classList.add('open');
 }
 
@@ -7003,6 +7607,7 @@ function renderManagerHub(){
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'kc\',this)">&#129504; Knowledge Check</button>'
     +'</div>'
+    +'<div class="sect" id="mgr-mood-card" style="margin-bottom:14px"><div class="sect-head"><span class="sect-title">&#128578; Team mood today</span></div></div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
     +'<div id="mgr-hub-pane-kc" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-quality" class="mgr-hub-pane"></div>'
@@ -7076,6 +7681,7 @@ function mgrHubInRange(dateStr){
 }
 
 function renderMgrHubPerformance(){
+  renderMgrMoodCard();
   var el=G('mgr-hub-pane-performance');if(!el)return;
 
   /* filter bar */
@@ -7319,146 +7925,7 @@ function mgrQInRange(dateStr){
   }catch(e){return true;}
 }
 
-function renderMgrHubQuality(){
-  var el=G('mgr-hub-pane-quality');if(!el)return;
-
-  var filterBar='<div class="filter-bar" style="margin-bottom:18px">'
-    +'<button class="filter-pill'+(mgrQDateFilter==='all'?' active':'')+'" data-f="all" onclick="mgrQFilter(this)">All Time</button>'
-    +'<button class="filter-pill'+(mgrQDateFilter==='today'?' active':'')+'" data-f="today" onclick="mgrQFilter(this)">Today</button>'
-    +'<button class="filter-pill'+(mgrQDateFilter==='week'?' active':'')+'" data-f="week" onclick="mgrQFilter(this)">This Week</button>'
-    +'<button class="filter-pill'+(mgrQDateFilter==='month'?' active':'')+'" data-f="month" onclick="mgrQFilter(this)">This Month</button>'
-    +'<button class="filter-pill'+(mgrQDateFilter==='quarter'?' active':'')+'" data-f="quarter" onclick="mgrQFilter(this)">This Quarter</button>'
-    +'<button class="filter-pill'+(mgrQDateFilter==='year'?' active':'')+'" data-f="year" onclick="mgrQFilter(this)">This Year</button>'
-    +'<div class="filter-sep"></div>'
-    +'<div class="range-cal" id="rcal-mgr-quality"><div class="range-cal-trigger" id="rcal-mgr-quality-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-mgr-quality-popup"></div></div>'
-    +'<button class="filter-pill" style="color:var(--muted)" onclick="mgrQClearFilter()">&#10005; Clear</button>'
-    +'</div>';
-
-  function makeRow(nick,fullName){
-    /* Contract Escalations (qesc) — everyone involved (uploader or escalationMember) */
-    var escItems=callouts.filter(function(c){
-      return c.type==='qesc'&&mgrQInRange(c.date)&&(c.uploader===nick||c.escalationMember===nick)&&c.status!=='discarded';
-    });
-    /* Contract Errors (qscore) — logged against this uploader */
-    var errItems=callouts.filter(function(c){
-      return c.type==='qscore'&&mgrQInRange(c.date)&&c.uploader===nick&&c.status!=='pending_review'&&c.status!=='discarded';
-    });
-    var escCount=escItems.length;
-    var errCount=errItems.length;
-    var escCell=escCount>0
-      ?'<span class="esc-metric-badge bad" style="cursor:pointer" onclick="openQualityDetail(\'esc\',\''+nick+'\')">'+escCount+'</span>'
-      :'<span style="font-size:12px;color:var(--muted)">0</span>';
-    var errCell=errCount>0
-      ?'<span class="esc-metric-badge warn" style="cursor:pointer" onclick="openQualityDetail(\'err\',\''+nick+'\')">'+errCount+'</span>'
-      :'<span style="font-size:12px;color:var(--muted)">0</span>';
-    return '<tr style="border-bottom:1px solid var(--border)">'
-      +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(nick,28)+'<span style="font-weight:600;color:var(--text)">'+fullName+'</span></div></td>'
-      +'<td style="padding:10px 12px;text-align:center">'+escCell+'</td>'
-      +'<td style="padding:10px 12px;text-align:center">'+errCell+'</td>'
-      +'</tr>';
-  }
-
-  var hdr='<thead><tr style="border-bottom:1px solid var(--border2)">'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:left">Member</th>'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Contract Escalations</th>'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Contract Errors</th>'
-    +'</tr></thead>';
-
-  var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
-  var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
-
-  var uplRows=uploaders.map(function(m){return makeRow(m.nickname,m.fullName);}).join('');
-  var escRows=escMembers.map(function(m){return makeRow(m.nickname,m.fullName);}).join('');
-
-  el.innerHTML=filterBar
-    +'<div class="sect" style="margin-bottom:16px">'
-    +'<div class="sect-head"><span class="sect-title">&#128188; Uploaders</span></div>'
-    +'<table style="width:100%;border-collapse:collapse">'+hdr+'<tbody>'+uplRows+'</tbody></table>'
-    +'</div>'
-    +'<div class="sect">'
-    +'<div class="sect-head"><span class="sect-title">&#9889; Escalation</span></div>'
-    +'<table style="width:100%;border-collapse:collapse">'+hdr+'<tbody>'+escRows+'</tbody></table>'
-    +'</div>';
-
-  if(mgrQDateFilter==='custom'){
-    var fi=G('mgr-q-from'),ti=G('mgr-q-to');
-    if(fi)fi.value=mgrQCustomRange.from;
-    if(ti)ti.value=mgrQCustomRange.to;
-  }
-}
-
-/* detail modal */
-var _qDetailNick=null;
-var _qDetailType=null;
-
-function openQualityDetail(type,nick){
-  _qDetailType=type;_qDetailNick=nick;
-  var mem=TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick};
-  var items=type==='esc'
-    ?callouts.filter(function(c){return c.type==='qesc'&&mgrQInRange(c.date)&&(c.uploader===nick||c.escalationMember===nick);})
-    :callouts.filter(function(c){return c.type==='qscore'&&mgrQInRange(c.date)&&c.uploader===nick;});
-  var title=type==='esc'?'Contract Escalations — '+mem.fullName:'Contract Errors — '+mem.fullName;
-  G('qdetail-title').textContent=title;
-  renderQDetailList(items);
-  G('modal-qdetail').classList.add('open');
-}
-
-function toggleQDetailExpand(row){
-  var exp=row.querySelector('.qdetail-expand');
-  if(exp)exp.style.display=exp.style.display==='none'?'block':'none';
-}
-
-function renderQDetailList(items){
-  var el=G('qdetail-list');if(!el)return;
-  if(!items.length){el.innerHTML='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No entries for this period.</div>';return;}
-  var statusColors={Pending:'var(--amber)',Acknowledged:'var(--green)',Resolved:'var(--accent)','pending_review':'var(--accent)'};
-  var statusLabels={Pending:'Pending',Acknowledged:'Acknowledged',Resolved:'Resolved','pending_review':'Awaiting Review','discarded':'Discarded'};
-  el.innerHTML=items.map(function(c){
-    var statusLabel=statusLabels[c.status]||c.status||'Pending';
-    var statusBadge='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--bg3);color:'+(statusColors[c.status]||'var(--amber)')+'">'+statusLabel+'</span>';
-    var escTag=c.escalationMember?'<span style="font-size:10px;color:var(--muted)"> · Esc: '+c.escalationMember+'</span>':'';
-    var ss=c.screenshot?'<img src="'+c.screenshot+'" style="max-width:100%;border-radius:8px;margin-top:8px"/>'  :'';
-    return '<div style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleQDetailExpand(this)">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.address+'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+c.date+' · '+c.uploader+escTag+'</div>'
-      +'</div>'
-      +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'
-      +statusBadge
-      +'<button onclick="event.stopPropagation();deleteQDetailEntry('+c.id+')" title="Delete" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--muted)\'">'
-      +'&#128465;</button>'
-      +'</div>'
-      +'</div>'
-      +'<div class="qdetail-expand" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Error Description</div>'
-      +'<div style="font-size:12px;color:var(--text);line-height:1.6">'+c.feedback+'</div>'
-      +ss
-      +(c.insight
-        ?'<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Uploader Acknowledgement</div>'
-          +'<div style="font-size:12px;color:var(--text);line-height:1.6;padding:8px 12px;background:var(--bg3);border-radius:8px">'+c.insight+'</div></div>'
-        :'<div style="margin-top:8px;font-size:11px;color:var(--muted);font-style:italic">No acknowledgement yet.</div>')
-      +'</div>'
-      +'</div>';
-  }).join('');
-}
-
-function deleteQDetailEntry(id){
-  if(!confirm('Delete this entry? This cannot be undone.'))return;
-  var idx=callouts.findIndex(function(c){return c.id===id;});
-  if(idx>-1){
-    var entry=callouts[idx];
-    if(entry._fsId)fsDeleteCallout(entry._fsId);
-    callouts.splice(idx,1);
-  }
-  /* Refresh modal list */
-  var items=_qDetailType==='esc'
-    ?callouts.filter(function(c){return c.type==='qesc'&&mgrQInRange(c.date)&&(c.uploader===_qDetailNick||c.escalationMember===_qDetailNick);})
-    :callouts.filter(function(c){return c.type==='qscore'&&mgrQInRange(c.date)&&c.uploader===_qDetailNick;});
-  renderQDetailList(items);
-  /* Refresh hub table */
-  renderMgrHubQuality();
-}
+/* Old renderMgrHubQuality removed — new version at line 6306 */
 
 function renderMgrHubAttendance(){renderUnifiedAttendance('mgr-hub-pane-attendance',true);}
 
@@ -8347,7 +8814,9 @@ function renderMyTeam(){
     return '<div class="team-card-wrap">'
       +'<div class="team-card" data-nick="'+nick+'">'
       +avEl(nick,52)
-      +'<div class="team-card-name">'+nick+'</div>'
+      +'<div class="team-card-name" style="display:flex;align-items:center;gap:5px">'
+      +'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+({online:'#1dd17a',break:'#ffb830',focus:'#ff3d3d',offline:'rgba(232,234,246,.2)'}[_statusCache[nick]||'online']||'#1dd17a')+'"></span>'
+      +nick+'</div>'
       +'<div class="team-card-role">'+TEAM_DIR[nick].role+'</div>'
       +'</div>'
       +removeBtn
