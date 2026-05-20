@@ -3873,17 +3873,35 @@ function credGet(nick){
   return _credCache[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
 }
 
-function credRecalcFromUploads(){
+async function credRecalcFromUploads(){
   if(!cu)return;
   var role=cu.role||'uploader';
   var threshold=credUploadsPerCredit(role);
   var nick=cu.nickname;
   var today=getSydneyDate().toISOString().slice(0,10);
-  var state=Object.assign({},credGet(nick));
-  if(state.lastCheckedDate!==today){state.lastCheckedUploads=0;state.lastCheckedDate=today;}
-  if((state.credits||0)>=CREDITS_MAX){updateCreditBadge();return;}
+
+  /* Read current state from Firestore first to avoid cache miss wiping progress */
+  var state={credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+  if(fsDb()){
+    try{
+      var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'player_credits',nick));
+      if(snap.exists())state=Object.assign({},snap.data());
+    }catch(e){
+      /* Fallback to cache */
+      state=Object.assign({},credGet(nick));
+    }
+  } else {
+    state=Object.assign({},credGet(nick));
+  }
+
+  /* Daily reset */
+  if(state.lastCheckedDate!==today){state.lastCheckedUploads=0;state.lastCheckedDate=today;state.credits=0;}
+  if((state.credits||0)>=CREDITS_MAX){
+    _credCache[nick]=state;updateCreditBadge();return;
+  }
+
   var todayUploads=(perfData[nick]&&perfData[nick][today]&&perfData[nick][today].uploadsTotal)||0;
-  var prevBracket=Math.floor(state.lastCheckedUploads/threshold);
+  var prevBracket=Math.floor((state.lastCheckedUploads||0)/threshold);
   var newBracket=Math.floor(todayUploads/threshold);
   var earned=Math.min(newBracket-prevBracket,CREDITS_MAX-(state.credits||0));
   if(earned>0){
@@ -3891,7 +3909,7 @@ function credRecalcFromUploads(){
     state.lastCheckedUploads=todayUploads;
     showCreditToast('+'+earned+' credit'+(earned>1?'s':'')+' earned! ('+todayUploads+' uploads today)');
   } else {
-    state.lastCheckedUploads=Math.max(state.lastCheckedUploads,todayUploads);
+    state.lastCheckedUploads=Math.max(state.lastCheckedUploads||0,todayUploads);
   }
   _credCache[nick]=state;
   if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true}).catch(function(e){console.error('credRecalc',e);});
@@ -5474,11 +5492,23 @@ async function unoDrawCards(){
 }
 
 async function unoForceEnd(){
-  if(!_unoState)return;
+  if(!confirm('Force end the current game and reset the room?'))return;
   await unoUpdate({
-    phase:'ended',winner:'',
-    lastAction:'Game ended by manager.',
-    activePlayers:[],hands:{}
+    phase:'lobby',
+    winner:'',
+    lastAction:'',
+    activePlayers:[],
+    hands:{},
+    draw:[],
+    discard:[],
+    seats:[null,null,null,null],
+    audience:[],
+    stackCount:0,
+    unoCallers:{},
+    currentTurn:0,
+    direction:1,
+    turnStart:0,
+    handTotals:{}
   });
 }
 
@@ -5549,10 +5579,9 @@ async function unoLeaveRoom(){
 function unoRender(){
   var root=G('uno-root');if(!root||!_unoState)return;
   root.style.position='relative';
-  /* Auto-end if playing with no active players */
+  /* Auto-end if playing with no active players — fire write but still render */
   if(_unoState.phase==='playing'&&(!_unoState.activePlayers||_unoState.activePlayers.length===0)){
     unoUpdate({phase:'ended',winner:'',lastAction:'Game ended — no players remaining.'});
-    return;
   }
   if(_unoState.phase==='lobby')unoRenderLobby(root);
   else if(_unoState.phase==='playing')unoRenderGame(root);
@@ -5775,9 +5804,9 @@ function unoRenderEnded(root){
     +'<div class="uno-result-sub">'+htmlEsc(s.lastAction||'')+'</div>'
     +totalsHTML
     +(iWon?'<div class="uno-credit-box">🎮 +2 credits added to your balance</div>':'')
-    +(isPlayer&&!iWon&&(credGet(_unoMyNick).credits||0)>=1?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (−1 credit)</button>':'')
-    +(isPlayer&&!iWon&&(credGet(_unoMyNick).credits||0)<1?'<div style="font-size:11px;color:#ef4444">No credits left — moved to audience</div>':'')
-    +(iWon?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (−1 credit)</button>':'')
+    +((credGet(_unoMyNick).credits||0)>=1?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (−1 credit)</button>':'')
+    +((credGet(_unoMyNick).credits||0)<1&&cu&&cu.role!=='manager'?'<div style="font-size:11px;color:#ef4444;margin-bottom:4px">No credits left</div>':'')
+    +(cu&&cu.role==='manager'?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (free)</button>':'')
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'
     +'<button class="uno-btn uno-btn-secondary" onclick="unoWatchAfterGame()">Stay & watch</button>'
     +'<button class="uno-btn uno-btn-secondary" onclick="unoLeaveRoom()">Leave room</button>'
