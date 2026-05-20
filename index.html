@@ -632,12 +632,12 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .game-score-pill strong{color:#f1f5f9;font-weight:600;}
 .games-scroll-row{display:flex;gap:10px;padding:12px 14px;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:none;}
 .games-scroll-row::-webkit-scrollbar{display:none;}
-.game-tile{flex:0 0 150px;border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .15s,transform .12s;background:var(--bg2);user-select:none;}
+.game-tile{flex:0 0 150px;border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:border-color .15s,transform .12s;background:var(--bg2);user-select:none;display:flex;flex-direction:column;justify-content:space-between;}
 .game-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
 .game-tile-icon{font-size:24px;margin-bottom:6px;}
 .game-tile-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
 .game-tile-desc{font-size:10px;color:var(--muted);margin-bottom:8px;}
-.game-tile-scores{border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;}
+.game-tile-scores{border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;min-height:32px;}
 .game-tile-score-row{display:flex;align-items:center;gap:5px;font-size:10px;}
 .game-tile-score-rank{width:14px;flex-shrink:0;}
 .game-tile-score-name{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -957,7 +957,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.46ae</div>
+    <div class="brand-sub">v.47ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1032,7 +1032,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.46ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.47ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -2672,8 +2672,11 @@ function clearNotifs(){notifications=[];renderNotifs();}
 
 /* ── BUILD MAIN ── */
 function buildMain(){
-  /* Subscribe to KC results from Firestore so all devices stay in sync */
+  /* Subscribe to all Firestore game data collections */
+  gameDataSubscribe();
+  /* Subscribe to KC results — retry after 2s to ensure fsDb is ready */
   kcSubscribe();
+  setTimeout(function(){if(!window._kcCache||Object.keys(window._kcCache).length===0)kcSubscribe();},2000);
   /* Auto-purge announcements past their expiresAt — fallback to 15 days if not set */
   var fallbackCutoff=Date.now()-(15*24*60*60*1000);
   var warnCutoff=Date.now()+(24*60*60*1000); /* expiring within 24hrs */
@@ -3722,120 +3725,151 @@ var KB_QUESTIONS=[
 var KB_Q_TOTAL=KB_QUESTIONS.length;
 
 /* ─── Score storage helpers ─── */
-var GAME_SCORES_KEY='lp_game_scores_v1';
-var UNO_STREAK_KEY='lp_uno_streak_v1';
-var MS_SCORES_KEY='lp_ms_scores_v1';
+/* ═══════════════════════════════════════════════════════
+   GAME DATA — Firestore-backed (replaces localStorage)
+   Collections: game_scores, ms_scores, uno_streaks, player_credits
+   ═══════════════════════════════════════════════════════ */
 
-function gsLoad(){try{return JSON.parse(localStorage.getItem(GAME_SCORES_KEY)||'{}')}catch(e){return {};}}
-function gsSave(d){try{localStorage.setItem(GAME_SCORES_KEY,JSON.stringify(d));}catch(e){}}
+/* ── In-memory caches (populated by Firestore listeners) ── */
+var _gsCache={};      /* game_scores: {gameId: [{nick,score}]} */
+var _gsMsCache={};    /* ms_scores:   {diff:   [{nick,score}]} */
+var _unoCache={};     /* uno_streaks: {nick:   {streak,best}}  */
+var _credCache={};    /* player_credits:{nick:  {credits,lastCheckedUploads,lastCheckedDate}} */
 
-function gsRecord(gameId,score,metric){
-  if(!cu)return;
-  var d=gsLoad();
-  if(!d[gameId])d[gameId]=[];
-  var nick=cu.nickname;
-  var existing=d[gameId].find(function(r){return r.nick===nick;});
-  var better=!existing||(metric==='low'?score<existing.score:score>existing.score);
-  if(better){
-    if(existing)existing.score=score;
-    else d[gameId].push({nick:nick,score:score});
-    gsSave(d);renderGamesGrid();
+/* ── Subscribe to all game collections on login ── */
+var _gameDataUnsubs=[];
+function gameDataSubscribe(){
+  _gameDataUnsubs.forEach(function(u){try{u();}catch(e){}});
+  _gameDataUnsubs=[];
+  if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
+
+  /* game_scores */
+  _gameDataUnsubs.push(window._fsOnSnapshot(window._fsColl(fsDb(),'game_scores'),function(snap){
+    _gsCache={};
+    snap.forEach(function(d){var data=d.data();if(!_gsCache[data.gameId])_gsCache[data.gameId]=[];_gsCache[data.gameId].push({nick:data.nick,score:data.score});});
+    renderGamesGrid();
+  }));
+
+  /* ms_scores */
+  _gameDataUnsubs.push(window._fsOnSnapshot(window._fsColl(fsDb(),'ms_scores'),function(snap){
+    _gsMsCache={};
+    snap.forEach(function(d){var data=d.data();if(!_gsMsCache[data.diff])_gsMsCache[data.diff]=[];_gsMsCache[data.diff].push({nick:data.nick,score:data.score});});
+    renderGamesGrid();
+  }));
+
+  /* uno_streaks */
+  _gameDataUnsubs.push(window._fsOnSnapshot(window._fsColl(fsDb(),'uno_streaks'),function(snap){
+    _unoCache={};
+    snap.forEach(function(d){var data=d.data();_unoCache[data.nick]={streak:data.streak||0,best:data.best||0};});
+    renderGamesGrid();
+  }));
+
+  /* player_credits — only current user's doc */
+  if(cu){
+    _gameDataUnsubs.push(window._fsOnSnapshot(window._fsDoc(fsDb(),'player_credits',cu.nickname),function(snap){
+      if(snap.exists()){
+        var data=snap.data();
+        var today=getSydneyDate().toISOString().slice(0,10);
+        /* Silent daily reset */
+        if(data.lastCheckedDate&&data.lastCheckedDate!==today){
+          data.credits=0;data.lastCheckedUploads=0;data.lastCheckedDate=today;
+          window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',cu.nickname),data,{merge:true});
+        }
+        _credCache[cu.nickname]=data;
+      } else {
+        _credCache[cu.nickname]={credits:0,lastCheckedUploads:0,lastCheckedDate:''};
+      }
+      updateCreditBadge();
+    }));
   }
 }
 
-/* Top 1 scorer for a game */
+/* ── Game Scores ── */
+function gsRecord(gameId,score,metric){
+  if(!cu)return;
+  var nick=cu.nickname;
+  var existing=(_gsCache[gameId]||[]).find(function(r){return r.nick===nick;});
+  var better=!existing||(metric==='low'?score<existing.score:score>existing.score);
+  if(!better)return;
+  if(!_gsCache[gameId])_gsCache[gameId]=[];
+  if(existing)existing.score=score;else _gsCache[gameId].push({nick:nick,score:score});
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'game_scores',gameId+'_'+nick),
+    {gameId:gameId,nick:nick,score:score},{merge:true}).catch(function(e){console.error('gsRecord',e);});
+  renderGamesGrid();
+}
+
 function gsTop1(gameId){
-  var d=gsLoad();
-  var arr=(d[gameId]||[]).slice().sort(function(a,b){
+  var arr=(_gsCache[gameId]||[]).slice().sort(function(a,b){
     return gameId==='wordguess'?a.score-b.score:b.score-a.score;
   });
   return arr[0]||null;
 }
 
-function gsFormat(gameId,score,diff){
+function gsFormat(gameId,score){
   if(gameId==='minesweeper')return score+'s';
   if(gameId==='wordguess')return score+' tries';
   if(gameId==='kbquizbattle')return score+'/15';
   return score.toLocaleString();
 }
 
-/* ── Minesweeper per-difficulty scores ── */
-function gsMsLoad(){try{return JSON.parse(localStorage.getItem(MS_SCORES_KEY)||'{}')}catch(e){return {};}}
-function gsMsSave(d){try{localStorage.setItem(MS_SCORES_KEY,JSON.stringify(d));}catch(e){}}
-
+/* ── Minesweeper per-difficulty ── */
 function gsMsRecord(diff,elapsed){
   if(!cu)return;
-  var d=gsMsLoad();
-  if(!d[diff])d[diff]=[];
   var nick=cu.nickname;
-  var existing=d[diff].find(function(r){return r.nick===nick;});
-  if(!existing||elapsed<existing.score){
-    if(existing)existing.score=elapsed;
-    else d[diff].push({nick:nick,score:elapsed});
-    gsMsSave(d);renderGamesGrid();
-  }
+  var existing=(_gsMsCache[diff]||[]).find(function(r){return r.nick===nick;});
+  if(existing&&elapsed>=existing.score)return;
+  if(!_gsMsCache[diff])_gsMsCache[diff]=[];
+  if(existing)existing.score=elapsed;else _gsMsCache[diff].push({nick:nick,score:elapsed});
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'ms_scores',diff+'_'+nick),
+    {diff:diff,nick:nick,score:elapsed},{merge:true}).catch(function(e){console.error('gsMsRecord',e);});
+  renderGamesGrid();
 }
 
 function gsMsTop1(diff){
-  var d=gsMsLoad();
-  var arr=(d[diff]||[]).slice().sort(function(a,b){return a.score-b.score;});
+  var arr=(_gsMsCache[diff]||[]).slice().sort(function(a,b){return a.score-b.score;});
   return arr[0]||null;
 }
 
-/* ── UNO win streak ── */
-function unoStreakLoad(){try{return JSON.parse(localStorage.getItem(UNO_STREAK_KEY)||'{}')}catch(e){return {};}}
-function unoStreakSave(d){try{localStorage.setItem(UNO_STREAK_KEY,JSON.stringify(d));}catch(e){}}
-
+/* ── UNO Streaks ── */
 function unoRecordWin(nick){
-  var d=unoStreakLoad();
-  if(!d[nick])d[nick]={streak:0,best:0};
-  d[nick].streak=(d[nick].streak||0)+1;
-  if(d[nick].streak>d[nick].best)d[nick].best=d[nick].streak;
-  unoStreakSave(d);renderGamesGrid();
+  if(!nick)nick=cu?cu.nickname:'';
+  if(!_unoCache[nick])_unoCache[nick]={streak:0,best:0};
+  _unoCache[nick].streak=(_unoCache[nick].streak||0)+1;
+  if(_unoCache[nick].streak>_unoCache[nick].best)_unoCache[nick].best=_unoCache[nick].streak;
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'uno_streaks',nick),
+    {nick:nick,streak:_unoCache[nick].streak,best:_unoCache[nick].best},{merge:true}).catch(function(e){console.error('unoWin',e);});
+  renderGamesGrid();
 }
 
 function unoRecordLoss(nick){
-  var d=unoStreakLoad();
-  if(!d[nick])return;
-  d[nick].streak=0;
-  unoStreakSave(d);
+  if(!nick)nick=cu?cu.nickname:'';
+  if(!_unoCache[nick])return;
+  _unoCache[nick].streak=0;
+  if(fsDb())window._fsUpdateDoc(window._fsDoc(fsDb(),'uno_streaks',nick),{streak:0}).catch(function(e){});
 }
 
 function unoTopStreak(){
-  var d=unoStreakLoad();
   var best=null;
-  Object.keys(d).forEach(function(nick){
-    if(!best||d[nick].best>best.score)best={nick:nick,score:d[nick].best,current:d[nick].streak};
+  Object.keys(_unoCache).forEach(function(nick){
+    var d=_unoCache[nick];
+    if(!best||d.best>best.score)best={nick:nick,score:d.best,current:d.streak};
   });
   return best;
 }
 
-/* ─── CREDITS SYSTEM ─── */
-var CREDITS_KEY='lp_credits_v1';
-var CREDITS_MAX=10;     /* hard cap — silent */
-var CREDITS_PER_WIN=2;  /* 2 credits for winning multiplayer */
-var CREDITS_COST=1;     /* 1 credit per game play */
+/* ── CREDITS SYSTEM ── */
+var CREDITS_MAX=10;
+var CREDITS_PER_WIN=2;
+var CREDITS_COST=1;
 
-/* Upload threshold per role to earn 1 credit */
 function credUploadsPerCredit(role){
   if(role==='uploader')return 10;
-  return 5; /* escalation + manager: 1 credit per 5 uploads */
+  return 5;
 }
-
-function credLoad(){try{return JSON.parse(localStorage.getItem(CREDITS_KEY)||'{}')}catch(e){return {};}}
-function credSave(d){try{localStorage.setItem(CREDITS_KEY,JSON.stringify(d));}catch(e){}}
 
 function credGet(nick){
   if(!nick)nick=cu?cu.nickname:'';
-  var d=credLoad();
-  var today=getSydneyDate().toISOString().slice(0,10);
-  var state=d[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
-  /* Silent daily reset — new day = credits back to 0 */
-  if(state.lastCheckedDate&&state.lastCheckedDate!==today&&state.lastCheckedDate!==''){
-    state.credits=0;state.lastCheckedUploads=0;state.lastCheckedDate=today;
-    d[nick]=state;credSave(d);
-  }
-  return state;
+  return _credCache[nick]||{credits:0,lastCheckedUploads:0,lastCheckedDate:''};
 }
 
 function credRecalcFromUploads(){
@@ -3844,48 +3878,44 @@ function credRecalcFromUploads(){
   var threshold=credUploadsPerCredit(role);
   var nick=cu.nickname;
   var today=getSydneyDate().toISOString().slice(0,10);
-  var d=credLoad();
-  var state=credGet(nick); /* uses credGet so daily reset fires first */
+  var state=Object.assign({},credGet(nick));
   if(state.lastCheckedDate!==today){state.lastCheckedUploads=0;state.lastCheckedDate=today;}
-  if((state.credits||0)>=CREDITS_MAX){
-    d[nick]=state;credSave(d);
-    updateCreditBadge();return; /* already at cap */
-  }
+  if((state.credits||0)>=CREDITS_MAX){updateCreditBadge();return;}
   var todayUploads=(perfData[nick]&&perfData[nick][today]&&perfData[nick][today].uploadsTotal)||0;
   var prevBracket=Math.floor(state.lastCheckedUploads/threshold);
   var newBracket=Math.floor(todayUploads/threshold);
-  var earned=Math.min(newBracket-prevBracket, CREDITS_MAX-(state.credits||0));
+  var earned=Math.min(newBracket-prevBracket,CREDITS_MAX-(state.credits||0));
   if(earned>0){
     state.credits=(state.credits||0)+earned;
     state.lastCheckedUploads=todayUploads;
-    d[nick]=state;credSave(d);
     showCreditToast('+'+earned+' credit'+(earned>1?'s':'')+' earned! ('+todayUploads+' uploads today)');
   } else {
     state.lastCheckedUploads=Math.max(state.lastCheckedUploads,todayUploads);
-    d[nick]=state;credSave(d);
   }
+  _credCache[nick]=state;
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true}).catch(function(e){console.error('credRecalc',e);});
   updateCreditBadge();
 }
 
 function credSpend(nick){
   if(!nick)nick=cu?cu.nickname:'';
-  var d=credLoad();
-  var state=credGet(nick);
+  var state=Object.assign({},credGet(nick));
   if((state.credits||0)<CREDITS_COST)return false;
   state.credits-=CREDITS_COST;
-  d[nick]=state;credSave(d);
+  _credCache[nick]=state;
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true}).catch(function(e){});
   updateCreditBadge();
   return true;
 }
 
 function credAward(nick,amount){
   if(!nick)nick=cu?cu.nickname:'';
-  var d=credLoad();
-  var state=credGet(nick);
+  var state=Object.assign({},credGet(nick));
   var prev=state.credits||0;
-  state.credits=Math.min(prev+amount, CREDITS_MAX); /* cap at 10 */
+  state.credits=Math.min(prev+amount,CREDITS_MAX);
   var actual=state.credits-prev;
-  d[nick]=state;credSave(d);
+  _credCache[nick]=state;
+  if(fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true}).catch(function(e){});
   updateCreditBadge();
   if(actual>0)showCreditToast('+'+actual+' credit'+(actual>1?'s':'')+' for winning!');
 }
@@ -3900,6 +3930,7 @@ function updateCreditBadge(){
   el.style.background=full?'rgba(34,197,94,.15)':c>0?'rgba(139,45,255,.15)':'rgba(100,116,139,.1)';
   el.style.color=full?'var(--green)':c>0?'var(--accent)':'var(--muted)';
 }
+
 
 function showCreditToast(msg){
   var t=document.createElement('div');
@@ -5731,11 +5762,16 @@ async function kcSaveState(nick,state){
   if(fsDb()){
     try{
       var docId=kcFsId(nick,week);
-      await window._fsSetDoc(window._fsDoc(fsDb(),'kc_results',docId),
-        {nick:nick,week:week,state:state},{merge:true});
-    }catch(e){console.warn('KC save error',e);}
+      var payload={nick:nick,week:week,state:state};
+      await window._fsSetDoc(window._fsDoc(fsDb(),'kc_results',docId),payload,{merge:true});
+      console.log('KC saved to Firestore:',docId);
+    }catch(e){
+      console.error('KC Firestore write error:',e);
+    }
+  } else {
+    console.warn('KC save: fsDb not ready');
   }
-  /* Also update local cache immediately */
+  /* Update local cache immediately */
   if(!window._kcCache)window._kcCache={};
   if(!window._kcCache[nick])window._kcCache[nick]={};
   window._kcCache[nick][week]=state;
@@ -5920,16 +5956,24 @@ async function kcFinish(){
   var passed=pct>=KC_PASS_PCT;
   var nick=cu?cu.nickname:'';
   var s=kcGetState(nick);
+  /* Strip answers to minimal fields — avoids Firestore size/nesting issues */
+  var slimAnswers=_kcSession.answers.map(function(a){
+    return {qId:String(a.qId),chosen:a.chosen,correct:a.correct};
+  });
   s.attempts.push({
     score:score,
     pct:pct,
     passed:passed,
     week:kcWeekId(),
     date:getSydneyDate().toISOString().slice(0,10),
-    answers:_kcSession.answers
+    answers:slimAnswers
   });
   if(passed)s.completed=true;
-  await kcSaveState(nick,s);
+  try{
+    await kcSaveState(nick,s);
+  }catch(e){
+    console.error('KC save failed:',e);
+  }
   _kcSession=null;
   kcUpdateBanner();
   renderKCTile();
