@@ -4156,6 +4156,13 @@ function closeGame(){
   _removeGameKeys();
   if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
   if(window._unoTimerInterval){clearInterval(window._unoTimerInterval);window._unoTimerInterval=null;}
+  /* Closing UNO modal = stand up from seat */
+  if(_unoState&&_unoState.phase==='playing'){
+    var seats=_unoState.seats||[];
+    var isSeated=seats.some(function(s){return s&&s.nick===_unoMyNick;});
+    if(isSeated)unoStandUp();
+  }
+  if(_unoUnsub){_unoUnsub();_unoUnsub=null;}
   var m=G('game-modal');if(m)m.classList.remove('open');
   renderGamesGrid();
 }
@@ -5108,9 +5115,9 @@ function renderMgrKpiCard(){
     '.uno-card{width:48px;height:68px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;border:2px solid rgba(0,0,0,.2);position:relative;flex-shrink:0;cursor:default;user-select:none;}',
     '.uno-card-label{position:absolute;top:3px;left:5px;font-size:8px;font-weight:700;opacity:.85;}',
     '.uno-card-label-br{position:absolute;bottom:3px;right:5px;font-size:8px;font-weight:700;opacity:.85;transform:rotate(180deg);}',
-    '.uno-card.red{background:#dc2626;color:#fff;}.uno-card.blue{background:#2563eb;color:#fff;}',
-    '.uno-card.green{background:#16a34a;color:#fff;}.uno-card.yellow{background:#d97706;color:#fff;}',
-    '.uno-card.wild{background:linear-gradient(135deg,#dc2626 25%,#16a34a 25% 50%,#2563eb 50% 75%,#d97706 75%);color:#fff;}',
+    '.uno-card.red,.uno-hand-card.red{background:#dc2626;color:#fff;}.uno-card.blue,.uno-hand-card.blue{background:#2563eb;color:#fff;}',
+    '.uno-card.green,.uno-hand-card.green{background:#16a34a;color:#fff;}.uno-card.yellow,.uno-hand-card.yellow{background:#d97706;color:#fff;}',
+    '.uno-card.wild,.uno-hand-card.wild{background:linear-gradient(135deg,#dc2626 25%,#16a34a 25% 50%,#2563eb 50% 75%,#d97706 75%);color:#fff;}',
     '.uno-card.back{background:#4c1d95;color:#a78bfa;}',
     '.uno-color-dot{width:28px;height:28px;border-radius:50%;border:2px solid rgba(255,255,255,.2);}',
     '.uno-hand{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;padding:6px 0;}',
@@ -5261,22 +5268,28 @@ async function unoStandUp(){
   var seatIdx=seats.findIndex(function(s){return s&&s.nick===_unoMyNick;});
   if(seatIdx<0)return;
   seats[seatIdx]=null;
-  /* If game is playing, void hand and promote first audience member */
   var patch={seats:seats};
   if(_unoState.phase==='playing'){
     var hands=Object.assign({},_unoState.hands);
     delete hands[_unoMyNick];
     var active=(_unoState.activePlayers||[]).filter(function(n){return n!==_unoMyNick;});
     patch.hands=hands;patch.activePlayers=active;
+    /* If no players left — end the game */
+    if(active.length===0){
+      patch.phase='ended';
+      patch.winner='';
+      patch.lastAction='All players stood up — game ended.';
+      await unoUpdate(patch);
+      return;
+    }
     /* Promote first audience member */
     var aud=(_unoState.audience||[]).slice();
     if(aud.length>0){
       var promoted=aud.shift();
       seats[seatIdx]=promoted;
       patch.seats=seats;patch.audience=aud;
-      /* Give promoted player remaining hand or 7 fresh */
       hands[promoted.nick]=[];
-      for(var i=0;i<7;i++)hands[promoted.nick].push(patch.draw?patch.draw.pop():_unoState.draw[_unoState.draw.length-1-i]);
+      for(var i=0;i<7;i++)hands[promoted.nick].push(_unoState.draw[_unoState.draw.length-1-i]);
       patch.hands=hands;active.push(promoted.nick);patch.activePlayers=active;
     }
     patch.lastAction=(cu?cu.fullName:_unoMyNick)+' stood up mid-game';
@@ -5394,6 +5407,19 @@ async function unoPlayCard(cardIdx,chosenColor){
 }
 
 /* ─── DRAW CARD(S) ─── */
+/* ─── UNO CARD POINT VALUES ─── */
+function unoCardPoints(card){
+  if(!card)return 0;
+  var v=card.value;
+  if(v==='wild'||v==='+4')return 10;
+  if(v==='Skip'||v==='Reverse'||v==='+2')return 5;
+  var n=parseInt(v);
+  return isNaN(n)?0:n;
+}
+function unoHandTotal(hand){
+  return (hand||[]).reduce(function(s,c){return s+unoCardPoints(c);},0);
+}
+
 async function unoDrawCards(){
   if(!_unoState||_unoState.phase!=='playing')return;
   var active=_unoState.activePlayers;
@@ -5406,8 +5432,13 @@ async function unoDrawCards(){
   var count=stackCount>0?stackCount:1;
   var hand=(_unoState.hands[_unoMyNick]||[]).slice();
 
+  var deckExhausted=false;
   for(var i=0;i<count;i++){
-    if(draw.length===0){draw=unoShuffle(discard.slice(0,-1));discard=[discard[discard.length-1]];}
+    if(draw.length===0){
+      /* Deck empty — cannot reshuffle, mark exhausted */
+      deckExhausted=true;
+      break;
+    }
     hand.push(draw.pop());
   }
 
@@ -5416,6 +5447,23 @@ async function unoDrawCards(){
   var nextTurn=(_unoState.currentTurn+_unoState.direction+active.length*10)%active.length;
   var unoCallers=Object.assign({},_unoState.unoCallers||{});
   delete unoCallers[_unoMyNick];
+
+  /* Deck exhausted — end game, lowest hand total wins */
+  if(deckExhausted){
+    var totals={};
+    Object.keys(hands).forEach(function(nick){totals[nick]=unoHandTotal(hands[nick]);});
+    var lowestNick=Object.keys(totals).reduce(function(a,b){return totals[a]<=totals[b]?a:b;});
+    var summary=Object.keys(totals).map(function(n){return n+': '+totals[n]+'pts';}).join(' · ');
+    SFX.unoWin();
+    credAward(lowestNick,2);unoRecordWin(lowestNick);
+    await unoUpdate({
+      hands:hands,draw:draw,discard:discard,stackCount:0,
+      phase:'ended',winner:lowestNick,handTotals:totals,
+      lastAction:'Draw deck empty! Lowest hand wins. '+summary,
+      turnStart:Date.now()
+    });
+    return;
+  }
 
   await unoUpdate({
     hands:hands,draw:draw,discard:discard,stackCount:0,
@@ -5563,7 +5611,8 @@ function unoRenderGame(root){
   var s=_unoState;
   var active=s.activePlayers||[];
   var myTurnIdx=s.currentTurn%active.length;
-  var myTurn=active[myTurnIdx]===_unoMyNick;
+  var currentPlayer=active.length>0?active[myTurnIdx]:'—';
+  var myTurn=active.length>0&&currentPlayer===_unoMyNick;
   var topCard=s.discard[s.discard.length-1];
   var myHand=s.hands[_unoMyNick]||[];
   var isPlayer=active.indexOf(_unoMyNick)>=0;
@@ -5588,8 +5637,8 @@ function unoRenderGame(root){
 
   /* Timer bar */
   var elapsed=Date.now()-(s.turnStart||Date.now());
-  var remaining=Math.max(0,15000-elapsed);
-  var pct=Math.round((remaining/15000)*100);
+  var remaining=Math.max(0,20000-elapsed);
+  var pct=Math.round((remaining/20000)*100);
   
   var timerClass2=pct>50?'':pct>20?'warn':'danger';
 
@@ -5602,13 +5651,12 @@ function unoRenderGame(root){
   if(isPlayer){
     handHTML=myHand.map(function(card,i){
       var playable=myTurn&&unoCanPlay(card,topCard,s.currentColor,s.stackCount);
-      var cls='uno-hand-card '+(card.color==='wild'?'wild':card.color)+' '+(playable?'playable':'not-playable');
       var isWild=card.color==='wild';
-      return '<div class="'+cls+'" onclick="'+(playable?(isWild?'unoPickColor('+i+')':'unoPlayCard('+i+',\'\')'):'')+'"">'
+      var cls='uno-hand-card '+(isWild?'wild':card.color)+' '+(playable?'playable':'not-playable');
+      var stk=s.stackCount>0&&(card.value==='+2'||card.value==='+4')?'<div class="uno-stack-badge">STACK</div>':'';
+      return '<div class="'+cls+'" data-idx="'+i+'" data-wild="'+(isWild?'1':'0')+'">'
         +'<div class="uno-card-label">'+htmlEsc(card.display)+'</div>'
-        +htmlEsc(card.display)
-        +(s.stackCount>0&&(card.value==='+2'||card.value==='+4')?'<div class="uno-stack-badge">STACK</div>':'')
-        +'</div>';
+        +htmlEsc(card.display)+stk+'</div>';
     }).join('');
   } else {
     handHTML='<div style="font-size:11px;color:#64748b;text-align:center;padding:8px">You\'re watching this game</div>';
@@ -5634,7 +5682,7 @@ function unoRenderGame(root){
     +colorDot
     +'</div>'
     /* turn + stack */
-    +'<div class="uno-turn">'+(myTurn?'✦ Your turn':'Waiting for '+active[myTurnIdx])+'</div>'
+    +'<div class="uno-turn">'+(myTurn?'✦ Your turn':active.length>0?'Waiting for '+currentPlayer:'Game paused')+'</div>'
     +stackNotice
     /* log */
     +'<div class="uno-log">'+htmlEsc(s.lastAction||'')+'</div>'
@@ -5657,6 +5705,19 @@ function unoRenderGame(root){
     +'</div>'
     +'</div>'
     +'</div>';
+  /* Wire hand card clicks via delegation */
+  setTimeout(function(){
+    var handEl=root.querySelector('.uno-hand');
+    if(!handEl)return;
+    handEl.querySelectorAll('[data-idx]').forEach(function(el){
+      if(!el.classList.contains('playable'))return;
+      el.addEventListener('click',function(){
+        var idx=parseInt(el.dataset.idx);
+        var wild=el.dataset.wild==='1';
+        if(wild)unoPickColor(idx);else unoPlayCard(idx,'');
+      });
+    });
+  },50);
 }
 
 window.unoPickColor=function(cardIdx){
@@ -5668,12 +5729,35 @@ window.unoPickColor=function(cardIdx){
 function unoRenderEnded(root){
   var s=_unoState;
   var iWon=s.winner===_unoMyNick;
+  var isDeckEnd=!!(s.handTotals&&Object.keys(s.handTotals).length>0);
   if(!iWon&&_unoMyNick&&s.winner)unoRecordLoss(_unoMyNick);
   var isPlayer=(s.activePlayers||[]).indexOf(_unoMyNick)>=0;
+
+  /* Hand totals table for deck-exhaustion endings */
+  var totalsHTML='';
+  if(isDeckEnd&&s.handTotals){
+    var sorted=Object.keys(s.handTotals).sort(function(a,b){return s.handTotals[a]-s.handTotals[b];});
+    totalsHTML='<div style="margin:12px 0;background:rgba(255,255,255,.06);border-radius:10px;overflow:hidden;width:100%;max-width:260px">'
+      +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.08)">Hand Totals</div>'
+      +sorted.map(function(nick,i){
+        var pts=s.handTotals[nick];
+        var isWinner=nick===s.winner;
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.05);'+(isWinner?'background:rgba(34,197,94,.1)':'')+'">'
+          +'<span style="font-size:12px;color:'+(isWinner?'#86efac':'#94a3b8')+'">'+(i===0?'🏆 ':'')+htmlEsc(nick)+'</span>'
+          +'<span style="font-size:12px;font-weight:700;color:'+(isWinner?'#86efac':'#f1f5f9')+'">'+pts+' pts</span>'
+          +'</div>';
+      }).join('')
+      +'</div>';
+  }
+
+  var titleText=iWon?'You won!':(s.winner?htmlEsc(s.winner)+' wins!':'Game ended');
+  var emojiText=iWon?'🏆':(s.winner&&s.winner!==''?'😅':'🏁');
+
   root.innerHTML='<div class="uno-wrap"><div class="uno-result" style="position:static;background:transparent;min-height:360px">'
-    +'<div class="uno-result-emoji">'+(iWon?'🏆':'😅')+'</div>'
-    +'<div class="uno-result-title">'+(iWon?'You won!':htmlEsc(s.winner)+' wins!')+'</div>'
+    +'<div class="uno-result-emoji">'+emojiText+'</div>'
+    +'<div class="uno-result-title">'+titleText+'</div>'
     +'<div class="uno-result-sub">'+htmlEsc(s.lastAction||'')+'</div>'
+    +totalsHTML
     +(iWon?'<div class="uno-credit-box">🎮 +2 credits added to your balance</div>':'')
     +(isPlayer&&!iWon&&(credGet(_unoMyNick).credits||0)>=1?'<button class="uno-btn uno-btn-primary" onclick="unoReplay()">Play again (−1 credit)</button>':'')
     +(isPlayer&&!iWon&&(credGet(_unoMyNick).credits||0)<1?'<div style="font-size:11px;color:#ef4444">No credits left — moved to audience</div>':'')
@@ -5712,17 +5796,23 @@ function unoStartTimerUI(){
   _unoTimerInterval=setInterval(function(){
     var fill=G('uno-timer-fill');if(!fill)return;
     var elapsed=Date.now()-((_unoState&&_unoState.turnStart)||Date.now());
-    var remaining=Math.max(0,15000-elapsed);
-    var pct=Math.round((remaining/15000)*100);
+    var remaining=Math.max(0,20000-elapsed);
+    var pct=Math.round((remaining/20000)*100);
     fill.style.width=pct+'%';
     fill.className='uno-timer-fill'+(pct<=20?' danger':pct<=50?' warn':'');
     /* Auto-play when timer expires */
     if(remaining===0){
       clearInterval(_unoTimerInterval);
       _unoTimerInterval=null;
-      var active=(_unoState&&_unoState.activePlayers)||[];
-      var myTurnIdx=(_unoState&&_unoState.currentTurn||0)%active.length;
-      if(active[myTurnIdx]===_unoMyNick)unoAutoPlay();
+      /* Only fire auto-play if this client is actually the current turn player */
+      /* Double-check against Firestore state to avoid race conditions */
+      if(!_unoState||_unoState.phase!=='playing')return;
+      var active=(_unoState.activePlayers)||[];
+      var myTurnIdx=(_unoState.currentTurn||0)%active.length;
+      var isMyTurn=active[myTurnIdx]===_unoMyNick;
+      /* Extra guard: verify turnStart is old enough (18s) to avoid premature fire */
+      var serverElapsed=Date.now()-((_unoState.turnStart)||Date.now());
+      if(isMyTurn&&serverElapsed>=18000)unoAutoPlay();
     }
   },500);
 }
