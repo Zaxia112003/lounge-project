@@ -10568,7 +10568,7 @@ function renderDailyTbl(nick,range){
     const status=attRec?attRec.status:'full';const wt=wtMap[status]||'x1.0';
     const offTag='';
     const note=attRec&&attRec.notes?' — '+attRec.notes:'';
-    var errCount=callouts.filter(function(co){return co.uploader===nick&&co.type==='qscore'&&co.date===d;}).length;return '<tr><td>'+fmtDate(d)+'</td><td>'+(dd.uploadsTotal||0)+'</td><td>'+(errCount>0?'<span class="kpi-badge kb-red" style="font-size:9px">'+errCount+'</span>':'<span style="font-size:11px;color:var(--muted)">—</span>')+'</td></tr>';
+    var errCount=callouts.filter(function(co){return co.uploader===nick&&co.type==='qscore'&&co.date===d&&co.status!=='pending_review'&&co.status!=='discarded';}).length;return '<tr><td>'+fmtDate(d)+'</td><td>'+(dd.uploadsTotal||0)+'</td><td>'+(errCount>0?'<span class="kpi-badge kb-red" style="font-size:9px">'+errCount+'</span>':'<span style="font-size:11px;color:var(--muted)">—</span>')+'</td></tr>';
   }).join('');
   el.innerHTML='<table><thead><tr><th>Date (AEST)</th><th>Total Uploads</th><th>Errors Logged</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
