@@ -2029,8 +2029,8 @@ var ATT_STATUS_DEF={
   SL:     {label:'SL', full:'Sick Leave',   color:'#ff7a30',bg:'rgba(255,122,48,.18)', memberVisible:true},
   PL:     {label:'PL', full:'Annual Leave',  color:'#00d4b4',bg:'rgba(0,212,180,.18)',  memberVisible:true},
   Holiday:{label:'HOL',full:'Holiday',       color:'#2d7fff',bg:'rgba(45,127,255,.18)', memberVisible:true},
-  Absent: {label:'ABS',full:'Absent',        color:'#ff3d3d',bg:'rgba(255,61,61,.18)',  memberVisible:true},
-  UDT:    {label:'UDT',full:'Undertime',     color:'#f59e0b',bg:'rgba(245,158,11,.18)', memberVisible:true},
+  Absent: {label:'ABS',full:'Absent',        color:'#ff3d3d',bg:'rgba(255,61,61,.18)',  memberVisible:false},
+  UDT:    {label:'HD', full:'Half Day',      color:'#f59e0b',bg:'rgba(245,158,11,.18)', memberVisible:true},
   Offline:{label:'OFF',full:'Offline',       color:'#8b9cf4',bg:'rgba(139,156,244,.18)',memberVisible:true},
   Tardy:  {label:'TAR',full:'Tardy',         color:'#f43f5e',bg:'rgba(244,63,94,.18)',  memberVisible:false}
 };
@@ -2076,11 +2076,11 @@ function renderUnifiedAttendance(containerId,isManager){
       var isToday=ds===todayStr;
       var isWeekend=d.getDay()===0||d.getDay()===6;
       var cellStyle='text-align:center;padding:3px 1px;border:1px solid var(--border);'+(isWeekend?'background:rgba(0,0,0,.06);':isToday?'background:rgba(139,45,255,.06);':'');
-      if(entry&&entry.status==='Tardy'&&!isManager)entry=null;
+      if(entry&&(entry.status==='Tardy'||entry.status==='Absent')&&!isManager)entry=null;
       var badge='';
       if(entry){
         var _rawSt=entry.status;
-      var _normSt={AL:'PL','Annual Leave':'PL',SickLeave:'SL','Sick Leave':'SL',absent:'Absent',offline:'Offline',tardy:'Tardy',udt:'UDT',holiday:'Holiday',sl:'SL',al:'PL',half:'UDT'}[_rawSt]||_rawSt;
+      var _normSt={AL:'PL','Annual Leave':'PL',SickLeave:'SL','Sick Leave':'SL',absent:'Absent',offline:'Offline',tardy:'Tardy',udt:'UDT',holiday:'Holiday',sl:'SL',al:'PL',half:'UDT',full:'Tardy'}[_rawSt]||_rawSt;
       var def=ATT_STATUS_DEF[_normSt]||ATT_STATUS_DEF[_rawSt]||{label:_rawSt,color:'var(--muted)',bg:'rgba(128,128,128,.15)',full:_rawSt};
         var tip=def.full+(entry.hours?' ('+entry.hours+'h lost)':(entry.notes?' \u2014 '+entry.notes:''));
         badge='<span title="'+tip+'" style="display:inline-block;padding:1px 4px;border-radius:3px;font-size:9px;font-weight:700;background:'+def.bg+';color:'+def.color+'">'+def.label+'</span>';
@@ -2109,7 +2109,7 @@ function renderUnifiedAttendance(containerId,isManager){
     +'<thead><tr><th style="padding:5px 10px;font-size:10px;font-weight:700;color:var(--muted);text-align:left;border:1px solid var(--border2)">Member</th>'
     +dateHeaders+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+legendItems+'</div>'
-    +(isManager?'<div style="margin-top:6px;font-size:10px;color:var(--muted)">&#128274; Tardy is only visible to you.</div>':'');
+    +(isManager?'<div style="margin-top:6px;font-size:10px;color:var(--muted)">&#128274; Tardy and Absent are only visible to you.</div>':'');
 }
 function uniAttNav(dir){
   var s=_uniAtt;
@@ -8008,6 +8008,7 @@ function openQualMemberErrors(nick,fullName){
     var stPill='<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+stColor+'22;color:'+stColor+'">'+htmlEsc(c.status||'Pending')+'</span>';
     var ssHTML=c.screenshot?'<div style="margin-top:6px"><img src="'+c.screenshot+'" style="max-width:100%;border-radius:6px;max-height:120px;object-fit:cover;cursor:pointer" onclick="window.open(\''+c.screenshot+'\')"/></div>':'';
     var remarkHTML=(c.insight&&c.insight.trim())?'<div style="margin-top:5px;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:11px;color:var(--muted)">💬 '+htmlEsc(c.insight)+'</div>':'';
+    var removeBtn='<button onclick="qualRemoveError('+c.id+',\''+nick+'\',\''+htmlEsc(fullName)+'\')" style="font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,.08);color:var(--red);cursor:pointer;margin-top:6px">Remove error</button>';
     return '<div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px">'
       +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">'
       +typePill+' '+stPill
@@ -8016,7 +8017,7 @@ function openQualMemberErrors(nick,fullName){
       +'</div>'
       +'<div style="color:var(--text);font-weight:600;margin-bottom:2px">'+htmlEsc(c.address||'—')+'</div>'
       +'<div style="color:var(--muted)">'+htmlEsc(c.feedback||'—')+'</div>'
-      +ssHTML+remarkHTML
+      +ssHTML+remarkHTML+removeBtn
       +'</div>';
   }).join('')
   :'<div style="padding:16px;color:var(--muted);font-size:12px">No errors in this period.</div>';
@@ -8037,6 +8038,22 @@ function openQualMemberErrors(nick,fullName){
     +'<div style="max-height:480px;overflow-y:auto">'+rows+'</div>'
     +'</div>';
   modal.classList.add('open');
+}
+
+function qualRemoveError(calloutId,nick,fullName){
+  if(!confirm('Remove this error from '+fullName+'? This cannot be undone.'))return;
+  var co=callouts.find(function(c){return c.id===calloutId;});
+  if(!co){alert('Error not found.');return;}
+  /* Delete from Firestore and local */
+  if(co._fsId&&fsDb()){
+    try{window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));}catch(e){}
+  }
+  var ci=callouts.indexOf(co);
+  if(ci>-1)callouts.splice(ci,1);
+  /* Refresh modal and quality tab */
+  openQualMemberErrors(nick,fullName);
+  renderMgrHubQuality();
+  renderMgrKpiCard();
 }
 
 /* Old renderMgrHubQuality removed — new version at line 6306 */
@@ -8088,14 +8105,14 @@ function submitAttModal(){
   attendanceLog.push(attEntry);
   fsSaveAttendance(attEntry);
   /* Sync to uploader/escalation attendance object */
-  var statusMap={SL:'sl',PL:'al',Holiday:'al',Absent:'absent',UDT:'half',Tardy:'full',Offline:'full'};
+  var statusMap={SL:'sl',PL:'al',Holiday:'al',Absent:'absent',UDT:'half',Tardy:'tardy',Offline:'offline'};
   if(!attendance[nick])attendance[nick]={};
-  attendance[nick][date]={status:statusMap[status]||'full',notes:note||'',weight:weight};
+  attendance[nick][date]={status:statusMap[status]||status.toLowerCase(),notes:note||'',weight:weight};
   /* Persist to Firestore attendance sub-collection */
   if(fsDb()){
     try{
       window._fsSetDoc(window._fsDoc(fsDb(),'attendance',nick+'_'+date),
-        {nick:nick,date:date,status:statusMap[status]||'full',notes:note||'',weight:weight,managerLogged:true},{merge:true});
+        {nick:nick,date:date,status:statusMap[status]||status.toLowerCase(),notes:note||'',weight:weight,managerLogged:true},{merge:true});
     }catch(e){console.warn('att sync',e);}
   }
   G('att-modal').classList.remove('open');
@@ -10215,7 +10232,7 @@ var ATT_STATUS={
   PL:      {label:'PL',   full:'Personal Leave',  color:'#ffd93d', bg:'rgba(255,217,61,.18)'},
   Holiday: {label:'HOL',  full:'Holiday',         color:'#6bcbff', bg:'rgba(107,203,255,.18)'},
   Absent:  {label:'ABS',  full:'Absent',          color:'#ff3d3d', bg:'rgba(255,61,61,.18)'},
-  UDT:     {label:'UDT',  full:'Undertime',       color:'#ffb830', bg:'rgba(255,184,48,.18)'},
+  UDT:     {label:'HD',   full:'Half Day',        color:'#ffb830', bg:'rgba(255,184,48,.18)'  },
   Tardy:   {label:'TAR',  full:'Tardy',           color:'#c77dff', bg:'rgba(199,125,255,.18)'},
   Offline: {label:'OFL',  full:'Offline',         color:'#74c0fc', bg:'rgba(116,192,252,.18)'},
 };
@@ -11402,7 +11419,7 @@ document.addEventListener('DOMContentLoaded',function(){
           <option value="PL">PL — Personal Leave</option>
           <option value="Holiday">HOL — Holiday</option>
           <option value="Absent">ABS — Absent</option>
-          <option value="UDT">UDT — Undertime</option>
+          <option value="UDT">HD — Half Day</option>
           <option value="Tardy">TAR — Tardy</option>
           <option value="Offline">OFL — Offline</option>
         </select>
