@@ -993,7 +993,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.47ae</div>
+    <div class="brand-sub">v.49ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1068,7 +1068,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.47ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.49ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -2767,10 +2767,10 @@ function buildUploaderDOM(){
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
     <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
+      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127968; Overview</button>
+      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128203; My Work</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; Team</button>
+      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#128218; My Space</button>
       
     </div>
     <div class="kc-banner" id="kc-banner">
@@ -2783,7 +2783,6 @@ function buildUploaderDOM(){
         <input class="article-search" type="text" placeholder="&#128269; Search articles..." oninput="setArticleSearch(this.value)"/>
         <div class="article-filter" id="my-space-filters">
           <button class="article-pill active" data-f="all" onclick="setArticleFilter('all',this)">All</button>
-          <button class="article-pill" data-f="ann" onclick="setArticleFilter('ann',this)">&#128226; Announcements</button>
           <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128218; Knowledge Base</button>
           <button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter('template',this)" style="display:none">&#128196; Templates</button>
         </div>
@@ -2878,10 +2877,10 @@ function buildEscalationDOM(){
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
     <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
+      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127968; Overview</button>
+      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128203; My Work</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; Team</button>
+      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#128218; My Space</button>
       
     </div>
     <div class="kc-banner" id="kc-banner">
@@ -2892,9 +2891,8 @@ function buildEscalationDOM(){
     <div class="lounge-pane" id="lounge-pane-my-space">
       <div class="article-toolbar">
         <input class="article-search" type="text" placeholder="&#128269; Search articles..." oninput="setArticleSearch(this.value)"/>
-        <div class="article-filter">
+        <div class="article-filter" id="my-space-filters">
           <button class="article-pill active" data-f="all" onclick="setArticleFilter('all',this)">All</button>
-          <button class="article-pill" data-f="ann" onclick="setArticleFilter('ann',this)">&#128226; Announcements</button>
           <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128218; Knowledge Base</button>
           <button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter('template',this)" style="display:none">&#128196; Templates</button>
         </div>
@@ -2917,10 +2915,9 @@ function buildManagerDOM(){
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
     <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127774; My Day</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#127760; My Space</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; My Team</button>
+      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127968; Overview</button>
+      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; Team</button>
       
     </div>
     <div class="kc-banner" id="kc-banner">
@@ -3430,49 +3427,68 @@ function renderMyDay(){
   var dateStr=days[today.getDay()]+', '+today.getDate()+' '+months[today.getMonth()]+' '+today.getFullYear();
   var clockStr=fmtClock(today);
 
-  var pendingCount=pwPending.length;
-  var reviewBtn=isManager&&pendingCount>0
-    ?''
-    :'';
-
   el.innerHTML=
+    /* Date + clock */
     '<div class="panel-header">'
     +'<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">'
     +'<div><div style="font-size:15px;font-weight:600;color:var(--muted);font-family:var(--font-d)">'+dateStr+'</div>'
     +'<div style="font-size:13px;color:var(--muted2);margin-top:2px;font-family:var(--font-d)" id="my-day-clock">'+clockStr+'</div>'
     +'</div>'
-
-    +reviewBtn
     +'</div></div>'
-    +'<div class="sect ann-board"'+(cu&&cu.role==='manager'?' style="display:none"':'')+'>'
+
+    /* Announcements — always visible, manager gets + Post button */
+    +'<div class="sect ann-board">'
     +'<div class="sect-head">'
-    +'<span class="sect-title">&#128226; Announcements</span>'
-    +'<span class="ann-unread-badge" id="ann-unread-badge"></span>'
+    +'<div style="display:flex;align-items:center;gap:8px"><span class="sect-title">&#128226; Announcements</span>'
+    +'<span class="ann-unread-badge" id="ann-unread-badge"></span></div>'
+    +(isManager?'<button class="btn btn-outline btn-sm" onclick="openAddArticleModal(\'ann\')" style="font-size:11px">+ Post</button>':'')
     +'</div>'
     +'<div class="ann-list" id="ann-list"></div>'
     +'</div>'
-    /* Manager KPI Quick-Glance */
-    +(isManager
-      ?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>'
+
+    /* Manager: KPI quick view */
+    +(isManager?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>':'')
+
+    /* Mood + Status side by side (non-manager only) */
+    +(cu&&!isManager
+      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+        +'<div class="sect" id="mood-tile-wrap" style="padding:0">'
+          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128578; How are you?</span></div>'
+          +'<div id="mood-tile-body"></div>'
+        +'</div>'
+        +'<div class="sect" style="padding:0">'
+          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128994; My Status</span></div>'
+          +'<div id="my-status-picker" style="padding:8px 14px"></div>'
+        +'</div>'
+      +'</div>'
       :'')
-    /* Team Photos — full width, fixed height */
-    +'<div class="sect pw-wrap" style="margin-bottom:14px">'
-    +'<div class="sect-head">'
-    +'<span class="sect-title">&#128247; Team Photos</span>'
-    +'<div style="display:flex;gap:8px;align-items:center">'
-    +'<span style="font-size:10px;color:var(--muted)">'+pwPinned().length+'/'+PW_MAX_PINNED+' on wall</span>'
-    +'<button class="btn btn-outline btn-sm" onclick="pwOpenUploadModal()">+ Add Photo</button>'
-    +'</div></div>'
-    +pwRenderSlideshow()
-    +'<div class="pw-footer">'
-    +'<div class="pw-dots">'+pwRenderDots()+'</div>'
-    +'<button id="pw-autoplay-btn" onclick="pwToggleAutoplay()" title="Play/Pause" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;opacity:.7;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7">'
-    +(_pwAutoplayOn?'&#9646;&#9646;':'&#9654;')
-    +'</button>'
-    +(pwPhotos.length>0?'<a class="pw-gallery-link" onclick="pwOpenGallery()">Open Gallery &#8594;</a>':'')
-    +'</div>'
-    +'</div>'
-    /* Games — full width, solo + multiplayer merged */
+
+    /* Manager: Mood + Status side by side */
+    +(isManager
+      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+        +'<div class="sect" style="padding:0">'
+          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128578; Team mood today</span><span style="font-size:10px;color:var(--muted)">Anonymous</span></div>'
+          +'<div id="mgr-mood-overview-card" style="padding:10px 14px"></div>'
+        +'</div>'
+        +'<div class="sect" style="padding:0">'
+          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128994; My Status</span></div>'
+          +'<div id="my-status-picker" style="padding:8px 14px"></div>'
+        +'</div>'
+      +'</div>'
+      :'')
+
+    /* Knowledge Check — compact horizontal strip (non-manager) */
+    +(cu&&!isManager
+      ?'<div class="sect" style="padding:0;margin-bottom:14px">'
+        +'<div class="sect-head" style="padding:11px 14px 10px">'
+        +'<span class="sect-title">&#129504; Knowledge Check</span>'
+        +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
+        +'</div>'
+        +'<div id="kc-tile-body"></div>'
+        +'</div>'
+      :'')
+
+    /* Games — compact chip row */
     +'<div class="sect" style="padding:0;margin-bottom:14px">'
     +'<div class="sect-head" style="padding:11px 14px 10px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
@@ -3480,44 +3496,29 @@ function renderMyDay(){
     +(cu?'<div id="credit-badge" style="display:none;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:default"></div>':'')
     +'</div>'
     +'<div style="display:flex;align-items:center;gap:6px">'
-    +'<span style="font-size:10px;color:var(--muted)">Solo &amp; Multiplayer</span>'
     +'<button onclick="gamesScrollLeft()" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center">&#8592;</button>'
     +'<button onclick="gamesScrollRight()" style="width:22px;height:22px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center">&#8594;</button>'
     +'</div>'
     +'</div>'
     +'<div class="games-scroll-row" id="games-scroll-row"></div>'
+    +'</div>';
 
-    +'</div>'
-    /* Knowledge Check — Live */
-    /* Knowledge Check + Mood Check-In — side by side */
-    +(cu&&cu.role!=='manager'
-      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
-        +'<div class="sect" style="padding:0">'
-          +'<div class="sect-head" style="padding:11px 14px 10px">'
-          +'<span class="sect-title">&#129504; Knowledge Check</span>'
-          +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
-          +'</div>'
-          +'<div id="kc-tile-body"></div>'
-        +'</div>'
-        +'<div class="sect" id="mood-tile-wrap" style="padding:0">'
-          +'<div class="sect-head" style="padding:11px 14px 10px">'
-          +'<span class="sect-title">&#128578; How are you?</span>'
-          +'</div>'
-          +'<div id="mood-tile-body"></div>'
-        +'</div>'
-      +'</div>'
-      :'');
   var _prevAnnCount=mdAnnouncements.length;
   renderAnnouncements();
   renderGamesGrid();
   if(mdAnnouncements.length>0&&_prevAnnCount===0){_playAnnouncementSound();}
-  if(isManager)renderMgrKpiCard();
+  if(isManager){
+    renderMgrKpiCard();
+    /* Render manager mood overview */
+    setTimeout(function(){
+      renderMgrMoodOverview();
+      renderStatusPicker();
+    },50);
+  }
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
-  if(cu&&cu.role!=='manager'){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();},50);}
+  if(cu&&!isManager){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();renderStatusPicker();},50);}
   startClock();
-  /* Start wall slideshow autoplay */
-  setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},500);
 }
 
 
@@ -6239,6 +6240,28 @@ function moodRespond(idx){
   },2500);
 }
 
+function renderMgrMoodOverview(){
+  var el=G('mgr-mood-overview-card');if(!el)return;
+  moodLoadAggregate(function(data){
+    if(!data||!data.total){
+      el.innerHTML='<div style="font-size:11px;color:var(--muted);padding:4px 0">No check-ins yet today.</div>';
+      return;
+    }
+    var counts=data.counts||[0,0,0,0,0];
+    var total=data.total||1;
+    var barHTML=counts.map(function(c,i){
+      var pct=Math.round((c/total)*100);
+      return '<div class="mood-dist-seg" style="background:'+MOOD_COLORS[i]+';width:'+pct+'%;min-width:'+(c>0?4:0)+'px"></div>';
+    }).join('');
+    var legendHTML=MOOD_EMOJIS.map(function(e,i){
+      return '<div class="mood-leg-item"><div class="mood-leg-dot" style="background:'+MOOD_COLORS[i]+'"></div>'+e+' '+counts[i]+'</div>';
+    }).join('');
+    el.innerHTML='<div class="mood-dist-bar">'+barHTML+'</div>'
+      +'<div class="mood-legend">'+legendHTML+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-top:6px">'+data.total+' of '+TEAM.filter(function(t){return t.role!=='manager';}).length+' checked in</div>';
+  });
+}
+
 function renderMgrMoodCard(){
   var el=G('mgr-mood-card');if(!el)return;
   if(!fsDb()||!window._fsGetDoc){
@@ -7150,6 +7173,8 @@ function switchLoungeTab(tab, btn){
   }
   if(tab==='my-space'){if(mgrSelectMode)mgrExitSelectMode();renderArticles();}
   if(tab==='my-team')renderMyTeam();
+  /* Scroll to top on tab switch */
+  var panel=G('the-lounge-panel');if(panel)panel.scrollTop=0;
 }
 
 var mgrSelectedArticles=new Set();
@@ -7161,6 +7186,11 @@ function renderArticles(){
   /* Show Templates filter pill for escalation/manager */
   var tmplPill=G('tmpl-filter-pill');
   if(tmplPill)tmplPill.style.display=(cu&&(cu.role==='escalation'||cu.role==='manager'))?'':'none';
+  /* Hide ann filter pill for non-managers — announcements shown on Overview instead */
+  var annPillEl=G('my-space-filters')?G('my-space-filters').querySelector('[data-f="ann"]'):null;
+  if(annPillEl)annPillEl.style.display=isManager?'':'none';
+  /* For non-managers, skip announcements in item list if viewing My Space */
+  var showAnnsInSpace=isManager||(typeof loungeTab!=='undefined'&&loungeTab==='my-space'===false);
   /* Sync active pill */
   document.querySelectorAll('.article-pill').forEach(function(p){
     p.classList.toggle('active', p.dataset.f===articleFilter);
@@ -7663,13 +7693,17 @@ function renderManagerHub(){
     +'<button class="sub-tab active" onclick="switchMgrHubTab(\'performance\',this)">&#9989; Performance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'quality\',this)">&#128203; Quality</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
-    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kc\',this)">&#129504; Knowledge Check</button>'
+    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kc\',this)">&#129504; KC</button>'
+    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kb\',this)">&#128218; Knowledge Base</button>'
+    +'<button class="sub-tab" onclick="switchMgrHubTab(\'announcements\',this)">&#128226; Announcements</button>'
     +'</div>'
     +'<div class="sect" id="mgr-mood-card" style="margin-bottom:14px"><div class="sect-head"><span class="sect-title">&#128578; Team mood today</span></div></div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
     +'<div id="mgr-hub-pane-kc" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-quality" class="mgr-hub-pane"></div>'
-    +'<div id="mgr-hub-pane-attendance" class="mgr-hub-pane"></div>';
+    +'<div id="mgr-hub-pane-attendance" class="mgr-hub-pane"></div>'
+    +'<div id="mgr-hub-pane-kb" class="mgr-hub-pane"></div>'
+    +'<div id="mgr-hub-pane-announcements" class="mgr-hub-pane"></div>';
 
   renderMgrHubPerformance();
   setTimeout(function(){
@@ -7703,6 +7737,45 @@ function switchMgrHubTab(tab,btn){
   },50);}
   else if(tab==='attendance')renderMgrHubAttendance();
   else if(tab==='kc')renderMgrKCResults(G('mgr-hub-pane-kc'));
+  else if(tab==='kb'){
+    var kbPane=G('mgr-hub-pane-kb');if(!kbPane)return;
+    /* Render KB articles in hub pane */
+    kbPane.innerHTML='<div class="article-toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:14px">'
+      +'<input class="article-search" type="text" placeholder="&#128269; Search articles..." oninput="setArticleSearch(this.value)"/>'
+      +'<div class="article-filter" id="my-space-filters">'
+      +'<button class="article-pill active" data-f="all" onclick="setArticleFilter(\'all\',this)">All</button>'
+      +'<button class="article-pill" data-f="kb" onclick="setArticleFilter(\'kb\',this)">&#128218; Knowledge Base</button>'
+      +'<button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter(\'template\',this)">&#128196; Templates</button>'
+      +'</div>'
+      +'<button class="btn btn-primary btn-sm" onclick="openAddArticleModal()" style="margin-left:auto">&#43; Add Article</button>'
+      +'</div>'
+      +'<div class="article-list" id="article-list"></div>';
+    renderArticles();
+  }
+  else if(tab==='announcements'){
+    var annPane=G('mgr-hub-pane-announcements');if(!annPane)return;
+    annPane.innerHTML='<div class="article-toolbar" style="margin-bottom:14px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-left:auto">'
+      +'<button class="btn btn-primary btn-sm" onclick="openAddArticleModal(\'ann\')">&#43; Post Announcement</button>'
+      +'</div></div>'
+      +'<div id="mgr-hub-ann-list"></div>';
+    /* Render announcements list */
+    var annList=G('mgr-hub-ann-list');
+    if(annList){
+      var anns=mdAnnouncements.slice().reverse();
+      annList.innerHTML=anns.length?anns.map(function(a){
+        var daysLeft=Math.ceil((new Date(a.expires)-new Date())/86400000);
+        return '<div class="space-ann-card" style="border-radius:10px;margin-bottom:8px">'
+          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">'
+          +'<div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">'+htmlEsc(a.title)+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+htmlEsc(a.body||'')+'</div>'
+          +'<div style="font-size:10px;color:var(--muted2);margin-top:6px">Expires in '+daysLeft+' day'+(daysLeft!==1?'s':'')+'</div>'
+          +'</div>'
+          +'<button onclick="deleteAnnouncement('+a.id+')" style="font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;flex-shrink:0">Remove</button>'
+          +'</div></div>';
+      }).join(''):'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No active announcements.</div>';
+    }
+  }
 }
 
 function mgrHubFilter(btn){
@@ -8938,8 +9011,8 @@ function renderMyTeam(){
     var d=TEAM_DIR[nick];if(groups[d.role])groups[d.role].push(nick);
   });
   function makeCard(nick){
-    var isManager=cu&&cu.role==='manager';
-    var removeBtn=isManager&&nick!==cu.nickname
+    var isMgr=cu&&cu.role==='manager';
+    var removeBtn=isMgr&&nick!==cu.nickname
       ?'<button class="team-card-x" data-remove="'+nick+'" title="Remove member">&#x2715;</button>'
       :'';
     return '<div class="team-card-wrap">'
@@ -8954,14 +9027,37 @@ function renderMyTeam(){
       +'</div>';
   }
   var addBtn=(cu&&cu.role==='manager')
-    ?'<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="openAddMemberModal()">&#43; Add Member</button></div>'
+    ?'<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-primary btn-sm" onclick="openAddMemberModal()">&#43; Add Member</button></div>'
     :'';
-  el.innerHTML=addBtn
+
+  /* Team Photos at top of Team tab */
+  var photosSection='<div class="sect pw-wrap" style="margin-bottom:16px">'
+    +'<div class="sect-head">'
+    +'<span class="sect-title">&#128247; Team Photos</span>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<span style="font-size:10px;color:var(--muted)">'+pwPinned().length+'/'+PW_MAX_PINNED+' on wall</span>'
+    +'<button class="btn btn-outline btn-sm" onclick="pwOpenUploadModal()">+ Add Photo</button>'
+    +'</div></div>'
+    +pwRenderSlideshow()
+    +'<div class="pw-footer">'
+    +'<div class="pw-dots">'+pwRenderDots()+'</div>'
+    +'<button id="pw-autoplay-btn" onclick="pwToggleAutoplay()" title="Play/Pause" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;opacity:.7;transition:opacity .2s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7">'
+    +(_pwAutoplayOn?'&#9646;&#9646;':'&#9654;')
+    +'</button>'
+    +(pwPhotos.length>0?'<a class="pw-gallery-link" onclick="pwOpenGallery()">Open Gallery &#8594;</a>':'')
+    +'</div>'
+    +'</div>';
+
+  el.innerHTML=photosSection
+    +addBtn
     +'<div class="team-org">'
     +'<div><div class="team-org-label">&#128084; Manager</div><div class="team-org-row">'+groups.Manager.map(makeCard).join('')+'</div></div>'
     +'<div><div class="team-org-label">&#9889; Escalation</div><div class="team-org-row">'+groups.Escalation.map(makeCard).join('')+'</div></div>'
     +'<div><div class="team-org-label">&#128188; Uploaders</div><div class="team-org-row">'+groups.Uploader.map(makeCard).join('')+'</div></div>'
     +'</div>';
+
+  /* Start wall slideshow */
+  setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},300);
 
   /* Delegated click handler — handles both card and X button */
   el.onclick=function(e){
@@ -9594,6 +9690,7 @@ async function submitQScoreFromOverlay(){
   var _files2=Array.from(G('qscore-file2').files);var ss=null;
   if(_files2.length>0){var _urls=await Promise.all(_files2.map(function(f){return uploadScreenshot(f);}));ss=_urls.filter(Boolean).join('||');}
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
+  var cat2=G('qscore-cat2')?G('qscore-cat2').value:'Others';
   var newCo={id:nextId++,type:'qscore',uploader:upl,category:cat2||'Others',address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCo);
   /* Save callout and wait for Firestore ID before sending review notif */
