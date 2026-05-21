@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Lounge — Realm</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07080f;--bg2:#0c0e1c;--bg3:#111327;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);--border3:rgba(255,255,255,0.2);
+  --text:#e8eaf6;--muted:rgba(232,234,246,0.5);--muted2:rgba(232,234,246,0.25);
+  --gold:#c9a84c;--gold2:#f0cc6e;--gold3:rgba(201,168,76,0.15);
+  --purple:#8b2dff;--pink:#f72b6e;--blue:#2d7fff;--teal:#00d4b4;
+  --green:#1dd17a;--red:#ff3d3d;--amber:#ffb830;
+  --grad:linear-gradient(135deg,#f72b6e,#8b2dff,#2d7fff);
+  --grad-gold:linear-gradient(135deg,#c9a84c,#f0cc6e,#c9a84c);
+  --font-d:'Cinzel',serif;--font-b:'Exo 2',sans-serif;
+}
+body{min-height:100vh;font-family:var(--font-b);background:var(--bg);color:var(--text);overflow-x:hidden;font-size:14px;}
+
+/* ── BG ── */
+.bg-fixed{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);animation:drift 18s ease-in-out infinite alternate;}
+.o1{width:700px;height:700px;background:radial-gradient(circle,rgba(139,45,255,.12),transparent 70%);top:-250px;left:-200px;}
+.o2{width:500px;height:500px;background:radial-gradient(circle,rgba(201,168,76,.08),transparent 70%);top:20%;right:-150px;animation-delay:-6s;}
+.o3{width:600px;height:600px;background:radial-gradient(circle,rgba(247,43,110,.08),transparent 70%);bottom:-200px;left:30%;animation-delay:-12s;}
+.scanlines{position:fixed;inset:0;z-index:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px);}
+@keyframes drift{0%{transform:translate(0,0);}100%{transform:translate(25px,20px);}}
+
+/* ── LOGIN ── */
+#pg-login{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+#pg-login.hidden{display:none;}
+.login-wrap{text-align:center;animation:fadeUp .6s cubic-bezier(.22,1,.36,1) both;}
+.login-crest{width:80px;height:80px;margin:0 auto 24px;background:var(--grad-gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 0 40px rgba(201,168,76,.3),0 0 80px rgba(201,168,76,.1);}
+.login-title{font-family:var(--font-d);font-size:28px;font-weight:700;letter-spacing:2px;color:var(--gold2);margin-bottom:4px;}
+.login-sub{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:36px;}
+.login-field{width:260px;background:rgba(255,255,255,.05);border:1px solid var(--border2);border-radius:10px;padding:12px 16px;font-size:14px;color:var(--text);font-family:var(--font-b);outline:none;text-align:center;letter-spacing:1px;transition:all .2s;margin-bottom:12px;}
+.login-field:focus{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.06);box-shadow:0 0 0 3px rgba(201,168,76,.1);}
+.login-field::placeholder{color:var(--muted2);}
+.login-btn{width:260px;background:var(--grad-gold);border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#07080f;font-family:var(--font-d);cursor:pointer;transition:opacity .2s,transform .15s;}
+.login-btn:hover{opacity:.88;}.login-btn:active{transform:scale(.98);}
+.login-err{font-size:12px;color:#ff6b9d;margin-top:8px;min-height:16px;}
+.back-link{margin-top:20px;font-size:11px;color:var(--muted);letter-spacing:1px;cursor:pointer;transition:color .2s;}
+.back-link:hover{color:var(--gold);}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;}}
+
+/* ── MAIN ── */
+#pg-main{display:none;position:relative;z-index:1;min-height:100vh;padding:28px 24px 40px;}
+#pg-main.active{display:block;}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;}
+.topbar-left{display:flex;align-items:center;gap:12px;}
+.realm-badge{font-family:var(--font-d);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);border:1px solid rgba(201,168,76,.3);border-radius:6px;padding:4px 10px;background:rgba(201,168,76,.06);}
+.topbar-title{font-family:var(--font-d);font-size:18px;font-weight:700;letter-spacing:1px;color:var(--text);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.back-btn{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border:1px solid var(--border2);border-radius:6px;padding:5px 12px;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-block;}
+.back-btn:hover{color:var(--text);border-color:var(--border3);}
+.signout-btn{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);cursor:pointer;transition:color .2s;}
+.signout-btn:hover{color:var(--red);}
+
+/* ── LAYOUT ── */
+.realm-grid{display:grid;grid-template-columns:300px 1fr;gap:20px;max-width:1100px;margin:0 auto;}
+
+/* ── CHARACTER CARD ── */
+.char-card{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:28px 24px;position:relative;overflow:hidden;}
+.char-card::before{content:'';position:absolute;inset:-1px;border-radius:16px;background:var(--grad-gold);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;padding:1px;pointer-events:none;opacity:.4;}
+.char-sprite-wrap{display:flex;justify-content:center;margin-bottom:20px;position:relative;}
+.char-sprite{width:110px;height:110px;position:relative;}
+.char-aura{position:absolute;inset:-12px;border-radius:50%;animation:pulse-aura 3s ease-in-out infinite;}
+@keyframes pulse-aura{0%,100%{opacity:.3;transform:scale(1);}50%{opacity:.6;transform:scale(1.05);}}
+.char-level-badge{position:absolute;bottom:-6px;right:-6px;background:var(--grad-gold);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:12px;font-weight:700;color:#07080f;border:2px solid var(--bg2);}
+.char-name{font-family:var(--font-d);font-size:20px;font-weight:700;letter-spacing:.5px;text-align:center;color:var(--text);margin-bottom:2px;}
+.char-class{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;text-align:center;margin-bottom:6px;}
+.char-class.archivist{color:var(--purple);}
+.char-class.sentinel{color:var(--teal);}
+.char-class.gamemaster{color:var(--gold);}
+.char-title{font-size:12px;color:var(--muted);text-align:center;margin-bottom:20px;}
+
+/* XP bar */
+.xp-row{display:flex;justify-content:space-between;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.xp-bar-bg{width:100%;height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;margin-bottom:20px;}
+.xp-bar-fill{height:100%;border-radius:3px;background:var(--grad-gold);transition:width .8s cubic-bezier(.22,1,.36,1);}
+
+/* Divider */
+.card-divider{height:1px;background:var(--border);margin:20px 0;}
+
+/* Credits */
+.credits-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.credits-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+.credits-val{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--gold2);}
+.credits-sub{font-size:10px;color:var(--muted);margin-top:1px;}
+
+/* Status */
+.status-row{display:flex;gap:8px;flex-wrap:wrap;}
+.status-chip{font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:3px 9px;border-radius:4px;font-weight:600;}
+.chip-green{background:rgba(29,209,122,.12);color:var(--green);border:1px solid rgba(29,209,122,.25);}
+.chip-amber{background:rgba(255,184,48,.1);color:var(--amber);border:1px solid rgba(255,184,48,.2);}
+.chip-purple{background:rgba(139,45,255,.12);color:#c084fc;border:1px solid rgba(139,45,255,.25);}
+.chip-red{background:rgba(255,61,61,.1);color:var(--red);border:1px solid rgba(255,61,61,.2);}
+.chip-teal{background:rgba(0,212,180,.1);color:var(--teal);border:1px solid rgba(0,212,180,.2);}
+
+/* ── RIGHT COLUMN ── */
+.right-col{display:flex;flex-direction:column;gap:16px;}
+
+/* Stats panel */
+.panel{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:22px;}
+.panel-title{font-family:var(--font-d);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+.panel-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,168,76,.3),transparent);}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.stat-block{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;}
+.stat-block::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:2px 0 0 2px;}
+.stat-block.str::before{background:#f72b6e;}
+.stat-block.int::before{background:#8b2dff;}
+.stat-block.def::before{background:#2d7fff;}
+.stat-block.agi::before{background:#00d4b4;}
+.stat-block.lck::before{background:#ffb830;}
+.stat-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.stat-val{font-family:var(--font-d);font-size:28px;font-weight:700;line-height:1;margin-bottom:8px;}
+.stat-block.str .stat-val{color:#f72b6e;}
+.stat-block.int .stat-val{color:#c084fc;}
+.stat-block.def .stat-val{color:#60a5fa;}
+.stat-block.agi .stat-val{color:var(--teal);}
+.stat-block.lck .stat-val{color:var(--amber);}
+.stat-bar-bg{width:100%;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
+.stat-bar-fill{height:100%;border-radius:2px;transition:width 1s cubic-bezier(.22,1,.36,1);}
+.stat-block.str .stat-bar-fill{background:#f72b6e;}
+.stat-block.int .stat-bar-fill{background:#8b2dff;}
+.stat-block.def .stat-bar-fill{background:#2d7fff;}
+.stat-block.agi .stat-bar-fill{background:#00d4b4;}
+.stat-block.lck .stat-bar-fill{background:#ffb830;}
+.stat-desc{font-size:10px;color:var(--muted2);margin-top:6px;line-height:1.5;}
+
+/* Equipment */
+.equip-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.equip-slot{aspect-ratio:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all .18s;position:relative;}
+.equip-slot:hover{border-color:var(--border2);}
+.equip-slot.filled{border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.05);}
+.equip-slot.filled:hover{border-color:rgba(201,168,76,.5);}
+.equip-icon{font-size:20px;}
+.equip-label{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);}
+.equip-slot.filled .equip-label{color:var(--gold);}
+.equip-rarity{position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;}
+.rarity-common{background:#888;}
+.rarity-rare{background:#2d7fff;}
+.rarity-epic{background:#8b2dff;}
+.rarity-legendary{background:var(--gold);}
+
+/* Activity row */
+.activity-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.activity-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;}
+.activity-val{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.activity-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.activity-delta{font-size:10px;margin-top:4px;}
+.delta-up{color:var(--green);}
+.delta-down{color:var(--red);}
+
+/* Streak bar */
+.streak-row{display:flex;gap:5px;margin-top:14px;}
+.streak-dot{width:28px;height:28px;border-radius:6px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .2s;}
+.streak-dot.active{background:rgba(201,168,76,.15);border-color:rgba(201,168,76,.4);color:var(--gold2);}
+.streak-dot.today{background:var(--grad-gold);border-color:var(--gold);color:#07080f;font-weight:700;}
+
+/* Loading skeleton */
+.skel{background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+/* Manager view */
+.manager-banner{background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(201,168,76,.04));border:1px solid rgba(201,168,76,.2);border-radius:14px;padding:28px;text-align:center;}
+.manager-crown{font-size:48px;margin-bottom:12px;}
+.manager-title{font-family:var(--font-d);font-size:18px;font-weight:700;color:var(--gold2);margin-bottom:6px;letter-spacing:1px;}
+.manager-desc{font-size:13px;color:var(--muted);line-height:1.7;max-width:400px;margin:0 auto 20px;}
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:20px;}
+.team-mini{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .18s;}
+.team-mini:hover{border-color:var(--border2);transform:translateY(-2px);}
+.team-mini-avatar{width:44px;height:44px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:16px;font-weight:700;color:#fff;margin:0 auto 10px;}
+.team-mini-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.team-mini-class{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+.team-mini-level{font-family:var(--font-d);font-size:18px;font-weight:700;color:var(--gold2);margin-top:6px;}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:#1e1b4b;color:#a78bfa;border:1px solid #7c3aed;border-radius:10px;padding:12px 18px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:fadeUp .3s ease;pointer-events:none;max-width:260px;}
+
+/* Loading overlay */
+.loading-overlay{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.loading-overlay.hidden{display:none;}
+.loading-icon{font-size:40px;animation:spin 2s linear infinite;}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.loading-text{font-family:var(--font-d);font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);}
+
+@media(max-width:768px){
+  .realm-grid{grid-template-columns:1fr;}
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  #pg-main{padding:20px 16px 40px;}
+}
+</style>
+</head>
+<body>
+
+<div class="bg-fixed">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+<div class="scanlines"></div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-icon">⚔️</div>
+  <div class="loading-text">Entering the Realm...</div>
+</div>
+
+<!-- Login -->
+<div id="pg-login" class="hidden">
+  <div class="login-wrap">
+    <div class="login-crest">⚔️</div>
+    <div class="login-title">The Realm</div>
+    <div class="login-sub">Lounge Project · RPG</div>
+    <input class="login-field" id="login-nick" type="text" placeholder="Your nickname" autocomplete="off" spellcheck="false">
+    <br>
+    <button class="login-btn" id="login-btn" onclick="doRpgLogin()">Enter Realm</button>
+    <div class="login-err" id="login-err"></div>
+    <div class="back-link" onclick="window.location.href='index.html'">← Back to The Lounge</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="pg-main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="realm-badge">⚔ The Realm</span>
+      <span class="topbar-title" id="tb-title">Character</span>
+    </div>
+    <div class="topbar-right">
+      <a href="index.html" class="back-btn">← The Lounge</a>
+      <span class="signout-btn" onclick="rpgSignout()">Sign Out</span>
+    </div>
+  </div>
+
+  <div class="realm-grid" id="realm-grid">
+    <!-- Populated by JS -->
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+/* ── Firebase ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyByZVGBzLgXw59s1qCM8NOyuUYMDCZi84o",
+  authDomain: "rta-portal-ee180.firebaseapp.com",
+  projectId: "rta-portal-ee180",
+  storageBucket: "rta-portal-ee180.firebasestorage.app",
+  messagingSenderId: "873530548996",
+  appId: "1:873530548996:web:bcb927ca8a4a8501936651"
+};
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+/* ── State ── */
+let cu = null;        // {nickname, fullName, role}
+let teamDir = {};     // all members from Firestore team
+let perfData = {};    // perfData[nick][date] = {uploadsTotal,...}
+let credData = {};    // player_credits doc
+let kcData   = {};    // kc_results docs
+let attData  = {};    // attendance docs
+let unoData  = {};    // uno_streaks
+let rpgData  = {};    // rpg_profile/{nick}
+
+const unsubs = [];
+
+/* ── Helpers ── */
+function getSydneyDate() {
+  return new Date(new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
+}
+function todayKey() { return getSydneyDate().toISOString().slice(0, 10); }
+function weekKey() {
+  const d = getSydneyDate();
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function initials(name) {
+  return (name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function classFromRole(role) {
+  if (role === 'manager')    return { label: 'Game Master', key: 'gamemaster', emoji: '👑' };
+  if (role === 'escalation') return { label: 'Sentinel',    key: 'sentinel',   emoji: '🛡' };
+  return                            { label: 'Archivist',   key: 'archivist',   emoji: '📜' };
+}
+
+function titleFromLevel(level) {
+  if (level >= 20) return 'Legendary Archivist';
+  if (level >= 15) return 'Elite Operative';
+  if (level >= 10) return 'Seasoned Agent';
+  if (level >= 5)  return 'Field Agent';
+  return 'Initiate';
+}
+
+function auraColor(cls) {
+  if (cls === 'gamemaster') return 'rgba(201,168,76,.25)';
+  if (cls === 'sentinel')   return 'rgba(0,212,180,.2)';
+  return 'rgba(139,45,255,.2)';
+}
+
+/* ── Stat calculations ── */
+function calcSTR(nick) {
+  // Average daily uploads over the last 7 days, scaled to 0–100
+  const days = [];
+  const today = getSydneyDate();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const uploads = (perfData[nick]?.[key]?.uploadsTotal) || 0;
+    days.push(uploads);
+  }
+  const avg = days.reduce((a, b) => a + b, 0) / 7;
+  return Math.min(Math.round(avg * 2.5), 100); // 40 uploads/day = 100 STR
+}
+
+function calcINT(nick) {
+  // KC results this week — score out of 15, scaled to 100
+  const key = nick + '_' + weekKey();
+  const kc = kcData[key];
+  if (!kc) return 0;
+  return Math.min(Math.round((kc.score / 15) * 100), 100);
+}
+
+function calcDEF(nick) {
+  // Consecutive present days in attendance — capped at 14 days = 100 DEF
+  let streak = 0;
+  const today = getSydneyDate();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = nick + '_' + d.toISOString().slice(0, 10);
+    const att = attData[key];
+    if (att && (att.status === 'present' || att.status === 'late')) {
+      streak++;
+    } else if (i > 0) { // skip today if not yet logged
+      break;
+    }
+  }
+  return Math.min(Math.round((streak / 14) * 100), 100);
+}
+
+function calcAGI(nick) {
+  // Ratio of in-shift uploads vs total over last 7 days
+  let inShift = 0, total = 0;
+  const today = getSydneyDate();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const day = perfData[nick]?.[key];
+    if (day) { inShift += day.uploadsInShift || 0; total += day.uploadsTotal || 0; }
+  }
+  if (!total) return 0;
+  return Math.min(Math.round((inShift / total) * 100), 100);
+}
+
+function calcLCK(nick) {
+  // UNO win streak — best streak, capped at 20 = 100 LCK
+  const uno = unoData[nick];
+  if (!uno) return Math.floor(Math.random() * 15) + 5; // baseline luck if no data
+  return Math.min(Math.round(((uno.streak || 0) / 20) * 100), 100);
+}
+
+function calcXP(nick) {
+  // Lifetime uploads as XP source
+  let total = 0;
+  Object.values(perfData[nick] || {}).forEach(day => { total += day.uploadsTotal || 0; });
+  return total * 10; // 10 XP per upload lifetime
+}
+
+function calcLevel(xp) {
+  // Level thresholds: each level needs 500 more XP
+  let level = 1, needed = 500;
+  while (xp >= needed) { xp -= needed; level++; needed += 200; if (level >= 30) break; }
+  return { level, current: xp, needed };
+}
+
+function calcCredits(nick) {
+  return credData[nick] || { credits: 0, lastCheckedUploads: 0 };
+}
+
+function calcStreak7(nick) {
+  // Last 7 days attendance — true/false array
+  const result = [];
+  const today = getSydneyDate();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const dayStr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    const key = nick + '_' + d.toISOString().slice(0, 10);
+    const att = attData[key];
+    const present = att && (att.status === 'present' || att.status === 'late');
+    result.push({ day: dayStr, present, isToday: i === 0 });
+  }
+  return result;
+}
+
+function todayUploads(nick) {
+  return perfData[nick]?.[todayKey()]?.uploadsTotal || 0;
+}
+
+function weekUploads(nick) {
+  let total = 0;
+  const today = getSydneyDate();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    total += perfData[nick]?.[key]?.uploadsTotal || 0;
+  }
+  return total;
+}
+
+/* ── Save/write RPG profile ── */
+async function ensureRpgProfile(nick) {
+  const ref = doc(db, 'rpg_profile', nick);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      nick,
+      equippedItems: {},
+      createdAt: new Date().toISOString()
+    });
+  }
+  return snap.exists() ? snap.data() : { nick, equippedItems: {} };
+}
+
+/* ── Character sprite SVG ── */
+function buildSpriteSVG(cls) {
+  const colors = {
+    archivist:  { body: '#8b2dff', trim: '#c084fc', accent: '#f72b6e' },
+    sentinel:   { body: '#0f6e56', trim: '#00d4b4', accent: '#2d7fff' },
+    gamemaster: { body: '#7a5c1e', trim: '#c9a84c', accent: '#f0cc6e' }
+  };
+  const c = colors[cls] || colors.archivist;
+  return `<svg viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg" width="110" height="110">
+    <!-- Shadow -->
+    <ellipse cx="55" cy="100" rx="28" ry="5" fill="rgba(0,0,0,.3)"/>
+    <!-- Legs -->
+    <rect x="36" y="72" width="14" height="22" rx="5" fill="${c.body}"/>
+    <rect x="60" y="72" width="14" height="22" rx="5" fill="${c.body}"/>
+    <rect x="36" y="87" width="14" height="7" rx="3" fill="${c.trim}" opacity=".7"/>
+    <rect x="60" y="87" width="14" height="7" rx="3" fill="${c.trim}" opacity=".7"/>
+    <!-- Body -->
+    <rect x="28" y="40" width="54" height="36" rx="8" fill="${c.body}"/>
+    <!-- Chest detail -->
+    <rect x="38" y="44" width="34" height="4" rx="2" fill="${c.trim}" opacity=".5"/>
+    <rect x="48" y="52" width="14" height="16" rx="4" fill="${c.accent}" opacity=".6"/>
+    <!-- Arms -->
+    <rect x="10" y="42" width="20" height="28" rx="8" fill="${c.body}"/>
+    <rect x="80" y="42" width="20" height="28" rx="8" fill="${c.body}"/>
+    <rect x="10" y="60" width="20" height="10" rx="4" fill="${c.trim}" opacity=".7"/>
+    <rect x="80" y="60" width="20" height="10" rx="4" fill="${c.trim}" opacity=".7"/>
+    <!-- Neck -->
+    <rect x="46" y="30" width="18" height="14" rx="4" fill="${c.body}"/>
+    <!-- Head -->
+    <ellipse cx="55" cy="22" rx="18" ry="18" fill="#d4956a"/>
+    <!-- Hair / hat based on class -->
+    ${cls === 'gamemaster'
+      ? `<rect x="37" y="4" width="36" height="18" rx="4" fill="${c.trim}"/>
+         <rect x="30" y="18" width="50" height="5" rx="2" fill="${c.trim}"/>
+         <rect x="50" y="0" width="10" height="6" rx="2" fill="${c.accent}"/>`
+      : cls === 'sentinel'
+      ? `<path d="M37 16 Q55 2 73 16 L73 10 Q55 -4 37 10 Z" fill="${c.trim}"/>
+         <rect x="45" y="6" width="20" height="4" rx="2" fill="${c.accent}" opacity=".8"/>`
+      : `<rect x="38" y="6" width="34" height="14" rx="6" fill="${c.body}"/>
+         <rect x="35" y="16" width="40" height="4" rx="2" fill="${c.trim}" opacity=".7"/>`
+    }
+    <!-- Eyes -->
+    <circle cx="47" cy="22" r="3" fill="#1a1a2e"/>
+    <circle cx="63" cy="22" r="3" fill="#1a1a2e"/>
+    <circle cx="48" cy="21" r="1" fill="#fff"/>
+    <circle cx="64" cy="21" r="1" fill="#fff"/>
+    <!-- Mouth -->
+    <path d="M49 29 Q55 33 61 29" stroke="#b07850" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Weapon -->
+    ${cls === 'sentinel'
+      ? `<rect x="88" y="10" width="5" height="65" rx="2" fill="${c.trim}"/>
+         <rect x="82" y="18" width="17" height="5" rx="2" fill="${c.accent}"/>
+         <polygon points="90.5,6 87,18 94,18" fill="${c.accent}"/>`
+      : cls === 'gamemaster'
+      ? `<rect x="87" y="20" width="5" height="55" rx="2" fill="${c.trim}"/>
+         <circle cx="89.5" cy="17" r="9" fill="${c.accent}" opacity=".9"/>
+         <circle cx="89.5" cy="17" r="5" fill="${c.trim}"/>`
+      : `<rect x="88" y="30" width="4" height="50" rx="1" fill="${c.trim}"/>
+         <rect x="82" y="38" width="16" height="3" rx="1" fill="${c.accent}"/>
+         <rect x="86" y="26" width="8" height="16" rx="2" fill="${c.accent}" opacity=".8"/>`
+    }
+  </svg>`;
+}
+
+/* ── Render character screen ── */
+function renderCharacter(nick) {
+  const member = teamDir[nick] || {};
+  const cls = classFromRole(member.role || cu.role);
+  const str = calcSTR(nick);
+  const int_ = calcINT(nick);
+  const def = calcDEF(nick);
+  const agi = calcAGI(nick);
+  const lck = calcLCK(nick);
+  const xp = calcXP(nick);
+  const { level, current: xpCurrent, needed: xpNeeded } = calcLevel(xp);
+  const xpPct = Math.min(Math.round((xpCurrent / xpNeeded) * 100), 100);
+  const cred = calcCredits(nick);
+  const streak7 = calcStreak7(nick);
+  const todayUpl = todayUploads(nick);
+  const weekUpl = weekUploads(nick);
+  const equipped = rpgData[nick]?.equippedItems || {};
+
+  const streakDots = streak7.map(d =>
+    `<div class="streak-dot ${d.isToday ? 'today' : d.present ? 'active' : ''}" title="${d.day}">
+      ${d.present ? '✓' : d.isToday ? '?' : '·'}
+    </div>`
+  ).join('');
+
+  const equipSlots = [
+    { key: 'armor',  label: 'Armor',  emoji: '🛡' },
+    { key: 'weapon', label: 'Weapon', emoji: '⚔️' },
+    { key: 'ring',   label: 'Ring',   emoji: '💍' },
+    { key: 'cape',   label: 'Cape',   emoji: '🧣' },
+  ].map(slot => {
+    const item = equipped[slot.key];
+    const filled = !!item;
+    const rarity = item?.rarity || '';
+    return `<div class="equip-slot ${filled ? 'filled' : ''}" title="${filled ? item.name : 'Empty slot'}">
+      ${rarity ? `<div class="equip-rarity rarity-${rarity}"></div>` : ''}
+      <div class="equip-icon">${filled ? item.emoji : slot.emoji}</div>
+      <div class="equip-label">${filled ? item.name.slice(0, 7) : slot.label}</div>
+    </div>`;
+  }).join('');
+
+  const grid = document.getElementById('realm-grid');
+  grid.innerHTML = `
+    <!-- LEFT: Character Card -->
+    <div class="char-card">
+      <div class="char-sprite-wrap">
+        <div class="char-sprite">
+          <div class="char-aura" style="background:radial-gradient(circle,${auraColor(cls.key)},transparent 70%);"></div>
+          ${buildSpriteSVG(cls.key)}
+          <div class="char-level-badge">${level}</div>
+        </div>
+      </div>
+
+      <div class="char-name">${member.fullName || cu.fullName}</div>
+      <div class="char-class ${cls.key}">${cls.emoji} ${cls.label}</div>
+      <div class="char-title">${titleFromLevel(level)}</div>
+
+      <div class="xp-row"><span>XP</span><span>${xpCurrent.toLocaleString()} / ${xpNeeded.toLocaleString()}</span></div>
+      <div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${xpPct}%"></div></div>
+
+      <div class="credits-row">
+        <div>
+          <div class="credits-label">Game Credits</div>
+          <div class="credits-sub">Today's balance</div>
+        </div>
+        <div style="text-align:right">
+          <div class="credits-val">⬡ ${cred.credits}</div>
+        </div>
+      </div>
+
+      <div class="card-divider"></div>
+
+      <div class="panel-title" style="font-size:10px;margin-bottom:12px;">Equipment</div>
+      <div class="equip-grid">${equipSlots}</div>
+
+      <div class="card-divider"></div>
+
+      <div class="status-row">
+        <span class="status-chip chip-${str > 60 ? 'green' : str > 30 ? 'amber' : 'red'}">
+          STR ${str}
+        </span>
+        <span class="status-chip chip-${int_ > 60 ? 'purple' : 'amber'}">
+          INT ${int_}
+        </span>
+        <span class="status-chip chip-${def > 60 ? 'teal' : 'amber'}">
+          DEF ${def}
+        </span>
+      </div>
+    </div>
+
+    <!-- RIGHT: Stats + Activity -->
+    <div class="right-col">
+
+      <!-- Stats -->
+      <div class="panel">
+        <div class="panel-title">Core Stats</div>
+        <div class="stats-grid">
+          <div class="stat-block str">
+            <div class="stat-label">Strength</div>
+            <div class="stat-val">${str}</div>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${str}%"></div></div>
+            <div class="stat-desc">Upload volume — 7-day avg</div>
+          </div>
+          <div class="stat-block int">
+            <div class="stat-label">Intelligence</div>
+            <div class="stat-val">${int_}</div>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${int_}%"></div></div>
+            <div class="stat-desc">KB quiz score this week</div>
+          </div>
+          <div class="stat-block def">
+            <div class="stat-label">Defense</div>
+            <div class="stat-val">${def}</div>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${def}%"></div></div>
+            <div class="stat-desc">Attendance streak</div>
+          </div>
+          <div class="stat-block agi">
+            <div class="stat-label">Agility</div>
+            <div class="stat-val">${agi}</div>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${agi}%"></div></div>
+            <div class="stat-desc">On-shift upload ratio</div>
+          </div>
+          <div class="stat-block lck" style="grid-column:1/-1">
+            <div class="stat-label">Luck</div>
+            <div class="stat-val">${lck}</div>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" style="width:${lck}%"></div></div>
+            <div class="stat-desc">UNO win streak — pure chaos</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div class="panel">
+        <div class="panel-title">Activity</div>
+        <div class="activity-grid">
+          <div class="activity-card">
+            <div class="activity-val">${todayUpl}</div>
+            <div class="activity-label">Today's Uploads</div>
+            <div class="activity-delta ${todayUpl > 0 ? 'delta-up' : ''}">${todayUpl > 0 ? '+' + todayUpl + ' XP gained' : 'No uploads yet'}</div>
+          </div>
+          <div class="activity-card">
+            <div class="activity-val">${weekUpl}</div>
+            <div class="activity-label">This Week</div>
+            <div class="activity-delta ${weekUpl > 0 ? 'delta-up' : ''}">${weekUpl > 0 ? '+' + (weekUpl * 10).toLocaleString() + ' XP' : '—'}</div>
+          </div>
+          <div class="activity-card">
+            <div class="activity-val">${xp.toLocaleString()}</div>
+            <div class="activity-label">Total XP</div>
+            <div class="activity-delta" style="color:var(--gold)">Level ${level}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">7-Day Attendance Streak</div>
+          <div class="streak-row">${streakDots}</div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+/* ── Manager view: see all characters ── */
+async function renderManagerView() {
+  document.getElementById('tb-title').textContent = 'Game Master';
+  const members = Object.entries(teamDir)
+    .filter(([, m]) => m.role !== 'manager')
+    .map(([nick, m]) => {
+      const xp = calcXP(nick);
+      const { level } = calcLevel(xp);
+      const cls = classFromRole(m.role);
+      return `<div class="team-mini" onclick="window._rpgViewMember('${nick}')">
+        <div class="team-mini-avatar" style="background:${m.role === 'escalation' ? 'linear-gradient(135deg,#0f6e56,#00d4b4)' : 'linear-gradient(135deg,#8b2dff,#2d7fff)'}">
+          ${initials(m.fullName)}
+        </div>
+        <div class="team-mini-name">${m.fullName}</div>
+        <div class="team-mini-class">${cls.emoji} ${cls.label}</div>
+        <div class="team-mini-level">Lv ${level}</div>
+      </div>`;
+    }).join('');
+
+  const grid = document.getElementById('realm-grid');
+  grid.style.gridTemplateColumns = '1fr';
+  grid.innerHTML = `
+    <div>
+      <div class="manager-banner">
+        <div class="manager-crown">👑</div>
+        <div class="manager-title">Game Master Console</div>
+        <div class="manager-desc">You oversee The Realm. Your agents earn XP through uploads, knowledge battles, and attendance. Select a member to view their character sheet.</div>
+      </div>
+      <div class="team-grid">${members}</div>
+    </div>
+  `;
+}
+
+window._rpgViewMember = function(nick) {
+  renderCharacter(nick);
+  document.getElementById('realm-grid').style.gridTemplateColumns = '300px 1fr';
+};
+
+/* ── Subscribe to Firestore ── */
+function subscribe(nick) {
+  // perfData
+  unsubs.push(onSnapshot(collection(db, 'perfData'), snap => {
+    snap.forEach(d => {
+      if (!perfData[d.id]) perfData[d.id] = {};
+      Object.assign(perfData[d.id], d.data());
+    });
+    if (cu.role === 'manager') renderManagerView();
+    else renderCharacter(nick);
+  }));
+
+  // player_credits (own)
+  unsubs.push(onSnapshot(doc(db, 'player_credits', nick), snap => {
+    if (snap.exists()) credData[nick] = snap.data();
+    if (cu.role !== 'manager') renderCharacter(nick);
+  }));
+
+  // kc_results (all)
+  unsubs.push(onSnapshot(collection(db, 'kc_results'), snap => {
+    snap.forEach(d => { kcData[d.id] = d.data(); });
+    if (cu.role !== 'manager') renderCharacter(nick);
+  }));
+
+  // attendance (all)
+  unsubs.push(onSnapshot(collection(db, 'attendance'), snap => {
+    snap.forEach(d => { attData[d.id] = d.data(); });
+    if (cu.role !== 'manager') renderCharacter(nick);
+  }));
+
+  // uno_streaks
+  unsubs.push(onSnapshot(collection(db, 'uno_streaks'), snap => {
+    snap.forEach(d => { unoData[d.id] = d.data(); });
+    if (cu.role !== 'manager') renderCharacter(nick);
+  }));
+
+  // team (all members for manager view)
+  unsubs.push(onSnapshot(collection(db, 'team'), snap => {
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.nickname) teamDir[data.nickname] = data;
+    });
+    if (cu.role === 'manager') renderManagerView();
+  }));
+}
+
+/* ── Login flow ── */
+async function loadTeamAndLogin(nick) {
+  // Load team from Firestore for validation
+  const snap = await getDocs(collection(db, 'team'));
+  snap.forEach(d => {
+    const data = d.data();
+    if (data.nickname) teamDir[data.nickname] = data;
+  });
+  return teamDir[nick];
+}
+
+window.doRpgLogin = async function() {
+  const nickEl = document.getElementById('login-nick');
+  const errEl  = document.getElementById('login-err');
+  const btn    = document.getElementById('login-btn');
+  const nick   = nickEl.value.trim();
+  if (!nick) { errEl.textContent = 'Enter your nickname.'; return; }
+  btn.disabled = true; btn.textContent = 'Loading...';
+  errEl.textContent = '';
+  try {
+    const member = await loadTeamAndLogin(nick);
+    if (!member) { errEl.textContent = 'Nickname not found in The Lounge.'; btn.disabled = false; btn.textContent = 'Enter Realm'; return; }
+    cu = { nickname: nick, fullName: member.fullName, role: member.role };
+    localStorage.setItem('rpg_session', JSON.stringify(cu));
+    enterRealm();
+  } catch(e) {
+    errEl.textContent = 'Connection failed. Try again.';
+    btn.disabled = false; btn.textContent = 'Enter Realm';
+  }
+};
+
+window.rpgSignout = function() {
+  unsubs.forEach(u => { try { u(); } catch(e) {} });
+  localStorage.removeItem('rpg_session');
+  document.getElementById('pg-main').classList.remove('active');
+  document.getElementById('pg-login').classList.remove('hidden');
+};
+
+async function enterRealm() {
+  document.getElementById('pg-login').classList.add('hidden');
+  document.getElementById('loading-overlay').classList.remove('hidden');
+  // Ensure RPG profile doc exists
+  const prof = await ensureRpgProfile(cu.nickname);
+  rpgData[cu.nickname] = prof;
+  document.getElementById('loading-overlay').classList.add('hidden');
+  document.getElementById('pg-main').classList.add('active');
+  document.getElementById('tb-title').textContent = cu.role === 'manager' ? 'Game Master' : 'Character';
+  subscribe(cu.nickname);
+}
+
+/* ── Boot ── */
+(async function boot() {
+  // Try session from localStorage (set by main app or previous RPG login)
+  const stored = localStorage.getItem('rpg_session');
+  if (stored) {
+    try {
+      cu = JSON.parse(stored);
+      await enterRealm();
+      return;
+    } catch(e) { localStorage.removeItem('rpg_session'); }
+  }
+  // Try reading from main app's team cache
+  const teamCache = localStorage.getItem('rta_TEAM');
+  if (teamCache) {
+    try {
+      const team = JSON.parse(teamCache);
+      team.forEach(m => { if (m.nickname) teamDir[m.nickname] = m; });
+    } catch(e) {}
+  }
+  // Show login
+  document.getElementById('loading-overlay').classList.add('hidden');
+  document.getElementById('pg-login').classList.remove('hidden');
+})();
+
+/* ── Nickname autocomplete from cached team ── */
+document.getElementById('login-nick').addEventListener('keydown', e => {
+  if (e.key === 'Enter') window.doRpgLogin();
+});
+</script>
+</body>
+</html>
