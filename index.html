@@ -1886,21 +1886,11 @@ function buildSidebar(){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
   const wrap=G('sb-av-wrap');
   var avSrc=cu&&AVATARS[cu.fullName];
-  var statusKey=statusGet(nick);
-  var statusColors={online:'#1dd17a',break:'#ffb830',focus:'#ff3d3d',offline:'rgba(232,234,246,.3)'};
-  var dotHTML='<div id="sb-status-dot" style="position:absolute;bottom:8px;right:-2px;width:11px;height:11px;border-radius:50%;background:'+(statusColors[statusKey]||'#1dd17a')+';border:2px solid var(--bg);"></div>';
-  var wrapStyle='position:relative;display:inline-block;cursor:pointer;';
   if(avSrc){
-    wrap.innerHTML='<div style="'+wrapStyle+'" onclick="toggleSbStatusPicker()" title="Set status">'
-      +'<img class="sb-avatar" src="'+avSrc+'" alt="'+full+'" style="pointer-events:none"/>'
-      +dotHTML+'</div>'
-      +'<div id="sb-status-picker-pop" style="display:none;position:fixed;left:0;top:0;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:8px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.3);min-width:160px;"></div>';
+    wrap.innerHTML='<img class="sb-avatar" src="'+avSrc+'" alt="'+full+'"/>';
   } else {
     const i=full.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    wrap.innerHTML='<div style="'+wrapStyle+'" onclick="toggleSbStatusPicker()" title="Set status">'
-      +'<div class="sb-avatar-init" style="pointer-events:none">'+i+'</div>'
-      +dotHTML+'</div>'
-      +'<div id="sb-status-picker-pop" style="display:none;position:fixed;left:0;top:0;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:8px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.3);min-width:160px;"></div>';
+    wrap.innerHTML='<div class="sb-avatar-init">'+i+'</div>';
   }
   G('sb-name').textContent=full;
   G('sb-role').textContent={manager:'Manager',escalation:'Escalation Team',uploader:'Uploader'}[role]||role;
@@ -2621,7 +2611,16 @@ function navigateToQuality(){
     setTimeout(function(){switchSubTab('esc-quality',document.querySelector('#sub-esc-quality'));},100);
   } else {
     switchLoungeTab('the-hub',document.querySelector('.lounge-tab[data-tab="the-hub"]'));
-    setTimeout(function(){var qTab=document.querySelector('.sub-tab[onclick*="quality"]');if(qTab)switchSubTab('quality',qTab);},100);
+    setTimeout(function(){
+      /* Quality remarks now inside Performance tab — switch to perf and expand */
+      var perfTab=document.querySelector('.sub-tab[onclick*="perf"]');
+      if(perfTab)switchSubTab('perf',perfTab);
+      setTimeout(function(){
+        var body=G('body-quality-remarks');
+        if(body&&body.style.maxHeight==='0px')toggleUplSection('quality-remarks');
+        var el=G('qp-list');if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+      },150);
+    },100);
   }
 }
 
@@ -2820,10 +2819,10 @@ function buildUploaderDOM(){
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
     <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127968; Overview</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128203; My Work</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; Team</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#128218; My Space</button>
+      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
+      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">My Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">My Team</button>
+      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">My Space</button>
       
     </div>
     <div class="kc-banner" id="kc-banner">
@@ -2853,7 +2852,6 @@ function buildUploaderDOM(){
     <div class="panel-header"><div class="panel-sub" id="dash-sub" style="font-size:15px;font-weight:600;color:var(--muted);font-family:var(--font-d)">${shLabel}</div></div>
     <div class="sub-tabs">
       <button class="sub-tab active" onclick="switchSubTab('perf',this)">&#128200; Performance<span class="tab-badge tab-badge-perf"></span></button>
-      <button class="sub-tab" onclick="switchSubTab('quality',this)">&#128203; Quality<span class="tab-badge tab-badge-quality"></span></button>
       <button class="sub-tab" onclick="switchSubTab('cal',this)">&#128197; Attendance<span class="tab-badge tab-badge-cal"></span></button>
     </div>
     <div class="sub-pane active" id="sub-perf">
@@ -2868,24 +2866,40 @@ function buildUploaderDOM(){
           <div class="range-cal-trigger" id="rcal-upl-perf-trigger">&#128197; Custom range</div>
           <div class="range-cal-popup" id="rcal-upl-perf-popup"></div>
         </div>
-
       </div>
       <div class="kpi-grid" id="kpi-grid"></div>
-      <div class="sect"><div class="sect-head"><span class="sect-title">&#128197; Daily Detail</span><span style="font-size:10px;color:var(--muted)">All times AEST (Sydney)</span></div><div id="daily-tbl"></div></div>
-    </div>
-    <div class="sub-pane" id="sub-quality">
-      <div class="filter-bar" style="margin-bottom:14px">
-        <button class="filter-pill" onclick="setQPFilter('all',this)">All Time</button>
-        <button class="filter-pill" onclick="setQPFilter('week',this)">This Week</button>
-        <button class="filter-pill active" onclick="setQPFilter('month',this)">This Month</button>
-        <button class="filter-pill" onclick="setQPFilter('quarter',this)">This Quarter</button>
-        <button class="filter-pill" onclick="setQPFilter('year',this)">This Year</button>
-        <button class="filter-pill" style="color:var(--muted)" onclick="setQPFilter('all',document.querySelector('.filter-pill'))">&#10005; Clear</button>
-        <div class="filter-sep"></div>
-        <div class="range-cal" id="rcal-upl-quality"><div class="range-cal-trigger" id="rcal-upl-quality-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-upl-quality-popup"></div></div>
-
+      <!-- Daily Detail — collapsible -->
+      <div class="sect" id="sect-daily-detail">
+        <div class="sect-head" onclick="toggleUplSection('daily-detail')" style="cursor:pointer">
+          <span class="sect-title">&#128197; Daily Detail<span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:8px">All times AEST (Sydney)</span></span>
+          <span id="chev-daily-detail" style="font-size:12px;color:var(--muted);transition:transform .2s;display:inline-block">&#8964;</span>
+        </div>
+        <div id="body-daily-detail" style="overflow:hidden;transition:max-height .25s ease;max-height:2000px">
+          <div id="daily-tbl"></div>
+        </div>
       </div>
-      <div class="sect"><div class="sect-head"><span class="sect-title">&#128203; Quality Remarks</span></div><div class="qp-list" id="qp-list"></div></div>
+      <!-- Quality Remarks — collapsible, separate card -->
+      <div class="sect" id="sect-quality-remarks">
+        <div class="sect-head" onclick="toggleUplSection('quality-remarks')" style="cursor:pointer">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sect-title">&#128203; Quality Remarks</span>
+            <span class="tab-badge tab-badge-quality" id="quality-remarks-badge"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <!-- Quality filter pills inline in header -->
+            <div id="qp-filter-bar" style="display:flex;gap:4px" onclick="event.stopPropagation()">
+              <button class="filter-pill" style="font-size:10px;padding:2px 8px" onclick="setQPFilter('all',this)">All</button>
+              <button class="filter-pill" style="font-size:10px;padding:2px 8px" onclick="setQPFilter('week',this)">Week</button>
+              <button class="filter-pill active" style="font-size:10px;padding:2px 8px" onclick="setQPFilter('month',this)">Month</button>
+              <button class="filter-pill" style="font-size:10px;padding:2px 8px" onclick="setQPFilter('quarter',this)">Quarter</button>
+            </div>
+            <span id="chev-quality-remarks" style="font-size:12px;color:var(--muted);transition:transform .2s;display:inline-block">&#8964;</span>
+          </div>
+        </div>
+        <div id="body-quality-remarks" style="overflow:hidden;transition:max-height .25s ease;max-height:2000px">
+          <div class="qp-list" id="qp-list"></div>
+        </div>
+      </div>
     </div>
     <div class="sub-pane" id="sub-cal">
       <div class="sect cal-compact" id="att-cal-wrap"></div>
@@ -2930,10 +2944,10 @@ function buildEscalationDOM(){
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
     <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127968; Overview</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128203; My Work</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; Team</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">&#128218; My Space</button>
+      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
+      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">My Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">My Team</button>
+      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">My Space</button>
       
     </div>
     <div class="kc-banner" id="kc-banner">
@@ -2968,9 +2982,9 @@ function buildManagerDOM(){
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
     <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">&#127968; Overview</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">&#128202; Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">&#128101; Team</button>
+      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
+      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">Hub</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">My Team</button>
       
     </div>
     <div class="kc-banner" id="kc-banner">
@@ -3088,12 +3102,27 @@ function switchSubTab(id,btn){
   document.querySelectorAll('.sub-pane').forEach(p=>p.classList.remove('active'));
   const pane=G('sub-'+id);if(pane)pane.classList.add('active');
   clearTabBadge(id);
+  /* Quality remarks now inside Performance — render both when perf loads */
+  if(id==='perf')setTimeout(function(){renderQualityPortal();},50);
   if(id==='quality')renderQualityPortal();
   if(id==='cal')renderAttendance();
 }
+
+function toggleUplSection(id){
+  var body=G('body-'+id);
+  var chev=G('chev-'+id);
+  if(!body)return;
+  var collapsed=body.style.maxHeight==='0px';
+  body.style.maxHeight=collapsed?'2000px':'0px';
+  if(chev)chev.style.transform=collapsed?'':'rotate(180deg)';
+}
+
 function setQPFilter(f,btn){
   qpDateFilter=f;
-  document.querySelectorAll('#sub-quality .filter-pill').forEach(p=>p.classList.remove('active'));
+  /* Update filter pills in quality remarks header */
+  var bar=G('qp-filter-bar');
+  if(bar)bar.querySelectorAll('.filter-pill').forEach(p=>p.classList.remove('active'));
+  else document.querySelectorAll('#sub-quality .filter-pill').forEach(p=>p.classList.remove('active'));
   if(btn)btn.classList.add('active');renderQualityPortal();
 }
 function setQPCustom(){
