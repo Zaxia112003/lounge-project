@@ -3596,16 +3596,31 @@ function annUpdateBadge(){
   else{badge.textContent='';badge.classList.remove('show');}
 }
 function deleteAnnouncement(id){
-  if(!confirm('Delete this announcement?'))return;
+  if(!confirm('Remove this announcement?'))return;
   var rawId=String(id).replace(/^ann-/,'');
-  var idx=mdAnnouncements.findIndex(function(a){return a._fsId===rawId||String(a.id)===rawId||a._fsId===String(id)||String(a.id)===String(id);});
-  var fsDocId=idx>-1?(mdAnnouncements[idx]._fsId||rawId):rawId;
+  /* Find in local array by any matching key */
+  var idx=mdAnnouncements.findIndex(function(a){
+    return String(a.id)===rawId||a._fsId===rawId||String(a.id)===String(id)||a._fsId===String(id);
+  });
+  var ann=idx>-1?mdAnnouncements[idx]:null;
+  var fsDocId=ann?(ann._fsId||rawId):rawId;
   if(idx>-1)mdAnnouncements.splice(idx,1);
   if(fsDb()){
-    try{window._fsDeleteDoc(window._fsDoc(fsDb(),'mdAnnouncements',fsDocId));}catch(e){}
-    try{window._fsGetDocs(window._fsColl(fsDb(),'mdAnnouncements')).then(function(snap){
-      snap.forEach(function(d){if(d.id===rawId||d.id===fsDocId||String(d.data().id)===rawId)window._fsDeleteDoc(d.ref);});
-    });}catch(e){}
+    /* Try articles collection first (primary store) */
+    if(ann&&ann._fsId){
+      try{window._fsDeleteDoc(window._fsDoc(fsDb(),'articles',ann._fsId)).catch(function(){});}catch(e){}
+    }
+    /* Also scan articles collection for matching doc */
+    try{
+      window._fsGetDocs(window._fsColl(fsDb(),'articles')).then(function(snap){
+        snap.forEach(function(d){
+          var data=d.data();
+          if(d.id===fsDocId||String(data.id)===rawId||(data.category==='ann'&&String(data.id)===rawId)){
+            window._fsDeleteDoc(d.ref);
+          }
+        });
+      });
+    }catch(e){}
   }
   renderAnnouncements();
 }
@@ -6929,6 +6944,75 @@ function kcGetAllResults(){
   });
 }
 
+function renderMgrKCSummaryCard(){
+  var results=kcGetAllResults();
+  var week=kcWeekId();
+  var takers=results.filter(function(r){return r.best;}).length;
+  var passed=results.filter(function(r){return r.best&&r.best.pct>=KC_PASS_PCT;}).length;
+  var failed=takers-passed;
+  var total=results.length;
+  var avgPct=takers>0?Math.round(results.filter(function(r){return r.best;}).reduce(function(s,r){return s+r.best.pct;},0)/takers):null;
+
+  return '<div class="sect" style="padding:0;margin-top:14px">'
+    +'<div class="sect-head" style="padding:12px 16px">'
+    +'<span class="sect-title">&#129504; Knowledge Check — '+week+'</span>'
+    +'<span style="font-size:10px;color:var(--muted)">'+takers+'/'+total+' completed</span>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--border)">'
+    +[
+      {label:'Takers',val:takers,col:'var(--text)',all:results,filter:function(r){return r.best;}},
+      {label:'Passed',val:passed,col:'var(--green)',all:results,filter:function(r){return r.best&&r.best.pct>=KC_PASS_PCT;}},
+      {label:'Failed',val:failed,col:'var(--red)',all:results,filter:function(r){return r.best&&r.best.pct<KC_PASS_PCT;}},
+      {label:'Avg score',val:avgPct!==null?avgPct+'%':'—',col:'var(--text)',all:results,filter:function(r){return r.best;}},
+    ].map(function(s,i){
+      var id='kc-summary-'+i;
+      return '<div onclick="toggleKCDetail(\''+id+'\')" style="padding:14px;text-align:center;cursor:pointer;border-right:'+(i<3?'1px solid var(--border)':'none')+';transition:background .15s" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
+        +'<div style="font-size:20px;font-weight:700;color:'+s.col+';line-height:1;margin-bottom:4px">'+s.val+'</div>'
+        +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">'+s.label+'</div>'
+        +'</div>';
+    }).join('')
+    +'</div>'
+    /* Expandable detail panel */
+    +'<div id="kc-inline-detail" style="display:none">'
+    +'<div class="kc-mgr-row kc-mgr-hdr"><div>Member</div><div>Status</div><div>Best Score</div><div>Attempts</div><div>Date</div></div>'
+    +results.map(function(r){
+      var statusDot,statusLabel;
+      if(r.best){var p=r.best.pct>=KC_PASS_PCT;statusDot='<span class="kc-dot '+(p?'pass':'fail')+'"></span>';statusLabel=p?'<span style="color:var(--green)">Passed</span>':'<span style="color:var(--red)">Not passed</span>';}
+      else{statusDot='<span class="kc-dot none"></span>';statusLabel='<span style="color:var(--muted)">Not taken</span>';}
+      var scoreStr=r.best?r.best.score+'/'+KC_Q_COUNT+' ('+r.best.pct+'%)':'—';
+      var brkId='kcbr2-'+r.nick.replace(/\s+/g,'_');
+      var breakdown='';
+      if(r.best&&r.best.answers&&r.best.answers.length){
+        var letters=['A','B','C','D'];
+        var rows=r.best.answers.map(function(a){
+          var q=KB_QUESTIONS.find(function(x){return String(x.id)===String(a.qId);});
+          if(!q)return '';
+          return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;display:flex;gap:8px;align-items:flex-start">'
+            +'<span style="color:'+(a.correct?'var(--green)':'var(--red)')+';font-weight:700;flex-shrink:0;width:14px">'+(a.correct?'✓':'✗')+'</span>'
+            +'<div style="flex:1;min-width:0"><div style="color:var(--text);margin-bottom:2px">'+q.q+'</div>'
+            +(a.correct?'':'<div style="color:var(--red);font-size:10px;margin-top:3px">Answered: '+letters[a.chosen]+' — '+q.opts[a.chosen]+'</div>'
+              +'<div style="color:var(--green);font-size:10px;margin-top:2px">Correct: '+letters[q.ans]+' — '+q.opts[q.ans]+'</div>')
+            +'</div></div>';
+        }).join('');
+        breakdown='<div id="'+brkId+'" style="display:none;grid-column:1/-1;padding:8px 14px 10px;background:var(--bg3);border-top:1px solid var(--border)">'+rows+'</div>';
+      }
+      return '<div class="kc-mgr-row" style="cursor:'+(r.best&&r.best.answers?'pointer':'default')+';flex-wrap:wrap" '
+        +(r.best&&r.best.answers?'onclick="var el=G(\''+brkId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"':'')+'>'
+        +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,24)+'<span style="font-weight:600">'+r.fullName+'</span></div>'
+        +'<div>'+statusDot+statusLabel+'</div>'
+        +'<div style="color:var(--text);font-weight:600">'+scoreStr+'</div>'
+        +'<div style="color:var(--muted)">'+r.attempts.length+'/2 attempts</div>'
+        +'<div style="color:var(--muted);font-size:10px">'+(r.best?r.best.date:'—')+'</div>'
+        +breakdown+'</div>';
+    }).join('')
+    +'</div></div>';
+}
+
+function toggleKCDetail(statId){
+  var panel=G('kc-inline-detail');if(!panel)return;
+  panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
 function renderMgrKCResults(container){
   if(!container)return;
   var results=kcGetAllResults();
@@ -7797,12 +7881,10 @@ function renderManagerHub(){
     +'<button class="sub-tab active" onclick="switchMgrHubTab(\'performance\',this)">&#9989; Performance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'quality\',this)">&#128203; Quality</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
-    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kc\',this)">&#129504; KC</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'kb\',this)">&#128218; Knowledge Base</button>'
     +'</div>'
     +'<div class="sect" id="mgr-mood-card" style="margin-bottom:14px"><div class="sect-head"><span class="sect-title">&#128578; Team mood today</span></div></div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
-    +'<div id="mgr-hub-pane-kc" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-quality" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-attendance" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-kb" class="mgr-hub-pane"></div>'
@@ -7839,7 +7921,6 @@ function switchMgrHubTab(tab,btn){
     });
   },50);}
   else if(tab==='attendance')renderMgrHubAttendance();
-  else if(tab==='kc')renderMgrKCResults(G('mgr-hub-pane-kc'));
   else if(tab==='kb'){
     var kbPane=G('mgr-hub-pane-kb');if(!kbPane)return;
     /* Render KB articles in hub pane */
@@ -8094,7 +8175,7 @@ function renderMgrHubPerformance(){
     +'</div></div>'
     +'</div>';
 
-  el.innerHTML=filterBar+memberDropdown+uplSection+escSection;
+  el.innerHTML=filterBar+memberDropdown+uplSection+escSection+renderMgrKCSummaryCard();
 
   /* Restore custom date inputs if active */
   if(mgrHubDateFilter==='custom'){
