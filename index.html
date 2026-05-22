@@ -444,7 +444,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .ann-board .sect-head{position:relative;}
 .ann-unread-badge{display:none;background:var(--pink,#f72b6e);color:#fff;font-size:9px;font-weight:700;font-family:var(--font-d);padding:2px 7px;border-radius:99px;letter-spacing:.3px;margin-left:auto;}
 .ann-unread-badge.show{display:inline-flex;align-items:center;}
-.ann-list{display:flex;flex-direction:column;}
+.ann-list{display:flex;flex-direction:column;max-height:260px;overflow-y:auto;}
 .ann-card{padding:14px 16px;border-bottom:1px solid var(--border);position:relative;transition:background .15s;}
 .ann-card:last-child{border-bottom:none;}
 .ann-card.unread{background:rgba(139,45,255,.05);}
@@ -898,6 +898,14 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .dl-section{display:none;}
 .dl-section.active{display:block;}
 /* ══ MOOD CHECK-IN ══ */
+.koby-mood-bubble{position:fixed;bottom:90px;right:24px;z-index:597;display:flex;align-items:flex-end;gap:8px;animation:fadeUp .3s ease both;}
+.koby-mood-bubble-text{background:var(--bg2);border:1px solid var(--border);border-radius:18px 18px 4px 18px;padding:12px 14px;max-width:220px;box-shadow:0 4px 20px rgba(0,0,0,.15);}
+.koby-mood-bubble-prompt{font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;}
+.koby-mood-bubble-sub{font-size:10px;color:var(--muted);margin-bottom:10px;}
+.koby-mood-bubble-opts{display:flex;gap:8px;justify-content:center;}
+.koby-mood-opt{font-size:20px;cursor:pointer;transition:transform .15s;border:none;background:none;padding:2px;}
+.koby-mood-opt:hover{transform:scale(1.25);}
+.koby-mood-av{font-size:30px;flex-shrink:0;}
 .mood-tile{padding:14px 16px;}
 .mood-options{display:flex;gap:8px;justify-content:center;margin:10px 0 6px;}
 .mood-btn{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--border2);background:var(--bg3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
@@ -1878,8 +1886,22 @@ function buildSidebar(){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
   const wrap=G('sb-av-wrap');
   var avSrc=cu&&AVATARS[cu.fullName];
-  if(avSrc)wrap.innerHTML=`<img class="sb-avatar" src="${avSrc}" alt="${full}" onclick="syncPortal()" title="Sync" style="cursor:pointer"/>`;
-  else{const i=full.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();wrap.innerHTML=`<div class="sb-avatar-init" onclick="syncPortal()" title="Sync" style="cursor:pointer">${i}</div>`;}
+  var statusKey=statusGet(nick);
+  var statusColors={online:'#1dd17a',break:'#ffb830',focus:'#ff3d3d',offline:'rgba(232,234,246,.3)'};
+  var dotHTML='<div id="sb-status-dot" style="position:absolute;bottom:8px;right:-2px;width:11px;height:11px;border-radius:50%;background:'+(statusColors[statusKey]||'#1dd17a')+';border:2px solid var(--bg);"></div>';
+  var wrapStyle='position:relative;display:inline-block;cursor:pointer;';
+  if(avSrc){
+    wrap.innerHTML='<div style="'+wrapStyle+'" onclick="toggleSbStatusPicker()" title="Set status">'
+      +'<img class="sb-avatar" src="'+avSrc+'" alt="'+full+'" style="pointer-events:none"/>'
+      +dotHTML+'</div>'
+      +'<div id="sb-status-picker-pop" style="display:none;position:fixed;left:0;top:0;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:8px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.3);min-width:160px;"></div>';
+  } else {
+    const i=full.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    wrap.innerHTML='<div style="'+wrapStyle+'" onclick="toggleSbStatusPicker()" title="Set status">'
+      +'<div class="sb-avatar-init" style="pointer-events:none">'+i+'</div>'
+      +dotHTML+'</div>'
+      +'<div id="sb-status-picker-pop" style="display:none;position:fixed;left:0;top:0;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:8px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.3);min-width:160px;"></div>';
+  }
   G('sb-name').textContent=full;
   G('sb-role').textContent={manager:'Manager',escalation:'Escalation Team',uploader:'Uploader'}[role]||role;
   const navDefs={
@@ -1949,14 +1971,45 @@ function switchPanel(id,btn){
 
 
 async function syncPortal(){
-  try{
-    await fsLoadAll();
-    _unsubscribers.forEach(function(u){try{u();}catch(e){}});_unsubscribers=[];
-    if(typeof fsStartRealtimeListeners==='function')fsStartRealtimeListeners();
-    if(cu){buildMain();if(cu.role==='manager')loadPendingReviews();}
-    var now=getSydneyDate();var h=now.getHours(),m=now.getMinutes(),ampm=h>=12?'PM':'AM';h=h%12||12;var ts=h+':'+(m<10?'0':'')+m+' '+ampm;
-    var sl=G('last-sync-label');if(sl)sl.textContent='Last synced '+ts;
-  }catch(e){console.warn('syncPortal',e);}
+  /* Kept for legacy calls — no-op now */
+}
+
+function toggleSbStatusPicker(){
+  var pop=G('sb-status-picker-pop');if(!pop)return;
+  if(pop.style.display!=='none'){pop.style.display='none';return;}
+  /* Position relative to avatar */
+  var wrap=G('sb-av-wrap');
+  if(wrap){
+    var rect=wrap.getBoundingClientRect();
+    pop.style.left=(rect.right+8)+'px';
+    pop.style.top=rect.top+'px';
+  }
+  var opts=[
+    {key:'online',label:'🟢 Available'},
+    {key:'break', label:'🟡 On break'},
+    {key:'focus', label:'🔴 Focus mode'},
+    {key:'offline',label:'⚫ Offline'},
+  ];
+  var current=statusGet(cu?cu.nickname:'');
+  pop.innerHTML=opts.map(function(o){
+    return '<div onclick="setSbStatus(\''+o.key+'\')" style="padding:7px 10px;border-radius:8px;font-size:12px;cursor:pointer;background:'+(o.key===current?'rgba(139,45,255,.1)':'none')+';font-weight:'+(o.key===current?'700':'400')+';color:var(--text);white-space:nowrap">'+o.label+'</div>';
+  }).join('');
+  pop.style.display='block';
+  setTimeout(function(){
+    document.addEventListener('click',function close(e){
+      if(!pop.contains(e.target)&&!e.target.closest('#sb-av-wrap')){pop.style.display='none';document.removeEventListener('click',close);}
+    });
+  },10);
+}
+
+function setSbStatus(key){
+  statusSet(cu?cu.nickname:'',key);
+  var dot=G('sb-status-dot');
+  var statusColors={online:'#1dd17a',break:'#ffb830',focus:'#ff3d3d',offline:'rgba(232,234,246,.3)'};
+  if(dot)dot.style.background=statusColors[key]||'#1dd17a';
+  var pop=G('sb-status-picker-pop');if(pop)pop.style.display='none';
+  /* Refresh team page if open */
+  if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
 }
 function signOut(){
   fsStopListeners();
@@ -3449,33 +3502,9 @@ function renderMyDay(){
     /* Manager: KPI quick view */
     +(isManager?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>':'')
 
-    /* Mood + Status side by side (non-manager only) */
-    +(cu&&!isManager
-      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
-        +'<div class="sect" id="mood-tile-wrap" style="padding:0">'
-          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128578; How are you?</span></div>'
-          +'<div id="mood-tile-body"></div>'
-        +'</div>'
-        +'<div class="sect" style="padding:0">'
-          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128994; My Status</span></div>'
-          +'<div id="my-status-picker" style="padding:8px 14px"></div>'
-        +'</div>'
-      +'</div>'
-      :'')
+    /* Status handled via avatar click — no inline section needed */
 
-    /* Manager: Mood + Status side by side */
-    +(isManager
-      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
-        +'<div class="sect" style="padding:0">'
-          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128578; Team mood today</span><span style="font-size:10px;color:var(--muted)">Anonymous</span></div>'
-          +'<div id="mgr-mood-overview-card" style="padding:10px 14px"></div>'
-        +'</div>'
-        +'<div class="sect" style="padding:0">'
-          +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128994; My Status</span></div>'
-          +'<div id="my-status-picker" style="padding:8px 14px"></div>'
-        +'</div>'
-      +'</div>'
-      :'')
+    /* Manager status handled via avatar click */
 
     /* Knowledge Check — compact horizontal strip (non-manager) */
     +(cu&&!isManager
@@ -3512,12 +3541,11 @@ function renderMyDay(){
     /* Render manager mood overview */
     setTimeout(function(){
       renderMgrMoodOverview();
-      renderStatusPicker();
     },50);
   }
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
-  if(cu&&!isManager){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();renderStatusPicker();},50);}
+  if(cu&&!isManager){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();},50);setTimeout(function(){showKobyMoodBubble();},1500);}
   startClock();
 }
 
@@ -6208,21 +6236,42 @@ function moodLoadAggregate(cb){
 }
 
 function renderMoodTile(){
-  var el=G('mood-tile-body');if(!el)return;
-  if(!cu||cu.role==='manager'){el.innerHTML='';return;}
+  /* Mood tile is now handled by Koby bubble — see showKobyMoodBubble() */
+  var el=G('mood-tile-body');if(el)el.innerHTML='';
+}
+
+function showKobyMoodBubble(){
+  if(!cu||cu.role==='manager')return;
   var existing=moodGetToday();
-  if(existing!==null&&existing!==undefined){
-    el.innerHTML=''; return; /* already responded — hide tile */
-  }
-  el.innerHTML='<div class="mood-tile">'
-    +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px">How are you today?</div>'
-    +'<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Anonymous · resets daily</div>'
-    +'<div class="mood-options">'
+  if(existing!==null&&existing!==undefined)return;
+  /* Remove existing bubble if any */
+  var old=G('koby-mood-bubble');if(old)old.remove();
+  var bubble=document.createElement('div');
+  bubble.id='koby-mood-bubble';
+  bubble.className='koby-mood-bubble';
+  bubble.innerHTML='<div class="koby-mood-av">🐸</div>'
+    +'<div class="koby-mood-bubble-text">'
+    +'<div class="koby-mood-bubble-prompt">Hey! How are you doing today?</div>'
+    +'<div class="koby-mood-bubble-sub">Anonymous · resets daily</div>'
+    +'<div class="koby-mood-bubble-opts">'
     +MOOD_EMOJIS.map(function(e,i){
-      return '<button class="mood-btn" title="'+MOOD_LABELS[i]+'" onclick="moodRespond('+i+')">'+e+'</button>';
+      return '<button class="koby-mood-opt" title="'+MOOD_LABELS[i]+'" onclick="moodRespondBubble('+i+')">'+e+'</button>';
     }).join('')
-    +'</div>'
-    +'</div>';
+    +'</div></div>';
+  document.body.appendChild(bubble);
+}
+
+function moodRespondBubble(idx){
+  moodSaveToday(idx);
+  var bubble=G('koby-mood-bubble');
+  if(!bubble)return;
+  bubble.querySelector('.koby-mood-bubble-text').innerHTML='<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+MOOD_EMOJIS[idx]+' '+MOOD_LABELS[idx]+'!</div>'
+    +'<div style="font-size:11px;color:var(--muted)">Thanks! See you tomorrow 👋</div>';
+  setTimeout(function(){
+    bubble.style.transition='opacity .5s';
+    bubble.style.opacity='0';
+    setTimeout(function(){bubble.remove();},500);
+  },2000);
 }
 
 function moodRespond(idx){
@@ -6917,29 +6966,55 @@ function renderMgrKCResults(container){
 
 function renderAnnouncements(){
   var el=G('ann-list');if(!el)return;
+  var isManager=cu&&cu.role==='manager';
   var sorted=mdAnnouncements.slice().sort(function(a,b){return b.postedAt-a.postedAt;});
   if(!sorted.length){
-    el.innerHTML='<div class="ann-empty">&#128236; No announcements yet.</div>';
+    el.innerHTML='<div class="ann-empty" style="padding:16px;text-align:center;color:var(--muted);font-size:12px">&#128236; No announcements yet.</div>';
     annUpdateBadge();return;
   }
-  var MAX=2;
-  var visible=sorted.slice(0,MAX);
-  var hasMore=sorted.length>MAX;
-  var PREVIEW_LEN=100;
-  var cards=visible.map(function(a){
+  /* Show 2 most recent, scrollable container with fixed height */
+  var PREVIEW_LEN=120;
+  function stripHtml(html){
+    if(!html)return'';
+    var tmp=document.createElement('div');
+    tmp.innerHTML=html;
+    return tmp.textContent||tmp.innerText||'';
+  }
+  var cards=sorted.map(function(a){
     var unseen=!annSeenIds.has(a.id);
     var dot=unseen?'<span class="ann-new-dot"></span>':'';
-    var preview=a.body.length>PREVIEW_LEN
-      ?a.body.slice(0,PREVIEW_LEN)+'... <span class="ann-see-more-inline" onclick="event.stopPropagation();viewAnn('+a.id+')">See more</span>'
-      :a.body;
+    var plainBody=stripHtml(a.body||'');
+    var preview=plainBody.length>PREVIEW_LEN
+      ?plainBody.slice(0,PREVIEW_LEN)+'...'
+      :plainBody;
+    var managerActions=isManager
+      ?'<div style="display:flex;gap:6px;margin-top:8px">'
+        +'<button onclick="event.stopPropagation();openEditAnn('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer">Edit</button>'
+        +'<button onclick="event.stopPropagation();deleteAnnouncement('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
+        +'</div>'
+      :'';
     return '<div class="ann-card'+(unseen?' unread':'')+'" data-id="'+a.id+'" onclick="viewAnn('+a.id+')">'
-      +'<div class="ann-card-title">'+dot+a.title+'</div>'
-      +'<div class="ann-card-body">'+preview+'</div>'
-      +'<div class="ann-card-meta">'+a.author+' &middot; '+timeAgo(new Date(a.postedAt).toISOString())+'</div>'
+      +'<div class="ann-card-title">'+dot+htmlEsc(a.title)+'</div>'
+      +'<div class="ann-card-body">'+htmlEsc(preview)+'</div>'
+      +'<div class="ann-card-meta">'+htmlEsc(a.author)+' &middot; '+timeAgo(new Date(a.postedAt).toISOString())+'</div>'
+      +managerActions
       +'</div>';
   }).join('');
   el.innerHTML=cards;
   annUpdateBadge();
+}
+
+function openEditAnn(id){
+  var a=mdAnnouncements.find(function(x){return x.id===id;});
+  if(!a)return;
+  var title=prompt('Edit title:',a.title);
+  if(title===null)return;
+  var body=prompt('Edit body:',a.body);
+  if(body===null)return;
+  a.title=title.trim();a.body=body.trim();
+  /* Save to Firestore */
+  if(a._fsId&&fsDb())window._fsSetDoc(window._fsDoc(fsDb(),'articles',a._fsId),{title:a.title,body:a.body},{merge:true}).catch(function(){});
+  renderAnnouncements();
 }
 function annMarkSeen(id){
   annSeenIds.add(id);
@@ -7695,7 +7770,6 @@ function renderManagerHub(){
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'kc\',this)">&#129504; KC</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'kb\',this)">&#128218; Knowledge Base</button>'
-    +'<button class="sub-tab" onclick="switchMgrHubTab(\'announcements\',this)">&#128226; Announcements</button>'
     +'</div>'
     +'<div class="sect" id="mgr-mood-card" style="margin-bottom:14px"><div class="sect-head"><span class="sect-title">&#128578; Team mood today</span></div></div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
@@ -7703,7 +7777,7 @@ function renderManagerHub(){
     +'<div id="mgr-hub-pane-quality" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-attendance" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-kb" class="mgr-hub-pane"></div>'
-    +'<div id="mgr-hub-pane-announcements" class="mgr-hub-pane"></div>';
+    ;
 
   renderMgrHubPerformance();
   setTimeout(function(){
@@ -7751,30 +7825,6 @@ function switchMgrHubTab(tab,btn){
       +'</div>'
       +'<div class="article-list" id="article-list"></div>';
     renderArticles();
-  }
-  else if(tab==='announcements'){
-    var annPane=G('mgr-hub-pane-announcements');if(!annPane)return;
-    annPane.innerHTML='<div class="article-toolbar" style="margin-bottom:14px">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-left:auto">'
-      +'<button class="btn btn-primary btn-sm" onclick="openAddArticleModal(\'ann\')">&#43; Post Announcement</button>'
-      +'</div></div>'
-      +'<div id="mgr-hub-ann-list"></div>';
-    /* Render announcements list */
-    var annList=G('mgr-hub-ann-list');
-    if(annList){
-      var anns=mdAnnouncements.slice().reverse();
-      annList.innerHTML=anns.length?anns.map(function(a){
-        var daysLeft=Math.ceil((new Date(a.expires)-new Date())/86400000);
-        return '<div class="space-ann-card" style="border-radius:10px;margin-bottom:8px">'
-          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">'
-          +'<div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">'+htmlEsc(a.title)+'</div>'
-          +'<div style="font-size:11px;color:var(--muted)">'+htmlEsc(a.body||'')+'</div>'
-          +'<div style="font-size:10px;color:var(--muted2);margin-top:6px">Expires in '+daysLeft+' day'+(daysLeft!==1?'s':'')+'</div>'
-          +'</div>'
-          +'<button onclick="deleteAnnouncement('+a.id+')" style="font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;flex-shrink:0">Remove</button>'
-          +'</div></div>';
-      }).join(''):'<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">No active announcements.</div>';
-    }
   }
 }
 
@@ -11652,9 +11702,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- AI ASSISTANT OVERLAY -->
 <!-- KOBY FAB -->
-<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby" style="display:none">
-  <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="#fff" stroke="none"/><circle cx="12" cy="10" r="1" fill="#fff" stroke="none"/><circle cx="15" cy="10" r="1" fill="#fff" stroke="none"/></svg>
-</button>
+<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby" style="display:none;font-size:26px;background:#128C7E">🐸</button>
 
 <div class="ai-overlay" id="ai-overlay" onclick="closeAI()"></div>
 
