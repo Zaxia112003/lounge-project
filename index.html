@@ -1456,6 +1456,12 @@ async function fsLoadAll(){
                postedAt:a.createdAt?new Date(a.createdAt).getTime():Date.now(),_fromArticles:true};
       if(!mdAnnouncements.find(function(x){return String(x.id)===String(a.id);}))mdAnnouncements.push(ann);
     });
+    /* Load announcement seen data */
+    try{
+      var annSeenSnap=await window._fsGetDocs(window._fsColl(fsDb(),'ann_seen'));
+      window._annSeenCache={};
+      annSeenSnap.forEach(function(d){window._annSeenCache[d.id]=d.data().seenBy||[];});
+    }catch(e){}
     var tmplSnap=await window._fsGetDocs(window._fsColl(fsDb(),'TEMPLATES'));
     tmplSnap.forEach(function(d){
       var data=Object.assign({id:parseInt(d.id)||d.id},d.data());
@@ -2119,7 +2125,7 @@ function renderUnifiedAttendance(containerId,isManager){
       var isToday=ds===todayStr;
       var isWeekend=d.getDay()===0||d.getDay()===6;
       var cellStyle='text-align:center;padding:3px 1px;border:1px solid var(--border);'+(isWeekend?'background:rgba(0,0,0,.06);':isToday?'background:rgba(139,45,255,.06);':'');
-      if(entry&&(entry.status==='Tardy'||entry.status==='Absent')&&!isManager)entry=null;
+      if(entry&&(entry.status==='Tardy'||entry.status==='Absent'||entry.status==='tardy'||entry.status==='absent')&&!isManager)entry=null;
       var badge='';
       if(entry){
         var _rawSt=entry.status;
@@ -2835,7 +2841,7 @@ function buildUploaderDOM(){
         <input class="article-search" type="text" placeholder="&#128269; Search articles..." oninput="setArticleSearch(this.value)"/>
         <div class="article-filter" id="my-space-filters">
           <button class="article-pill active" data-f="all" onclick="setArticleFilter('all',this)">All</button>
-          <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128218; Knowledge Base</button>
+          <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128203; Articles</button>
           <button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter('template',this)" style="display:none">&#128196; Templates</button>
         </div>
       </div>
@@ -2960,7 +2966,7 @@ function buildEscalationDOM(){
         <input class="article-search" type="text" placeholder="&#128269; Search articles..." oninput="setArticleSearch(this.value)"/>
         <div class="article-filter" id="my-space-filters">
           <button class="article-pill active" data-f="all" onclick="setArticleFilter('all',this)">All</button>
-          <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128218; Knowledge Base</button>
+          <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128203; Articles</button>
           <button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter('template',this)" style="display:none">&#128196; Templates</button>
         </div>
       </div>
@@ -2998,7 +3004,7 @@ function buildManagerDOM(){
         <div class="article-filter" id="my-space-filters">
           <button class="article-pill active" data-f="all" onclick="setArticleFilter('all',this)">All</button>
           <button class="article-pill" data-f="ann" onclick="setArticleFilter('ann',this)">&#128226; Announcements</button>
-          <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128218; Knowledge Base</button>
+          <button class="article-pill" data-f="kb" onclick="setArticleFilter('kb',this)">&#128203; Articles</button>
           <button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter('template',this)" style="display:none">&#128196; Templates</button>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
@@ -3539,7 +3545,7 @@ function renderMyDay(){
     +(cu&&!isManager
       ?'<div class="sect" style="padding:0;margin-bottom:14px">'
         +'<div class="sect-head" style="padding:11px 14px 10px">'
-        +'<span class="sect-title">&#129504; Knowledge Check</span>'
+        +'<span class="sect-title">&#129504; Knowledge Check — '+kcWeekId()+'</span>'
         +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
         +'</div>'
         +'<div id="kc-tile-body"></div>'
@@ -6355,6 +6361,14 @@ function renderMgrMoodOverview(){
   });
 }
 
+function renderMgrMoodInto(el,data){
+  if(!data||!data.total){el.innerHTML='<div style="font-size:11px;color:var(--muted)">No check-ins yet today.</div>';return;}
+  var counts=data.counts||[0,0,0,0,0];var total=data.total||1;
+  var bar=counts.map(function(c,i){var pct=Math.round((c/total)*100);return '<div class="mood-dist-seg" style="background:'+MOOD_COLORS[i]+';width:'+pct+'%;min-width:'+(c>0?4:0)+'px"></div>';}).join('');
+  var legend=MOOD_EMOJIS.map(function(e,i){return '<div class="mood-leg-item"><div class="mood-leg-dot" style="background:'+MOOD_COLORS[i]+'"></div>'+e+' '+counts[i]+'</div>';}).join('');
+  el.innerHTML='<div class="mood-dist-bar">'+bar+'</div><div class="mood-legend">'+legend+'</div><div style="font-size:10px;color:var(--muted);margin-top:5px">'+data.total+' of '+TEAM.filter(function(t){return t.role!=='manager';}).length+' checked in</div>';
+}
+
 function renderMgrMoodCard(){
   var el=G('mgr-mood-card');if(!el)return;
   if(!fsDb()||!window._fsGetDoc){
@@ -6931,6 +6945,18 @@ async function kcShowBreakdown(){
 }
 
 /* ── MANAGER KC VIEW ── */
+function kcGetAllResultsForWeek(week){
+  var cache=window._kcCache||{};
+  var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
+  return members.map(function(m){
+    var nick=m.nickname;
+    var ws=(cache[nick]&&cache[nick][week])||{attempts:[],completed:false};
+    var attempts=ws.attempts||[];
+    var best=attempts.length?attempts.reduce(function(b,a){return a.score>b.score?a:b;}):null;
+    return {nick:nick,fullName:m.fullName,role:m.role,attempts:attempts,best:best,completed:ws.completed||false};
+  });
+}
+
 function kcGetAllResults(){
   var cache=window._kcCache||{};
   var week=kcWeekId();
@@ -6945,32 +6971,55 @@ function kcGetAllResults(){
 }
 
 function renderMgrKCSummaryCard(){
-  var results=kcGetAllResults();
-  var week=kcWeekId();
+  var allWeeks=[];
+  /* Collect all available weeks from cache */
+  var cache=window._kcCache||{};
+  Object.keys(cache).forEach(function(nick){
+    Object.keys(cache[nick]||{}).forEach(function(wk){
+      if(allWeeks.indexOf(wk)<0)allWeeks.push(wk);
+    });
+  });
+  allWeeks.sort().reverse(); /* newest first */
+  var currentWeek=kcWeekId();
+  if(allWeeks.indexOf(currentWeek)<0)allWeeks.unshift(currentWeek);
+  /* Always default to current week unless user explicitly chose another */
+  var selectedWeek=window._kcSelectedWeek||currentWeek;
+  if(allWeeks.indexOf(selectedWeek)<0)selectedWeek=currentWeek;
+  if(allWeeks.indexOf(selectedWeek)<0&&allWeeks.length)selectedWeek=allWeeks[0];
+  window._kcSelectedWeek=selectedWeek;
+
+  var results=kcGetAllResultsForWeek(selectedWeek);
   var takers=results.filter(function(r){return r.best;}).length;
   var passed=results.filter(function(r){return r.best&&r.best.pct>=KC_PASS_PCT;}).length;
   var failed=takers-passed;
   var total=results.length;
   var avgPct=takers>0?Math.round(results.filter(function(r){return r.best;}).reduce(function(s,r){return s+r.best.pct;},0)/takers):null;
 
-  return '<div class="sect" style="padding:0;margin-top:14px">'
-    +'<div class="sect-head" style="padding:12px 16px">'
-    +'<span class="sect-title">&#129504; Knowledge Check — '+week+'</span>'
+  var weekSelect='<select id="kc-week-select" onchange="window._kcSelectedWeek=this.value;var wrap=G(\'kc-summary-wrap\');if(wrap)wrap.outerHTML=renderMgrKCSummaryCard();" style="font-size:11px;padding:3px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text);margin-left:8px">'
+    +allWeeks.map(function(w){return '<option value="'+w+'"'+(w===selectedWeek?' selected':'')+'>'+w+(w===currentWeek?' (current)':'')+'</option>';}).join('')
+    +'</select>';
+
+  return '<div id="kc-summary-wrap" class="sect" style="padding:0;margin-top:14px">'
+    +'<div class="sect-head" style="padding:12px 16px;flex-wrap:wrap;gap:6px">'
+    +'<span class="sect-title">&#129504; Knowledge Check'+weekSelect+'</span>'
     +'<span style="font-size:10px;color:var(--muted)">'+takers+'/'+total+' completed</span>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--border)">'
-    +[
-      {label:'Takers',val:takers,col:'var(--text)',all:results,filter:function(r){return r.best;}},
-      {label:'Passed',val:passed,col:'var(--green)',all:results,filter:function(r){return r.best&&r.best.pct>=KC_PASS_PCT;}},
-      {label:'Failed',val:failed,col:'var(--red)',all:results,filter:function(r){return r.best&&r.best.pct<KC_PASS_PCT;}},
-      {label:'Avg score',val:avgPct!==null?avgPct+'%':'—',col:'var(--text)',all:results,filter:function(r){return r.best;}},
-    ].map(function(s,i){
-      var id='kc-summary-'+i;
-      return '<div onclick="toggleKCDetail(\''+id+'\')" style="padding:14px;text-align:center;cursor:pointer;border-right:'+(i<3?'1px solid var(--border)':'none')+';transition:background .15s" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
-        +'<div style="font-size:20px;font-weight:700;color:'+s.col+';line-height:1;margin-bottom:4px">'+s.val+'</div>'
-        +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">'+s.label+'</div>'
-        +'</div>';
-    }).join('')
+    +(function(){
+      var cells=[
+        {label:'Takers', val:takers, col:'var(--text)',  f:'takers'},
+        {label:'Passed', val:passed, col:'var(--green)', f:'passed'},
+        {label:'Failed', val:failed, col:'var(--red)',   f:'failed'},
+        {label:'Avg score',val:avgPct!==null?avgPct+'%':'—',col:'var(--text)',f:'all'},
+      ];
+      return cells.map(function(s,i){
+        return '<div onclick="toggleKCDetail(\''+s.f+'\')" style="padding:14px;text-align:center;cursor:pointer;border-right:'+(i<3?'1px solid var(--border)':'none')+';transition:background .15s"'
+          +' onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'
+          +'<div style="font-size:20px;font-weight:700;color:'+s.col+';line-height:1;margin-bottom:4px">'+s.val+'</div>'
+          +'<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">'+s.label+'</div>'
+          +'</div>';
+      }).join('');
+    })()
     +'</div>'
     /* Expandable detail panel */
     +'<div id="kc-inline-detail" style="display:none">'
@@ -6996,9 +7045,11 @@ function renderMgrKCSummaryCard(){
         }).join('');
         breakdown='<div id="'+brkId+'" style="display:none;grid-column:1/-1;padding:8px 14px 10px;background:var(--bg3);border-top:1px solid var(--border)">'+rows+'</div>';
       }
-      return '<div class="kc-mgr-row" style="cursor:'+(r.best&&r.best.answers?'pointer':'default')+';flex-wrap:wrap" '
-        +(r.best&&r.best.answers?'onclick="var el=G(\''+brkId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"':'')+'>'
-        +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,24)+'<span style="font-weight:600">'+r.fullName+'</span></div>'
+      var isPassed=r.best&&r.best.pct>=KC_PASS_PCT?'1':'0';
+      var isTaken=r.best?'1':'0';
+      return '<div class="kc-mgr-row" data-nick="'+r.nick+'" data-passed="'+isPassed+'" data-taken="'+isTaken+'"'
+        +' style="cursor:'+(r.best&&r.best.answers?'pointer':'default')+';flex-wrap:wrap" '
+        +(r.best&&r.best.answers?'onclick="var el=G(\''+brkId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"':'')+'>'  
         +'<div>'+statusDot+statusLabel+'</div>'
         +'<div style="color:var(--text);font-weight:600">'+scoreStr+'</div>'
         +'<div style="color:var(--muted)">'+r.attempts.length+'/2 attempts</div>'
@@ -7008,9 +7059,26 @@ function renderMgrKCSummaryCard(){
     +'</div></div>';
 }
 
-function toggleKCDetail(statId){
+var _kcDetailFilter='all';
+function toggleKCDetail(filter){
   var panel=G('kc-inline-detail');if(!panel)return;
-  panel.style.display=panel.style.display==='none'?'block':'none';
+  /* If same filter clicked and panel open — close */
+  if(_kcDetailFilter===filter&&panel.style.display!=='none'){
+    panel.style.display='none';_kcDetailFilter='all';return;
+  }
+  _kcDetailFilter=filter;
+  panel.style.display='block';
+  /* Filter rows */
+  panel.querySelectorAll('.kc-mgr-row:not(.kc-mgr-hdr)').forEach(function(row){
+    var nick=row.dataset.nick;
+    var passed=row.dataset.passed;
+    var taken=row.dataset.taken;
+    if(filter==='all'||filter===0)row.style.display='';
+    else if(filter==='passed')row.style.display=(passed==='1'?'':'none');
+    else if(filter==='failed')row.style.display=(taken==='1'&&passed==='0'?'':'none');
+    else if(filter==='takers')row.style.display=(taken==='1'?'':'none');
+    else row.style.display='';
+  });
 }
 
 function renderMgrKCResults(container){
@@ -7100,8 +7168,14 @@ function renderAnnouncements(){
     var preview=plainBody.length>PREVIEW_LEN
       ?plainBody.slice(0,PREVIEW_LEN)+'...'
       :plainBody;
+    var seenKey=a._fsId||String(a.id);
+    var seenArr=window._annSeenCache&&window._annSeenCache[seenKey]?window._annSeenCache[seenKey]:[];
+    var seenLine=isManager&&seenArr.length?'<div style="margin-top:6px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
+      +'<span style="font-size:10px;color:var(--muted)">Seen by:</span>'
+      +seenArr.map(function(nick){return avEl(nick,18);}).join('')
+      +'</div>':'';
     var managerActions=isManager
-      ?'<div style="display:flex;gap:6px;margin-top:8px">'
+      ?seenLine+'<div style="display:flex;gap:6px;margin-top:6px">'
         +'<button onclick="event.stopPropagation();openEditAnn('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer">Edit</button>'
         +'<button onclick="event.stopPropagation();deleteAnnouncement('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
         +'</div>'
@@ -7306,6 +7380,19 @@ function viewAnn(id){
   if(!a&&window.mdArticles)a=(mdArticles||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
   if(!a)return;
   annSeenIds.add(id);
+  if(fsDb()&&cu&&a._fsId){
+    var seenRef=window._fsDoc(fsDb(),'ann_seen',a._fsId);
+    window._fsGetDoc(seenRef).then(function(snap){
+      var seenBy=snap.exists()?(snap.data().seenBy||[]):[];
+      if(!seenBy.includes(cu.nickname)){
+        seenBy.push(cu.nickname);
+        window._fsSetDoc(seenRef,{annId:a._fsId,seenBy:seenBy},{merge:true});
+        if(!window._annSeenCache)window._annSeenCache={};
+        window._annSeenCache[a._fsId]=seenBy;
+        if(cu.role==='manager')renderAnnouncements();
+      }
+    }).catch(function(){});
+  }
   var card=document.querySelector('.space-ann-card[data-id="'+id+'"]');
   if(card){var dot=card.querySelector('.ann-new-dot');if(dot)dot.remove();}
   annUpdateBadge();
@@ -7366,6 +7453,58 @@ function switchLoungeTab(tab, btn){
 }
 
 var mgrSelectedArticles=new Set();
+
+function renderArticlesInto(el){
+  /* Same logic as renderArticles but renders into a specific element */
+  if(!el)return;
+  var isManager=cu&&cu.role==='manager';
+  var tmplPill=G('tmpl-filter-pill');
+  if(tmplPill)tmplPill.style.display=(cu&&(cu.role==='escalation'||cu.role==='manager'))?'':'none';
+  document.querySelectorAll('.article-pill').forEach(function(p){p.classList.toggle('active',p.dataset.f===articleFilter);});
+  var items=[];
+  var role=cu?cu.role:'uploader';
+  (window.mdArticles||[]).forEach(function(a){
+    var atype=a.category||a.type||'kb';
+    if(atype==='tmpl')atype='template';
+    if(atype==='faq')atype='kb';
+    if(atype==='ann'||atype==='announcement')return;
+    if(atype==='template'&&role==='uploader')return;
+    items.push({id:a._fsId||a.id,type:atype,title:a.title,body:a.body,author:a.createdBy||a.author||'',date:a.createdAt?new Date(a.createdAt).getTime():0,unseen:false,role:a.role||'both',_fsId:a._fsId});
+  });
+  (KB_ARTICLES||[]).forEach(function(a){
+    if(a.role==='both'||(a.role==='escalation'&&(role==='escalation'||role==='manager'))){
+      items.push({id:'kb-'+a.id,type:'kb',title:a.title,body:a.body,author:'Knowledge Base',date:0,unseen:false,kbId:a.id});
+    }
+  });
+  if(role==='escalation'||role==='manager'){
+    (TEMPLATES||[]).forEach(function(t){
+      items.push({id:'tmpl-'+t.id,type:'template',title:t.title,body:t.body,author:'Templates · '+t.category,date:0,unseen:false,tmplId:t.id});
+    });
+  }
+  items.sort(function(a,b){var order={kb:0,template:1};var ao=order[a.type]!==undefined?order[a.type]:2;var bo=order[b.type]!==undefined?order[b.type]:2;if(ao!==bo)return ao-bo;return b.date-a.date;});
+  var filtered=items.filter(function(x){
+    if(articleFilter!=='all'&&x.type!==articleFilter)return false;
+    if(articleSearch){var q=articleSearch.toLowerCase();return(x.title||'').toLowerCase().indexOf(q)>=0||(x.body||'').toLowerCase().indexOf(q)>=0;}
+    return true;
+  });
+  if(!filtered.length){el.innerHTML='<div class="article-empty">No articles found.</div>';return;}
+  /* Use same card rendering as renderArticles */
+  el.innerHTML=filtered.map(function(x){
+    var badge=x.type==='ann'
+      ?'<span class="article-badge ann">&#128226; Announcement</span>'
+      :x.type==='template'
+      ?'<span class="article-badge template">&#128196; Template</span>'
+      :'<span class="article-badge kb">&#128218; Knowledge Base</span>';
+    var delBtn=isManager?'<button data-artid="'+x.id+'" onclick="event.stopPropagation();artDelBtn(this)" style="float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px" title="Delete">&#128465;</button>':'';
+    return '<div class="article-card" data-aid="'+x.id+'" onclick="viewArticle(this.dataset.aid)" style="cursor:pointer">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div class="article-card-top">'+badge+'</div>'
+      +'<div class="article-card-title">'+delBtn+htmlEsc(x.title||'Untitled')+'</div>'
+      +'<div class="article-card-preview">'+(typeof stripTags==='function'?htmlEsc(stripTags(x.body||'').slice(0,120)):htmlEsc((x.body||'').slice(0,120)))+'</div>'
+      +'<div class="article-card-meta">'+htmlEsc(x.author||'')+(x.date?(' &middot; '+timeAgo(new Date(x.date).toISOString())):'')+'</div>'
+      +'</div></div>';
+  }).join('');
+}
 
 function renderArticles(){
   var el=G('article-list');if(!el)return;
@@ -7881,7 +8020,7 @@ function renderManagerHub(){
     +'<button class="sub-tab active" onclick="switchMgrHubTab(\'performance\',this)">&#9989; Performance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'quality\',this)">&#128203; Quality</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
-    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kb\',this)">&#128218; Knowledge Base</button>'
+    +'<button class="sub-tab" onclick="switchMgrHubTab(\'kb\',this)">&#128203; Articles</button>'
     +'</div>'
     +'<div class="sect" id="mgr-mood-card" style="margin-bottom:14px"><div class="sect-head"><span class="sect-title">&#128578; Team mood today</span></div></div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
@@ -7923,18 +8062,37 @@ function switchMgrHubTab(tab,btn){
   else if(tab==='attendance')renderMgrHubAttendance();
   else if(tab==='kb'){
     var kbPane=G('mgr-hub-pane-kb');if(!kbPane)return;
-    /* Render KB articles in hub pane */
     kbPane.innerHTML='<div class="article-toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:14px">'
       +'<input class="article-search" type="text" placeholder="&#128269; Search articles..." oninput="setArticleSearch(this.value)"/>'
       +'<div class="article-filter" id="my-space-filters">'
       +'<button class="article-pill active" data-f="all" onclick="setArticleFilter(\'all\',this)">All</button>'
-      +'<button class="article-pill" data-f="kb" onclick="setArticleFilter(\'kb\',this)">&#128218; Knowledge Base</button>'
+      +'<button class="article-pill" data-f="kb" onclick="setArticleFilter(\'kb\',this)">&#128203; Articles</button>'
       +'<button class="article-pill" id="tmpl-filter-pill" data-f="template" onclick="setArticleFilter(\'template\',this)">&#128196; Templates</button>'
       +'</div>'
       +'<button class="btn btn-primary btn-sm" onclick="openAddArticleModal()" style="margin-left:auto">&#43; Add Article</button>'
       +'</div>'
-      +'<div class="article-list" id="article-list"></div>';
-    renderArticles();
+      +'<div class="article-list" id="mgr-hub-article-list"><div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Loading articles...</div></div>';
+    articleFilter='all';articleSearch='';
+    (async function loadKB(){
+      if(fsDb()){
+        try{
+          var fetches=await Promise.all([
+            window._fsGetDocs(window._fsColl(fsDb(),'KB_ARTICLES')),
+            window._fsGetDocs(window._fsColl(fsDb(),'articles')),
+            window._fsGetDocs(window._fsColl(fsDb(),'TEMPLATES')),
+          ]);
+          window.KB_ARTICLES=window.KB_ARTICLES||[];
+          fetches[0].forEach(function(d){var dat=d.data();dat.id=dat.id||d.id;var ei=KB_ARTICLES.findIndex(function(a){return String(a.id)===d.id;});if(ei>-1)KB_ARTICLES[ei]=dat;else KB_ARTICLES.push(dat);});
+          window.mdArticles=window.mdArticles||[];
+          fetches[1].forEach(function(d){var dat=d.data();dat._fsId=d.id;var ei=mdArticles.findIndex(function(a){return String(a.id)===d.id||a._fsId===d.id;});if(ei>-1)mdArticles[ei]=dat;else mdArticles.push(dat);});
+          window.TEMPLATES=window.TEMPLATES||[];
+          fetches[2].forEach(function(d){var dat=d.data();dat.id=dat.id||d.id;var ei=TEMPLATES.findIndex(function(t){return String(t.id)===d.id;});if(ei>-1)TEMPLATES[ei]=dat;else TEMPLATES.push(dat);});
+        }catch(e){console.warn('KB reload',e);}
+      }
+      /* Render directly into manager hub article list */
+      var el=G('mgr-hub-article-list');if(!el)return;
+      renderArticlesInto(el);
+    })();
   }
 }
 
@@ -8006,7 +8164,7 @@ function renderMgrHubPerformance(){
     var inShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
     var offShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
     var avgDaily=days.length?(totalUploads/days.length):null;
-    var qualEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
+    var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&(c.type==='qesc'||c.type==='qesc_esc')&&mgrHubInRange(c.date)&&c.status!=='discarded';}).length;
     var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&mgrHubInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
     var qScore=totalUploads>0?((totalUploads-errors-qualEsc)/totalUploads*100):null;
     return {m:m,nick:nick,totalUploads:totalUploads,inShift:inShift,offShift:offShift,avgDaily:avgDaily,qualEsc:qualEsc,errors:errors,qScore:qScore};
@@ -8273,17 +8431,36 @@ function openQualMemberErrors(nick,fullName){
   modal.classList.add('open');
 }
 
-function qualRemoveError(calloutId,nick,fullName){
+async function qualRemoveError(calloutId,nick,fullName){
   if(!confirm('Remove this error from '+fullName+'? This cannot be undone.'))return;
-  var co=callouts.find(function(c){return c.id===calloutId;});
-  if(!co){alert('Error not found.');return;}
-  /* Delete from Firestore and local */
-  if(co._fsId&&fsDb()){
-    try{window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));}catch(e){}
+  var co=callouts.find(function(c){return c.id===calloutId||String(c.id)===String(calloutId);});
+  if(!co){
+    /* Try matching by _fsId */
+    co=callouts.find(function(c){return c._fsId&&String(c._fsId)===String(calloutId);});
   }
+  if(!co){alert('Error not found — it may have already been removed.');openQualMemberErrors(nick,fullName);return;}
+  /* Remove from local first */
   var ci=callouts.indexOf(co);
   if(ci>-1)callouts.splice(ci,1);
-  /* Refresh modal and quality tab */
+  /* Delete from Firestore */
+  if(fsDb()){
+    var deleted=false;
+    if(co._fsId){
+      try{await window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));deleted=true;}catch(e){console.warn('qualRemove fsId',e);}
+    }
+    if(!deleted){
+      /* Scan callouts collection for matching doc */
+      try{
+        var snap=await window._fsGetDocs(window._fsColl(fsDb(),'callouts'));
+        snap.forEach(function(d){
+          var data=d.data();
+          if(String(data.id)===String(calloutId)||d.id===co._fsId){
+            window._fsDeleteDoc(d.ref);
+          }
+        });
+      }catch(e){console.warn('qualRemove scan',e);}
+    }
+  }
   openQualMemberErrors(nick,fullName);
   renderMgrHubQuality();
   renderMgrKpiCard();
@@ -8352,11 +8529,33 @@ function submitAttModal(){
   renderMgrHubAttendance();
 }
 
-function deleteAttEntry(){
+async function deleteAttEntry(){
   var nick=G('att-modal').dataset.nick;
   var date=G('att-modal').dataset.date;
   var idx=attendanceLog.findIndex(function(e){return e.nick===nick&&e.date===date;});
+  var entry=idx>-1?attendanceLog[idx]:null;
   if(idx>-1)attendanceLog.splice(idx,1);
+  /* Also clear from local attendance object */
+  if(window.attendance&&attendance[nick])delete attendance[nick][date];
+  /* Delete from Firestore — try both possible doc ID formats */
+  if(fsDb()){
+    /* Try nick_date format */
+    var docId=nick+'_'+date;
+    try{await window._fsDeleteDoc(window._fsDoc(fsDb(),'attendance',docId));}catch(e){console.warn('att del 1',e);}
+    /* Scan entire collection to catch any doc with matching nick+date */
+    try{
+      var snap=await window._fsGetDocs(window._fsColl(fsDb(),'attendance'));
+      var delPromises=[];
+      snap.forEach(function(d){
+        var data=d.data();
+        if((data.nick===nick||d.id.startsWith(nick))&&(data.date===date||d.id.endsWith(date))){
+          delPromises.push(window._fsDeleteDoc(d.ref));
+        }
+      });
+      await Promise.all(delPromises);
+    }catch(e){console.warn('att del scan',e);}
+  }
+  /* Force re-render immediately */
   G('att-modal').classList.remove('open');
   renderMgrHubAttendance();
 }
@@ -9190,6 +9389,15 @@ function renderMyTeam(){
     ?'<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-primary btn-sm" onclick="openAddMemberModal()">&#43; Add Member</button></div>'
     :'';
 
+  /* Mood aggregate — manager only, above photos */
+  var moodSection='';
+  if(cu&&cu.role==='manager'){
+    moodSection='<div class="sect" style="padding:0;margin-bottom:14px">'
+      +'<div class="sect-head" style="padding:11px 14px 10px"><span class="sect-title">&#128578; Team mood today</span><span style="font-size:10px;color:var(--muted)">Anonymous</span></div>'
+      +'<div id="mgr-mood-team-card" style="padding:10px 14px"></div>'
+      +'</div>';
+  }
+
   /* Team Photos at top of Team tab */
   var photosSection='<div class="sect pw-wrap" style="margin-bottom:16px">'
     +'<div class="sect-head">'
@@ -9208,7 +9416,7 @@ function renderMyTeam(){
     +'</div>'
     +'</div>';
 
-  el.innerHTML=photosSection
+  el.innerHTML=moodSection+photosSection
     +addBtn
     +'<div class="team-org">'
     +'<div><div class="team-org-label">&#128084; Manager</div><div class="team-org-row">'+groups.Manager.map(makeCard).join('')+'</div></div>'
@@ -9218,6 +9426,7 @@ function renderMyTeam(){
 
   /* Start wall slideshow */
   setTimeout(function(){if(pwPinned().length>0&&!_pwAutoplayOn)pwStartAutoplay();},300);
+  if(cu&&cu.role==='manager')setTimeout(function(){var el=G('mgr-mood-team-card');if(el){moodLoadAggregate(function(data){renderMgrMoodInto(el,data);});}},50);
 
   /* Delegated click handler — handles both card and X button */
   el.onclick=function(e){
@@ -10973,7 +11182,7 @@ const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review'
 function renderQualityPortal(){
   const nick=cu.nickname,role=cu.role;
   let list=callouts.slice().reverse();
-  if(role!=='manager')list=list.filter(c=>c.uploader===nick&&c.status!=='pending_review'&&c.status!=='discarded');
+  if(role!=='manager')list=list.filter(c=>(c.uploader===nick||c.escalationMember===nick)&&c.status!=='pending_review'&&c.status!=='discarded');
   if(role==='manager'){
     const sf=G('co-status'),tf=G('co-type');
     if(sf&&sf.value!=='all')list=list.filter(c=>c.status===sf.value);
