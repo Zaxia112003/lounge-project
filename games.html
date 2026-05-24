@@ -137,13 +137,22 @@ button{font-family:inherit}
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════
-   FIREBASE — loaded as regular scripts (not module)
-   so everything stays in global scope
-═══════════════════════════════════════════════════ */
+/* Firebase placeholder — initialized after SDKs load */
+var db = null;
 </script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyByZVGBzLgXw59s1qCM8NOyuUYMDCZi84o",
+  authDomain:"rta-portal-ee180.firebaseapp.com",
+  projectId:"rta-portal-ee180",
+  storageBucket:"rta-portal-ee180.firebasestorage.app",
+  messagingSenderId:"873530548996",
+  appId:"1:873530548996:web:bcb927ca8a4a8501936651"
+});
+db = firebase.firestore();
+</script>
 <script>
 var KB_QUESTIONS=[
   {id:1,cat:"Address",q:"The submission shows the address as 10 Smith Street but the contract reads 10 Smith St. What do you do?",opts:["Do not upload. Flag to escalation.","Proceed as normal — it is the same address.","Contact the agent before doing anything.","Upload and leave a note for tagging."],ans:1,exp:"Different street designator formats (Street vs St) represent the same address. Proceed normally."},
