@@ -8,29 +8,35 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#07080f;--bg2:#0e1020;--bg3:#13152a;--text:#e8eaf6;--muted:rgba(232,234,246,.5);--muted2:rgba(232,234,246,.25);--accent:#8b2dff;--green:#1dd17a;--red:#ff3d3d;--amber:#ffb830;--border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);--font-d:'Rajdhani',sans-serif;--font-b:'Exo 2',sans-serif;}
-body{background:var(--bg);color:var(--text);font-family:var(--font-b),sans-serif;min-height:100vh}
+:root{
+  --bg:#07080f;--bg2:#0e1020;--bg3:#13152a;
+  --text:#e8eaf6;--muted:rgba(232,234,246,.5);--muted2:rgba(232,234,246,.25);
+  --accent:#8b2dff;--green:#1dd17a;--red:#ff3d3d;--amber:#ffb830;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --font-d:'Rajdhani',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh}
 .g-header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
 .g-brand{display:flex;align-items:center;gap:10px}
-.g-brand-text{font-size:15px;font-weight:700;font-family:var(--font-d);color:var(--text)}
+.g-brand-text{font-size:15px;font-weight:700;font-family:var(--font-d)}
 .g-brand-sub{font-size:10px;color:var(--muted)}
 .g-player{display:flex;align-items:center;gap:10px}
 .g-credit-pill{display:flex;align-items:center;gap:6px;background:rgba(139,45,255,.15);border:1px solid rgba(139,45,255,.3);border-radius:20px;padding:5px 12px;font-size:12px;color:#c084fc;font-weight:700}
-.g-back{font-size:12px;color:var(--muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:8px;transition:all .15s}
+.g-back{font-size:12px;color:var(--muted);text-decoration:none;padding:6px 14px;border:1px solid var(--border);border-radius:8px;transition:all .15s}
 .g-back:hover{border-color:var(--accent);color:var(--text)}
 .g-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#8b2dff,#2d8bff);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
 .g-nick{font-size:12px;color:var(--muted)}
 .g-body{max-width:900px;margin:0 auto;padding:28px 24px}
 .g-section{margin-bottom:32px}
-.g-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(232,234,246,.35);margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.g-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06)}
+.g-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(232,234,246,.35);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.g-section-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06)}
 .g-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
 .g-tile{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;cursor:pointer;transition:border-color .15s,transform .12s,background .15s;display:flex;flex-direction:column;gap:8px;min-height:140px;user-select:none}
 .g-tile:hover{border-color:rgba(139,45,255,.5);background:rgba(139,45,255,.06);transform:translateY(-2px)}
 .g-tile.multi{border-color:rgba(45,139,255,.15)}
 .g-tile.multi:hover{border-color:rgba(45,139,255,.5);background:rgba(45,139,255,.05)}
 .g-tile-icon{font-size:24px}
-.g-tile-name{font-size:13px;font-weight:700;font-family:var(--font-d);color:var(--text)}
+.g-tile-name{font-size:13px;font-weight:700;font-family:var(--font-d)}
 .g-tile-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;display:inline-block;margin-left:4px}
 .solo-b{background:rgba(29,209,122,.12);color:#4ade80}
 .multi-b{background:rgba(45,139,255,.12);color:#60a5fa}
@@ -42,14 +48,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b),sans-serif
 .g-modal-title{font-size:15px;font-weight:700;font-family:var(--font-d)}
 .g-modal-close{background:none;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px 8px;border-radius:6px}
 .g-modal-close:hover{color:var(--text)}
-.g-modal-body{flex:1;overflow:auto;padding:16px;min-height:0}
-.g-score-bar{font-size:11px;color:var(--muted);display:flex;gap:12px;align-items:center}
-.g-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid rgba(139,45,255,.4);border-radius:12px;padding:10px 18px;font-size:13px;color:#c084fc;font-weight:700;z-index:600;box-shadow:0 4px 24px rgba(0,0,0,.4)}
-.g-nologin{text-align:center;padding:80px 24px;color:var(--muted)}
-.g-nologin h2{font-size:22px;font-weight:700;font-family:var(--font-d);color:var(--text);margin-bottom:8px}
-.g-nologin p{font-size:13px;margin-bottom:20px}
+.g-modal-body{flex:1;overflow:auto;padding:16px;min-height:300px}
+.g-score-bar{font-size:11px;color:var(--muted);display:flex;gap:12px}
+.g-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid rgba(139,45,255,.4);border-radius:12px;padding:10px 18px;font-size:13px;color:#c084fc;font-weight:700;z-index:600;box-shadow:0 4px 24px rgba(0,0,0,.4);animation:gfadeUp .3s ease both}
+@keyframes gfadeUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.g-nologin{text-align:center;padding:80px 24px}
+.g-nologin h2{font-size:22px;font-weight:700;font-family:var(--font-d);margin-bottom:8px}
+.g-nologin p{font-size:13px;color:var(--muted);margin-bottom:20px}
 .g-nologin a{display:inline-block;padding:10px 24px;background:var(--accent);color:#fff;text-decoration:none;border-radius:10px;font-weight:700}
-@keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>
 </head>
 <body>
@@ -62,32 +68,35 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b),sans-serif
     <div class="g-credit-pill" id="g-credits">🎮 — credits</div>
     <div class="g-av" id="g-av">?</div>
     <div class="g-nick" id="g-nick"></div>
-    <a href="/" class="g-back">← Portal</a>
+    <a href="/" class="g-back">&#8592; Portal</a>
   </div>
 </div>
+
 <div class="g-body">
   <div id="g-nologin" class="g-nologin" style="display:none">
-    <h2>Sign in to play</h2>
-    <p>Open The Lounge Portal first, then come back here.</p>
-    <a href="/">← Go to Portal</a>
+    <h2>You&#39;re not signed in</h2>
+    <p>Sign in to The Lounge Portal first, then come back here.</p>
+    <a href="/">Go to Portal</a>
   </div>
   <div id="g-content">
-    <div class="g-section"><div class="g-label">Solo</div><div class="g-grid" id="g-solo"></div></div>
-    <div class="g-section"><div class="g-label">Multiplayer</div><div class="g-grid" id="g-multi"></div></div>
+    <div class="g-section"><div class="g-section-label">Solo</div><div class="g-grid" id="g-solo"></div></div>
+    <div class="g-section"><div class="g-section-label">Multiplayer</div><div class="g-grid" id="g-multi"></div></div>
   </div>
 </div>
+
 <div class="g-modal-overlay" id="g-modal">
   <div class="g-modal">
     <div class="g-modal-head">
       <div class="g-modal-title" id="g-modal-title">Game</div>
       <div style="display:flex;align-items:center;gap:14px">
-        <div class="g-score-bar"><span id="g-score">Score: —</span><span id="g-best"></span></div>
+        <div class="g-score-bar"><span id="g-score">Score: &#8212;</span><span id="g-best"></span></div>
         <button class="g-modal-close" onclick="closeGModal()">&#x2715;</button>
       </div>
     </div>
     <div class="g-modal-body" id="g-modal-body"></div>
   </div>
 </div>
+
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -106,23 +115,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-window._db=db;window._fsColl=collection;window._fsDoc=doc;window._fsGetDocs=getDocs;window._fsGetDoc=getDoc;
+window._db=db;
+window._fsColl=collection;window._fsDoc=doc;window._fsGetDocs=getDocs;window._fsGetDoc=getDoc;
 window._fsSetDoc=setDoc;window._fsAddDoc=addDoc;window._fsDeleteDoc=deleteDoc;window._fsUpdateDoc=updateDoc;
 window._fsOnSnapshot=onSnapshot;window._fsServerTimestamp=serverTimestamp;window._fsQuery=query;window._fsOrderBy=orderBy;
 function fsDb(){return window._db;}
 
-/* ── Globals ── */
+/* ── Core globals needed by game code ── */
 var cu=null;
 var _credCache={};
 var CREDITS_MAX=10;
+var KC_PASS_PCT=80;
+var KC_Q_COUNT=10;
 var _currentGameId=null;
-var attendanceLog=[];var callouts=[];var perfData={};var TEAM=[];
+/* Stubs for things game code references but aren't needed here */
+var attendanceLog=[];var callouts=[];var perfData={};var TEAM=[];var AVATARS={};
+var allTimerSessions=[];var settings={use24h:false};
+function credRecalcFromUploads(){}
+function renderMyDay(){}
+function updateMemberBell(){}
 
-/* ── Utils ── */
+/* ── Utilities ── */
 function G(id){return document.getElementById(id);}
 function htmlEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function stripTags(s){var d=document.createElement('div');d.innerHTML=s||'';return d.textContent||'';}
 function avEl(nick,size){
-  var s=size||32;var i=(nick||'?').trim().split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  var s=size||32;
+  var i=(nick||'?').trim().split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
   return '<div style="width:'+s+'px;height:'+s+'px;border-radius:50%;background:linear-gradient(135deg,#8b2dff,#2d8bff);display:flex;align-items:center;justify-content:center;font-size:'+(s*0.35).toFixed(0)+'px;font-weight:700;color:#fff;flex-shrink:0">'+i+'</div>';
 }
 function getSydneyDate(){return new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));}
@@ -135,11 +154,12 @@ function updateCreditBadge(){
   el.textContent='🎮 '+c+' credit'+(c!==1?'s':'');
 }
 function showCreditToast(msg){
-  var t=document.createElement('div');t.className='g-toast';t.textContent=msg;t.style.animation='fadeUp .3s ease both';
+  var t=document.createElement('div');t.className='g-toast';t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(function(){t.style.transition='opacity .4s';t.style.opacity='0';setTimeout(function(){t.remove();},400);},2500);
 }
 async function credAward(nick,amount){
+  if(!nick&&cu)nick=cu.nickname;
   var state=Object.assign({},credGet(nick));
   state.credits=Math.min((state.credits||0)+amount,CREDITS_MAX);
   _credCache[nick]=state;
@@ -149,12 +169,13 @@ async function credAward(nick,amount){
 async function checkAndSpendCredit(){
   if(!cu)return false;
   var state=Object.assign({},credGet(cu.nickname));
-  if(!state.credits||state.credits<1){showCreditToast('Not enough credits — upload more to earn!');return false;}
+  if(!state.credits||state.credits<1){showCreditToast('Not enough credits! Upload more contracts to earn credits. 📤');return false;}
   state.credits=state.credits-1;
   _credCache[cu.nickname]=state;
   try{await window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',cu.nickname),state,{merge:true});}catch(e){}
   updateCreditBadge();return true;
 }
+/* Stubs used by game code */
 function _removeGameKeys(){}
 function gmSetScore(s){var el=G('g-score');if(el)el.textContent='Score: '+s;}
 function gsRecord(game,score,mode){
@@ -164,102 +185,117 @@ function gsRecord(game,score,mode){
     var best=snap.exists()?snap.data().best:null;
     var better=best===null||(mode==='low'?score<best:score>best);
     if(better){
-      window._fsSetDoc(window._fsDoc(fsDb(),'game_scores',key),{nick:cu.nickname,game:game,best:score,mode:mode},{merge:true});
+      window._fsSetDoc(window._fsDoc(fsDb(),'game_scores',key),{nick:cu.nickname,game:game,best:score,mode:mode,updatedAt:new Date().toISOString()},{merge:true});
       var el=G('g-best');if(el)el.textContent='Best: '+cu.nickname+' · '+score;
     }
   }).catch(function(){});
 }
 function unoRecordWin(nick){credAward(nick,2);showCreditToast('+2 credits earned! 🎮');}
-function unoRecordLoss(nick){}
-function credRecalcFromUploads(){}
+function unoRecordLoss(){}
+function pushNotif(){}
+function sendManagerDirectNotif(){}
+
+/* ── KB Quiz stubs — use full KB_QUESTIONS list ── */
+var KC_Q_COUNT=10;
 
 /* ── Modal ── */
-function closeGModal(){
+window.closeGModal=function(){
   _removeGameKeys();
   var m=G('g-modal');if(m)m.classList.remove('open');
   var b=G('g-modal-body');if(b)b.innerHTML='';
   if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
   if(window._unoTimerInterval){clearInterval(window._unoTimerInterval);window._unoTimerInterval=null;}
   if(window._unoUnsub){window._unoUnsub();window._unoUnsub=null;}
-}
-window.closeGModal=closeGModal;
-/* legacy aliases */
-window.closeGame=closeGModal;
-window.G=G;window.htmlEsc=htmlEsc;window.avEl=avEl;
-window.checkAndSpendCredit=checkAndSpendCredit;
-window.credAward=credAward;window.credGet=credGet;
-window.gmSetScore=gmSetScore;window.gsRecord=gsRecord;
+};
+/* legacy alias used by game code */
+window.closeGame=window.closeGModal;
+
+/* expose globals game code needs */
+window.G=G;window.htmlEsc=htmlEsc;window.avEl=avEl;window.stripTags=stripTags;
+window.cu=null;window.CREDITS_MAX=CREDITS_MAX;window.KC_PASS_PCT=KC_PASS_PCT;
+window.checkAndSpendCredit=checkAndSpendCredit;window.credAward=credAward;window.credGet=credGet;
+window.gmSetScore=gmSetScore;window.gsRecord=gsRecord;window.fsDb=fsDb;
 window.unoRecordWin=unoRecordWin;window.unoRecordLoss=unoRecordLoss;
 window.showCreditToast=showCreditToast;window.getSydneyDate=getSydneyDate;
-window.fsDb=fsDb;
+window.pushNotif=pushNotif;window.sendManagerDirectNotif=sendManagerDirectNotif;
+window.updateCreditBadge=updateCreditBadge;window._credCache=_credCache;
 
-async function openGModal(id){
-  if(!cu){showCreditToast('Not logged in — open the Portal first.');return;}
-  var GAME_INFO={
-    minesweeper:{label:'Minesweeper',emoji:'💣'},
-    wordguess:{label:'Word Guess',emoji:'📝'},
-    chess:{label:'Chess',emoji:'♟️'},
-    solitaire:{label:'Solitaire',emoji:'🂡'},
-    kbquizbattle:{label:'KB Quiz Battle',emoji:'🧩'},
-    uno:{label:'UNO',emoji:'🃏'},
-  };
-  var info=GAME_INFO[id];if(!info)return;
-  var ok=await checkAndSpendCredit();
-  if(!ok)return;
+/* ── Open game modal ── */
+var GAME_DEFS=[
+  {id:'minesweeper',emoji:'💣',label:'Minesweeper',type:'solo',desc:'Clear the board — choose difficulty'},
+  {id:'wordguess',emoji:'📝',label:'Word Guess',type:'solo',desc:'Guess the 5-letter word'},
+  {id:'chess',emoji:'♟️',label:'Chess',type:'solo',desc:'Play vs AI opponent'},
+  {id:'solitaire',emoji:'🂡',label:'Solitaire',type:'solo',desc:'Classic Klondike card game'},
+  {id:'kbquizbattle',emoji:'🧩',label:'KB Quiz Battle',type:'multi',desc:'First to 10 correct answers wins'},
+  {id:'uno',emoji:'🃏',label:'UNO',type:'multi',desc:'Classic card game — draw & match'},
+];
+
+window.openGModal=async function(id){
+  if(!cu){showCreditToast('Not signed in — open the Portal first.');return;}
+  var info=GAME_DEFS.find(function(g){return g.id===id;});if(!info)return;
+  var ok=await checkAndSpendCredit();if(!ok)return;
   _currentGameId=id;
   G('g-modal-title').textContent=info.emoji+' '+info.label;
   G('g-score').textContent='Score: —';G('g-best').textContent='';
-  var body=G('g-modal-body');body.innerHTML='<div style="padding:20px;text-align:center;color:var(--muted)">Loading...</div>';
+  var body=G('g-modal-body');
+  body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Loading…</div>';
   G('g-modal').classList.add('open');
   setTimeout(function(){
-    if(id==='minesweeper'){if(typeof initMinesweeper==='function')initMinesweeper(body);else body.innerHTML='<div style="padding:20px;color:var(--muted)">Minesweeper loading...</div>';}
-    else if(id==='wordguess'){if(typeof initWordGuess==='function')initWordGuess(body);}
-    else if(id==='chess'){if(typeof initChess==='function')initChess(body);}
-    else if(id==='solitaire'){if(typeof launchSolitaire==='function')launchSolitaire(body);}
-    else if(id==='kbquizbattle'){if(typeof initKBQuizBattle==='function')initKBQuizBattle(body);}
-    else if(id==='uno'){if(typeof unoInit==='function')unoInit(body);}
-  },50);
-}
-window.openGModal=openGModal;
+    if(id==='minesweeper'&&typeof initMinesweeper==='function')initMinesweeper(body);
+    else if(id==='wordguess'&&typeof initWordGuess==='function')initWordGuess(body);
+    else if(id==='chess'&&typeof initChess==='function')initChess(body);
+    else if(id==='solitaire'&&typeof launchSolitaire==='function')launchSolitaire(body);
+    else if(id==='kbquizbattle'&&typeof initKBQuizBattle==='function')initKBQuizBattle(body);
+    else if(id==='uno'&&typeof unoInit==='function')unoInit(body);
+    else body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Game loading failed. Try refreshing.</div>';
+  },80);
+};
 
 function renderGrid(){
-  var GAMES=[
-    {id:'minesweeper',emoji:'💣',label:'Minesweeper',type:'solo',desc:'Clear the board — choose difficulty'},
-    {id:'wordguess',emoji:'📝',label:'Word Guess',type:'solo',desc:'Guess the 5-letter word'},
-    {id:'chess',emoji:'♟️',label:'Chess',type:'solo',desc:'Play vs AI opponent'},
-    {id:'solitaire',emoji:'🂡',label:'Solitaire',type:'solo',desc:'Classic Klondike card game'},
-    {id:'kbquizbattle',emoji:'🧩',label:'KB Quiz Battle',type:'multi',desc:'First to 10 correct answers'},
-    {id:'uno',emoji:'🃏',label:'UNO',type:'multi',desc:'Classic card game — draw & match'},
-  ];
-  function tileHTML(g){
+  function tile(g){
     return '<div class="g-tile'+(g.type==='multi'?' multi':'')+'" onclick="openGModal(''+g.id+'')">'
       +'<div class="g-tile-icon">'+g.emoji+'</div>'
-      +'<div class="g-tile-name">'+g.label+'<span class="g-tile-badge '+(g.type==='solo'?'solo-b':'multi-b')+'">'+(g.type==='solo'?'Solo':'Multi')+'</span></div>'
+      +'<div class="g-tile-name">'+g.label
+      +'<span class="g-tile-badge '+(g.type==='solo'?'solo-b':'multi-b')+'">'+(g.type==='solo'?'Solo':'Multi')+'</span></div>'
       +'<div class="g-tile-desc">'+g.desc+'</div>'
       +'</div>';
   }
-  var sg=G('g-solo');if(sg)sg.innerHTML=GAMES.filter(function(g){return g.type==='solo';}).map(tileHTML).join('');
-  var mg=G('g-multi');if(mg)mg.innerHTML=GAMES.filter(function(g){return g.type==='multi';}).map(tileHTML).join('');
+  var sg=G('g-solo');if(sg)sg.innerHTML=GAME_DEFS.filter(function(g){return g.type==='solo';}).map(tile).join('');
+  var mg=G('g-multi');if(mg)mg.innerHTML=GAME_DEFS.filter(function(g){return g.type==='multi';}).map(tile).join('');
 }
 
-async function init(){
-  var nick=localStorage.getItem('lounge_nick')||sessionStorage.getItem('lounge_nick');
-  var full=localStorage.getItem('lounge_full')||sessionStorage.getItem('lounge_full');
-  var role=localStorage.getItem('lounge_role')||sessionStorage.getItem('lounge_role');
-  if(!nick){G('g-nologin').style.display='block';G('g-content').style.display='none';return;}
+/* ── Session init ── */
+async function initGamesPage(){
+  var nick=localStorage.getItem('lounge_nick');
+  var full=localStorage.getItem('lounge_full');
+  var role=localStorage.getItem('lounge_role');
+  if(!nick){
+    G('g-nologin').style.display='block';
+    G('g-content').style.display='none';
+    return;
+  }
   cu={nickname:nick,fullName:full||nick,role:role||'uploader'};
+  window.cu=cu;
+  /* Avatar initials */
   var av=G('g-av');
   if(av)av.textContent=(full||nick).trim().split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
   var gn=G('g-nick');if(gn)gn.textContent=full||nick;
-  if(fsDb()){
-    try{var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'player_credits',nick));if(snap.exists())_credCache[nick]=snap.data();}catch(e){}
-    window._fsOnSnapshot(window._fsDoc(fsDb(),'player_credits',nick),function(snap){if(snap.exists()){_credCache[nick]=snap.data();updateCreditBadge();}});
-  }
+  /* Load credits */
+  try{
+    var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'player_credits',nick));
+    if(snap.exists())_credCache[nick]=snap.data();
+  }catch(e){}
+  /* Real-time credit sync */
+  window._fsOnSnapshot(window._fsDoc(fsDb(),'player_credits',nick),function(snap){
+    if(snap.exists()){_credCache[nick]=snap.data();window._credCache=_credCache;updateCreditBadge();}
+  });
   updateCreditBadge();
   renderGrid();
 }
-init();
+initGamesPage();
 
+/* ── KB_QUESTIONS (needed for KB Quiz Battle) ── */
+}
 /* ══════════════════════════════════════════════════
    GAMES — Solo tiles + Multiplayer section
    ══════════════════════════════════════════════════ */
@@ -339,6 +375,8 @@ var KB_QUESTIONS=[
   {id:94,cat:"Process",q:"What is the maximum file size that can be uploaded to the system?",opts:["145MB","153MB","157MB","200MB"],ans:2,exp:"The maximum file size is 157MB. Files under this threshold can be uploaded."},
   {id:99,cat:"Process",q:"A vendor has a nickname (e.g., submission says Rob but contract says Robbie). What is the process?",opts:["Do not upload — names don't match.","Upload only if the escalation team approves first.","Upload and then flag to escalation.","Flag to escalation only, do not upload."],ans:2,exp:"Nicknames: upload first, then flag to escalation."},
   {id:100,cat:"Process",q:"Which is the complete and correct process for handling a submission with missing key pages?",opts:["Upload the partial document, flag to escalation, and leave a note.","DO NOT UPLOAD. Flag to escalation. Escalation team will contact the agent.","Contact the agent directly and wait for the corrected file.","Upload, contact the agent, and log the issue."],ans:1,exp:"Missing key pages: DO NOT UPLOAD. Flag to escalation. The escalation team handles agent communication."},
+
+/* ── Game engines ── */
 ];
 var KB_Q_TOTAL=KB_QUESTIONS.length;
 
@@ -3409,20 +3447,6 @@ async function kcShowBreakdown(){
   }).join('');
 
   var modal=G('modal-kc-breakdown');
-  if(!modal){
-    modal=document.createElement('div');
-    modal.id='modal-kc-breakdown';
-    modal.className='modal-overlay';
-    modal.innerHTML='<div class="modal" style="max-width:560px;padding:0">'
-      +'<div class="modal-header" style="padding:16px 20px"><span class="modal-title">📋 Knowledge Check Breakdown</span>'
-      +'<button class="modal-close" onclick="G(\'modal-kc-breakdown\').classList.remove(\'open\')">&times;</button></div>'
-      +'<div id="kc-breakdown-body" style="max-height:480px;overflow-y:auto"></div>'
-      +'</div>';
-    document.body.appendChild(modal);
-  }
-  G('kc-breakdown-body').innerHTML=rows||'<div style="padding:16px;color:var(--muted);font-size:12px">No breakdown available.</div>';
-  modal.classList.add('open');
-}
 </script>
 </body>
 </html>

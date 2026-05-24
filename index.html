@@ -2050,6 +2050,10 @@ function adminLoginAs(){
   var memberDir=TEAM_DIR[nick];
   if(!memberDir){err.textContent='Member not found.';return;}
   cu={nickname:nick,fullName:memberDir.fullName,role:memberDir.role,firstLogin:false};
+  /* Save session for games page — must happen at login, not just buildMain */
+  localStorage.setItem('lounge_nick',cu.nickname);
+  localStorage.setItem('lounge_full',cu.fullName);
+  localStorage.setItem('lounge_role',cu.role);
   G('scr-admin-select').classList.remove('active');
   G('scr-login').classList.add('active');
   G('inp-nick').value='';
@@ -8798,6 +8802,27 @@ async function sendAIMessage(){
       msgs.innerHTML+=aiKobyBubble('🔓 Test mode activated! I\'ve added <strong>'+toAdd+' free credits</strong> to your account. Have fun! 🎮<br><small style="color:var(--muted);font-size:10px">Note: This can only be used once per day.</small>');
       msgs.scrollTop=msgs.scrollHeight;
     })();
+    return;
+  }
+
+  /* ── SHORTCUT: "games" → open Game Corner in new tab ── */
+  if(/^games?$/i.test(text.trim())){
+    input.value='';input.style.height='auto';
+    var msgs=G('ai-messages');
+    if(msgs){
+      msgs.innerHTML+=aiKobyBubble('🎮 Opening Game Corner for you!');
+      msgs.scrollTop=msgs.scrollHeight;
+    }
+    setTimeout(function(){window.open('https://lounge-project-ae.netlify.app/games','_blank');},300);
+    return;
+  }
+
+  /* ── SHORTCUT: type 'games' (any case) → open Game Corner ── */
+  if(/^games?$/i.test(text.trim())){
+    input.value='';input.style.height='auto';
+    var msgs=G('ai-messages');
+    if(msgs){msgs.innerHTML+=aiKobyBubble('🎮 Opening Game Corner for you!');msgs.scrollTop=msgs.scrollHeight;}
+    setTimeout(function(){window.open('https://lounge-project-ae.netlify.app/games','_blank');},300);
     return;
   }
 
