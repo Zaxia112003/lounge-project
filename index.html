@@ -1793,7 +1793,7 @@ function initNickListener(){
 }
 /* ── ADMIN OVERRIDE CODE ── */
 var ADMIN_CODE='112003';
-var _adminTestMode=false; /* toggled via Koby — type 112003 to enable/disable */
+var _adminTestMode=false; /* legacy — no longer used */
 
 function handleLogin(){
   var raw=G('inp-nick').value.trim();
@@ -2008,6 +2008,9 @@ function setSbStatus(key){
   if(typeof renderMyTeam==='function'&&G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
 }
 function signOut(){
+  localStorage.removeItem('lounge_nick');
+  localStorage.removeItem('lounge_full');
+  localStorage.removeItem('lounge_role');
   fsStopListeners();
   cu=null;timerOn=false;clearInterval(timerIv);
   G('pg-dash').classList.remove('active');
@@ -2783,6 +2786,12 @@ function clearNotifs(){notifications=[];renderNotifs();}
 
 /* ── BUILD MAIN ── */
 function buildMain(){
+  /* Save session for games page */
+  if(cu){
+    localStorage.setItem('lounge_nick',cu.nickname);
+    localStorage.setItem('lounge_full',cu.fullName);
+    localStorage.setItem('lounge_role',cu.role);
+  }
   /* Subscribe to all Firestore game data collections */
   gameDataSubscribe();
   statusSubscribe();
@@ -3561,6 +3570,7 @@ function renderMyDay(){
     +'<div class="sect-head" style="padding:11px 14px 10px">'
     +'<div style="display:flex;align-items:center;gap:8px">'
     +'<span class="sect-title">&#127918; Games</span>'
+    +'<button onclick="window.open(\'https://lounge-project-ae.netlify.app/games\',\'_blank\')" style="font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid var(--accent);background:rgba(139,45,255,.1);color:#c084fc;cursor:pointer;font-weight:600">Open Game Corner &#8599;</button>'
     +(cu?'<div id="credit-badge" style="display:none;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;cursor:default"></div>':'')
     +'</div>'
     +'<div style="display:flex;align-items:center;gap:6px">'
@@ -4103,7 +4113,7 @@ function showCreditToast(msg){
 function checkAndSpendCredit(gameId){
   if(!cu)return false;
   if(cu.role==='manager')return true; /* manager plays free — uploads not tracked in perfData */
-  if(_adminTestMode)return true;
+  /* No free pass — credits always required */
   var c=credGet(cu.nickname).credits||0;
   if(c<CREDITS_COST){showNoCreditModal(gameId);return false;}
   return credSpend(cu.nickname);
@@ -8747,14 +8757,47 @@ async function sendAIMessage(){
 
   /* Silent admin test mode toggle */
   if(text.trim()==='112003'){
-    _adminTestMode=!_adminTestMode;
     input.value='';input.style.height='auto';
     var msgs=G('ai-messages');
-    if(msgs){
-      msgs.innerHTML+='<div class="ai-msg koby"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble">'+(_adminTestMode?'🔓 Test mode on — games are free.':'🔒 Test mode off.')+'</div></div>';
-      msgs.scrollTop=msgs.scrollHeight;
+    if(!msgs)return;
+    /* Check daily usage from Firestore */
+    var today=getSydneyDate().toISOString().slice(0,10);
+    var nick=cu?cu.nickname:'';
+    var TEST_CREDITS=3;
+    (async function(){
+      var usageKey='testCredit_'+nick;
+      var lastUsed=null,usedDate=null;
+      try{
+        if(fsDb()){
+          var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'adminTestUsage',nick));
+          if(snap.exists()){lastUsed=snap.data().date;usedDate=snap.data().date;}
+        }
+      }catch(e){lastUsed=localStorage.getItem(usageKey);}
+      if(lastUsed===today){
+        msgs.innerHTML+=aiKobyBubble('🔒 Sorry, you\'ve already used your free test credits today! Come back tomorrow, or upload more contracts to earn credits. 😊');
+        msgs.scrollTop=msgs.scrollHeight;
+        return;
+      }
+      /* Grant 3 credits */
+      var state=Object.assign({},credGet(nick));
+      var current=state.credits||0;
+      var toAdd=Math.min(TEST_CREDITS,CREDITS_MAX-current);
+      if(toAdd<=0){
+        msgs.innerHTML+=aiKobyBubble('🎮 You already have '+current+' credits — you\'re all set!');
+        msgs.scrollTop=msgs.scrollHeight;
+        return;
+      }
+      state.credits=current+toAdd;
+      _credCache[nick]=state;
+      if(fsDb()){
+        try{await window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true});}catch(e){}
+        try{await window._fsSetDoc(window._fsDoc(fsDb(),'adminTestUsage',nick),{date:today,nick:nick},{merge:true});}catch(e){}
+      }
+      localStorage.setItem(usageKey,today);
       updateCreditBadge();
-    }
+      msgs.innerHTML+=aiKobyBubble('🔓 Test mode activated! I\'ve added <strong>'+toAdd+' free credits</strong> to your account. Have fun! 🎮<br><small style="color:var(--muted);font-size:10px">Note: This can only be used once per day.</small>');
+      msgs.scrollTop=msgs.scrollHeight;
+    })();
     return;
   }
 
