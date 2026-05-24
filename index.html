@@ -2509,7 +2509,11 @@ async function discardReview(){
   }
   thread.status='discarded';
   if(thread._fsId){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}catch(e){}}
-  if(co&&co._fsId&&fsDb()){try{window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));}catch(e){}var ci=callouts.indexOf(co);if(ci>-1)callouts.splice(ci,1);}
+  /* Mark callout as discarded — do NOT delete it permanently so it can be audited */
+  if(co&&co._fsId&&fsDb()){
+    try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'discarded'});}catch(e){}
+  }
+  if(co){co.status='discarded';}
   G('modal-error-review').classList.remove('open');
   G('modal-reviews').classList.remove('open');
   updateReviewBadge();
@@ -8164,7 +8168,13 @@ function renderMgrHubPerformance(){
     var inShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
     var offShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
     var avgDaily=days.length?(totalUploads/days.length):null;
-    var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&(c.type==='qesc'||c.type==='qesc_esc')&&mgrHubInRange(c.date)&&c.status!=='discarded';}).length;
+    var qualEsc=callouts.filter(function(c){
+      if(!(c.type==='qesc'||c.type==='qesc_esc'))return false;
+      if(c.status==='discarded')return false;
+      if(!mgrHubInRange(c.date))return false;
+      /* Match by any field that could hold this member's nick */
+      return c.uploader===nick||c.escalationMember===nick||c.uploader===m.fullName||c.escalationMember===m.fullName;
+    }).length;
     var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&mgrHubInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
     var qScore=totalUploads>0?((totalUploads-errors-qualEsc)/totalUploads*100):null;
     return {m:m,nick:nick,totalUploads:totalUploads,inShift:inShift,offShift:offShift,avgDaily:avgDaily,qualEsc:qualEsc,errors:errors,qScore:qScore};
@@ -8227,7 +8237,12 @@ function renderMgrHubPerformance(){
     var memberSecs=(allTimerSessions||[]).filter(function(s){return s.nick===nick&&mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
     var memberHrs=memberSecs/3600;
     var rate=memberHrs>0?(uplTotal/memberHrs):null;
-    var qualEsc=callouts.filter(function(c){return (c.uploader===nick||c.escalationMember===nick)&&c.type==='qesc'&&mgrHubInRange(c.date);}).length;
+    var qualEsc=callouts.filter(function(c){
+      if(!(c.type==='qesc'||c.type==='qesc_esc'))return false;
+      if(c.status==='discarded')return false;
+      if(!mgrHubInRange(c.date))return false;
+      return c.uploader===nick||c.escalationMember===nick||c.uploader===m.fullName||c.escalationMember===m.fullName;
+    }).length;
     return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,memberHrs:memberHrs,qualEsc:qualEsc};
   });
 
@@ -8442,19 +8457,17 @@ async function qualRemoveError(calloutId,nick,fullName){
   /* Remove from local first */
   var ci=callouts.indexOf(co);
   if(ci>-1)callouts.splice(ci,1);
-  /* Delete from Firestore */
+  /* Delete from Firestore — only by exact _fsId, no scanning */
   if(fsDb()){
-    var deleted=false;
     if(co._fsId){
-      try{await window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));deleted=true;}catch(e){console.warn('qualRemove fsId',e);}
-    }
-    if(!deleted){
-      /* Scan callouts collection for matching doc */
+      try{await window._fsDeleteDoc(window._fsDoc(fsDb(),'callouts',co._fsId));}catch(e){console.warn('qualRemove fsId',e);}
+    } else {
+      /* No _fsId — try scanning but with strict equality only */
       try{
         var snap=await window._fsGetDocs(window._fsColl(fsDb(),'callouts'));
         snap.forEach(function(d){
           var data=d.data();
-          if(String(data.id)===String(calloutId)||d.id===co._fsId){
+          if(String(data.id)===String(calloutId)&&data.uploader===co.uploader&&data.date===co.date){
             window._fsDeleteDoc(d.ref);
           }
         });
@@ -8701,8 +8714,16 @@ function aiTimestamp(){
   return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
 }
 
+function sanitizeKobyResponse(text){
+  if(!text)return text;
+  /* Strip anchor tags that link to internal paths (like /rpg) — keep the link text */
+  return text.replace(/<a\s[^>]*href=['"]\/[^'"]*['"][^>]*>([\s\S]*?)<\/a>/gi,function(match,inner){return inner;})
+    /* Also remove any modal/popup triggers for internal URLs */
+    .replace(/href=['"](?:https?:\/\/lounge-project[^'"]*|\/[^'"#][^'"]*)['"](\s*target=['"][^'"]*['"])?/gi,'href="#"');
+}
+
 function aiKobyBubble(text){
-  return '<div class="ai-msg koby"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble">'+text+'<div class="ai-msg-time">'+aiTimestamp()+'</div></div></div>';
+  return '<div class="ai-msg koby"><div class="ai-msg-avatar">🐸</div><div class="ai-bubble">'+sanitizeKobyResponse(text)+'<div class="ai-msg-time">'+aiTimestamp()+'</div></div></div>';
 }
 
 function aiUserBubble(text){
