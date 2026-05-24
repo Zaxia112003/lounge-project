@@ -1,5 +1,6 @@
 [build]
   publish = "."
+  command = ""
 
 [[redirects]]
   from = "/games"
@@ -14,9 +15,4 @@
 [[headers]]
   for = "/*.html"
     [headers.values]
-    Cache-Control = "no-cache"
-
-[[headers]]
-  for = "/games.html"
-    [headers.values]
-    Cache-Control = "no-cache"
+    Cache-Control = "no-cache, no-store, must-revalidate"
