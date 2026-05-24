@@ -229,7 +229,7 @@ var KB_Q_TOTAL=KB_QUESTIONS.length;
 /* ═══════════════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════════════ */
-var cu=null, credits=0, musicOn=false, musicVol=0.22;
+var cu=null, credits=0, creditsLoaded=false, musicOn=false, musicVol=0.22;
 var audioCtx=null, musicNodes=[], musicTimer=null, currentGame=null;
 
 /* ═══════════════════════════════════════════════════
@@ -249,9 +249,18 @@ function updateCreditUI(){
   var el=G('credit-pill');if(el)el.textContent='🎮 '+credits+' credit'+(credits!==1?'s':'');
 }
 function spendCredit(cb){
-  if(!cu){toast('Not signed in.');return;}
+  if(!cu){toast('Not signed in — open the Portal first.');return;}
   if(cu.role==='manager'){cb();return;}
-  if(credits<1){toast('Not enough credits! Upload more in the Portal.');return;}
+  /* If credits not loaded yet, load fresh then spend */
+  if(!creditsLoaded){
+    db.collection('player_credits').doc(cu.nickname).get().then(function(snap){
+      credits=snap.exists?(snap.data().credits||0):0;
+      creditsLoaded=true;updateCreditUI();
+      spendCredit(cb);
+    }).catch(function(){cb();});/* on error just allow */
+    return;
+  }
+  if(credits<1){toast('Not enough credits! Earn more by uploading contracts in the Portal.');return;}
   credits--;updateCreditUI();
   db.collection('player_credits').doc(cu.nickname).set({credits:credits},{merge:true}).catch(function(){});
   cb();
@@ -398,7 +407,8 @@ function init(){
   G('user-av').textContent=(full||nick).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
   G('user-nick').textContent=full||nick;
   db.collection('player_credits').doc(nick).onSnapshot(function(snap){
-    credits=snap.exists?(snap.data().credits||0):0;updateCreditUI();
+    credits=snap.exists?(snap.data().credits||0):0;
+    creditsLoaded=true;updateCreditUI();
   });
   renderGrid();
   function fg(){startMusic();document.removeEventListener('click',fg);document.removeEventListener('keydown',fg);}
