@@ -119,9 +119,18 @@ button{font-family:inherit}
         <button class="g-modal-close" onclick="closeGModal()">✕</button>
       </div>
     </div>
-    <div class="g-modal-body" id="g-modal-body"></div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 18px 0 0;flex-shrink:0;display:none">
+      <span id="gm-score-bar"></span>
+    </div>
+    <div class="g-modal-body" id="g-modal-body">
+      <div id="game-modal-body" style="display:contents">
+        <div id="game-modal-title" style="display:none"></div>
+      </div>
+    </div>
   </div>
 </div>
+<!-- game-modal alias — game engine checks G('game-modal') -->
+<div id="game-modal" style="display:none"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc, deleteDoc, updateDoc, onSnapshot, serverTimestamp, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -143,13 +152,30 @@ function fsDb(){return window._db;}
 
 /* ── Globals ── */
 var cu=null;var _credCache={};var CREDITS_MAX=10;var KC_PASS_PCT=80;var KC_Q_COUNT=10;
+var _adminTestMode=false; /* required by game engine checkAndSpendCredit */
 var _currentGameId=null;
 var attendanceLog=[];var callouts=[];var perfData={};var TEAM=[];var AVATARS={};
 var allTimerSessions=[];var settings={use24h:false};var _pwAutoplayOn=false;
 var pwPhotos=[];var mdAnnouncements=[];var mgrSelectMode=false;
 
 /* ── Utils ── */
-function G(id){return document.getElementById(id);}
+function G(id){
+  /* Redirect game engine modal IDs to our g-modal elements */
+  if(id==='game-modal')return document.getElementById('g-modal');
+  if(id==='game-modal-body')return document.getElementById('g-modal-body');
+  if(id==='game-modal-title')return document.getElementById('g-modal-title');
+  if(id==='gm-score-bar'){var el=document.getElementById('g-score');return el||null;}
+  if(id==='gm-cur-score')return document.getElementById('g-score');
+  if(id==='gm-canvas-wrap'){
+    /* Return or create the canvas wrap inside g-modal-body */
+    var wrap=document.getElementById('gm-canvas-wrap');
+    if(wrap)return wrap;
+    var body=document.getElementById('g-modal-body');
+    if(body){var w=document.createElement('div');w.id='gm-canvas-wrap';body.appendChild(w);return w;}
+    return null;
+  }
+  return document.getElementById(id);
+}
 function htmlEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function stripTags(s){var d=document.createElement('div');d.innerHTML=s||'';return d.textContent||'';}
 function avEl(nick,size){
@@ -157,7 +183,7 @@ function avEl(nick,size){
   var i=(nick||'?').trim().split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
   return '<div style="width:'+s+'px;height:'+s+'px;border-radius:50%;background:linear-gradient(135deg,#8b2dff,#2d8bff);display:flex;align-items:center;justify-content:center;font-size:'+Math.round(s*0.35)+'px;font-weight:700;color:#fff;flex-shrink:0">'+i+'</div>';
 }
-/* getSydneyDate defined in game engine */ // function getSydneyDate(){return new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));}
+function getSydneyDate(){try{var d=new Date();var s=d.toLocaleString('en-US',{timeZone:'Australia/Sydney'});return new Date(s);}catch(e){return new Date();}}
 
 /* ── Chill 8-bit music via Web Audio API ── */
 var _audioCtx=null,_musicOn=false,_musicNodes=[],_musicLoop=null,_musicVol=0.25;
@@ -204,15 +230,18 @@ window.toggleSoundPanel=function(){
 
 /* ── Modal ── */
 window.closeGModal=function(){
-  if(window._removeGameKeys)window._removeGameKeys();
+  if(typeof _removeGameKeys==='function')_removeGameKeys();
   var m=G('g-modal');if(m)m.classList.remove('open');
   var b=G('g-modal-body');if(b)b.innerHTML='';
+  /* Also call game engine close */
+  if(typeof closeGame==='function'&&closeGame!==window.closeGModal)closeGame();
   if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
   if(window._unoTimerInterval){clearInterval(window._unoTimerInterval);window._unoTimerInterval=null;}
   if(window._unoUnsub){window._unoUnsub();window._unoUnsub=null;}
   setTimeout(function(){if(!_musicOn)startMusic();},300);
 };
-window.closeGame=window.closeGModal;
+/* closeGame will be overwritten by game engine — save our version first */
+var _ourCloseGModal=window.closeGModal;
 
 /* ── Game tiles ── */
 var GAME_DEFS=[
@@ -236,27 +265,19 @@ function renderGrid(){
 }
 
 /* ── Open game ── */
-window.openGModal=async function(id){
-  if(!cu){var st=window.showCreditToast||function(m){alert(m);};st('Not signed in — open the Portal first.');return;}
-  var info=GAME_DEFS.find(function(g){return g.id===id;});if(!info)return;
-  var spend=window.checkAndSpendCredit||checkAndSpendCredit;
-  var ok=await spend();if(!ok)return;
-  _currentGameId=id;
-  G('g-modal-title').textContent=info.emoji+' '+info.label;
-  G('g-score').textContent='Score: —';G('g-best').textContent='';
-  var body=G('g-modal-body');
-  body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Loading…</div>';
-  G('g-modal').classList.add('open');
+window.openGModal=function(id){
+  if(!cu){alert('Not signed in — open the Portal first.');return;}
   if(_musicOn)stopMusic();
+  G('g-modal').classList.add('open');
+  G('g-modal-body').innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:13px">Loading…</div>';
   setTimeout(function(){
-    if(id==='minesweeper'&&typeof initMinesweeper==='function')initMinesweeper(body);
-    else if(id==='wordguess'&&typeof initWordGuess==='function')initWordGuess(body);
-    else if(id==='chess'&&typeof initChess==='function')initChess(body);
-    else if(id==='solitaire'&&typeof launchSolitaire==='function')launchSolitaire(body);
-    else if(id==='kbquizbattle'&&typeof initKBQuizBattle==='function')initKBQuizBattle(body);
-    else if(id==='uno'&&typeof unoInit==='function')unoInit(body);
-    else body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Game unavailable. Try refreshing.</div>';
-  },80);
+    /* Use the game engine's openGame() which handles credits, canvas wrap, score bar */
+    if(typeof openGame==='function'){
+      openGame(id);
+    } else {
+      G('g-modal-body').innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Game unavailable.</div>';
+    }
+  },50);
 };
 
 /* ── Init ── */
@@ -280,13 +301,37 @@ initGamesPage();
 
 /* ── expose globals for game engine ── */
 window.G=G;window.htmlEsc=htmlEsc;window.avEl=avEl;window.stripTags=stripTags;
-window.fsDb=fsDb;window.getSydneyDate=getSydneyDate;
+window.fsDb=fsDb;
 window.CREDITS_MAX=CREDITS_MAX;window.KC_PASS_PCT=KC_PASS_PCT;window.KC_Q_COUNT=KC_Q_COUNT;
 window.pushNotif=function(){};window.sendManagerDirectNotif=function(){};
 window.renderMyDay=function(){};window.updateMemberBell=function(){};
 window._credCache=_credCache;window.TEAM=TEAM;window.AVATARS=AVATARS;
 
 /* ── KB Questions ── */
+
+/* ── Post-load patch: override closeGame + credit badge after game engine initializes ── */
+setTimeout(function(){
+  window.closeGame=function(){
+    if(typeof _removeGameKeys==='function')_removeGameKeys();
+    var m=document.getElementById('g-modal');if(m)m.classList.remove('open');
+    var b=document.getElementById('g-modal-body');if(b)b.innerHTML='';
+    if(window._snakeInterval){clearInterval(window._snakeInterval);window._snakeInterval=null;}
+    if(window._unoTimerInterval){clearInterval(window._unoTimerInterval);window._unoTimerInterval=null;}
+    if(window._unoUnsub){window._unoUnsub();window._unoUnsub=null;}
+    setTimeout(function(){if(!_musicOn)startMusic();},300);
+  };
+  window.closeGModal=window.closeGame;
+  /* Update credit badge to use g-credits header element */
+  var origUCB=window.updateCreditBadge;
+  window.updateCreditBadge=function(){
+    if(typeof origUCB==='function')origUCB();
+    var el=document.getElementById('g-credits');
+    if(el&&cu){
+      var c=(window._credCache&&window._credCache[cu.nickname]&&window._credCache[cu.nickname].credits)||0;
+      el.textContent='\uD83C\uDFAE '+c+' credit'+(c!==1?'s':'');
+    }
+  };
+},300);
 
 var KB_QUESTIONS=[
   {id:1,cat:"Address",q:"The submission shows the address as 10 Smith Street but the contract reads 10 Smith St. What do you do?",opts:["Do not upload. Flag to escalation.","Proceed as normal — it is the same address.","Contact the agent before doing anything.","Upload and leave a note for tagging."],ans:1,exp:"Different street designator formats (Street vs St) represent the same address. Proceed normally."},
