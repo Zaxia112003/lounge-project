@@ -4861,12 +4861,14 @@ function renderMgrKCSummaryCard(){
       var isTaken=r.best?'1':'0';
       return '<div class="kc-mgr-row" data-nick="'+r.nick+'" data-passed="'+isPassed+'" data-taken="'+isTaken+'"'
         +' style="cursor:'+(r.best&&r.best.answers?'pointer':'default')+';flex-wrap:wrap" '
-        +(r.best&&r.best.answers?'onclick="var el=G(\''+brkId+'\');if(el)el.style.display=el.style.display===\'none\'?\'block\':\'none\'"':'')+'>'  
+        +(r.best&&r.best.answers?'onclick="var el=G(\''+brkId+'\');if(el){el.style.display=el.style.display===\'none\'?\'block\':\'none\';}"':'')+'>'
+        +'<div style="font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.fullName+'</div>'
         +'<div>'+statusDot+statusLabel+'</div>'
         +'<div style="color:var(--text);font-weight:600">'+scoreStr+'</div>'
         +'<div style="color:var(--muted)">'+r.attempts.length+'/2 attempts</div>'
         +'<div style="color:var(--muted);font-size:10px">'+(r.best?r.best.date:'—')+'</div>'
-        +breakdown+'</div>';
+        +'</div>'
+        +(breakdown?'<div style="margin:-1px 0 0;border-bottom:1px solid var(--border)">'+breakdown.replace('<div id="'+brkId+'" style="display:none;grid-column:1/-1;padding:8px 14px 10px;background:var(--bg3);border-top:1px solid var(--border)">','<div id="'+brkId+'" style="display:none;padding:8px 14px 10px;background:var(--bg3)">').replace('</div></div>','</div></div>')+'</div>':'');
     }).join('')
     +'</div></div>';
 }
@@ -5603,6 +5605,7 @@ function submitAddArticle(){
       fsSaveAnnouncement(newAnn);
       renderAnnouncements();
       annUpdateBadge();
+      pushNotif('📢','New announcement from '+cu.fullName+': "'+title+'"','ann');
     } else if(type==='kb'||type==='tmpl'||type==='faq'){
       /* Save to Firestore articles collection */
       var artId='art_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6));
