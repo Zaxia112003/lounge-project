@@ -644,249 +644,213 @@ function gameSolitaire(C){
   function isRed(s){return RED.includes(s);}
   function vi(v){return VALS.indexOf(v);}
   function canStack(c,on){return on?isRed(c.s)!==isRed(on.s)&&vi(c.v)===vi(on.v)-1:vi(c.v)===12;}
-  function canFound(c,pile){return pile.length?pile[pile.length-1].s===c.s&&vi(c.v)===vi(pile[pile.length-1].v)+1:c.v==='A';}
+  function canFound(c,f){return f.length?f[f.length-1].s===c.s&&vi(c.v)===vi(f[f.length-1].v)+1:c.v==='A';}
 
-  var deck=[],stock=[],waste=[],foundation=[[],[],[],[]],tableau=[[],[],[],[],[],[],[]],moves=0;
-  /* Selection state */
-  var sel=null; /* {src:'waste'|'tab', tabIdx:N, cardIdx:N} */
+  var deck=[],stock=[],waste=[],found=[[],[],[],[]],tab=[[],[],[],[],[],[],[]],moves=0,sel=null;
 
   function deal(){
     deck=[];
     SUITS.forEach(function(s){VALS.forEach(function(v){deck.push({s:s,v:v,up:false});});});
     deck.sort(function(){return Math.random()-.5;});
-    foundation=[[],[],[],[]];
-    for(var i=0;i<7;i++){tableau[i]=deck.splice(0,i+1);tableau[i][i].up=true;}
-    stock=deck.splice(0);waste=[];moves=0;sel=null;
+    found=[[],[],[],[]];tab=[[],[],[],[],[],[],[]];
+    for(var i=0;i<7;i++){tab[i]=deck.splice(0,i+1);tab[i][i].up=true;}
+    stock=deck.slice();deck=[];waste=[];moves=0;sel=null;
   }
 
-  function autoFoundation(){
-    /* Try to move top tableau/waste cards to foundation */
-    var moved=true;
-    while(moved){
-      moved=false;
-      /* waste top */
-      if(waste.length){
-        var wc=waste[waste.length-1];
-        var fi=foundation.findIndex(function(f){return canFound(wc,f);});
-        if(fi>=0){foundation[fi].push(waste.pop());moves++;moved=true;SND.card();continue;}
-      }
-      /* tableau tops */
-      for(var ti=0;ti<7;ti++){
-        if(!tableau[ti].length)continue;
-        var tc=tableau[ti][tableau[ti].length-1];
-        if(!tc.up)continue;
-        var fi2=foundation.findIndex(function(f){return canFound(tc,f);});
-        if(fi2>=0){foundation[fi2].push(tableau[ti].pop());if(tableau[ti].length)tableau[ti][tableau[ti].length-1].up=true;moves++;moved=true;SND.card();break;}
-      }
-    }
-  }
-
-  function checkWin(){
-    return foundation.every(function(f){return f.length===13;});
-  }
-
-  function getSelected(){
+  function selCards(){
     if(!sel)return null;
     if(sel.src==='waste')return waste.length?[waste[waste.length-1]]:null;
-    if(sel.src==='tab'){
-      var pile=tableau[sel.tabIdx];
-      return pile.slice(sel.cardIdx);
-    }
-    return null;
+    return tab[sel.ti].slice(sel.ci);
   }
 
-  function clearSel(){sel=null;}
-
-  function tryMoveToTab(toIdx){
-    if(!sel)return false;
-    var cards=getSelected();
+  function moveToTab(ti){
+    var cards=selCards();
     if(!cards||!cards.length)return false;
-    var pile=tableau[toIdx];
-    var top=pile.length?pile[pile.length-1]:null;
-    if(!canStack(cards[0],top))return false;
-    /* Move cards */
-    if(sel.src==='waste'){
-      waste.pop();
-      pile.push(cards[0]);
-    } else {
-      var fromPile=tableau[sel.tabIdx];
-      var moved=fromPile.splice(sel.cardIdx);
-      moved.forEach(function(c){pile.push(c);});
-      if(fromPile.length&&!fromPile[fromPile.length-1].up){
-        fromPile[fromPile.length-1].up=true;
-      }
+    var pile=tab[ti];
+    var pTop=pile.length?pile[pile.length-1]:null;
+    if(!canStack(cards[0],pTop))return false;
+    if(sel.src==='waste'){waste.pop();pile.push(cards[0]);}
+    else{
+      var fp=tab[sel.ti];
+      fp.splice(sel.ci).forEach(function(c){pile.push(c);});
+      if(fp.length&&!fp[fp.length-1].up)fp[fp.length-1].up=true;
     }
-    moves++;SND.card();clearSel();
-    return true;
+    moves++;SND.card();sel=null;return true;
   }
 
-  function tryMoveToFoundation(toIdx){
-    if(!sel)return false;
-    var cards=getSelected();
+  function moveToFound(fi){
+    var cards=selCards();
     if(!cards||cards.length!==1)return false;
     var c=cards[0];
-    var pile=foundation[toIdx];
-    if(!canFound(c,pile))return false;
+    if(!canFound(c,found[fi]))return false;
     if(sel.src==='waste'){waste.pop();}
-    else{
-      var fromPile=tableau[sel.tabIdx];
-      fromPile.pop();
-      if(fromPile.length&&!fromPile[fromPile.length-1].up)fromPile[fromPile.length-1].up=true;
-    }
-    pile.push(c);moves++;SND.card();clearSel();
-    return true;
+    else{var fp=tab[sel.ti];fp.pop();if(fp.length&&!fp[fp.length-1].up)fp[fp.length-1].up=true;}
+    found[fi].push(c);moves++;SND.card();sel=null;return true;
   }
 
-  function render(){
-    var wrap=document.createElement('div');
-
-    /* Stock + Waste + Foundation */
-    var top=document.createElement('div');top.style.cssText='display:flex;gap:8px;margin-bottom:12px;align-items:flex-end;flex-wrap:wrap';
-
-    /* Stock */
-    var stockEl=document.createElement('div');stockEl.style.cursor='pointer';
-    stockEl.appendChild(stock.length?mkCard({up:false},40,56):mkEmpty(40,56,'↺'));
-    stockEl.onclick=function(){
-      SND.card();clearSel();
-      if(!stock.length){stock=waste.slice().reverse();waste=[];stock.forEach(function(c){c.up=false;});}
-      else{var c=stock.pop();c.up=true;waste.push(c);}
-      moves++;render();
-    };
-    top.appendChild(stockEl);
-
-    /* Waste */
-    var wasteEl=document.createElement('div');
-    wasteEl.style.cssText='cursor:pointer;position:relative';
-    if(waste.length){
-      var wc=waste[waste.length-1];
-      var wcEl=mkCard(wc,40,56);
-      var isSelWaste=sel&&sel.src==='waste';
-      if(isSelWaste)wcEl.style.outline='2px solid var(--accent)';
-      wcEl.onclick=function(){
-        if(isSelWaste){clearSel();render();return;}
-        clearSel();sel={src:'waste'};render();
-      };
-      wasteEl.appendChild(wcEl);
-    } else {
-      wasteEl.appendChild(mkEmpty(40,56));
-    }
-    top.appendChild(wasteEl);
-
-    /* Spacer */
-    var sp=document.createElement('div');sp.style.width='16px';top.appendChild(sp);
-
-    /* Foundation */
-    foundation.forEach(function(f,fi){
-      var fe=document.createElement('div');fe.style.cursor='pointer';
-      var topCard=f.length?f[f.length-1]:null;
-      var fEl=topCard?mkCard(topCard,40,56):mkEmpty(40,56,SUITS[fi]);
-      fe.appendChild(fEl);
-      fe.onclick=function(){
-        if(sel){
-          if(tryMoveToFoundation(fi)){render();autoFoundation();if(checkWin()){SND.win();setScore(moves+' moves');saveScore('solitaire',moves,false);}render();return;}
-          clearSel();render();return;
-        }
-        /* Select foundation top to move back (optional) */
-      };
-      top.appendChild(fe);
-    });
-
-    wrap.appendChild(top);
-
-    /* Tableau */
-    var tab=document.createElement('div');tab.style.cssText='display:flex;gap:6px;align-items:flex-start;overflow-x:auto';
-    tableau.forEach(function(pile,ti){
-      var col=document.createElement('div');col.style.cssText='min-width:44px;flex-shrink:0;position:relative';
-
-      if(!pile.length){
-        var emptyCol=mkEmpty(40,56);
-        emptyCol.style.cursor='pointer';
-        emptyCol.onclick=function(){
-          if(sel){if(tryMoveToTab(ti)){render();return;}clearSel();render();}
-        };
-        col.appendChild(emptyCol);
-      } else {
-        var inner=document.createElement('div');
-        inner.style.cssText='position:relative;height:'+(pile.length*22+56)+'px';
-
-        pile.forEach(function(c,ci){
-          var isTop=ci===pile.length-1;
-          var isSelCard=sel&&sel.src==='tab'&&sel.tabIdx===ti&&ci>=sel.cardIdx;
-          var ce=mkCard(c,40,56);
-          ce.style.cssText+=';position:absolute;top:'+(ci*22)+'px;left:0;z-index:'+(ci+1);
-          if(isSelCard)ce.style.outline='2px solid var(--accent)';
-
-          (function(card,colIdx,cardIdx,isTopCard){
-            ce.onclick=function(e){
-              e.stopPropagation();
-              /* Clicking a face-down card — flip if it's the top */
-              if(!card.up){
-                if(isTopCard){card.up=true;moves++;SND.card();clearSel();render();}
-                return;
-              }
-              /* If something is selected — try to move onto this col */
-              if(sel){
-                /* Clicking within same column below selection — deselect */
-                if(sel.src==='tab'&&sel.tabIdx===colIdx&&cardIdx>=sel.cardIdx){clearSel();render();return;}
-                /* Try to move selected onto this column's top */
-                var destTop=pile[pile.length-1];
-                if(canStack(getSelected()[0],isTopCard?null:destTop)){
-                  if(tryMoveToTab(colIdx)){render();return;}
-                }
-                /* Otherwise re-select this card */
-                clearSel();
-              }
-              /* Select this card and cards below it */
-              sel={src:'tab',tabIdx:colIdx,cardIdx:cardIdx};
-              render();
-            };
-          })(c,ti,ci,isTop);
-
-          inner.appendChild(ce);
-        });
-
-        /* Click on column background = try to move there */
-        inner.onclick=function(){
-          if(sel&&sel.tabIdx!==ti){if(tryMoveToTab(ti)){render();return;}clearSel();render();}
-        };
-        col.appendChild(inner);
+  function autoFound(){
+    var again=true;
+    while(again){
+      again=false;
+      if(waste.length){var w=waste[waste.length-1];var fi=found.findIndex(function(f){return canFound(w,f);});if(fi>=0){found[fi].push(waste.pop());moves++;again=true;SND.card();continue;}}
+      for(var i=0;i<7;i++){
+        if(!tab[i].length)continue;
+        var tc=tab[i][tab[i].length-1];if(!tc.up)continue;
+        var fi2=found.findIndex(function(f){return canFound(tc,f);});
+        if(fi2>=0){found[fi2].push(tab[i].pop());if(tab[i].length)tab[i][tab[i].length-1].up=true;moves++;again=true;SND.card();break;}
       }
-      tab.appendChild(col);
-    });
-    wrap.appendChild(tab);
-
-    /* Info row */
-    var info=document.createElement('div');info.style.cssText='display:flex;align-items:center;gap:10px;margin-top:10px;font-size:11px;color:var(--muted)';
-    info.textContent='Moves: '+moves;
-    var autoBtn=document.createElement('button');autoBtn.className='btn btn-outline';autoBtn.style.cssText='font-size:10px;padding:3px 10px';autoBtn.textContent='Auto-finish';
-    autoBtn.onclick=function(){autoFoundation();if(checkWin()){SND.win();setScore(moves+' moves');saveScore('solitaire',moves,false);}render();};
-    info.appendChild(autoBtn);
-    var nb=document.createElement('button');nb.className='btn btn-outline';nb.style.cssText='font-size:11px;padding:4px 12px';nb.textContent='New Game';
-    nb.onclick=function(){deal();SND.card();render();};
-    info.appendChild(nb);
-    wrap.appendChild(info);
-
-    C.innerHTML='';C.appendChild(wrap);
+    }
   }
 
   function mkCard(c,w,h){
     var d=document.createElement('div');
     if(!c.up){
-      d.style.cssText='width:'+w+'px;height:'+h+'px;background:linear-gradient(135deg,#2a2d4a,#1e2035);border:1px solid #3a3d5a;border-radius:6px;flex-shrink:0';
+      d.style.cssText='width:'+w+'px;height:'+h+'px;background:linear-gradient(135deg,#3a3d6a,#1e2035);border:1px solid #4a4d7a;border-radius:6px;flex-shrink:0;cursor:default';
       return d;
     }
-    d.style.cssText='width:'+w+'px;height:'+h+'px;background:#fff;border:1px solid #d0d0d0;border-radius:6px;'
-      +'display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;'
-      +'font-size:12px;font-weight:700;color:'+(isRed(c.s)?'#e00':'#111')+';flex-shrink:0;cursor:pointer;user-select:none;box-shadow:0 1px 3px rgba(0,0,0,.15)';
-    d.innerHTML='<div style="line-height:1">'+c.v+'<br><span style="font-size:14px">'+c.s+'</span></div>';
+    d.style.cssText='width:'+w+'px;height:'+h+'px;background:#fff;border:1px solid #ccc;border-radius:6px;'
+      +'display:flex;flex-direction:column;justify-content:space-between;padding:2px 3px;'
+      +'font-size:11px;font-weight:700;color:'+(isRed(c.s)?'#d00':'#111')+';'
+      +'flex-shrink:0;cursor:pointer;user-select:none;box-shadow:0 1px 3px rgba(0,0,0,.2);overflow:hidden';
+    d.innerHTML='<div style="line-height:1.1;font-size:10px">'+c.v+'<br>'+c.s+'</div>'
+      +'<div style="line-height:1.1;font-size:10px;align-self:flex-end;transform:rotate(180deg)">'+c.v+'<br>'+c.s+'</div>';
     return d;
   }
 
-  function mkEmpty(w,h,suit){
+  function mkEmpty(w,h,label){
     var d=document.createElement('div');
-    d.style.cssText='width:'+w+'px;height:'+h+'px;border:2px dashed #3a3d5a;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted)';
-    if(suit)d.textContent=suit;
+    d.style.cssText='width:'+w+'px;height:'+h+'px;border:2px dashed #3a3d5a;border-radius:6px;'
+      +'display:flex;align-items:center;justify-content:center;font-size:16px;color:#4a4d6a;cursor:pointer';
+    if(label)d.textContent=label;
     return d;
+  }
+
+  function render(){
+    var wrap=document.createElement('div');
+
+    /* ── TOP ROW: stock / waste / gap / foundations ── */
+    var topRow=document.createElement('div');
+    topRow.style.cssText='display:flex;gap:8px;margin-bottom:14px;align-items:flex-end';
+
+    /* Stock */
+    var sEl=document.createElement('div');sEl.style.cursor='pointer';
+    sEl.appendChild(stock.length?mkCard({up:false},40,56):mkEmpty(40,56,'↺'));
+    sEl.onclick=function(){
+      sel=null;SND.card();
+      if(!stock.length){waste.slice().reverse().forEach(function(c){c.up=false;stock.push(c);});waste=[];}
+      else{var c=stock.pop();c.up=true;waste.push(c);}
+      moves++;render();
+    };
+    topRow.appendChild(sEl);
+
+    /* Waste — this is the key fix: attach onclick directly on the wrapper, not child */
+    var wEl=document.createElement('div');wEl.style.cssText='position:relative;width:40px;height:56px;cursor:pointer';
+    if(waste.length){
+      var wc=waste[waste.length-1];
+      var wcEl=mkCard(wc,40,56);
+      var isWasteSel=sel&&sel.src==='waste';
+      wcEl.style.cssText+=';position:absolute;inset:0;width:100%;height:100%';
+      if(isWasteSel)wcEl.style.boxShadow='0 0 0 2px #7c3aed';
+      wEl.appendChild(wcEl);
+    } else {
+      wEl.appendChild(mkEmpty(40,56));
+    }
+    wEl.onclick=function(e){
+      e.stopPropagation();
+      if(!waste.length)return;
+      if(sel&&sel.src==='waste'){sel=null;render();return;} /* deselect */
+      /* If something else selected and waste top can go somewhere — handled by tab/found clicks */
+      sel={src:'waste'};render();
+    };
+    topRow.appendChild(wEl);
+
+    /* Gap */
+    var gap=document.createElement('div');gap.style.width='20px';topRow.appendChild(gap);
+
+    /* Foundations */
+    found.forEach(function(f,fi){
+      var fEl=document.createElement('div');fEl.style.cssText='width:40px;height:56px;cursor:pointer;position:relative';
+      var fCard=f.length?mkCard(f[f.length-1],40,56):mkEmpty(40,56,SUITS[fi]);
+      fCard.style.cssText+=(f.length?';position:absolute;inset:0;width:100%;height:100%':'');
+      fEl.appendChild(fCard);
+      fEl.onclick=function(e){
+        e.stopPropagation();
+        if(!sel)return;
+        if(moveToFound(fi)){render();autoFound();if(found.every(function(ff){return ff.length===13;})){SND.win();setScore(moves+' moves');saveScore('solitaire',moves,false);render();}else render();}
+        else{sel=null;render();}
+      };
+      topRow.appendChild(fEl);
+    });
+    wrap.appendChild(topRow);
+
+    /* ── TABLEAU ── */
+    var tabRow=document.createElement('div');tabRow.style.cssText='display:flex;gap:7px;align-items:flex-start;overflow-x:auto';
+
+    tab.forEach(function(pile,ti){
+      var col=document.createElement('div');col.style.cssText='position:relative;width:40px;flex-shrink:0';
+
+      if(!pile.length){
+        /* Empty column — click to drop */
+        var emp=mkEmpty(40,56);
+        emp.onclick=function(e){
+          e.stopPropagation();
+          if(sel){if(moveToTab(ti)){render();}else{sel=null;render();}}
+        };
+        col.style.minHeight='56px';
+        col.appendChild(emp);
+      } else {
+        col.style.height=(pile.length*22+56+8)+'px';
+        pile.forEach(function(c,ci){
+          var isTop=ci===pile.length-1;
+          var isSel=sel&&sel.src==='tab'&&sel.ti===ti&&ci>=sel.ci;
+          var ce=mkCard(c,40,56);
+          ce.style.cssText+=';position:absolute;top:'+(ci*22)+'px;left:0;z-index:'+(ci+1);
+          if(isSel)ce.style.boxShadow='0 0 0 2px #7c3aed';
+
+          (function(card,colIdx,cardIdx,isTopCard){
+            ce.onclick=function(e){
+              e.stopPropagation();
+
+              /* Face-down: only flip if it's the top card */
+              if(!card.up){
+                if(isTopCard){card.up=true;moves++;SND.card();sel=null;render();}
+                return;
+              }
+
+              /* Something selected → try to move it HERE */
+              if(sel){
+                /* Clicking selected card(s) again → deselect */
+                if(sel.src==='tab'&&sel.ti===colIdx&&cardIdx>=sel.ci){sel=null;render();return;}
+                /* Try move */
+                if(moveToTab(colIdx)){render();return;}
+                /* Move failed → switch selection to this card instead */
+                sel={src:'tab',ti:colIdx,ci:cardIdx};render();return;
+              }
+
+              /* Nothing selected → select this card */
+              sel={src:'tab',ti:colIdx,ci:cardIdx};render();
+            };
+          })(c,ti,ci,isTop);
+
+          col.appendChild(ce);
+        });
+      }
+      tabRow.appendChild(col);
+    });
+    wrap.appendChild(tabRow);
+
+    /* ── FOOTER ── */
+    var footer=document.createElement('div');footer.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11px;color:var(--muted)';
+    footer.textContent='Moves: '+moves+'  ';
+    var abtn=document.createElement('button');abtn.className='btn btn-outline';abtn.style.cssText='font-size:10px;padding:3px 10px';abtn.textContent='Auto-finish';
+    abtn.onclick=function(){autoFound();if(found.every(function(f){return f.length===13;})){SND.win();setScore(moves+' moves');saveScore('solitaire',moves,false);}render();};
+    footer.appendChild(abtn);
+    var nbtn=document.createElement('button');nbtn.className='btn btn-outline';nbtn.style.cssText='font-size:11px;padding:4px 12px';nbtn.textContent='New Game';
+    nbtn.onclick=function(){deal();SND.card();render();};
+    footer.appendChild(nbtn);
+    wrap.appendChild(footer);
+
+    C.innerHTML='';C.appendChild(wrap);
   }
 
   deal();render();
