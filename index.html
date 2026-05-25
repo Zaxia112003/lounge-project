@@ -1820,7 +1820,7 @@ function handleLogin(){
       if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='Sign In';}
       return;
     }
-    cu={nickname:raw,fullName:cred.fullName,role:cred.role,firstLogin:false};
+    cu={nickname:raw,fullName:cred.fullName,role:(cred.role||'uploader').toLowerCase(),firstLogin:false};
     if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='Sign In';}
     showPinScreen();
   };
@@ -2049,7 +2049,7 @@ function adminLoginAs(){
   if(!nick){err.textContent='Please select a member.';return;}
   var memberDir=TEAM_DIR[nick];
   if(!memberDir){err.textContent='Member not found.';return;}
-  cu={nickname:nick,fullName:memberDir.fullName,role:memberDir.role,firstLogin:false};
+  cu={nickname:nick,fullName:memberDir.fullName,role:(memberDir.role||'uploader').toLowerCase(),firstLogin:false};
   /* Save session for games page — must happen at login, not just buildMain */
   localStorage.setItem('lounge_nick',cu.nickname);
   localStorage.setItem('lounge_full',cu.fullName);
@@ -6429,6 +6429,35 @@ function getKBContext(){
 var aiHistory=[];
 var aiOpen=false;
 
+/* ── KOBY IDLE HINTS ── */
+var _kobyIdleTimer=null;
+var _kobyLastActivity=Date.now();
+var KOBY_HINTS=[
+  'On a break? Try typing <strong>games</strong> to open Game Corner 🎮',
+  'Did you know? Type <strong>games</strong> and I\'ll take you to Game Corner! 🐸',
+  'Psst — you can earn credits by uploading contracts and spend them on games 🃏',
+  'Quiet shift? Type <strong>games</strong> — UNO is waiting for you 🃏',
+  'Need a breather? Game Corner has Minesweeper, Chess, UNO and more 🎮',
+  'Fun fact: Sheena once cleared Minesweeper on Hard. Allegedly 💣',
+  'Reminder: KB Quiz is a thing. Knowledge = power = credits 🧠',
+  'Type <strong>games</strong> if you\'re looking for a reason to not do work 🐸',
+];
+var _kobyHintIdx=0;
+function _kobyResetIdleTimer(){
+  _kobyLastActivity=Date.now();
+  clearTimeout(_kobyIdleTimer);
+  _kobyIdleTimer=setTimeout(_kobyDropIdleHint, 4*60*1000); /* 4 min idle */
+}
+function _kobyDropIdleHint(){
+  if(!aiOpen)return; /* only when chat is open */
+  var msgs=G('ai-messages');if(!msgs)return;
+  var hint=KOBY_HINTS[_kobyHintIdx%KOBY_HINTS.length];
+  _kobyHintIdx++;
+  msgs.innerHTML+=aiKobyBubble(hint);
+  msgs.scrollTop=msgs.scrollHeight;
+  _kobyIdleTimer=setTimeout(_kobyDropIdleHint, 5*60*1000); /* next hint in 5 min */
+}
+
 function openAI(){
   aiHistory=[];
   var panel=G('ai-panel');
@@ -6441,6 +6470,7 @@ function openAI(){
   msgs.innerHTML='';
   msgs.innerHTML+=aiKobyBubble('Hey! Ask me anything about contracts, vendors, addresses, or escalation procedures. Fair warning: I might sneak in a pun. 🐸');
   setTimeout(function(){G('ai-input').focus();},300);
+  _kobyResetIdleTimer();
 }
 
 function aiTimestamp(){
@@ -6471,6 +6501,7 @@ function closeAI(){
   panel.classList.remove('open');
   aiOpen=false;
   aiHistory=[];
+  clearTimeout(_kobyIdleTimer);
   var fab=G('koby-fab');if(fab)fab.style.display='flex';
 }
 
@@ -6478,6 +6509,7 @@ async function sendAIMessage(){
   var input=G('ai-input');
   var text=input.value.trim();
   if(!text)return;
+  _kobyResetIdleTimer();
 
   /* Silent admin test mode toggle */
   if(text.trim()==='112003'){
