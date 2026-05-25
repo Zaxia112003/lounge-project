@@ -3560,7 +3560,7 @@ function renderMyDay(){
 
     /* Knowledge Check — compact horizontal strip (non-manager) */
     +(cu&&!isManager
-      ?'<div class="sect" style="padding:0;margin-bottom:14px">'
+      ?'<div class="sect" style="padding:0;margin-bottom:14px;overflow:visible">'
         +'<div class="sect-head" style="padding:11px 14px 10px">'
         +'<span class="sect-title">&#129504; Knowledge Check — '+kcWeekId()+'</span>'
         +'<span style="font-size:10px;color:var(--muted)">Due Friday EOD</span>'
@@ -4363,6 +4363,26 @@ function showUnoInviteToast(players){
 
 
 
+/* ── SOUND EFFECTS (KC + general) ── */
+var SFX={
+  _play:function(freqs,type,vol){
+    try{
+      var ctx=new(window.AudioContext||window.webkitAudioContext)();
+      freqs.forEach(function(f,i){
+        var osc=ctx.createOscillator(),g=ctx.createGain();
+        osc.connect(g);g.connect(ctx.destination);
+        osc.type=type||'sine';osc.frequency.setValueAtTime(f[0],ctx.currentTime+f[1]);
+        g.gain.setValueAtTime(vol||0.10,ctx.currentTime+f[1]);
+        g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+f[1]+f[2]);
+        osc.start(ctx.currentTime+f[1]);osc.stop(ctx.currentTime+f[1]+f[2]+0.05);
+      });
+    }catch(e){}
+  },
+  kcCorrect:function(){this._play([[660,0,.18],[880,.12,.14],[1100,.24,.12]],'sine',.09);},
+  kcWrong:function(){this._play([[300,0,.15],[200,.1,.2]],'sawtooth',.08);},
+};
+
+
 /* ══════════════════════════════════════════════════
    KNOWLEDGE CHECK QUESTIONS
    ══════════════════════════════════════════════════ */
@@ -4550,22 +4570,20 @@ function kcRenderQuestion(){
   var letters=['A','B','C','D'];
   var progress=Math.round((qi/KC_Q_COUNT)*100);
 
+  /* Build options as HTML string — avoids DOM timing race with innerHTML+querySelector */
+  var optsHtml=q.opts.map(function(o,i){
+    return '<button class="kc-opt" data-idx="'+i+'" onclick="kcAnswer('+i+')">'
+      +'<strong style="color:var(--muted);margin-right:6px">'+letters[i]+'.</strong>'+o
+      +'</button>';
+  }).join('');
+
   el.innerHTML='<div style="padding:12px 14px">'
     +'<div class="kc-progress"><div class="kc-progress-fill" style="width:'+progress+'%"></div></div>'
     +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:6px">'+q.cat+' · Q'+(qi+1)+'/'+KC_Q_COUNT+'</div>'
     +'<div style="font-size:13px;font-weight:600;color:var(--text);line-height:1.5;margin-bottom:12px">'+q.q+'</div>'
-    +'<div id="kc-opts"></div>'
+    +'<div id="kc-opts">'+optsHtml+'</div>'
     +'<div id="kc-fb"></div>'
     +'</div>';
-
-  var opts=G('kc-opts');
-  q.opts.forEach(function(o,i){
-    var btn=document.createElement('button');
-    btn.className='kc-opt';
-    btn.innerHTML='<strong style="color:var(--muted);margin-right:6px">'+letters[i]+'.</strong>'+o;
-    btn.addEventListener('click',function(){kcAnswer(i);});
-    opts.appendChild(btn);
-  });
 }
 
 function kcAnswer(chosen){
@@ -5743,7 +5761,428 @@ function mgrQClearFilter(){
 }
 
 /* ── MANAGER HUB ── */
-var mgrHubTab='performance';
+/* ══════════════════════════════════════════════════
+   RATINGS TAB
+   ══════════════════════════════════════════════════ */
+var ratingsState={
+  quarter:null,   /* 'Q1','Q2','Q3','Q4' */
+  year:null,
+  month:null,     /* 1-12 or null = whole quarter */
+  memberFilter:null,
+  /* Weightages — performance (must sum to 100) */
+  wUploads:50, wQuality:30, wEscalation:20,
+  /* Competency weightages (each scored 1-5, averaged with equal weight) */
+  /* Performance band ranges — [min,max] inclusive for each rating 1-5 */
+  bands:{
+    uploads: {5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]},
+    quality: {5:[100,9999],4:[99,99],3:[98,98],2:[93,97],1:[0,92]},
+    escalation:{5:[0,0],4:[1,1],3:[2,3],2:[4,5],1:[6,9999]}
+  },
+  /* Saved competency scores: {nick: {c1,c2,c3}} */
+  competency:{},
+  /* Incentive multiplier per final rating */
+  multiplier:{5:120,4:110,3:100,2:0,1:0}
+};
+
+function ratingsGetQuarters(){
+  var now=getSydneyDate();
+  var yr=now.getFullYear();
+  var q=Math.floor(now.getMonth()/3)+1;
+  var opts=[];
+  /* Current + 3 past quarters */
+  for(var i=0;i<4;i++){
+    var qq=q-i; var yy=yr;
+    if(qq<1){qq+=4;yy--;}
+    opts.push({q:'Q'+qq,year:yy,label:'Q'+qq+' '+yy});
+  }
+  return opts;
+}
+
+function ratingsGetDateRange(){
+  var st=ratingsState;
+  var qNum=parseInt((st.quarter||'Q1').replace('Q',''));
+  var yr=st.year||getSydneyDate().getFullYear();
+  var qStart=new Date(yr,(qNum-1)*3,1);
+  var qEnd=new Date(yr,qNum*3,0);
+  if(st.month){
+    var mStart=new Date(yr,(qNum-1)*3+(st.month-1),1);
+    var mEnd=new Date(yr,(qNum-1)*3+st.month,0);
+    return{from:mStart.toISOString().slice(0,10),to:mEnd.toISOString().slice(0,10)};
+  }
+  return{from:qStart.toISOString().slice(0,10),to:qEnd.toISOString().slice(0,10)};
+}
+
+function ratingsInRange(dateStr){
+  var r=ratingsGetDateRange();
+  return dateStr>=r.from&&dateStr<=r.to;
+}
+
+function ratingsGetKPIs(nick){
+  var days=Object.keys(perfData[nick]||{}).filter(ratingsInRange);
+  var totalUpl=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+  var dayCount=days.length||1;
+  var avgDaily=Math.round((totalUpl/dayCount)*10)/10;
+  var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&ratingsInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
+  var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&ratingsInRange(c.date);}).length;
+  var qScore=totalUpl>0?Math.round(((totalUpl-errs-qEsc)/totalUpl)*1000)/10:null;
+  return{avgDaily:avgDaily,qScore:qScore,qEsc:qEsc,totalUpl:totalUpl,dayCount:dayCount};
+}
+
+function ratingsBandScore(metric,val){
+  if(val===null)return null;
+  var bands=ratingsState.bands[metric];
+  for(var r=5;r>=1;r--){
+    var b=bands[r];
+    if(val>=b[0]&&val<=b[1])return r;
+  }
+  return 1;
+}
+
+function ratingsCalcPerformance(nick){
+  var kpi=ratingsGetKPIs(nick);
+  var su=ratingsBandScore('uploads',kpi.avgDaily);
+  var sq=ratingsBandScore('quality',kpi.qScore);
+  var se=ratingsBandScore('escalation',kpi.qEsc);
+  if(su===null&&sq===null&&se===null)return null;
+  su=su||1;sq=sq||1;se=se||1;
+  var w=ratingsState;
+  return Math.round(((su*(w.wUploads/100))+(sq*(w.wQuality/100))+(se*(w.wEscalation/100)))*100)/100;
+}
+
+function ratingsCalcCompetency(nick){
+  var c=ratingsState.competency[nick]||{};
+  var c1=parseFloat(c.c1)||0,c2=parseFloat(c.c2)||0,c3=parseFloat(c.c3)||0;
+  if(!c1&&!c2&&!c3)return null;
+  return Math.round(((c1+c2+c3)/3)*100)/100;
+}
+
+function ratingsCalcFinal(nick){
+  var perf=ratingsCalcPerformance(nick);
+  var comp=ratingsCalcCompetency(nick);
+  if(perf===null&&comp===null)return null;
+  return Math.round(((perf||0)*0.6+(comp||0)*0.4)*100)/100;
+}
+
+function ratingsLabel(score){
+  if(score===null)return{label:'No data',cls:'r-none'};
+  if(score>=4.5)return{label:'5 — Redefined',cls:'r-5'};
+  if(score>=3.5)return{label:'4 — Exceeded',cls:'r-4'};
+  if(score>=2.5)return{label:'3 — Met',cls:'r-3'};
+  if(score>=1.5)return{label:'2 — Partial',cls:'r-2'};
+  return{label:'1 — Did not meet',cls:'r-1'};
+}
+
+function ratingsSave(){
+  if(!fsDb())return;
+  try{
+    var payload={
+      quarter:ratingsState.quarter,year:ratingsState.year,
+      wUploads:ratingsState.wUploads,wQuality:ratingsState.wQuality,wEscalation:ratingsState.wEscalation,
+      bands:ratingsState.bands,competency:ratingsState.competency,
+      savedAt:new Date().toISOString(),savedBy:cu?cu.nickname:''
+    };
+    window._fsSetDoc(window._fsDoc(fsDb(),'ratings',ratingsState.quarter+'_'+ratingsState.year),payload,{merge:true});
+  }catch(e){console.warn('ratings save',e);}
+}
+
+async function ratingsLoad(quarter,year){
+  if(!fsDb())return;
+  try{
+    var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'ratings',quarter+'_'+year));
+    if(snap.exists()){
+      var d=snap.data();
+      if(d.wUploads!==undefined)ratingsState.wUploads=d.wUploads;
+      if(d.wQuality!==undefined)ratingsState.wQuality=d.wQuality;
+      if(d.wEscalation!==undefined)ratingsState.wEscalation=d.wEscalation;
+      if(d.bands)ratingsState.bands=d.bands;
+      if(d.competency)ratingsState.competency=d.competency;
+    }
+  }catch(e){}
+  renderRatingsTable();
+}
+
+function renderRatingsTab(){
+  var pane=G('mgr-hub-pane-ratings');if(!pane)return;
+  /* Init default quarter */
+  var qs=ratingsGetQuarters();
+  if(!ratingsState.quarter){ratingsState.quarter=qs[0].q;ratingsState.year=qs[0].year;}
+  var qOpts=qs.map(function(q){
+    return '<option value="'+q.q+'_'+q.year+'"'+(q.q===ratingsState.quarter&&q.year===ratingsState.year?' selected':'')+'>'+q.label+'</option>';
+  }).join('');
+  var qNum=parseInt(ratingsState.quarter.replace('Q',''));
+  var yr=ratingsState.year;
+  var mStart=(qNum-1)*3;
+  var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var mOpts='<option value="">Whole quarter</option>';
+  for(var mi=1;mi<=3;mi++){
+    var mIdx=mStart+(mi-1);
+    mOpts+='<option value="'+mi+'"'+(ratingsState.month===mi?' selected':'')+'>'+MONTHS[mIdx]+' '+yr+'</option>';
+  }
+  var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
+  var memberOpts='<option value="">All members</option>'+members.map(function(m){
+    return '<option value="'+m.nickname+'"'+(ratingsState.memberFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';
+  }).join('');
+
+  pane.innerHTML=
+    /* ── toolbar ── */
+    '<div class="sect" style="padding:14px 16px;margin-bottom:16px">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<span style="font-size:11px;color:var(--muted);font-weight:600">Quarter</span>'
+    +'<select id="rt-quarter" onchange="ratingsOnQuarterChange(this.value)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+qOpts+'</select>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<span style="font-size:11px;color:var(--muted);font-weight:600">Month</span>'
+    +'<select id="rt-month" onchange="ratingsOnMonthChange(this.value)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+mOpts+'</select>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:6px">'
+    +'<span style="font-size:11px;color:var(--muted);font-weight:600">Member</span>'
+    +'<select id="rt-member" onchange="ratingsOnMemberChange(this.value)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+memberOpts+'</select>'
+    +'</div>'
+    +'<button onclick="ratingsOpenBands()" style="margin-left:auto;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#9881; Target Bands</button>'
+    +'<button onclick="ratingsSaveAndToast()" style="font-size:11px;padding:5px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">&#128190; Save Ratings</button>'
+    +'</div>'
+    +'</div>'
+    /* ── weightage row ── */
+    +'<div class="sect" style="padding:12px 16px;margin-bottom:16px">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Performance Weightage (must = 100%)</span>'
+    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Avg Uploads</span>'
+    +'<input id="rt-w-upl" type="number" min="0" max="100" value="'+ratingsState.wUploads+'" oninput="ratingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Quality Score</span>'
+    +'<input id="rt-w-qua" type="number" min="0" max="100" value="'+ratingsState.wQuality+'" oninput="ratingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Quality Esc</span>'
+    +'<input id="rt-w-esc" type="number" min="0" max="100" value="'+ratingsState.wEscalation+'" oninput="ratingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<span id="rt-w-total" style="font-size:11px;font-weight:700;color:var(--green);margin-left:6px">= 100%</span>'
+    +'</div>'
+    +'</div>'
+    /* ── table ── */
+    +'<div id="ratings-table-wrap" style="overflow-x:auto"></div>'
+    /* ── bands modal ── */
+    +'<div id="rt-bands-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">'
+    +'<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(94vw,560px);max-height:80vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">&#9881; Target Bands</span>'
+    +'<button onclick="ratingsCloseBands()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
+    +'</div>'
+    +'<div id="rt-bands-body"></div>'
+    +'<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">'
+    +'<button onclick="ratingsCloseBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Close</button>'
+    +'<button onclick="ratingsSaveBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Save Bands</button>'
+    +'</div></div></div>'
+    ;
+
+  ratingsLoad(ratingsState.quarter,ratingsState.year);
+}
+
+function renderRatingsTable(){
+  var wrap=G('ratings-table-wrap');if(!wrap)return;
+  var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
+  if(ratingsState.memberFilter)members=members.filter(function(m){return m.nickname===ratingsState.memberFilter;});
+
+  /* CSS injected once */
+  if(!G('rt-style')){
+    var s=document.createElement('style');s.id='rt-style';
+    s.textContent=
+      '.rt-tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:820px}'
+      +'.rt-tbl th{background:var(--bg3);padding:7px 10px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);text-align:center;white-space:nowrap}'
+      +'.rt-tbl th.th-perf{background:#0d2a0d;color:#97C459}'
+      +'.rt-tbl th.th-comp{background:#0a1f2e;color:#85b7eb}'
+      +'.rt-tbl th.th-final{background:#1a1025;color:#c4b5fd}'
+      +'.rt-tbl td{padding:7px 10px;border:1px solid var(--border);text-align:center;vertical-align:middle}'
+      +'.rt-tbl tr:hover td{background:rgba(255,255,255,.03)}'
+      +'.rt-tbl td.td-name{text-align:left}'
+      +'.rt-comp-sel{font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);width:52px}'
+      +'.r-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap}'
+      +'.r-5{background:rgba(34,197,94,.15);color:#22c55e}'
+      +'.r-4{background:rgba(132,204,22,.15);color:#84cc16}'
+      +'.r-3{background:rgba(59,130,246,.15);color:#60a5fa}'
+      +'.r-2{background:rgba(234,179,8,.15);color:#eab308}'
+      +'.r-1{background:rgba(239,68,68,.15);color:#ef4444}'
+      +'.r-none{background:rgba(255,255,255,.06);color:var(--muted)}'
+      +'.rt-mult{font-size:11px;font-weight:700;color:var(--accent)}'
+      +'.rt-score{font-size:13px;font-weight:700}'
+      ;
+    document.head.appendChild(s);
+  }
+
+  var html='<table class="rt-tbl">'
+    +'<thead>'
+    +'<tr>'
+    +'<th rowspan="2" style="text-align:left;min-width:140px">Member</th>'
+    +'<th rowspan="2" style="min-width:90px">Incentive<br>Multiplier</th>'
+    +'<th colspan="5" class="th-perf">Performance (60%)</th>'
+    +'<th colspan="4" class="th-comp">Competencies (40%)</th>'
+    +'<th rowspan="2" class="th-final" style="min-width:100px">Final<br>Rating</th>'
+    +'</tr>'
+    +'<tr>'
+    /* performance sub-headers */
+    +'<th class="th-perf">Avg Daily<br>Uploads<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
+    +'<th class="th-perf">Quality<br>Score %<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
+    +'<th class="th-perf">Quality<br>Escalation<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
+    +'<th class="th-perf">Perf<br>Score</th>'
+    +'<th class="th-perf">Perf<br>Rating</th>'
+    /* competency sub-headers */
+    +'<th class="th-comp">Core<br>Skills</th>'
+    +'<th class="th-comp">Working<br>w/ Others</th>'
+    +'<th class="th-comp">Delivering<br>Results</th>'
+    +'<th class="th-comp">Comp<br>Score</th>'
+    +'</tr>'
+    +'</thead>'
+    +'<tbody>';
+
+  members.forEach(function(m){
+    var nick=m.nickname;
+    var kpi=ratingsGetKPIs(nick);
+    var su=ratingsBandScore('uploads',kpi.avgDaily);
+    var sq=ratingsBandScore('quality',kpi.qScore);
+    var se=ratingsBandScore('escalation',kpi.qEsc);
+    var perfScore=ratingsCalcPerformance(nick);
+    var perfRating=ratingsLabel(perfScore);
+    var comp=ratingsState.competency[nick]||{c1:'',c2:'',c3:''};
+    var compScore=ratingsCalcCompetency(nick);
+    var finalScore=ratingsCalcFinal(nick);
+    var finalRating=ratingsLabel(finalScore);
+    var mult=(finalScore!==null)?ratingsState.multiplier[Math.round(finalScore)]||0:null;
+    var initials=(m.fullName||nick).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+
+    html+='<tr>'
+      /* name */
+      +'<td class="td-name"><div style="display:flex;align-items:center;gap:8px">'
+      +avEl(nick,28)
+      +'<div><div style="font-size:12px;font-weight:600">'+m.fullName+'</div>'
+      +'<div style="font-size:10px;color:var(--muted)">'+m.role+'</div></div></div></td>'
+      /* multiplier */
+      +'<td><span class="rt-mult">'+(mult!==null?mult+'%':'—')+'</span></td>'
+      /* KPI values */
+      +'<td>'+((kpi.avgDaily||kpi.totalUpl)?kpi.avgDaily:'—')+'</td>'
+      +'<td>'+(kpi.qScore!==null?kpi.qScore.toFixed(1)+'%':'—')+'</td>'
+      +'<td>'+kpi.qEsc+'</td>'
+      /* perf score & rating */
+      +'<td><span class="rt-score">'+(perfScore!==null?perfScore.toFixed(2):'—')+'</span></td>'
+      +'<td><span class="r-pill '+perfRating.cls+'">'+perfRating.label+'</span></td>'
+      /* competency dropdowns */
+      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c1\',this.value)">'
+      +ratingsCompOpts(comp.c1)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c2\',this.value)">'
+      +ratingsCompOpts(comp.c2)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c3\',this.value)">'
+      +ratingsCompOpts(comp.c3)+'</select></td>'
+      +'<td><span class="rt-score">'+(compScore!==null?compScore.toFixed(2):'—')+'</span></td>'
+      /* final */
+      +'<td><div><span class="rt-score">'+(finalScore!==null?finalScore.toFixed(2):'—')+'</span>'
+      +'<div style="margin-top:3px"><span class="r-pill '+finalRating.cls+'">'+finalRating.label+'</span></div></div></td>'
+      +'</tr>';
+  });
+
+  html+='</tbody></table>';
+
+  /* Legend */
+  html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--muted)">'
+    +'<span>Formula: <strong>Final = (Perf Score × 60%) + (Comp Score × 40%)</strong></span>'
+    +'<span style="margin-left:auto">Perf Score = (Uploads×'+ratingsState.wUploads+'% + Quality×'+ratingsState.wQuality+'% + Esc×'+ratingsState.wEscalation+'%)</span>'
+    +'</div>';
+
+  wrap.innerHTML=html;
+}
+
+function ratingsCompOpts(val){
+  var opts='<option value="">—</option>';
+  for(var i=1;i<=5;i++)opts+='<option value="'+i+'"'+(String(val)===String(i)?' selected':'')+'>'+i+'</option>';
+  return opts;
+}
+
+function ratingsSetComp(nick,key,val){
+  if(!ratingsState.competency[nick])ratingsState.competency[nick]={c1:'',c2:'',c3:''};
+  ratingsState.competency[nick][key]=val;
+  renderRatingsTable();
+}
+
+function ratingsOnWeight(){
+  var wu=parseFloat(G('rt-w-upl').value)||0;
+  var wq=parseFloat(G('rt-w-qua').value)||0;
+  var we=parseFloat(G('rt-w-esc').value)||0;
+  var total=wu+wq+we;
+  var tEl=G('rt-w-total');
+  if(tEl){tEl.textContent='= '+total+'%';tEl.style.color=total===100?'var(--green)':'#ef4444';}
+  if(total===100){
+    ratingsState.wUploads=wu;ratingsState.wQuality=wq;ratingsState.wEscalation=we;
+    renderRatingsTable();
+  }
+}
+
+function ratingsOnQuarterChange(val){
+  var parts=val.split('_');
+  ratingsState.quarter=parts[0];ratingsState.year=parseInt(parts[1]);
+  ratingsState.month=null;ratingsState.competency={};
+  ratingsLoad(ratingsState.quarter,ratingsState.year);
+  renderRatingsTab();
+}
+
+function ratingsOnMonthChange(val){
+  ratingsState.month=val?parseInt(val):null;
+  renderRatingsTable();
+}
+
+function ratingsOnMemberChange(val){
+  ratingsState.memberFilter=val||null;
+  renderRatingsTable();
+}
+
+function ratingsSaveAndToast(){
+  ratingsSave();
+  var btn=document.querySelector('#mgr-hub-pane-ratings button[onclick="ratingsSaveAndToast()"]');
+  if(btn){var orig=btn.textContent;btn.textContent='✓ Saved!';btn.style.background='var(--green)';setTimeout(function(){btn.textContent=orig;btn.style.background='';},1800);}
+}
+
+/* ── BANDS MODAL ── */
+function ratingsOpenBands(){
+  var overlay=G('rt-bands-overlay');if(!overlay)return;
+  overlay.style.display='flex';
+  var body=G('rt-bands-body');if(!body)return;
+  var metrics=[
+    {key:'uploads',label:'Avg Daily Uploads',hint:'Number of uploads per day'},
+    {key:'quality',label:'Quality Score %',hint:'(Total - Errors - Escalations) / Total × 100'},
+    {key:'escalation',label:'Quality Escalation',hint:'Count of quality escalations (lower = better)'}
+  ];
+  var html='';
+  metrics.forEach(function(m){
+    html+='<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;margin-bottom:4px">'+m.label+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:8px">'+m.hint+'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<tr><th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Rating</th>'
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Min</th>'
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>';
+    var labels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
+    for(var r=5;r>=1;r--){
+      var b=ratingsState.bands[m.key][r];
+      var maxDisplay=b[1]>=9000?'∞':b[1];
+      html+='<tr>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text)">'+labels[r]+'</td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-metric="'+m.key+'" data-r="'+r+'" data-pos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-metric="'+m.key+'" data-r="'+r+'" data-pos="1" value="'+(b[1]>=9000?9999:b[1])+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center" placeholder="9999=∞"></td>'
+        +'</tr>';
+    }
+    html+='</table></div>';
+  });
+  body.innerHTML=html;
+}
+
+function ratingsSaveBands(){
+  G('rt-bands-body').querySelectorAll('input[data-metric]').forEach(function(inp){
+    var metric=inp.dataset.metric,r=parseInt(inp.dataset.r),pos=parseInt(inp.dataset.pos);
+    var val=parseFloat(inp.value)||0;
+    ratingsState.bands[metric][r][pos]=val;
+  });
+  ratingsCloseBands();
+  renderRatingsTable();
+}
+
+function ratingsCloseBands(){
+  var o=G('rt-bands-overlay');if(o)o.style.display='none';
+}
+
+
 var mgrHubDateFilter='today';
 var mgrHubCustomRange={from:'',to:''};
 
@@ -5759,12 +6198,14 @@ function renderManagerHub(){
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'quality\',this)">&#128203; Quality</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'attendance\',this)">&#128197; Attendance</button>'
     +'<button class="sub-tab" onclick="switchMgrHubTab(\'kb\',this)">&#128203; Articles</button>'
+    +'<button class="sub-tab" onclick="switchMgrHubTab(\'ratings\',this)">&#11088; Ratings</button>'
     +'</div>'
     +'<div class="sect" id="mgr-mood-card" style="margin-bottom:14px"><div class="sect-head"><span class="sect-title">&#128578; Team mood today</span></div></div>'
     +'<div id="mgr-hub-pane-performance" class="mgr-hub-pane active"></div>'
     +'<div id="mgr-hub-pane-quality" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-attendance" class="mgr-hub-pane"></div>'
     +'<div id="mgr-hub-pane-kb" class="mgr-hub-pane"></div>'
+    +'<div id="mgr-hub-pane-ratings" class="mgr-hub-pane"></div>'
     ;
 
   renderMgrHubPerformance();
@@ -5798,6 +6239,7 @@ function switchMgrHubTab(tab,btn){
     });
   },50);}
   else if(tab==='attendance')renderMgrHubAttendance();
+  else if(tab==='ratings')renderRatingsTab();
   else if(tab==='kb'){
     var kbPane=G('mgr-hub-pane-kb');if(!kbPane)return;
     kbPane.innerHTML='<div class="article-toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:14px">'
