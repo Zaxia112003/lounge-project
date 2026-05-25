@@ -5918,14 +5918,20 @@ function renderRatingsTab(){
     var mIdx=mStart+(mi-1);
     mOpts+='<option value="'+mi+'"'+(ratingsState.month===mi?' selected':'')+'>'+MONTHS[mIdx]+' '+yr+'</option>';
   }
-  var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
+  var members=TEAM.filter(function(m){return m.role==='uploader';});
   var memberOpts='<option value="">All members</option>'+members.map(function(m){
     return '<option value="'+m.nickname+'"'+(ratingsState.memberFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';
   }).join('');
 
   pane.innerHTML=
+    /* ── sub-tabs: Uploaders / Escalation ── */
+    '<div class="sub-tabs" style="margin-bottom:16px">'
+    +'<button class="sub-tab active" id="rt-sub-uploaders" onclick="ratingsSubTab(\'uploaders\',this)">&#128228; Uploaders</button>'
+    +'<button class="sub-tab" id="rt-sub-escalation" onclick="ratingsSubTab(\'escalation\',this)">&#128680; Escalation</button>'
+    +'</div>'
+    +'<div id="rt-pane-uploaders">'
     /* ── toolbar ── */
-    '<div class="sect" style="padding:14px 16px;margin-bottom:16px">'
+    +'<div class="sect" style="padding:14px 16px;margin-bottom:16px">'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
     +'<div style="display:flex;align-items:center;gap:6px">'
     +'<span style="font-size:11px;color:var(--muted);font-weight:600">Quarter</span>'
@@ -5970,6 +5976,9 @@ function renderRatingsTab(){
     +'<button onclick="ratingsCloseBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Close</button>'
     +'<button onclick="ratingsSaveBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Save Bands</button>'
     +'</div></div></div>'
+    +'</div>' /* close rt-pane-uploaders */
+    /* ── escalation pane (hidden initially) ── */
+    +'<div id="rt-pane-escalation" style="display:none"></div>'
     ;
 
   ratingsLoad(ratingsState.quarter,ratingsState.year);
@@ -5977,7 +5986,7 @@ function renderRatingsTab(){
 
 function renderRatingsTable(){
   var wrap=G('ratings-table-wrap');if(!wrap)return;
-  var members=TEAM.filter(function(m){return m.role==='uploader'||m.role==='escalation';});
+  var members=TEAM.filter(function(m){return m.role==='uploader';});
   if(ratingsState.memberFilter)members=members.filter(function(m){return m.nickname===ratingsState.memberFilter;});
 
   /* CSS injected once */
@@ -6010,7 +6019,6 @@ function renderRatingsTable(){
     +'<thead>'
     +'<tr>'
     +'<th rowspan="2" style="text-align:left;min-width:140px">Member</th>'
-    +'<th rowspan="2" style="min-width:90px">Incentive<br>Multiplier</th>'
     +'<th colspan="5" class="th-perf">Performance (60%)</th>'
     +'<th colspan="4" class="th-comp">Competencies (40%)</th>'
     +'<th rowspan="2" class="th-final" style="min-width:100px">Final<br>Rating</th>'
@@ -6043,8 +6051,6 @@ function renderRatingsTable(){
     var compScore=ratingsCalcCompetency(nick);
     var finalScore=ratingsCalcFinal(nick);
     var finalRating=ratingsLabel(finalScore);
-    var mult=(finalScore!==null)?ratingsState.multiplier[Math.round(finalScore)]||0:null;
-    var initials=(m.fullName||nick).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
 
     html+='<tr>'
       /* name */
@@ -6052,8 +6058,6 @@ function renderRatingsTable(){
       +avEl(nick,28)
       +'<div><div style="font-size:12px;font-weight:600">'+m.fullName+'</div>'
       +'<div style="font-size:10px;color:var(--muted)">'+m.role+'</div></div></div></td>'
-      /* multiplier */
-      +'<td><span class="rt-mult">'+(mult!==null?mult+'%':'—')+'</span></td>'
       /* KPI values */
       +'<td>'+((kpi.avgDaily||kpi.totalUpl)?kpi.avgDaily:'—')+'</td>'
       +'<td>'+(kpi.qScore!==null?kpi.qScore.toFixed(1)+'%':'—')+'</td>'
@@ -6182,8 +6186,313 @@ function ratingsCloseBands(){
   var o=G('rt-bands-overlay');if(o)o.style.display='none';
 }
 
+/* ── RATINGS SUB-TABS ── */
+var ratingsSubTabActive='uploaders';
+function ratingsSubTab(tab,btn){
+  ratingsSubTabActive=tab;
+  document.querySelectorAll('#mgr-hub-pane-ratings .sub-tab').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  var up=G('rt-pane-uploaders'),esc=G('rt-pane-escalation');
+  if(up)up.style.display=tab==='uploaders'?'':'none';
+  if(esc){esc.style.display=tab==='escalation'?'':'none';if(tab==='escalation')renderEscRatingsPane();}
+}
 
-var mgrHubDateFilter='today';
+/* ══════════════════════════════════════════════════
+   ESCALATION RATINGS TAB
+   ══════════════════════════════════════════════════ */
+var escRatingsState={
+  quarter:null, year:null, month:null, memberFilter:null,
+  /* KPI weightages for escalation — SLA + Quality Esc handled (must = 100) */
+  wSLA:60, wQEsc:40,
+  bands:{
+    sla:   {5:[95,9999],4:[90,94],3:[80,89],2:[70,79],1:[0,69]},
+    qesc:  {5:[20,9999],4:[15,19],3:[10,14],2:[5,9],1:[0,4]}
+  },
+  competency:{},
+};
+
+function escRatingsGetDateRange(){
+  var st=escRatingsState;
+  var qNum=parseInt((st.quarter||'Q1').replace('Q',''));
+  var yr=st.year||getSydneyDate().getFullYear();
+  var qStart=new Date(yr,(qNum-1)*3,1);
+  var qEnd=new Date(yr,qNum*3,0);
+  if(st.month){
+    var mStart=new Date(yr,(qNum-1)*3+(st.month-1),1);
+    var mEnd=new Date(yr,(qNum-1)*3+st.month,0);
+    return{from:mStart.toISOString().slice(0,10),to:mEnd.toISOString().slice(0,10)};
+  }
+  return{from:qStart.toISOString().slice(0,10),to:qEnd.toISOString().slice(0,10)};
+}
+
+function escRatingsInRange(dateStr){
+  var r=escRatingsGetDateRange();
+  return dateStr>=r.from&&dateStr<=r.to;
+}
+
+function escRatingsGetKPIs(nick){
+  /* SLA % — team-wide from slaLog, filtered to date range */
+  var slaEntries=slaLog.filter(function(e){return escRatingsInRange(e.date);});
+  var avgSLA=slaEntries.length
+    ? Math.round(slaEntries.reduce(function(s,e){return s+(e.pct||0);},0)/slaEntries.length*10)/10
+    : null;
+  /* Quality Escalation handled — callouts where escalationMember===nick */
+  var handled=callouts.filter(function(c){
+    return (c.type==='qesc'||c.type==='qesc_esc')
+      &&c.escalationMember===nick
+      &&escRatingsInRange(c.date||c.loggedAt||'');
+  }).length;
+  return{avgSLA:avgSLA,handled:handled};
+}
+
+function escRatingsBandScore(metric,val){
+  if(val===null||val===undefined)return null;
+  var bands=escRatingsState.bands[metric];
+  for(var r=5;r>=1;r--){
+    var b=bands[r];
+    if(val>=b[0]&&val<=b[1])return r;
+  }
+  return 1;
+}
+
+function escRatingsCalcPerformance(nick){
+  var kpi=escRatingsGetKPIs(nick);
+  var ss=escRatingsBandScore('sla',kpi.avgSLA);
+  var sq=escRatingsBandScore('qesc',kpi.handled);
+  if(ss===null&&sq===null)return null;
+  ss=ss||1;sq=sq||1;
+  var w=escRatingsState;
+  return Math.round(((ss*(w.wSLA/100))+(sq*(w.wQEsc/100)))*100)/100;
+}
+
+function escRatingsCalcCompetency(nick){
+  var c=escRatingsState.competency[nick]||{};
+  var c1=parseFloat(c.c1)||0,c2=parseFloat(c.c2)||0,c3=parseFloat(c.c3)||0;
+  if(!c1&&!c2&&!c3)return null;
+  return Math.round(((c1+c2+c3)/3)*100)/100;
+}
+
+function escRatingsCalcFinal(nick){
+  var perf=escRatingsCalcPerformance(nick);
+  var comp=escRatingsCalcCompetency(nick);
+  if(perf===null&&comp===null)return null;
+  return Math.round(((perf||0)*0.6+(comp||0)*0.4)*100)/100;
+}
+
+function escRatingsSetComp(nick,key,val){
+  if(!escRatingsState.competency[nick])escRatingsState.competency[nick]={c1:'',c2:'',c3:''};
+  escRatingsState.competency[nick][key]=val;
+  renderEscRatingsTable();
+}
+
+function escRatingsSave(){
+  if(!fsDb())return;
+  try{
+    var key='esc_'+escRatingsState.quarter+'_'+escRatingsState.year;
+    window._fsSetDoc(window._fsDoc(fsDb(),'ratings',key),{
+      quarter:escRatingsState.quarter,year:escRatingsState.year,
+      wSLA:escRatingsState.wSLA,wQEsc:escRatingsState.wQEsc,
+      bands:escRatingsState.bands,competency:escRatingsState.competency,
+      savedAt:new Date().toISOString(),savedBy:cu?cu.nickname:''
+    },{merge:true});
+  }catch(e){}
+}
+
+async function escRatingsLoad(quarter,year){
+  if(!fsDb())return;
+  try{
+    var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'ratings','esc_'+quarter+'_'+year));
+    if(snap.exists()){
+      var d=snap.data();
+      if(d.wSLA!==undefined)escRatingsState.wSLA=d.wSLA;
+      if(d.wQEsc!==undefined)escRatingsState.wQEsc=d.wQEsc;
+      if(d.bands)escRatingsState.bands=d.bands;
+      if(d.competency)escRatingsState.competency=d.competency;
+    }
+  }catch(e){}
+  renderEscRatingsTable();
+}
+
+function renderEscRatingsPane(){
+  var pane=G('rt-pane-escalation');if(!pane)return;
+  /* Sync quarter/year from main ratingsState */
+  escRatingsState.quarter=ratingsState.quarter;
+  escRatingsState.year=ratingsState.year;
+  escRatingsState.month=ratingsState.month;
+
+  var escMembers=TEAM.filter(function(m){return m.role==='escalation';});
+  var memberOpts='<option value="">All members</option>'+escMembers.map(function(m){
+    return '<option value="'+m.nickname+'"'+(escRatingsState.memberFilter===m.nickname?' selected':'')+'>'+m.fullName+'</option>';
+  }).join('');
+
+  pane.innerHTML=
+    /* toolbar */
+    '<div class="sect" style="padding:14px 16px;margin-bottom:16px">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted);font-weight:600">Member</span>'
+    +'<select id="ert-member" onchange="escRatingsState.memberFilter=this.value||null;renderEscRatingsTable()" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+memberOpts+'</select>'
+    +'</div>'
+    +'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
+    +'<span style="font-size:10px;color:var(--muted2)">Quarter: '+escRatingsState.quarter+' '+escRatingsState.year+(escRatingsState.month?' · Month '+escRatingsState.month:'')+'</span>'
+    +'<button onclick="escRatingsOpenBands()" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#9881; Target Bands</button>'
+    +'<button onclick="escRatingsSaveAndToast()" style="font-size:11px;padding:5px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">&#128190; Save Ratings</button>'
+    +'</div></div></div>'
+    /* weightage */
+    +'<div class="sect" style="padding:12px 16px;margin-bottom:16px">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Performance Weightage (must = 100%)</span>'
+    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Escalation SLA %</span>'
+    +'<input id="ert-w-sla" type="number" min="0" max="100" value="'+escRatingsState.wSLA+'" oninput="escRatingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Esc Handled</span>'
+    +'<input id="ert-w-qesc" type="number" min="0" max="100" value="'+escRatingsState.wQEsc+'" oninput="escRatingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<span id="ert-w-total" style="font-size:11px;font-weight:700;color:var(--green);margin-left:6px">= 100%</span>'
+    +'</div></div>'
+    /* table */
+    +'<div id="esc-ratings-table-wrap" style="overflow-x:auto"></div>'
+    /* bands modal */
+    +'<div id="ert-bands-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">'
+    +'<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(94vw,480px);max-height:80vh;overflow-y:auto">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">&#9881; Escalation Target Bands</span>'
+    +'<button onclick="escRatingsCloseBands()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
+    +'</div>'
+    +'<div id="ert-bands-body"></div>'
+    +'<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">'
+    +'<button onclick="escRatingsCloseBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Close</button>'
+    +'<button onclick="escRatingsSaveBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Save Bands</button>'
+    +'</div></div></div>'
+    ;
+
+  escRatingsLoad(escRatingsState.quarter,escRatingsState.year);
+}
+
+function renderEscRatingsTable(){
+  var wrap=G('esc-ratings-table-wrap');if(!wrap)return;
+  var members=TEAM.filter(function(m){return m.role==='escalation';});
+  if(escRatingsState.memberFilter)members=members.filter(function(m){return m.nickname===escRatingsState.memberFilter;});
+
+  var html='<table class="rt-tbl">'
+    +'<thead><tr>'
+    +'<th rowspan="2" style="text-align:left;min-width:140px">Member</th>'
+    +'<th colspan="4" class="th-perf">Performance (60%)</th>'
+    +'<th colspan="4" class="th-comp">Competencies (40%)</th>'
+    +'<th rowspan="2" class="th-final" style="min-width:100px">Final<br>Rating</th>'
+    +'</tr><tr>'
+    +'<th class="th-perf">Escalation SLA %<br><span style="font-weight:400;color:#5a8a3a">team avg · auto</span></th>'
+    +'<th class="th-perf">Esc Handled<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
+    +'<th class="th-perf">Perf<br>Score</th>'
+    +'<th class="th-perf">Perf<br>Rating</th>'
+    +'<th class="th-comp">Core<br>Skills</th>'
+    +'<th class="th-comp">Working<br>w/ Others</th>'
+    +'<th class="th-comp">Delivering<br>Results</th>'
+    +'<th class="th-comp">Comp<br>Score</th>'
+    +'</tr></thead><tbody>';
+
+  if(!members.length){
+    html+='<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No escalation team members found.</td></tr>';
+  }
+
+  members.forEach(function(m){
+    var nick=m.nickname;
+    var kpi=escRatingsGetKPIs(nick);
+    var perfScore=escRatingsCalcPerformance(nick);
+    var perfRating=ratingsLabel(perfScore);
+    var comp=escRatingsState.competency[nick]||{c1:'',c2:'',c3:''};
+    var compScore=escRatingsCalcCompetency(nick);
+    var finalScore=escRatingsCalcFinal(nick);
+    var finalRating=ratingsLabel(finalScore);
+
+    html+='<tr>'
+      +'<td class="td-name"><div style="display:flex;align-items:center;gap:8px">'
+      +avEl(nick,28)
+      +'<div><div style="font-size:12px;font-weight:600">'+m.fullName+'</div>'
+      +'<div style="font-size:10px;color:var(--muted)">escalation</div></div></div></td>'
+      /* KPIs */
+      +'<td>'+(kpi.avgSLA!==null?kpi.avgSLA+'%':'—')+'<div style="font-size:9px;color:var(--muted2)">team avg</div></td>'
+      +'<td>'+kpi.handled+'</td>'
+      /* perf */
+      +'<td><span class="rt-score">'+(perfScore!==null?perfScore.toFixed(2):'—')+'</span></td>'
+      +'<td><span class="r-pill '+perfRating.cls+'">'+perfRating.label+'</span></td>'
+      /* competency */
+      +'<td><select class="rt-comp-sel" onchange="escRatingsSetComp(\''+nick+'\',\'c1\',this.value)">'+ratingsCompOpts(comp.c1)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="escRatingsSetComp(\''+nick+'\',\'c2\',this.value)">'+ratingsCompOpts(comp.c2)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="escRatingsSetComp(\''+nick+'\',\'c3\',this.value)">'+ratingsCompOpts(comp.c3)+'</select></td>'
+      +'<td><span class="rt-score">'+(compScore!==null?compScore.toFixed(2):'—')+'</span></td>'
+      /* final */
+      +'<td><div><span class="rt-score">'+(finalScore!==null?finalScore.toFixed(2):'—')+'</span>'
+      +'<div style="margin-top:3px"><span class="r-pill '+finalRating.cls+'">'+finalRating.label+'</span></div></div></td>'
+      +'</tr>';
+  });
+
+  html+='</tbody></table>';
+  html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--muted)">'
+    +'<span>Formula: <strong>Final = (Perf Score × 60%) + (Comp Score × 40%)</strong></span>'
+    +'<span style="margin-left:auto">Perf Score = (SLA×'+escRatingsState.wSLA+'% + Esc Handled×'+escRatingsState.wQEsc+'%)</span>'
+    +'</div>'
+    +'<div style="margin-top:8px;font-size:10px;color:var(--muted2)">&#9432; Escalation SLA % is a team-wide metric logged by the manager. It applies equally across all escalation members for the selected period.</div>';
+
+  wrap.innerHTML=html;
+}
+
+function escRatingsOnWeight(){
+  var ws=parseFloat(G('ert-w-sla').value)||0;
+  var wq=parseFloat(G('ert-w-qesc').value)||0;
+  var total=ws+wq;
+  var tEl=G('ert-w-total');
+  if(tEl){tEl.textContent='= '+total+'%';tEl.style.color=total===100?'var(--green)':'#ef4444';}
+  if(total===100){escRatingsState.wSLA=ws;escRatingsState.wQEsc=wq;renderEscRatingsTable();}
+}
+
+function escRatingsSaveAndToast(){
+  escRatingsSave();
+  var btn=document.querySelector('#rt-pane-escalation button[onclick="escRatingsSaveAndToast()"]');
+  if(btn){var orig=btn.textContent;btn.textContent='✓ Saved!';btn.style.background='var(--green)';setTimeout(function(){btn.textContent=orig;btn.style.background='';},1800);}
+}
+
+function escRatingsOpenBands(){
+  var overlay=G('ert-bands-overlay');if(!overlay)return;
+  overlay.style.display='flex';
+  var body=G('ert-bands-body');if(!body)return;
+  var metrics=[
+    {key:'sla',label:'Escalation SLA %',hint:'Average team SLA % for the period (logged by manager)'},
+    {key:'qesc',label:'Escalations Handled',hint:'Count of quality escalations handled by this member'},
+  ];
+  var html='';
+  var labels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
+  metrics.forEach(function(m){
+    html+='<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;margin-bottom:4px">'+m.label+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:8px">'+m.hint+'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<tr><th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Rating</th>'
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Min</th>'
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>';
+    for(var r=5;r>=1;r--){
+      var b=escRatingsState.bands[m.key][r];
+      html+='<tr>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text)">'+labels[r]+'</td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-emetric="'+m.key+'" data-er="'+r+'" data-epos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-emetric="'+m.key+'" data-er="'+r+'" data-epos="1" value="'+(b[1]>=9000?9999:b[1])+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center" placeholder="9999=∞"></td>'
+        +'</tr>';
+    }
+    html+='</table></div>';
+  });
+  body.innerHTML=html;
+}
+
+function escRatingsSaveBands(){
+  G('ert-bands-body').querySelectorAll('input[data-emetric]').forEach(function(inp){
+    var metric=inp.dataset.emetric,r=parseInt(inp.dataset.er),pos=parseInt(inp.dataset.epos);
+    escRatingsState.bands[metric][r][pos]=parseFloat(inp.value)||0;
+  });
+  escRatingsCloseBands();
+  renderEscRatingsTable();
+}
+
+function escRatingsCloseBands(){
+  var o=G('ert-bands-overlay');if(o)o.style.display='none';
+}
+
+
 var mgrHubCustomRange={from:'',to:''};
 
 function renderManagerHub(){
