@@ -4364,6 +4364,27 @@ function showUnoInviteToast(players){
 
 
 /* ══════════════════════════════════════════════════
+   KNOWLEDGE CHECK QUESTIONS
+   ══════════════════════════════════════════════════ */
+var KB_QUESTIONS=[
+  {id:1,cat:"Address",q:"The submission shows the address as 10 Smith Street but the contract reads 10 Smith St. What do you do?",opts:["Do not upload. Flag to escalation.","Proceed as normal — it is the same address.","Contact the agent before doing anything.","Upload and leave a note for tagging."],ans:1,exp:"Different street designator formats (Street vs St) represent the same address. Proceed normally."},
+  {id:2,cat:"Address",q:"The submission shows unit 5/10 Smith Street but the contract shows Unit 5, 10 Smith Street. What do you do?",opts:["Do not upload — the address is different.","Proceed — different format, same address.","Flag to escalation.","Ask the agent to resubmit."],ans:1,exp:"Different format, same address. Proceed."},
+  {id:3,cat:"Address",q:"The submission shows 12A Smith Street but the contract shows 12 Smith Street. What do you do?",opts:["Proceed — minor difference.","Do not upload. Flag to escalation.","Upload with a note for tagging.","Contact the agent to confirm."],ans:1,exp:"The unit/lot detail differs. Flag to escalation."},
+  {id:4,cat:"Address",q:"A submission comes in for Lot 5, 10 Smith Street but the contract says 5/10 Smith Street. What do you do?",opts:["Do not upload — lot numbers are not unit numbers.","Flag to escalation immediately.","Proceed — these are different formats of the same address.","Check with your manager first."],ans:2,exp:"Lot 5 and 5/10 are the same address in different formats. Proceed."},
+  {id:5,cat:"Dates",q:"The submission date is today but the contract execution date is two weeks ago. What do you do?",opts:["Upload — submission date is what matters.","Flag to escalation — dates don't match.","Do not upload under any circumstance.","Ask the agent to resubmit with today's date."],ans:0,exp:"The submission date and contract execution date can differ. Upload normally."},
+  {id:6,cat:"Dates",q:"The contract shows a settlement date that has already passed. What do you do?",opts:["Upload normally.","Flag to escalation.","Do not upload — contract is expired.","Contact the agent first."],ans:1,exp:"A past settlement date is a flag. Escalate for review."},
+  {id:7,cat:"Parties",q:"The buyer name on the submission is 'John Smith' but the contract reads 'John A. Smith'. What do you do?",opts:["Flag to escalation — names don't match.","Proceed — middle initial does not change identity.","Do not upload.","Ask agent to correct the submission."],ans:1,exp:"A middle initial does not constitute a name mismatch. Proceed."},
+  {id:8,cat:"Parties",q:"The submission lists one buyer but the contract has two buyers. What do you do?",opts:["Proceed — one buyer is enough.","Flag to escalation.","Upload and note the discrepancy.","Contact the agent."],ans:1,exp:"Missing party on the submission is a discrepancy. Flag to escalation."},
+  {id:9,cat:"Documents",q:"The contract is missing the vendor signature page. What do you do?",opts:["Upload — buyer signature is enough.","Flag to escalation.","Do not upload.","Ask agent to resend."],ans:1,exp:"Missing required signatures must be escalated."},
+  {id:10,cat:"Documents",q:"You receive a contract with pages clearly out of order but all pages are present. What do you do?",opts:["Do not upload — document is malformed.","Proceed — all pages are present.","Flag to escalation.","Contact agent to resubmit."],ans:1,exp:"Page order does not affect validity if all pages are present. Proceed."},
+  {id:11,cat:"Price",q:"The submission shows a purchase price of $500,000 but the contract reads $500K. What do you do?",opts:["Flag to escalation — prices don't match.","Proceed — $500K equals $500,000.","Do not upload.","Ask agent to clarify."],ans:1,exp:"$500K is shorthand for $500,000. Proceed normally."},
+  {id:12,cat:"Price",q:"The purchase price on the contract has been handwritten over a typed amount. What do you do?",opts:["Proceed if initialled by all parties.","Do not upload — alterations are invalid.","Flag to escalation.","Upload and leave a note."],ans:0,exp:"Handwritten alterations are valid if initialled by all parties."},
+  {id:13,cat:"Process",q:"An agent emails asking for the status of a submission. What is the correct response?",opts:["Reply with full contract details.","Direct them to the portal status tracker.","Ask your manager to handle it.","Ignore — agents should not contact processing."],ans:1,exp:"Direct agents to the portal status tracker for submission status."},
+  {id:14,cat:"Process",q:"You are unsure whether a document qualifies for upload. What should you do first?",opts:["Upload and see if it gets flagged.","Check the knowledge base.","Ask a colleague.","Escalate immediately."],ans:1,exp:"Check the knowledge base first. Escalate only if the KB does not resolve it."},
+  {id:15,cat:"Process",q:"A duplicate submission arrives for a contract already uploaded. What do you do?",opts:["Upload it — the system will deduplicate.","Flag as duplicate and do not upload.","Delete the original and upload the new one.","Escalate to the manager."],ans:1,exp:"Mark as duplicate and do not upload. The original stands."}
+];
+
+/* ══════════════════════════════════════════════════
    KNOWLEDGE CHECK SYSTEM
    ══════════════════════════════════════════════════ */
 var KC_KEY='lp_kc_v1'; /* kept for legacy fallback */
