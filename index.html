@@ -2546,33 +2546,37 @@ async function upgradeToEscalation(){
 async function discardReview(){
   var modal=G('modal-error-review');
   var threadId=modal.dataset.threadId;
-  /* _pendingReviews entries use _fsId as their document ID */
   var thread=(window._pendingReviews||[]).find(function(r){return r._fsId===threadId||r.id===threadId;});
   if(!thread){console.warn('discardReview: thread not found for threadId',threadId);return;}
   if(!confirm('Discard this error? It will be kept as a hidden record but never shown to the uploader.'))return;
-  /* Mark in local array immediately so UI updates before Firestore confirms */
+  /* Step 1: Immediately mark as dismissed so snapshot can never re-add it */
+  if(!window._dismissedReviews)window._dismissedReviews=new Set();
+  if(thread._fsId)window._dismissedReviews.add(thread._fsId);
+  /* Step 2: Remove from local array and mark status */
   thread.status='discarded';
-  window._pendingReviews=window._pendingReviews.filter(function(r){return r._fsId!==threadId&&r.id!==threadId;});
-  /* Find matching callout by calloutId (_fsId or numeric) */
-  var co=callouts.find(function(c){
-    return c._fsId===String(thread.calloutId)||c._fsId===thread.calloutFsId||String(c.id)===String(thread.calloutId);
+  window._pendingReviews=(window._pendingReviews||[]).filter(function(r){
+    return r._fsId!==threadId&&r.id!==threadId;
   });
-  if(co){
-    co.status='discarded';
-    if(co._fsId){
-      try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'discarded'});}
-      catch(e){console.warn('discard callout',e);}
-    }
-  }
-  /* Mark errorReviews doc as discarded */
-  if(thread._fsId){
-    try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}
-    catch(e){console.warn('discard review',e);}
-  }
+  /* Step 3: Close modals and refresh UI immediately — don't wait for Firestore */
   G('modal-error-review').classList.remove('open');
   G('modal-reviews').classList.remove('open');
   updateReviewBadge();
   if(typeof renderQualityPortal==='function')renderQualityPortal();
+  /* Step 4: Find matching callout and update locally */
+  var co=callouts.find(function(c){
+    return (thread.calloutFsId&&c._fsId===thread.calloutFsId)
+      ||(thread.calloutId&&(c._fsId===String(thread.calloutId)||String(c.id)===String(thread.calloutId)));
+  });
+  if(co)co.status='discarded';
+  /* Step 5: Write to Firestore in background — no await, snapshot will be filtered by _dismissedReviews */
+  if(fsDb()){
+    if(co&&co._fsId){
+      window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'discarded'}).catch(function(e){console.warn('discard callout write',e);});
+    }
+    if(thread._fsId){
+      window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'}).catch(function(e){console.warn('discard review write',e);});
+    }
+  }
 }
 
 /* Load pending reviews from Firestore on login */
@@ -2809,8 +2813,9 @@ function activateTestMode(role){
   /* Re-render entire app as this member */
   buildSidebar();buildMain();
   setTimeout(function(){
-    /* Show test mode banner */
     _showTestBanner();
+    /* Ensure quality remarks render for the simulated member */
+    if(typeof renderQualityPortal==='function'&&G('qp-list'))renderQualityPortal();
   },200);
 }
 
@@ -3044,7 +3049,7 @@ function buildUploaderDOM(){
             <span id="chev-quality-remarks" style="font-size:12px;color:var(--muted);transition:transform .2s;display:inline-block">&#8964;</span>
           </div>
         </div>
-        <div id="body-quality-remarks" style="overflow:hidden;transition:max-height .25s ease;max-height:2000px">
+        <div id="body-quality-remarks" style="overflow-y:auto;transition:max-height .3s ease;max-height:4000px">
           <div class="qp-list" id="qp-list"></div>
         </div>
       </div>
@@ -3261,7 +3266,16 @@ function toggleUplSection(id){
   var chev=G('chev-'+id);
   if(!body)return;
   var collapsed=body.style.maxHeight==='0px';
-  body.style.maxHeight=collapsed?'2000px':'0px';
+  if(collapsed){
+    body.style.maxHeight='4000px';
+    body.style.overflowY='auto';
+  } else {
+    /* Before collapsing, scroll the sect header into view smoothly */
+    var sect=body.previousElementSibling;
+    if(sect)sect.scrollIntoView({behavior:'smooth',block:'nearest'});
+    body.style.maxHeight='0px';
+    body.style.overflowY='hidden';
+  }
   if(chev)chev.style.transform=collapsed?'':'rotate(180deg)';
 }
 
@@ -10033,7 +10047,7 @@ function renderQualityPortal(){
       +'<div id="qp-detail-'+_ckey+'" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
       +'<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Error Description</div>'
       +'<div class="qp-body">'+c.feedback+'</div>'+ss+ackSect
-      +'<div class="qp-footer"><span style="font-size:10px;color:var(--muted2)">Logged by: '+logger+'</span>'+completeBtn+'</div>'
+      +'<div class="qp-footer">'+(role==='manager'||role==='escalation'?'<span style="font-size:10px;color:var(--muted2)">Logged by: '+logger+'</span>':'')+completeBtn+'</div>'
       +'</div>'
       +'</div>';
   }).join('');
