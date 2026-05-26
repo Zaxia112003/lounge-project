@@ -4084,11 +4084,11 @@ function deleteArticle(id){
 /* ── GAMES ── moved to standalone games.html ── */
 /* Credit stubs — actual credit logic lives in games.html */
 var _credCache={};
-var CREDITS_MAX=10;
+var CREDITS_MAX=9999; /* no cap */
 function credGet(nick){if(!nick&&cu)nick=cu&&cu.nickname;return _credCache[nick]||{credits:0};}
 function credAward(nick,amount){
   var state=Object.assign({},credGet(nick));
-  state.credits=Math.min((state.credits||0)+amount,CREDITS_MAX);
+  state.credits=(state.credits||0)+amount; /* no cap */
   _credCache[nick]=state;
   if(fsDb())try{window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true});}catch(e){}
   updateCreditBadge();
@@ -4999,6 +4999,10 @@ async function kcFinish(){
     answers:slimAnswers
   });
   if(passed)s.completed=true;
+  /* Award 5 credits silently for a perfect score (10/10) */
+  if(score===KC_Q_COUNT&&cu){
+    credAward(cu.nickname,5);
+  }
   try{
     await kcSaveState(nick,s);
   }catch(e){
@@ -7632,45 +7636,7 @@ async function sendAIMessage(){
   if(text.trim()==='112003'){
     input.value='';input.style.height='auto';
     var msgs=G('ai-messages');
-    if(!msgs)return;
-    /* Check daily usage from Firestore */
-    var today=getSydneyDate().toISOString().slice(0,10);
-    var nick=cu?cu.nickname:'';
-    var TEST_CREDITS=3;
-    (async function(){
-      var usageKey='testCredit_'+nick;
-      var lastUsed=null,usedDate=null;
-      try{
-        if(fsDb()){
-          var snap=await window._fsGetDoc(window._fsDoc(fsDb(),'adminTestUsage',nick));
-          if(snap.exists()){lastUsed=snap.data().date;usedDate=snap.data().date;}
-        }
-      }catch(e){lastUsed=localStorage.getItem(usageKey);}
-      if(lastUsed===today){
-        msgs.innerHTML+=aiKobyBubble('🔒 Sorry, you\'ve already used your free test credits today! Come back tomorrow, or upload more contracts to earn credits. 😊');
-        msgs.scrollTop=msgs.scrollHeight;
-        return;
-      }
-      /* Grant 3 credits */
-      var state=Object.assign({},credGet(nick));
-      var current=state.credits||0;
-      var toAdd=Math.min(TEST_CREDITS,CREDITS_MAX-current);
-      if(toAdd<=0){
-        msgs.innerHTML+=aiKobyBubble('🎮 You already have '+current+' credits — you\'re all set!');
-        msgs.scrollTop=msgs.scrollHeight;
-        return;
-      }
-      state.credits=current+toAdd;
-      _credCache[nick]=state;
-      if(fsDb()){
-        try{await window._fsSetDoc(window._fsDoc(fsDb(),'player_credits',nick),state,{merge:true});}catch(e){}
-        try{await window._fsSetDoc(window._fsDoc(fsDb(),'adminTestUsage',nick),{date:today,nick:nick},{merge:true});}catch(e){}
-      }
-      localStorage.setItem(usageKey,today);
-      updateCreditBadge();
-      msgs.innerHTML+=aiKobyBubble('🔓 Test mode activated! I\'ve added <strong>'+toAdd+' free credits</strong> to your account. Have fun! 🎮<br><small style="color:var(--muted);font-size:10px">Note: This can only be used once per day.</small>');
-      msgs.scrollTop=msgs.scrollHeight;
-    })();
+    if(msgs){msgs.innerHTML+=aiKobyBubble('🔒 That code has been disabled. Ask your manager to top up your Game Corner credits directly. 🎮');msgs.scrollTop=msgs.scrollHeight;}
     return;
   }
 

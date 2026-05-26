@@ -86,11 +86,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
       <input type="range" min="0" max="1" step="0.01" value="0.22" oninput="setVol(this.value)">
       <button id="music-toggle-btn" class="btn btn-outline" style="width:100%;margin-top:10px;font-size:11px" onclick="toggleMusic()">▶ Play</button>
     </div>
+    <!-- Manager credit panel toggle -->
+    <button id="mgr-credits-btn" style="display:none;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer" onclick="toggleMgrPanel()">👑 Credits</button>
     <div class="user-chip" id="user-chip" style="display:none">
       <div class="av" id="user-av"></div>
       <div class="user-nick" id="user-nick"></div>
     </div>
   </div>
+</div>
+
+<!-- Manager credit management panel -->
+<div id="mgr-panel-wrap" style="display:none;position:fixed;top:58px;right:0;width:280px;height:calc(100vh - 58px);background:var(--surface);border-left:1px solid var(--border);z-index:200;overflow-y:auto;padding:16px;box-shadow:-4px 0 20px rgba(0,0,0,.3);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700;color:var(--text)">👑 Credit Manager</div>
+    <button onclick="toggleMgrPanel()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+    Each game costs <strong style="color:var(--text)">3 credits</strong>. Use + / − to adjust member balances.
+  </div>
+  <div id="mgr-pane"></div>
 </div>
 
 <div class="main">
@@ -104,6 +118,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <div class="game-grid" id="solo-grid"></div>
     <div class="section-label">Multiplayer</div>
     <div class="game-grid" id="multi-grid"></div>
+    <!-- Hidden card games — unlocks at 5+ credits -->
+    <div id="card-section" style="margin-top:8px">
+      <div id="card-lock-banner" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="tryUnlockCards()">
+        <span style="font-size:22px">🔒</span>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text)">Card Games</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Requires 5 credits to unlock · You have <span id="lock-credits-count">0</span> credits</div>
+        </div>
+        <div style="margin-left:auto;font-size:11px;color:var(--muted2)">Tap to unlock ›</div>
+      </div>
+      <div id="card-games-wrap" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="section-label" style="margin-bottom:0">🃏 Card Games</div>
+          <button onclick="collapseCards()" style="font-size:11px;padding:3px 10px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer">Collapse ▲</button>
+        </div>
+        <div class="game-grid" id="card-grid"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -257,8 +289,11 @@ var SND={
    CREDITS
 ═══════════════════════════════════════════════════ */
 function updateCreditUI(){
-  var el=G('credit-pill');if(el)el.textContent='🎮 '+credits+' credit'+(credits!==1?'s':'');
+  var el=G('credit-pill');if(el)el.textContent='🎮 '+credits+' credit'+(credits!==1?'s':'')+' · '+CREDIT_COST+' per game';
+  renderCardLock();
 }
+var CREDIT_COST=3; /* credits per game */
+
 function spendCredit(cb){
   if(!cu){toast('Not signed in — open the Portal first.');return;}
   if(cu.role==='manager'){cb();return;}
@@ -268,18 +303,66 @@ function spendCredit(cb){
     }).catch(function(){cb();});
     return;
   }
-  if(credits<1){toast('Not enough credits! Earn more by uploading contracts.');return;}
-  credits--;updateCreditUI();
+  if(credits<CREDIT_COST){toast('Not enough credits! You need '+CREDIT_COST+' credits to play. Ask your manager to top up. 🎮');return;}
+  credits-=CREDIT_COST;updateCreditUI();
   db.collection('player_credits').doc(cu.nickname).set({credits:credits},{merge:true}).catch(function(){});
   cb();
 }
+
 function awardCredit(nick,amount){
   db.collection('player_credits').doc(nick).get().then(function(snap){
     var c=snap.exists?(snap.data().credits||0):0;
-    var nc=Math.min(c+amount,10);
+    var nc=c+amount; /* no cap */
     db.collection('player_credits').doc(nick).set({credits:nc},{merge:true});
     if(cu&&cu.nickname===nick){credits=nc;updateCreditUI();}
   }).catch(function(){});
+}
+
+/* ── MANAGER CREDIT PANEL ── */
+var _allCredits={};
+
+function renderMgrPanel(){
+  var pane=G('mgr-pane');if(!pane)return;
+  var members=_allCredits;
+  var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Team Credits</div>';
+  var keys=Object.keys(members);
+  if(!keys.length){html+='<div style="font-size:11px;color:var(--muted)">Loading…</div>';pane.innerHTML=html;return;}
+  keys.sort().forEach(function(nick){
+    var c=members[nick];
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nick+'</div>'
+        +'<div style="font-size:10px;color:var(--muted)">'+c+' credit'+(c!==1?'s':'')+'</div>'
+      +'</div>'
+      +'<button onclick="mgrAdjCredit(\''+nick+'\',-1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">−</button>'
+      +'<button onclick="mgrAdjCredit(\''+nick+'\',1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>'
+      +'</div>';
+  });
+  pane.innerHTML=html;
+}
+
+function mgrAdjCredit(nick,delta){
+  db.collection('player_credits').doc(nick).get().then(function(snap){
+    var c=snap.exists?(snap.data().credits||0):0;
+    var nc=Math.max(0,c+delta); /* no cap */
+    db.collection('player_credits').doc(nick).set({credits:nc},{merge:true}).then(function(){
+      _allCredits[nick]=nc;
+      renderMgrPanel();
+      toast((delta>0?'+1 credit':'−1 credit')+' for '+nick+' → '+nc+' total');
+    });
+  }).catch(function(){toast('Error updating credits.');});
+}
+
+function loadAllCredits(){
+  db.collection('player_credits').get().then(function(snap){
+    snap.forEach(function(d){_allCredits[d.id]=d.data().credits||0;});
+    /* Also subscribe for live updates */
+    db.collection('player_credits').onSnapshot(function(snap){
+      snap.forEach(function(d){_allCredits[d.id]=d.data().credits||0;});
+      renderMgrPanel();
+    });
+    renderMgrPanel();
+  }).catch(function(){G('mgr-pane').innerHTML='<div style="font-size:11px;color:var(--muted)">Could not load credits.</div>';});
 }
 
 /* ═══════════════════════════════════════════════════
@@ -369,6 +452,10 @@ function launchGame(id,title){
       else if(id==='solitaire')gameSolitaire(body);
       else if(id==='kbquiz')gameKBQuiz(body);
       else if(id==='uno')gameUNO(body);
+      else if(id==='lucky9')gameLucky9(body);
+      else if(id==='pusoy')gamePusoyDos(body);
+      else if(id==='tongits')gameTongIts(body);
+      else if(id==='poker')gamePoker(body);
     },60);
   });
 }
@@ -387,18 +474,71 @@ function renderGrid(){
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base'},
     {id:'uno',e:'🃏',n:'UNO',d:'1 player vs 1–3 AI opponents'},
   ];
-  function makeTile(g,mp){
+  var cardGames=[
+    {id:'lucky9',e:'9️⃣',n:'Lucky 9',d:'Get closest to 9 — beat the dealer'},
+    {id:'pusoy',e:'🂢',n:'Pusoy Dos',d:'Big Two — 1 vs 3 AI opponents'},
+    {id:'tongits',e:'🀄',n:'Tong Its',d:'Draw & discard — go Tong-Its to win'},
+    {id:'poker',e:'♠️',n:'Texas Hold\'em',d:'Community cards — best 5-card hand wins'},
+  ];
+  function makeTile(g,mp,isCard){
     var div=document.createElement('div');
-    div.className='tile'+(mp?' multi':'');
+    div.className='tile'+(mp?' multi':'')+(isCard?' card-tile':'');
     div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
       +'<div class="tile-name">'+g.n+'<span class="badge '+(mp?'multi-b':'solo-b')+'">'+(mp?'Multi':'Solo')+'</span></div>'
       +'<div class="tile-desc">'+g.d+'</div>';
     div.addEventListener('click',(function(id,title){return function(){launchGame(id,title);};})(g.id,g.e+' '+g.n));
     return div;
   }
-  var sg=G('solo-grid'),mg=G('multi-grid');sg.innerHTML='';mg.innerHTML='';
-  solo.forEach(function(g){sg.appendChild(makeTile(g,false));});
-  multi.forEach(function(g){mg.appendChild(makeTile(g,true));});
+  var sg=G('solo-grid'),mg=G('multi-grid'),cg=G('card-grid');
+  sg.innerHTML='';mg.innerHTML='';if(cg)cg.innerHTML='';
+  solo.forEach(function(g){sg.appendChild(makeTile(g,false,false));});
+  multi.forEach(function(g){mg.appendChild(makeTile(g,true,false));});
+  if(cg)cardGames.forEach(function(g){cg.appendChild(makeTile(g,false,true));});
+  renderCardLock();
+}
+
+function renderCardLock(){
+  var banner=G('card-lock-banner');
+  var wrap=G('card-games-wrap');
+  var countEl=G('lock-credits-count');
+  if(!banner||!wrap)return;
+  if(cu&&cu.role==='manager'){
+    banner.style.display='none';wrap.style.display='';return;
+  }
+  if(countEl)countEl.textContent=credits;
+  if(credits>=5){
+    banner.style.display='none';
+    /* Don't auto-open — let them click to reveal */
+    if(wrap.style.display==='none'){
+      /* Show unlock banner instead */
+      banner.style.display='flex';
+      banner.style.background='rgba(37,211,102,.08)';
+      banner.style.borderColor='rgba(37,211,102,.3)';
+      banner.querySelector('span').textContent='🔓';
+      banner.querySelector('.section-label')||
+        (banner.querySelector('div div').firstChild.textContent='Card Games — Unlocked!');
+      banner.querySelector('[style*="color:var(--muted2)"]').textContent='Tap to open ›';
+    }
+  } else {
+    banner.style.display='flex';banner.style.background='';banner.style.borderColor='';
+    wrap.style.display='none';
+  }
+}
+
+function tryUnlockCards(){
+  if(!cu||cu.role==='manager'){G('card-games-wrap').style.display='';G('card-lock-banner').style.display='none';return;}
+  if(credits>=5){
+    G('card-games-wrap').style.display='';
+    G('card-lock-banner').style.display='none';
+    SND.win();toast('🃏 Card games unlocked!');
+  } else {
+    toast('You need at least 5 credits to unlock card games. You have '+credits+'. 🔒');
+  }
+}
+
+function collapseCards(){
+  G('card-games-wrap').style.display='none';
+  renderCardLock();
 }
 
 /* ═══════════════════════════════════════════════════
@@ -466,6 +606,12 @@ function applyTheme(nick){
   }
 }
 
+function toggleMgrPanel(){
+  var wrap=G('mgr-panel-wrap');
+  if(!wrap)return;
+  wrap.style.display=wrap.style.display==='none'?'block':'none';
+}
+
 function init(){
   var nick=localStorage.getItem('lounge_nick');
   var full=localStorage.getItem('lounge_full');
@@ -476,6 +622,12 @@ function init(){
   cu={nickname:nick,fullName:full||nick,role:role||'uploader'};
   G('user-av').textContent=(full||nick).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
   G('user-nick').textContent=full||nick;
+  /* Show manager credit panel button */
+  if(cu.role==='manager'){
+    var mgrBtn=G('mgr-credits-btn');
+    if(mgrBtn)mgrBtn.style.display='';
+    loadAllCredits();
+  }
   db.collection('player_credits').doc(nick).onSnapshot(function(snap){
     credits=snap.exists?(snap.data().credits||0):0;creditsLoaded=true;updateCreditUI();
   });
@@ -1066,7 +1218,7 @@ function gameUNO(C){
       }
       pile.push(card);SND.card();
       applyEffect(card);
-      if(!myHand.length){gover=true;SND.win();setScore('You win! 🃏');awardCredit(cu.nickname,2);toast('+2 credits for winning UNO! 🎮');render();return;}
+      if(!myHand.length){gover=true;SND.win();setScore('You win! 🃏');toast('🎉 UNO! You win!');render();return;}
       if(myHand.length===1){SND.uno();toast('UNO! 🃏');}
       nextTurn();render();
     }
@@ -1144,6 +1296,748 @@ window.addEventListener('DOMContentLoaded',function(){
   var uc=document.getElementById('user-chip');if(uc)uc.style.display='flex';
   init();
 });
+</script>
+<script>
+/* ═══════════════════════════════════════════════════
+   SHARED CARD UTILITIES
+═══════════════════════════════════════════════════ */
+var _SUITS=['♠','♥','♦','♣'];
+var _VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+var _RED=['♥','♦'];
+function _isRed(s){return _RED.includes(s);}
+function _mkDeck(n){
+  var d=[];
+  for(var i=0;i<(n||1);i++)
+    _SUITS.forEach(function(s){_VALS.forEach(function(v){d.push({s:s,v:v});});});
+  return d.sort(function(){return Math.random()-.5;});
+}
+function _vi(v){return _VALS.indexOf(v);}
+function _cardEl(c,w,h,faceDown){
+  var el=document.createElement('div');
+  el.style.cssText='width:'+(w||54)+'px;height:'+(h||78)+'px;border-radius:7px;flex-shrink:0;display:flex;flex-direction:column;justify-content:space-between;padding:3px 5px;cursor:pointer;user-select:none;box-shadow:0 2px 6px rgba(0,0,0,.25);border:1px solid #ccc;';
+  if(faceDown){
+    el.style.background='linear-gradient(135deg,#1e2035,#2a2d4a)';
+    el.style.border='1px solid #3a3d5a';
+    return el;
+  }
+  var color=_isRed(c.s)?'#d00':'#111';
+  el.style.background='#fff';el.style.color=color;
+  el.innerHTML='<div style="font-size:11px;font-weight:700;line-height:1.1">'+c.v+'<br>'+c.s+'</div>'
+    +'<div style="font-size:11px;font-weight:700;line-height:1.1;align-self:flex-end;transform:rotate(180deg)">'+c.v+'<br>'+c.s+'</div>';
+  return el;
+}
+
+/* ═══════════════════════════════════════════════════
+   LUCKY 9
+   Closest to 9 wins. Face cards = 0. A = 1.
+   Player gets 2 cards, can draw a 3rd. Dealer does same.
+═══════════════════════════════════════════════════ */
+function gameLucky9(C){
+  var deck,playerHand,dealerHand,phase,playerScore,dealerScore,bet=1;
+
+  function cardVal(c){
+    if(['J','Q','K','10'].includes(c.v))return 0;
+    if(c.v==='A')return 1;
+    return parseInt(c.v);
+  }
+  function handScore(hand){
+    return hand.reduce(function(s,c){return s+cardVal(c);},0)%10;
+  }
+  function newGame(){
+    deck=_mkDeck();playerHand=[];dealerHand=[];
+    playerHand.push(deck.pop(),deck.pop());
+    dealerHand.push(deck.pop(),deck.pop());
+    phase='draw';SND.card();render();
+  }
+
+  function render(){
+    var wrap=document.createElement('div');
+    wrap.style.cssText='text-align:center;padding:4px 0';
+
+    /* Dealer */
+    var dLabel=document.createElement('div');
+    dLabel.style.cssText='font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px';
+    dLabel.textContent='Dealer';
+    wrap.appendChild(dLabel);
+
+    var dRow=document.createElement('div');
+    dRow.style.cssText='display:flex;gap:6px;justify-content:center;margin-bottom:4px';
+    dealerHand.forEach(function(c,i){
+      dRow.appendChild(_cardEl(c,54,78,phase==='draw'&&i===1));
+    });
+    wrap.appendChild(dRow);
+
+    if(phase!=='draw'){
+      var ds=document.createElement('div');
+      ds.style.cssText='font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)';
+      ds.textContent='Score: '+handScore(dealerHand);
+      wrap.appendChild(ds);
+    } else {
+      var sp=document.createElement('div');sp.style.height='20px';wrap.appendChild(sp);
+    }
+
+    /* Player */
+    var pLabel=document.createElement('div');
+    pLabel.style.cssText='font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px';
+    pLabel.textContent='You';
+    wrap.appendChild(pLabel);
+
+    var pRow=document.createElement('div');
+    pRow.style.cssText='display:flex;gap:6px;justify-content:center;margin-bottom:6px';
+    playerHand.forEach(function(c){pRow.appendChild(_cardEl(c,54,78));});
+    wrap.appendChild(pRow);
+
+    var ps=document.createElement('div');
+    ps.style.cssText='font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text)';
+    ps.textContent='Your score: '+handScore(playerHand);
+    wrap.appendChild(ps);
+
+    /* Actions / Result */
+    if(phase==='draw'){
+      var btnRow=document.createElement('div');
+      btnRow.style.cssText='display:flex;gap:8px;justify-content:center';
+      var hitBtn=document.createElement('button');hitBtn.className='btn btn-primary';
+      hitBtn.textContent='Draw Card';hitBtn.onclick=function(){
+        if(playerHand.length>=3){toast('Max 3 cards!');return;}
+        playerHand.push(deck.pop());SND.card();
+        if(playerHand.length===3){phase='result';dealerPlay();}
+        else render();
+      };
+      var standBtn=document.createElement('button');standBtn.className='btn btn-outline';
+      standBtn.textContent='Stand';standBtn.onclick=function(){phase='result';dealerPlay();};
+      btnRow.appendChild(hitBtn);btnRow.appendChild(standBtn);
+      wrap.appendChild(btnRow);
+    } else {
+      var ps2=handScore(playerHand),ds2=handScore(dealerHand);
+      var msg='',col='';
+      if(ps2>ds2){msg='🏆 You Win!';col='var(--green)';SND.win();setScore('Win');}
+      else if(ps2<ds2){msg='😞 Dealer Wins';col='var(--red)';SND.wrong();setScore('Loss');}
+      else{msg='🤝 Draw!';col='var(--amber)';setScore('Draw');}
+      var result=document.createElement('div');
+      result.style.cssText='font-size:18px;font-weight:700;color:'+col+';margin-bottom:14px';
+      result.textContent=msg;
+      wrap.appendChild(result);
+      var nb=document.createElement('button');nb.className='btn btn-primary';nb.textContent='Play Again';
+      nb.onclick=function(){saveScore('lucky9',ps2===9?1:0,true);newGame();};
+      wrap.appendChild(nb);
+    }
+
+    C.innerHTML='';C.appendChild(wrap);
+  }
+
+  function dealerPlay(){
+    /* Dealer draws if score < 6 */
+    if(handScore(dealerHand)<6&&dealerHand.length<3){
+      dealerHand.push(deck.pop());SND.card();
+    }
+    render();
+  }
+
+  newGame();
+}
+
+/* ═══════════════════════════════════════════════════
+   PUSOY DOS (Big Two)
+   1 player vs 3 AI. 2♠ starts. Highest card = 2.
+   Suit order: ♠>♥>♦>♣. Plays: single,pair,triple,5-card.
+═══════════════════════════════════════════════════ */
+function gamePusoyDos(C){
+  /* Card rank: 3 lowest, 2 highest */
+  var ORDER=['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
+  var SUIT_ORDER=['♣','♦','♥','♠'];
+  var AI_NAMES=['🤖 Bot A','🤖 Bot B','🤖 Bot C'];
+
+  function cRank(c){return ORDER.indexOf(c.v)*4+SUIT_ORDER.indexOf(c.s);}
+  function cStr(c){return c.v+c.s;}
+  function sortHand(h){return h.slice().sort(function(a,b){return cRank(a)-cRank(b);});}
+
+  /* Detect play type and rank */
+  function classifyPlay(cards){
+    if(!cards||!cards.length)return null;
+    var n=cards.length;
+    var sorted=sortHand(cards);
+    if(n===1)return{type:'single',rank:cRank(cards[0])};
+    if(n===2&&cards[0].v===cards[1].v)return{type:'pair',rank:Math.max(cRank(cards[0]),cRank(cards[1]))};
+    if(n===3&&cards[0].v===cards[1].v&&cards[1].v===cards[2].v)return{type:'triple',rank:Math.max.apply(null,cards.map(cRank))};
+    if(n===5){
+      var vals=sorted.map(function(c){return ORDER.indexOf(c.v);});
+      var suits=sorted.map(function(c){return c.s;});
+      var isFlush=suits.every(function(s){return s===suits[0];});
+      var isStraight=vals[4]-vals[0]===4&&new Set(vals).size===5;
+      var groups={};cards.forEach(function(c){groups[c.v]=(groups[c.v]||0)+1;});
+      var counts=Object.values(groups).sort(function(a,b){return b-a;});
+      var topCard=sorted[4];
+      if(isFlush&&isStraight)return{type:'strflush',rank:cRank(topCard)};
+      if(counts[0]===4)return{type:'bomb',rank:cRank(topCard)};
+      if(counts[0]===3&&counts[1]===2)return{type:'fullhouse',rank:cRank(topCard)};
+      if(isFlush)return{type:'flush',rank:cRank(topCard)};
+      if(isStraight)return{type:'straight',rank:cRank(topCard)};
+    }
+    return null;
+  }
+
+  var TYPE_ORDER=['single','pair','triple','straight','flush','fullhouse','bomb','strflush'];
+  function beats(play,last){
+    if(!last)return true;
+    if(play.type!==last.type)return false;
+    return play.rank>last.rank;
+  }
+
+  /* Game state */
+  var hands,turn,lastPlay,lastPlayer,pass,gover,sel;
+
+  function deal(){
+    var deck=_mkDeck();
+    hands=[deck.slice(0,13),deck.slice(13,26),deck.slice(26,39),deck.slice(39,52)];
+    /* Find 3♣ to determine first player */
+    turn=0;
+    for(var i=0;i<4;i++){
+      if(hands[i].find(function(c){return c.v==='3'&&c.s==='♣';})){turn=i;break;}
+    }
+    lastPlay=null;lastPlayer=null;pass=0;gover=false;sel=[];
+    hands=hands.map(sortHand);
+  }
+
+  function aiPlay(ai){
+    var hand=hands[ai];
+    /* Simple AI: try to beat lastPlay */
+    if(!lastPlay||lastPlayer===ai){
+      /* Lead: play lowest single */
+      var c=hand[0];
+      var play=[c];
+      hands[ai]=hand.filter(function(x){return x!==c;});
+      lastPlay=classifyPlay(play);lastPlayer=ai;pass=0;
+      SND.card();
+      if(!hands[ai].length){gover=true;SND.wrong();setScore(AI_NAMES[ai-1]+' wins!');render();return;}
+      nextTurn();render();
+    } else {
+      /* Try to beat last play with same type */
+      var type=lastPlay.type;
+      var found=null;
+      if(type==='single'){
+        found=hand.find(function(c){return cRank(c)>lastPlay.rank;});
+        if(found){
+          hands[ai]=hand.filter(function(x){return x!==found;});
+          var p=[found];lastPlay=classifyPlay(p);lastPlayer=ai;pass=0;SND.card();
+          if(!hands[ai].length){gover=true;SND.wrong();setScore(AI_NAMES[ai-1]+' wins!');render();return;}
+          nextTurn();render();return;
+        }
+      }
+      /* Pass */
+      pass++;
+      if(pass>=3){lastPlay=null;lastPlayer=ai;pass=0;}
+      nextTurn();render();
+    }
+  }
+
+  function nextTurn(){turn=(turn+1)%4;if(turn!==0)setTimeout(function(){aiPlay(turn);},600);}
+
+  function playerPlay(){
+    if(!sel.length){toast('Select cards to play!');return;}
+    var play=classifyPlay(sel);
+    if(!play){toast('Not a valid combination!');return;}
+    if(lastPlay&&lastPlayer!==0&&!beats(play,lastPlay)){toast('Must beat the current play!');return;}
+    /* Must play 3♣ first */
+    if(!lastPlay&&!lastPlayer&&turn===0){
+      var has3c=sel.find(function(c){return c.v==='3'&&c.s==='♣';});
+      if(!has3c){toast('First play must include 3♣!');return;}
+    }
+    hands[0]=hands[0].filter(function(c){return !sel.includes(c);});
+    lastPlay=play;lastPlayer=0;pass=0;sel=[];SND.card();
+    if(!hands[0].length){gover=true;SND.win();setScore('You Win! 🏆');saveScore('pusoy',hands.slice(1).reduce(function(s,h){return s+h.length;},0),true);render();return;}
+    nextTurn();render();
+  }
+
+  function playerPass(){
+    if(lastPlayer===0){toast('You lead — you must play!');return;}
+    pass++;
+    if(pass>=3){lastPlay=null;lastPlayer=0;pass=0;}
+    sel=[];nextTurn();render();
+  }
+
+  function render(){
+    var wrap=document.createElement('div');
+
+    /* Opponent hands */
+    var oppRow=document.createElement('div');
+    oppRow.style.cssText='display:flex;gap:12px;justify-content:center;margin-bottom:10px;flex-wrap:wrap';
+    [1,2,3].forEach(function(i){
+      var box=document.createElement('div');box.style.cssText='text-align:center';
+      box.innerHTML='<div style="font-size:10px;color:var(--muted);margin-bottom:4px">'+AI_NAMES[i-1]
+        +'<span style="margin-left:4px;color:var(--text);font-weight:600">'+hands[i].length+' cards</span></div>';
+      var row=document.createElement('div');row.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
+      hands[i].slice(0,Math.min(hands[i].length,7)).forEach(function(){row.appendChild(_cardEl(null,28,40,true));});
+      if(hands[i].length>7){var more=document.createElement('span');more.style.cssText='font-size:10px;color:var(--muted);align-self:center';more.textContent='+' +(hands[i].length-7);row.appendChild(more);}
+      box.appendChild(row);oppRow.appendChild(box);
+    });
+    wrap.appendChild(oppRow);
+
+    /* Last play */
+    var lpBox=document.createElement('div');
+    lpBox.style.cssText='min-height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin-bottom:8px;background:var(--surface2);border-radius:10px;padding:8px;border:1px solid var(--border)';
+    if(lastPlay){
+      var lpLabel=document.createElement('div');lpLabel.style.cssText='font-size:10px;color:var(--muted);margin-bottom:6px';
+      lpLabel.textContent=(lastPlayer===0?'You':AI_NAMES[lastPlayer-1])+' played '+lastPlay.type;
+      lpBox.appendChild(lpLabel);
+    } else {
+      var ll=document.createElement('div');ll.style.cssText='font-size:11px;color:var(--muted)';ll.textContent=turn===0?'Your lead':'Waiting…';lpBox.appendChild(ll);
+    }
+    wrap.appendChild(lpBox);
+
+    /* Player hand */
+    var hLabel=document.createElement('div');
+    hLabel.style.cssText='font-size:11px;color:var(--muted);margin-bottom:6px;text-align:center';
+    hLabel.textContent='Your hand ('+hands[0].length+' cards) — tap to select';
+    wrap.appendChild(hLabel);
+
+    var hRow=document.createElement('div');
+    hRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:10px';
+    hands[0].forEach(function(c){
+      var isSelected=sel.includes(c);
+      var ce=_cardEl(c,44,64);
+      ce.style.transform=isSelected?'translateY(-8px)':'';
+      ce.style.boxShadow=isSelected?'0 4px 12px rgba(124,58,237,.5)':'0 2px 6px rgba(0,0,0,.25)';
+      ce.style.transition='transform .1s,box-shadow .1s';
+      (function(card){ce.onclick=function(){
+        if(gover||turn!==0)return;
+        var idx=sel.indexOf(card);
+        if(idx>-1)sel.splice(idx,1);else sel.push(card);
+        render();
+      };})(c);
+      hRow.appendChild(ce);
+    });
+    wrap.appendChild(hRow);
+
+    /* Action buttons */
+    if(!gover&&turn===0){
+      var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px;justify-content:center';
+      var playBtn=document.createElement('button');playBtn.className='btn btn-primary';
+      playBtn.textContent='Play ('+sel.length+' selected)';playBtn.onclick=playerPlay;
+      var passBtn=document.createElement('button');passBtn.className='btn btn-outline';
+      passBtn.textContent='Pass';passBtn.onclick=playerPass;
+      if(lastPlayer===0)passBtn.disabled=true;
+      btnRow.appendChild(playBtn);btnRow.appendChild(passBtn);wrap.appendChild(btnRow);
+    }
+    if(gover){
+      var nb=document.createElement('button');nb.className='btn btn-primary';nb.style.marginTop='10px';
+      nb.textContent='New Game';nb.onclick=function(){deal();render();};wrap.appendChild(nb);
+    }
+
+    C.innerHTML='';C.appendChild(wrap);
+  }
+
+  deal();render();
+}
+
+/* ═══════════════════════════════════════════════════
+   TONG ITS (1 player vs 2 AI)
+   Draw/discard to form melds. Call draw or go Tong-Its.
+═══════════════════════════════════════════════════ */
+function gameTongIts(C){
+  var AI=['🤖 Aling','🤖 Mang'];
+  function vi(v){return ['A','2','3','4','5','6','7','8','9','10','J','Q','K'].indexOf(v);}
+  function cardVal(c){var i=vi(c.v);return Math.min(i+1,10);}
+  function handVal(h){return h.reduce(function(s,c){return s+cardVal(c);},0);}
+
+  function findMelds(hand){
+    /* Returns best meld groups: sets (same value) and runs (same suit, consecutive) */
+    var melds=[];
+    /* Sets */
+    var groups={};
+    hand.forEach(function(c){groups[c.v]=groups[c.v]||[];groups[c.v].push(c);});
+    Object.values(groups).forEach(function(g){if(g.length>=3)melds.push(g);});
+    /* Runs */
+    var bySuit={};
+    hand.forEach(function(c){bySuit[c.s]=bySuit[c.s]||[];bySuit[c.s].push(c);});
+    Object.values(bySuit).forEach(function(g){
+      g.sort(function(a,b){return vi(a.v)-vi(b.v);});
+      var run=[g[0]];
+      for(var i=1;i<g.length;i++){
+        if(vi(g[i].v)===vi(g[i-1].v)+1)run.push(g[i]);
+        else{if(run.length>=3)melds.push(run.slice());run=[g[i]];}
+      }
+      if(run.length>=3)melds.push(run);
+    });
+    return melds;
+  }
+
+  function deadwood(hand){
+    var melds=findMelds(hand);
+    var melded=new Set();
+    melds.forEach(function(m){m.forEach(function(c){melded.add(c);});});
+    return hand.filter(function(c){return !melded.has(c);}).reduce(function(s,c){return s+cardVal(c);},0);
+  }
+
+  var stock,discard,hands,turn,gover,sel,drawn;
+
+  function deal(){
+    var deck=_mkDeck();
+    hands=[[],[],[]];
+    for(var i=0;i<12;i++){hands[i%3].push(deck.pop());}
+    stock=deck;discard=[];turn=0;gover=false;sel=null;drawn=false;
+    render();
+  }
+
+  function aiTurn(ai){
+    var hand=hands[ai];
+    /* Draw */
+    var drew=false;
+    if(discard.length){
+      var top=discard[discard.length-1];
+      hand.push(top);discard.pop();drew=true;SND.card();
+    } else if(stock.length){hand.push(stock.pop());SND.card();}
+    /* Discard highest deadwood card */
+    var melds=findMelds(hand);
+    var melded=new Set();melds.forEach(function(m){m.forEach(function(c){melded.add(c);});});
+    var unmelded=hand.filter(function(c){return !melded.has(c);});
+    var toDiscard=unmelded.sort(function(a,b){return cardVal(b)-cardVal(a);})[0]||(hand[hand.length-1]);
+    discard.push(toDiscard);hands[ai]=hand.filter(function(c){return c!==toDiscard;});
+    /* Check Tong-Its */
+    if(!hands[ai].length){gover=true;SND.wrong();setScore(AI[ai-1]+' Tong-Its!');render();return;}
+    turn=(turn+1)%3;
+    if(turn!==0)setTimeout(function(){aiTurn(turn);},700);
+    render();
+  }
+
+  function playerDraw(fromDiscard){
+    if(drawn){toast('Already drew this turn!');return;}
+    if(fromDiscard&&!discard.length){toast('Discard pile is empty!');return;}
+    if(!fromDiscard&&!stock.length){toast('Stock is empty!');return;}
+    var c=fromDiscard?discard.pop():stock.pop();
+    hands[0].push(c);drawn=true;SND.card();render();
+  }
+
+  function playerDiscard(c){
+    if(!drawn){toast('Draw a card first!');return;}
+    discard.push(c);hands[0]=hands[0].filter(function(x){return x!==c;});drawn=false;
+    if(!hands[0].length){gover=true;SND.win();setScore('Tong-Its! 🏆');saveScore('tongits',0,false);render();return;}
+    turn=1;setTimeout(function(){aiTurn(1);},600);render();
+  }
+
+  function playerCallDraw(){
+    if(!drawn){toast('Draw a card first!');return;}
+    /* Compare deadwood */
+    var pw=deadwood(hands[0]),a1w=deadwood(hands[1]),a2w=deadwood(hands[2]);
+    gover=true;
+    if(pw<a1w&&pw<a2w){SND.win();setScore('Win! ('+pw+' vs '+a1w+','+a2w+')');saveScore('tongits',pw,false);}
+    else if(pw===a1w||pw===a2w){SND.card();setScore('Draw!');}
+    else{SND.wrong();setScore('Loss ('+pw+' vs '+Math.min(a1w,a2w)+')');}
+    render();
+  }
+
+  function render(){
+    var wrap=document.createElement('div');
+
+    /* Stock + discard */
+    var pileRow=document.createElement('div');
+    pileRow.style.cssText='display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:10px';
+    var stockEl=_cardEl(null,44,64,true);
+    stockEl.style.cursor='pointer';
+    stockEl.title='Draw from stock';
+    var stockLbl=document.createElement('div');stockLbl.style.cssText='text-align:center';
+    var stockNum=document.createElement('div');stockNum.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';stockNum.textContent='Stock: '+stock.length;
+    stockLbl.appendChild(stockNum);stockLbl.appendChild(stockEl);
+    stockEl.onclick=function(){if(turn===0&&!gover)playerDraw(false);};
+    pileRow.appendChild(stockLbl);
+
+    var discardLbl=document.createElement('div');discardLbl.style.cssText='text-align:center';
+    var discardNum=document.createElement('div');discardNum.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';discardNum.textContent='Discard';
+    discardLbl.appendChild(discardNum);
+    var discardEl=discard.length?_cardEl(discard[discard.length-1],44,64):_cardEl(null,44,64,true);
+    discardEl.style.cursor='pointer';discardEl.title='Draw from discard';
+    discardEl.onclick=function(){if(turn===0&&!gover)playerDraw(true);};
+    discardLbl.appendChild(discardEl);pileRow.appendChild(discardLbl);
+
+    /* AI deadwood */
+    [1,2].forEach(function(i){
+      var box=document.createElement('div');box.style.cssText='text-align:center';
+      box.innerHTML='<div style="font-size:10px;color:var(--muted);margin-bottom:3px">'+AI[i-1]+' ('+hands[i].length+' cards)</div>';
+      var row=document.createElement('div');row.style.cssText='display:flex;gap:2px;justify-content:center';
+      hands[i].slice(0,5).forEach(function(){row.appendChild(_cardEl(null,28,40,true));});
+      box.appendChild(row);pileRow.appendChild(box);
+    });
+    wrap.appendChild(pileRow);
+
+    /* Player hand */
+    var hLabel=document.createElement('div');
+    hLabel.style.cssText='font-size:11px;color:var(--muted);margin-bottom:6px;text-align:center';
+    hLabel.textContent='Your hand — '+(drawn?'tap to discard':'draw first')+' · Deadwood: '+deadwood(hands[0]);
+    wrap.appendChild(hLabel);
+
+    var hRow=document.createElement('div');
+    hRow.style.cssText='display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:10px';
+    var melds=findMelds(hands[0]);var melded=new Set();
+    melds.forEach(function(m){m.forEach(function(c){melded.add(c);});});
+    hands[0].forEach(function(c){
+      var ce=_cardEl(c,44,64);
+      if(melded.has(c))ce.style.boxShadow='0 0 0 2px var(--green)';
+      if(drawn)(function(card){ce.onclick=function(){if(turn===0&&!gover)playerDiscard(card);};})(c);
+      hRow.appendChild(ce);
+    });
+    wrap.appendChild(hRow);
+
+    if(!gover&&turn===0&&drawn){
+      var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:8px;justify-content:center';
+      var callBtn=document.createElement('button');callBtn.className='btn btn-outline';
+      callBtn.textContent='Call Draw';callBtn.onclick=playerCallDraw;
+      btnRow.appendChild(callBtn);wrap.appendChild(btnRow);
+    }
+    if(gover){
+      /* Show all hands */
+      var showRow=document.createElement('div');showRow.style.cssText='display:flex;gap:8px;justify-content:center;margin:10px 0;flex-wrap:wrap';
+      [1,2].forEach(function(i){
+        var box=document.createElement('div');box.style.cssText='text-align:center';
+        box.innerHTML='<div style="font-size:10px;color:var(--muted);margin-bottom:3px">'+AI[i-1]+' DW:'+deadwood(hands[i])+'</div>';
+        var row=document.createElement('div');row.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
+        hands[i].forEach(function(c){row.appendChild(_cardEl(c,32,46));});
+        box.appendChild(row);showRow.appendChild(box);
+      });
+      wrap.appendChild(showRow);
+      var nb=document.createElement('button');nb.className='btn btn-primary';
+      nb.textContent='New Game';nb.onclick=deal;wrap.appendChild(nb);
+    } else if(turn!==0){
+      var waiting=document.createElement('div');waiting.style.cssText='font-size:12px;color:var(--muted);text-align:center;margin-top:8px';
+      waiting.textContent=AI[turn-1]+' is thinking…';wrap.appendChild(waiting);
+    }
+
+    C.innerHTML='';C.appendChild(wrap);
+  }
+
+  deal();
+}
+
+/* ═══════════════════════════════════════════════════
+   5-CARD DRAW POKER (1 player vs 2 AI)
+═══════════════════════════════════════════════════ */
+function gamePoker(C){
+  /* ── Texas Hold'em: Player vs 2 AI ──
+     Rounds: Pre-flop → Flop → Turn → River → Showdown
+     Actions: Check / Call / Raise / Fold
+     Chips based — each starts with 100 */
+
+  var AI_NAMES=['🤖 Aling','🤖 Mang'];
+  var RANKS=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  var HAND_NAMES=['High Card','One Pair','Two Pair','Three of a Kind','Straight','Flush','Full House','Four of a Kind','Straight Flush','Royal Flush'];
+
+  function rv(v){return RANKS.indexOf(v);}
+
+  /* Best 5-card hand from 7 cards */
+  function best5(cards){
+    var best=null;
+    var combos=[];
+    for(var i=0;i<cards.length;i++)for(var j=i+1;j<cards.length;j++){
+      var five=cards.filter(function(_,k){return k!==i&&k!==j;});
+      combos.push(five);
+    }
+    combos.forEach(function(h){var r=rank5(h);if(!best||cmpRank(r,best)>0)best=r;});
+    return best;
+  }
+
+  function rank5(hand){
+    var vals=hand.map(function(c){return rv(c.v);}).sort(function(a,b){return b-a;});
+    var suits=hand.map(function(c){return c.s;});
+    var g={};vals.forEach(function(v){g[v]=(g[v]||0)+1;});
+    var cnts=Object.values(g).sort(function(a,b){return b-a;});
+    var flush=suits.every(function(s){return s===suits[0];});
+    var str=vals[0]-vals[4]===4&&new Set(vals).size===5;
+    var wheel=JSON.stringify(vals)==='[12,3,2,1,0]';if(wheel){str=true;}
+    var hi=wheel?3:vals[0];
+    if(flush&&str&&hi===12)return[9,12];
+    if(flush&&str)return[8,hi];
+    if(cnts[0]===4)return[7].concat(vals);
+    if(cnts[0]===3&&cnts[1]===2)return[6].concat(vals);
+    if(flush)return[5].concat(vals);
+    if(str)return[4,hi];
+    if(cnts[0]===3)return[3].concat(vals);
+    if(cnts[0]===2&&cnts[1]===2)return[2].concat(vals);
+    if(cnts[0]===2)return[1].concat(vals);
+    return[0].concat(vals);
+  }
+
+  function cmpRank(a,b){
+    for(var i=0;i<Math.max(a.length,b.length);i++){
+      if((a[i]||0)>(b[i]||0))return 1;
+      if((a[i]||0)<(b[i]||0))return -1;
+    }return 0;
+  }
+
+  /* Game state */
+  var deck,hole,aiHoles,community,pot,chips,aiBet,round,gover,toCall,roundBet,lastAction;
+
+  function newGame(){
+    deck=_mkDeck();
+    hole=[deck.pop(),deck.pop()];
+    aiHoles=[[deck.pop(),deck.pop()],[deck.pop(),deck.pop()]];
+    community=[];
+    chips=[100,100,100]; /* player, ai1, ai2 */
+    pot=0;roundBet=2;toCall=2;
+    /* Blinds */
+    chips[0]-=1;chips[1]-=2;pot=3;roundBet=2;toCall=2;
+    round=0;gover=false;lastAction='';
+    render();
+  }
+
+  function dealCommunity(){
+    if(round===0){community.push(deck.pop(),deck.pop(),deck.pop());}
+    else if(round===1||round===2){community.push(deck.pop());}
+  }
+
+  function aiAction(ai){
+    /* Simple AI: call with any pair+, bluff 20% */
+    var hand=aiHoles[ai].concat(community);
+    var r=hand.length>=5?best5(hand):null;
+    var strength=r?r[0]:0;
+    var rand=Math.random();
+    if(strength>=2||rand<0.2){
+      /* Call or raise */
+      var cost=Math.min(toCall,chips[ai+1]);
+      chips[ai+1]-=cost;pot+=cost;
+      lastAction=AI_NAMES[ai]+' calls';
+      if(strength>=3&&rand<0.3&&chips[ai+1]>0){
+        var raise=Math.min(4,chips[ai+1]);
+        chips[ai+1]-=raise;pot+=raise;toCall+=raise;
+        lastAction=AI_NAMES[ai]+' raises';
+      }
+    } else {
+      lastAction=AI_NAMES[ai]+' folds';
+    }
+  }
+
+  function playerAction(action){
+    if(action==='fold'){gover=true;setScore('You folded');render();return;}
+    if(action==='check'){lastAction='You check';}
+    if(action==='call'){
+      var cost=Math.min(toCall,chips[0]);
+      chips[0]-=cost;pot+=cost;
+      lastAction='You call ('+cost+')';
+    }
+    if(action==='raise'){
+      var r=Math.min(toCall+4,chips[0]);
+      chips[0]-=r;pot+=r;toCall=r;
+      lastAction='You raise ('+r+')';
+    }
+    /* AI respond */
+    aiAction(0);aiAction(1);
+    SND.card();
+    /* Advance round */
+    round++;toCall=0;
+    if(round<=3){dealCommunity();render();}
+    else{showdown();}
+  }
+
+  function showdown(){
+    var scores=[
+      {i:0,r:best5(hole.concat(community))},
+      {i:1,r:best5(aiHoles[0].concat(community))},
+      {i:2,r:best5(aiHoles[1].concat(community))},
+    ];
+    scores.sort(function(a,b){return cmpRank(b.r,a.r);});
+    var winner=scores[0].i;
+    gover=true;
+    if(winner===0){SND.win();chips[0]+=pot;setScore('You win! '+HAND_NAMES[scores[0].r[0]]+' 🏆');saveScore('poker',pot,true);}
+    else{SND.wrong();chips[winner]+=pot;setScore(AI_NAMES[winner-1]+' wins — '+HAND_NAMES[scores[0].r[0]]);}
+    render();
+  }
+
+  function render(){
+    var wrap=document.createElement('div');
+    wrap.style.cssText='font-size:12px';
+
+    /* Chips row */
+    var chipRow=document.createElement('div');
+    chipRow.style.cssText='display:flex;gap:8px;justify-content:center;margin-bottom:10px;flex-wrap:wrap';
+    var labels=['You',AI_NAMES[0],AI_NAMES[1]];
+    chips.forEach(function(c,i){
+      var el=document.createElement('div');
+      el.style.cssText='padding:4px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:11px;color:var(--text)';
+      el.textContent=labels[i]+': '+c+'🪙';
+      chipRow.appendChild(el);
+    });
+    wrap.appendChild(chipRow);
+
+    /* Pot */
+    var potEl=document.createElement('div');
+    potEl.style.cssText='text-align:center;font-size:13px;font-weight:700;color:var(--amber);margin-bottom:10px';
+    potEl.textContent='Pot: '+pot+'🪙';
+    wrap.appendChild(potEl);
+
+    /* Community cards */
+    var cLabel=document.createElement('div');
+    cLabel.style.cssText='font-size:10px;color:var(--muted);text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px';
+    cLabel.textContent=['Pre-flop','Flop','Turn','River','Showdown'][Math.min(round,4)];
+    wrap.appendChild(cLabel);
+
+    var cRow=document.createElement('div');
+    cRow.style.cssText='display:flex;gap:5px;justify-content:center;margin-bottom:14px;min-height:68px';
+    /* 5 community slots */
+    for(var i=0;i<5;i++){
+      cRow.appendChild(i<community.length?_cardEl(community[i],44,64):_cardEl(null,44,64,true));
+    }
+    wrap.appendChild(cRow);
+
+    /* AI holes (hidden until showdown) */
+    var aiRow=document.createElement('div');
+    aiRow.style.cssText='display:flex;gap:16px;justify-content:center;margin-bottom:12px';
+    aiHoles.forEach(function(h,i){
+      var box=document.createElement('div');box.style.cssText='text-align:center';
+      var lbl=document.createElement('div');lbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:4px';
+      lbl.textContent=AI_NAMES[i];
+      var row=document.createElement('div');row.style.cssText='display:flex;gap:4px;justify-content:center';
+      h.forEach(function(c){row.appendChild(_cardEl(gover?c:null,36,52,!gover));});
+      if(gover&&community.length>=3){
+        var rk=best5(h.concat(community));
+        var hn=document.createElement('div');hn.style.cssText='font-size:9px;color:var(--muted);margin-top:3px';
+        hn.textContent=HAND_NAMES[rk[0]];box.appendChild(lbl);box.appendChild(row);box.appendChild(hn);
+      } else {box.appendChild(lbl);box.appendChild(row);}
+      aiRow.appendChild(box);
+    });
+    wrap.appendChild(aiRow);
+
+    /* Player hole */
+    var hLbl=document.createElement('div');
+    hLbl.style.cssText='font-size:10px;color:var(--muted);text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px';
+    var myRank=community.length>=3?best5(hole.concat(community)):null;
+    hLbl.textContent='Your hand'+(myRank?' — '+HAND_NAMES[myRank[0]]:'');
+    wrap.appendChild(hLbl);
+
+    var hRow=document.createElement('div');
+    hRow.style.cssText='display:flex;gap:6px;justify-content:center;margin-bottom:12px';
+    hole.forEach(function(c){hRow.appendChild(_cardEl(c,50,72));});
+    wrap.appendChild(hRow);
+
+    /* Last action */
+    if(lastAction){
+      var la=document.createElement('div');
+      la.style.cssText='text-align:center;font-size:11px;color:var(--muted);margin-bottom:10px';
+      la.textContent=lastAction;wrap.appendChild(la);
+    }
+
+    /* Action buttons */
+    if(!gover&&round<=3){
+      var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:6px;justify-content:center;flex-wrap:wrap';
+      var actions=toCall===0?['check','raise','fold']:['call','raise','fold'];
+      actions.forEach(function(a){
+        var b=document.createElement('button');
+        b.className=a==='fold'?'btn btn-outline':a==='check'||a==='call'?'btn btn-primary':'btn btn-outline';
+        b.textContent=a==='call'?'Call ('+Math.min(toCall,chips[0])+'🪙)':a.charAt(0).toUpperCase()+a.slice(1);
+        b.onclick=function(){playerAction(a);};
+        if(a!=='fold'&&chips[0]<=0)b.disabled=true;
+        btnRow.appendChild(b);
+      });
+      wrap.appendChild(btnRow);
+    }
+
+    if(gover){
+      var nb=document.createElement('button');nb.className='btn btn-primary';nb.style.cssText='margin-top:12px;display:block;margin-left:auto;margin-right:auto';
+      nb.textContent='New Hand';nb.onclick=newGame;wrap.appendChild(nb);
+    }
+
+    C.innerHTML='';C.appendChild(wrap);
+  }
+
+  newGame();
+}
+
 </script>
 </body>
 </html>
