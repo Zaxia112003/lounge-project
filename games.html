@@ -1770,9 +1770,20 @@ function gameTongIts(C){
   }
 
   /* ── CHOW: take the top discard card ── */
+  /* Check if taking the discard card would form a meld with the current hand */
+  function canChow(card,hand){
+    if(!card)return false;
+    var testHand=hand.concat([card]);
+    /* Check if card is part of any meld in the test hand */
+    var melds=findMelds(testHand);
+    return melds.some(function(m){return m.some(function(c){return c===card;});});
+  }
+
   function playerChow(){
     if(drawn){toast('Already drew this turn!');return;}
     if(!discard.length){toast('Discard pile is empty!');return;}
+    var top=discard[discard.length-1];
+    if(!canChow(top,hands[0])){toast('Can\'t Chow — '+top.v+top.s+' won\'t form a meld with your hand. Draw instead.');return;}
     var c=discard.pop();
     hands[0].push(c);
     hands[0]=sortHand(hands[0]);
@@ -1898,13 +1909,15 @@ function gameTongIts(C){
     var dWrap=document.createElement('div');dWrap.style.cssText='text-align:center';
     var dLbl=document.createElement('div');dLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';dLbl.textContent='Discard'+(lastDiscardCard?' ('+lastDiscardCard.v+lastDiscardCard.s+')':'');
     var dEl=discard.length?_cardEl(discard[discard.length-1],44,64):_cardEl(null,44,64,true);
-    if(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length){
-      dEl.style.cursor='pointer';
-      dEl.style.boxShadow='0 0 0 2px var(--accent)';
-    }
+    var chowAvail=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length&&canChow(discard[discard.length-1],hands[0]));
+    var chowVisible=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length);
+    if(chowAvail){dEl.style.cursor='pointer';dEl.style.boxShadow='0 0 0 2px var(--accent)';}
+    else if(chowVisible){dEl.style.opacity='0.55';dEl.style.cursor='not-allowed';}
     dEl.onclick=function(){if(turn===0&&!gover&&!pendingDraw&&!drawn)playerChow();};
     dWrap.appendChild(dLbl);dWrap.appendChild(dEl);
-    var chowLbl=document.createElement('div');chowLbl.style.cssText='font-size:9px;color:var(--accent);margin-top:4px;font-weight:600';chowLbl.textContent='Chow!';
+    var chowLbl=document.createElement('div');
+    chowLbl.style.cssText='font-size:9px;margin-top:4px;font-weight:600;color:'+(chowAvail?'var(--accent)':'var(--muted)');
+    chowLbl.textContent=chowAvail?'✓ Chow':'✗ No meld';
     dWrap.appendChild(chowLbl);piles.appendChild(dWrap);
 
     wrap.appendChild(piles);
@@ -1943,7 +1956,7 @@ function gameTongIts(C){
     var dw=deadwood(hands[0]);
     var hLabel=document.createElement('div');
     hLabel.style.cssText='font-size:11px;color:var(--muted);margin-bottom:6px;text-align:center';
-    hLabel.textContent='Your hand · DW: '+dw+(drawn?' — tap card to discard':turn===0?' — Draw or Chow':'');
+    hLabel.textContent='Your hand · DW: '+dw+(drawn?' — tap card to discard':turn===0?(chowAvail?' — Draw or Chow':' — Draw (no Chow available)'):'');
     wrap.appendChild(hLabel);
 
     var hRow=document.createElement('div');
