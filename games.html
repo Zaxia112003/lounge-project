@@ -404,10 +404,74 @@ function renderGrid(){
 /* ═══════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════ */
+function applyTheme(nick){
+  var theme=localStorage.getItem('lounge_theme_'+nick)||localStorage.getItem('lounge_theme_default')||'dark';
+  var existing=document.getElementById('games-theme-style');
+  if(existing)existing.remove();
+  if(theme==='whatsapp'){
+    var s=document.createElement('style');
+    s.id='games-theme-style';
+    s.textContent=
+      /* Root overrides */
+      ':root{'
+      +'--bg:#f0f2f5;--surface:#ffffff;--surface2:#f0f2f5;--border:#e9edef;--border2:#d1d7db;'
+      +'--text:#111b21;--muted:#54656f;--muted2:#8696a0;--accent:#128c7e;--accent2:#075e54;'
+      +'--green:#25d366;--red:#ef4444;--amber:#f59f00;}'
+      /* Header — green */
+      +'.header{background:#075e54;border-bottom-color:rgba(0,0,0,.1);}'
+      +'.header-logo{background:linear-gradient(135deg,#fff,rgba(255,255,255,.8));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}'
+      +'.credit-pill{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.3);color:#fff;}'
+      +'.user-nick{color:#fff;}'
+      +'.av{background:linear-gradient(135deg,#128c7e,#25d366);}'
+      +'.snd-btn{color:rgba(255,255,255,.85);}'
+      +'.snd-panel{background:#fff;border-color:#e9edef;}'
+      +'.snd-panel label{color:#54656f;}'
+      +'.eq-b{background:#25d366;}'
+      +'.eq-b.off{background:#d1d7db;}'
+      /* Body */
+      +'body{background:#f0f2f5;color:#111b21;}'
+      /* Game tiles */
+      +'.section-label{color:#8696a0;}'
+      +'.tile{background:#fff;border-color:#e9edef;}'
+      +'.tile:hover{border-color:#128c7e;}'
+      +'.tile::before{background:linear-gradient(135deg,rgba(18,140,126,.05),transparent);}'
+      +'.tile.multi{border-color:rgba(37,211,102,.3);}'
+      +'.tile.multi:hover{border-color:#25d366;}'
+      +'.tile-name{color:#111b21;}'
+      +'.tile-desc{color:#54656f;}'
+      +'.badge{color:#fff;}'
+      +'.solo-b{background:rgba(18,140,126,.12);color:#128c7e;}'
+      +'.multi-b{background:rgba(37,211,102,.12);color:#128c7e;}'
+      /* Modal */
+      +'.modal-overlay{background:rgba(0,0,0,.5);}'
+      +'.modal{background:#fff;border-color:#e9edef;}'
+      +'.modal-head{border-bottom-color:#e9edef;}'
+      +'.modal-title{color:#111b21;}'
+      +'.score-chip{background:#f0f2f5;color:#54656f;}'
+      +'.modal-close{color:#54656f;}'
+      +'.modal-body{background:#fff;}'
+      /* Buttons */
+      +'.btn-primary{background:#128c7e;color:#fff;border:none;}'
+      +'.btn-primary:hover{opacity:.88;}'
+      +'.btn-outline{background:#f0f2f5;border-color:#d1d7db;color:#54656f;}'
+      +'.btn-outline:hover{border-color:#128c7e;color:#128c7e;}'
+      /* Toast */
+      +'.toast{background:#fff;border-color:#e9edef;color:#111b21;}'
+      /* No-login */
+      +'#nologin{color:#54656f;}'
+      ;
+    document.head.appendChild(s);
+  } else {
+    /* Any other non-dark theme — keep games default dark, just remove overrides */
+  }
+}
+
 function init(){
   var nick=localStorage.getItem('lounge_nick');
   var full=localStorage.getItem('lounge_full');
   var role=localStorage.getItem('lounge_role');
+  /* Apply user's portal theme */
+  applyTheme(nick||'');
   if(!nick){G('nologin').style.display='block';G('game-grid').style.display='none';return;}
   cu={nickname:nick,fullName:full||nick,role:role||'uploader'};
   G('user-av').textContent=(full||nick).split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
