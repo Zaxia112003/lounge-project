@@ -58,7 +58,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 /* modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--surface);border:1px solid var(--border2);border-radius:20px;width:min(92vw,700px);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:20px;width:min(96vw,780px);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6);}
 .modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .modal-title{font-family:var(--fd);font-size:15px;font-weight:700;}
 .score-chip{font-size:11px;color:var(--muted);padding:2px 8px;background:var(--surface2);border-radius:10px;}
@@ -1806,17 +1806,8 @@ function gamePusoyDos(C){
   deal();render();
 }
   /* Card rank: 3 lowest, 2 highest */
-/* ═══════════════════════════════════════════════════
-   TONG ITS — Filipino rules
-   12 cards each player, 13 for dealer (discards 1 to start).
-   Form melds (sets/runs of 3+). Win by:
-     - Tong-Its: empty your hand
-     - Call Draw: lowest deadwood wins
-   AI can call draw — you must Fight or Fold.
-   Burn rule: can't call draw if you have a 5-card suit or 4-of-a-kind.
-═══════════════════════════════════════════════════ */
 function gameTongIts(C){
-  var AI=['🤖 Nene','🤖 Dodong'];
+  var AI=['🤖 Nene','🤖 Dodong']; /* Nene=1=right, Dodong=2=left */
   var VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
   var SUIT_ORDER=['♣','♠','♥','♦'];
   function vi(v){return VALS.indexOf(v);}
@@ -1824,12 +1815,10 @@ function gameTongIts(C){
   function cardVal(c){var i=vi(c.v);return i===0?1:Math.min(i+1,10);}
 
   var sortMode='face';
-  /* allExposedMelds[i] = array of meld groups for player i (0=player,1=Nene,2=Dodong) */
-  var allExposedMelds;
-  /* sapawTargets[i][meldIdx] = true if someone did sapaw on player i's meld idx */
-  var sapawTargets;
-  /* playerHasSapaw = true if anyone added to player's exposed meld */
+  var allExposedMelds; /* [player][meldIdx] = array of cards */
   var playerGotSapawed;
+  /* selectedCards: cards raised up from hand. Each card can be in only one state. */
+  var selectedCards; /* Set of card objects */
 
   function sortHand(hand){
     if(sortMode==='face'){
@@ -1842,56 +1831,57 @@ function gameTongIts(C){
     return hand.slice().sort(function(a,b){var vd=vi(a.v)-vi(b.v);return vd!==0?vd:si(a.s)-si(b.s);});
   }
 
+  /* findMelds — no card appears in two melds */
   function findMelds(hand){
+    var used=new Set();
     var melds=[];
-    var g={};hand.forEach(function(c){g[c.v]=g[c.v]||[];g[c.v].push(c);});
-    Object.values(g).forEach(function(gr){if(gr.length>=3)melds.push(gr.slice());});
-    var bs={};hand.forEach(function(c){bs[c.s]=bs[c.s]||[];bs[c.s].push(c);});
+    /* Sets first */
+    var g={};hand.forEach(function(c){if(!used.has(c)){g[c.v]=g[c.v]||[];g[c.v].push(c);}});
+    Object.values(g).forEach(function(gr){
+      if(gr.length>=3){
+        var m=gr.slice(0,gr.length);/* all of same value */
+        m.forEach(function(c){used.add(c);});
+        melds.push(m);
+      }
+    });
+    /* Runs */
+    var bs={};hand.forEach(function(c){if(!used.has(c)){bs[c.s]=bs[c.s]||[];bs[c.s].push(c);}});
     Object.values(bs).forEach(function(gr){
       gr.sort(function(a,b){return vi(a.v)-vi(b.v);});
       var run=[gr[0]];
       for(var i=1;i<gr.length;i++){
         if(vi(gr[i].v)===vi(gr[i-1].v)+1)run.push(gr[i]);
-        else{if(run.length>=3)melds.push(run.slice());run=[gr[i]];}
+        else{if(run.length>=3){run.forEach(function(c){used.add(c);});melds.push(run.slice());}run=[gr[i]];}
       }
-      if(run.length>=3)melds.push(run.slice());
+      if(run.length>=3){run.forEach(function(c){used.add(c);});melds.push(run.slice());}
     });
     return melds;
   }
 
   function getMelded(hand){
-    var melds=findMelds(hand);var melded=new Set();
-    melds.forEach(function(m){m.forEach(function(c){melded.add(c);});});
-    return melded;
+    var melds=findMelds(hand);var s=new Set();
+    melds.forEach(function(m){m.forEach(function(c){s.add(c);});});
+    return s;
   }
 
   function deadwood(hand){
-    var melded=getMelded(hand);
-    return hand.filter(function(c){return !melded.has(c);}).reduce(function(s,c){return s+cardVal(c);},0);
+    var m=getMelded(hand);
+    return hand.filter(function(c){return !m.has(c);}).reduce(function(s,c){return s+cardVal(c);},0);
   }
 
-  /* Protected from burn if: has exposed meld OR holds 5-card suit OR holds 4 of same face */
   function isBurnProtected(player){
     if(allExposedMelds[player].length>0)return true;
-    var hand=hands[player];
-    var suits={};var vals={};
+    var hand=hands[player],suits={},vals={};
     hand.forEach(function(c){suits[c.s]=(suits[c.s]||0)+1;vals[c.v]=(vals[c.v]||0)+1;});
-    if(Object.values(suits).some(function(n){return n>=5;}))return true;
-    if(Object.values(vals).some(function(n){return n>=4;}))return true;
-    return false;
+    return Object.values(suits).some(function(n){return n>=5;})||Object.values(vals).some(function(n){return n>=4;});
   }
 
-  /* Can a card sapaw (extend) any existing exposed meld? */
   function canSapaw(card,owner){
     var melds=allExposedMelds[owner];
     for(var i=0;i<melds.length;i++){
       var m=melds[i];
-      /* Set meld: same value, can add if same value */
-      if(m.every(function(c){return c.v===m[0].v;})){
-        if(card.v===m[0].v)return{owner:owner,meldIdx:i};
-      }
-      /* Run meld: consecutive same suit */
-      if(m.every(function(c){return c.s===m[0].s;})){
+      if(m.every(function(c){return c.v===m[0].v;})){if(card.v===m[0].v&&m.length<4)return{owner:owner,meldIdx:i};}
+      else if(m.every(function(c){return c.s===m[0].s;})){
         var sorted=m.slice().sort(function(a,b){return vi(a.v)-vi(b.v);});
         if(card.s===sorted[0].s&&(vi(card.v)===vi(sorted[0].v)-1||vi(card.v)===vi(sorted[sorted.length-1].v)+1))
           return{owner:owner,meldIdx:i};
@@ -1900,25 +1890,26 @@ function gameTongIts(C){
     return null;
   }
 
-  /* Can current player chow the top discard — forms a meld or can sapaw? */
-  function canChow(card,hand){
-    if(!card)return false;
-    var testHand=hand.concat([card]);
-    var melds=findMelds(testHand);
-    if(melds.some(function(m){return m.some(function(c){return c===card;})}))return true;
-    /* Also allow chow if it can sapaw an exposed meld */
-    for(var owner=0;owner<3;owner++){
-      if(canSapaw(card,owner))return true;
-    }
-    return false;
+  function anySapawTarget(card){
+    for(var o=0;o<3;o++){var r=canSapaw(card,o);if(r)return r;}
+    return null;
   }
 
-  var stock,discard,hands,turn,gover,drawn,pendingDraw,lastDiscardCard,discardHistory,showDiscardPile;
+  function canChow(card,hand){
+    if(!card)return false;
+    /* Only allow chow if the card forms a new meld with cards currently in hand */
+    var testHand=hand.concat([card]);
+    return findMelds(testHand).some(function(m){return m.some(function(c){return c===card;});});
+  }
+
+  var stock,discard,hands,turn,gover,drawn,drawnByChow,didSapawThisTurn,pendingDraw,lastDiscardCard,discardHistory,showDiscardPile;
 
   function deal(){
     var deck=_mkDeck();
-    hands=[[],[],[]];allExposedMelds=[[],[],[]];sapawTargets=[[],[]];
-    playerGotSapawed=false;showDiscardPile=false;
+    hands=[[],[],[]];allExposedMelds=[[],[],[]];
+    playerGotSapawed=false;showDiscardPile=false;selectedCards=new Set();
+    drawnByChow=false;didSapawThisTurn=false;
+    /* Dodong=dealer(index 2) gets 13 */
     hands[2]=deck.splice(0,13);
     hands[0]=deck.splice(0,12);
     hands[1]=deck.splice(0,12);
@@ -1927,123 +1918,175 @@ function gameTongIts(C){
     discard=[dealerDiscard];discardHistory=[dealerDiscard];lastDiscardCard=dealerDiscard;
     stock=deck;turn=0;gover=false;drawn=false;pendingDraw=null;
     hands=hands.map(function(h){return sortHand(h);});
+    checkInstantWin(0);
     render();
+  }
+
+  function checkInstantWin(player){
+    if(deadwood(hands[player])===0){
+      gover=true;
+      if(player===0){SND.win();setScore('Tong-Its! 🏆 (DW=0)');saveScore('tongits',0,false);}
+      else{SND.wrong();setScore(AI[player-1]+' Tong-Its! (DW=0)');}
+    }
+  }
+
+  function playerToggleCard(card){
+    if(selectedCards.has(card))selectedCards.delete(card);
+    else selectedCards.add(card);
+    render();
+  }
+
+  function playerConfirmMeld(){
+    /* Group selected cards and try to expose as a meld */
+    var sel=Array.from(selectedCards);
+    if(sel.length<3){toast('Select at least 3 cards to meld.');return;}
+    var meld=findMelds(sel);
+    /* Check the entire selection forms exactly one valid meld */
+    var allMelded=meld.length>0&&meld[0].length===sel.length&&meld.some(function(m){return m.length===sel.length;});
+    if(!allMelded){toast('Selected cards don\'t form a valid meld!');return;}
+    var validMeld=meld.find(function(m){return m.length===sel.length;})||meld[0];
+    allExposedMelds[0].push(validMeld);
+    hands[0]=hands[0].filter(function(c){return !validMeld.includes(c);});
+    selectedCards=new Set();
+    toast('Meld exposed! ✅');SND.card();
+    checkDW0Win(0);
+    render();
+  }
+
+  function playerConfirmSapaw(target){
+    var sel=Array.from(selectedCards);
+    if(sel.length!==1){toast('Select exactly one card to sapaw.');return;}
+    var card=sel[0];
+    allExposedMelds[target.owner][target.meldIdx].push(card);
+    hands[0]=hands[0].filter(function(c){return c!==card;});
+    if(target.owner===0)playerGotSapawed=true;
+    didSapawThisTurn=true; /* cannot call draw after doing a sapaw */
+    selectedCards=new Set();
+    toast('Sapaw! ✅');SND.card();
+    checkDW0Win(0);
+    render();
+  }
+
+  function playerConfirmDiscard(){
+    var sel=Array.from(selectedCards);
+    if(sel.length!==1){toast('Select exactly one card to discard.');return;}
+    playerDiscard(sel[0]);
   }
 
   function playerChow(){
     if(drawn){toast('Already drew!');return;}
-    if(!discard.length){toast('Discard pile empty!');return;}
+    if(!discard.length)return;
     var top=discard[discard.length-1];
-    if(!canChow(top,hands[0])){toast('Can\'t Chow — '+top.v+top.s+' won\'t form a meld. Draw instead.');return;}
+    if(!canChow(top,hands[0])){toast('Can\'t Chow — '+top.v+top.s+' won\'t form a meld with your hand.');return;}
     var c=discard.pop();
-    /* Chow goes directly to exposed meld — not into hand */
+    /* Find the meld this card completes with hand cards */
     var testHand=hands[0].concat([c]);
-    var newMelds=findMelds(testHand);
+    var melds=findMelds(testHand);
     var bestMeld=null;
-    newMelds.forEach(function(m){if(m.some(function(x){return x===c;})){if(!bestMeld||m.length>bestMeld.length)bestMeld=m;}});
-    /* Try sapaw first */
-    var sapawResult=null;
-    for(var owner=0;owner<3;owner++){var sr=canSapaw(c,owner);if(sr){sapawResult=sr;break;}}
-    if(sapawResult){
-      allExposedMelds[sapawResult.owner][sapawResult.meldIdx].push(c);
-      if(sapawResult.owner===0)playerGotSapawed=true;
-      toast('Sapaw on '+AI[sapawResult.owner-1]+'\'s meld!');
-    } else if(bestMeld){
-      /* Remove meld cards from hand and expose them */
-      var meldCards=bestMeld.filter(function(x){return x!==c;});
-      meldCards.forEach(function(x){hands[0]=hands[0].filter(function(y){return y!==x;});});
+    melds.forEach(function(m){if(m.some(function(x){return x===c;})){if(!bestMeld||m.length>bestMeld.length)bestMeld=m;}});
+    if(bestMeld){
+      /* Remove the hand cards that form the meld, expose them together with the chowed card */
+      bestMeld.filter(function(x){return x!==c;}).forEach(function(x){hands[0]=hands[0].filter(function(y){return y!==x;});});
       allExposedMelds[0].push(bestMeld);
       toast('Chow + Expose Meld! ✅');
     } else {
+      /* Shouldn't reach here since canChow validated, but safety fallback */
       hands[0].push(c);hands[0]=sortHand(hands[0]);
     }
-    drawn=true;SND.card();
-    if(hands[0].length===0){gover=true;SND.win();setScore('Tong-Its! 🏆');saveScore('tongits',0,false);render();return;}
-    render();
+    drawn=true;drawnByChow=true;SND.card();
+    checkDW0Win(0);
+    if(!gover)render();
   }
 
   function playerDraw(){
     if(drawn){toast('Already drew!');return;}
     if(!stock.length){endStockEmpty();return;}
     hands[0].push(stock.pop());hands[0]=sortHand(hands[0]);
-    drawn=true;SND.card();render();
+    drawn=true;selectedCards=new Set();SND.card();render();
   }
 
   function playerDiscard(c){
     if(!drawn){toast('Draw or Chow first!');return;}
-    lastDiscardCard=c;
-    discard.push(c);discardHistory.push(c);
+    lastDiscardCard=c;discard.push(c);discardHistory.push(c);
     hands[0]=hands[0].filter(function(x){return x!==c;});
-    drawn=false;
-    if(hands[0].length===0&&allExposedMelds[0].length===0){gover=true;SND.win();setScore('Tong-Its! 🏆');saveScore('tongits',0,false);render();return;}
+    selectedCards=new Set();drawn=false;drawnByChow=false;didSapawThisTurn=false;
     if(hands[0].length===0){gover=true;SND.win();setScore('Tong-Its! 🏆');saveScore('tongits',0,false);render();return;}
-    turn=1;setTimeout(function(){aiTurn(1);},700);render();
-  }
-
-  function playerExpose(){
-    if(!drawn){toast('Draw or Chow first!');return;}
-    if(playerGotSapawed){toast('Cannot expose — someone already added to your meld!');return;}
-    var melds=findMelds(hands[0]);
-    if(!melds.length){toast('No melds to expose!');return;}
-    var best=melds.slice().sort(function(a,b){return b.length-a.length;})[0];
-    allExposedMelds[0].push(best);
-    hands[0]=hands[0].filter(function(c){return !best.includes(c);});
-    toast('Meld exposed! ✅ Safe from burn.');SND.card();render();
-  }
-
-  /* Sapaw: add a card from hand to an existing exposed meld */
-  function playerSapaw(card,owner,meldIdx){
-    if(!drawn){toast('Draw first!');return;}
-    allExposedMelds[owner][meldIdx].push(card);
-    hands[0]=hands[0].filter(function(c){return c!==card;});
-    if(owner===0)playerGotSapawed=true;
-    toast('Sapaw! Card added to meld. ✅');SND.card();
-    if(hands[0].length===0){gover=true;SND.win();setScore('Tong-Its! 🏆');saveScore('tongits',0,false);}
+    checkDW0Win(0);
+    if(!gover){turn=1;setTimeout(function(){aiTurn(1);},700);}
     render();
+  }
+
+  function checkDW0Win(player){
+    if(!gover&&hands[player].length>0&&deadwood(hands[player])===0){
+      gover=true;
+      if(player===0){SND.win();setScore('Tong-Its! 🏆 (DW=0 — pure meld!');saveScore('tongits',0,false);}
+      else{SND.wrong();setScore(AI[player-1]+' Tong-Its! (DW=0)');}
+    }
   }
 
   function playerCallDraw(){
     if(!drawn){toast('Draw or Chow first!');return;}
-    if(allExposedMelds[0].length>0){toast('Cannot call draw — you have exposed melds!');return;}
-    if(playerGotSapawed){toast('Cannot call draw — someone added to your exposed meld!');return;}
-    pendingDraw={caller:0,dw:deadwood(hands[0])};
+    if(drawnByChow){toast('Cannot call draw — you took a Chow this turn!');return;}
+    if(didSapawThisTurn){toast('Cannot call draw — you did a Sapaw this turn!');return;}
+    if(playerGotSapawed){toast('Cannot call draw — your meld was sapawed this turn!');return;}
+    var playerDW=deadwood(hands[0]);
+    gover=true;
+    /* Each AI responds: fight if protected or DW ≤ player's, else fold (burned) */
+    var results=[];
+    var playerWins=true;
+    [1,2].forEach(function(ai){
+      var aiDW=deadwood(hands[ai]);
+      var aiProtected=isBurnProtected(ai);
+      if(!aiProtected){
+        /* AI is burned — player wins against this one */
+        results.push(AI[ai-1]+' burned (DW:'+aiDW+')');
+      } else if(aiDW<playerDW){
+        /* AI fights and wins */
+        results.push(AI[ai-1]+' wins (DW:'+aiDW+' < '+playerDW+')');
+        playerWins=false;
+      } else if(aiDW===playerDW){
+        results.push(AI[ai-1]+' ties (DW:'+aiDW+')');
+        /* Tie — caller (player) loses in Filipino rules */
+        playerWins=false;
+      } else {
+        results.push(AI[ai-1]+' burned (DW:'+aiDW+' > '+playerDW+')');
+      }
+    });
+    if(playerWins){
+      SND.win();
+      setScore('Draw! You win — DW:'+playerDW+' · '+results.join(' · '));
+      saveScore('tongits',playerDW,false);
+    } else {
+      SND.wrong();
+      setScore('Draw called — DW:'+playerDW+' · '+results.join(' · '));
+    }
     render();
   }
 
   function endStockEmpty(){
-    /* Stock empty — lowest deadwood wins */
     gover=true;
     var dws=[deadwood(hands[0]),deadwood(hands[1]),deadwood(hands[2])];
     var minDW=Math.min.apply(null,dws);
-    var winners=dws.map(function(d,i){return d===minDW?i:-1;}).filter(function(i){return i>-1;});
-    if(winners.length===1&&winners[0]===0){SND.win();setScore('Stock empty — You win! DW:'+dws[0]);saveScore('tongits',dws[0],false);}
-    else if(winners[0]===0){{SND.card();setScore('Stock empty — Tie! DW:'+dws[0]);}}
-    else{SND.wrong();setScore('Stock empty — '+(winners[0]>0?AI[winners[0]-1]:'')+' wins (DW:'+minDW+')');};
+    if(dws[0]===minDW){SND.win();setScore('Stock empty — You win! DW:'+dws[0]);saveScore('tongits',dws[0],false);}
+    else{var w=dws.indexOf(minDW);SND.wrong();setScore('Stock empty — '+AI[w-1]+' wins (DW:'+minDW+')');}
     render();
   }
 
   function aiTurn(ai){
     var hand=hands[ai];
-    /* Check if stock is empty */
     if(!stock.length&&!discard.length){endStockEmpty();return;}
-    /* Try chow if top discard can complete a meld */
     var chowed=false;
     if(discard.length){
       var top=discard[discard.length-1];
-      if(canChow(top,hand)){
+      /* AI chows only if it forms a meld with cards in hand */
+      var testAI=hands[ai].concat([top]);
+      var aiMelds=findMelds(testAI);
+      var aiBestMeld=null;
+      aiMelds.forEach(function(m){if(m.some(function(x){return x===top;})){if(!aiBestMeld||m.length>aiBestMeld.length)aiBestMeld=m;}});
+      if(aiBestMeld){
         var c=discard.pop();
-        /* Try sapaw on exposed meld */
-        var sr=null;for(var owner=0;owner<3;owner++){var s2=canSapaw(c,owner);if(s2){sr=s2;break;}}
-        if(sr){allExposedMelds[sr.owner][sr.meldIdx].push(c);if(sr.owner===0)playerGotSapawed=true;}
-        else{
-          var testHand=hand.concat([c]);
-          var melds=findMelds(testHand);
-          var bestM=null;melds.forEach(function(m){if(m.some(function(x){return x===c;})){if(!bestM||m.length>bestM.length)bestM=m;}});
-          if(bestM){
-            bestM.filter(function(x){return x!==c;}).forEach(function(x){hands[ai]=hands[ai].filter(function(y){return y!==x;});});
-            allExposedMelds[ai].push(bestM);
-          } else {hand.push(c);}
-        }
+        aiBestMeld.filter(function(x){return x!==c;}).forEach(function(x){hands[ai]=hands[ai].filter(function(y){return y!==x;});});
+        allExposedMelds[ai].push(aiBestMeld);
         chowed=true;SND.card();
       }
     }
@@ -2051,207 +2094,260 @@ function gameTongIts(C){
       if(stock.length){hand.push(stock.pop());SND.card();}
       else{endStockEmpty();return;}
     }
+    /* Check DW=0 */
+    if(deadwood(hand)===0&&hand.length>0){gover=true;SND.wrong();setScore(AI[ai-1]+' Tong-Its! (DW=0)');render();return;}
     /* Discard highest deadwood */
     var melded=getMelded(hand);
     var unmelded=hand.filter(function(c){return !melded.has(c);});
-    var toDiscard=(unmelded.slice().sort(function(a,b){return cardVal(b)-cardVal(a);})[0])||hand[hand.length-1];
-    if(toDiscard){lastDiscardCard=toDiscard;discard.push(toDiscard);discardHistory.push(toDiscard);hands[ai]=hand.filter(function(c){return c!==toDiscard;});}
+    var td=(unmelded.slice().sort(function(a,b){return cardVal(b)-cardVal(a);})[0])||hand[hand.length-1];
+    if(td){lastDiscardCard=td;discard.push(td);discardHistory.push(td);hands[ai]=hand.filter(function(c){return c!==td;});}
     if(!hands[ai].length){gover=true;SND.wrong();setScore(AI[ai-1]+' Tong-Its!');render();return;}
-    /* AI may call draw if deadwood is low and allowed */
     var dw=deadwood(hands[ai]);
-    if(dw<=6&&allExposedMelds[ai].length===0&&Math.random()<0.5){
-      pendingDraw={caller:ai,dw:dw};render();return;
-    }
-    turn=(ai+1)%3;
-    if(turn!==0)setTimeout(function(){aiTurn(turn);},700);
-    render();
+    if(dw<=6&&allExposedMelds[ai].length===0&&!gover&&Math.random()<0.5){pendingDraw={caller:ai,dw:dw};render();return;}
+    turn=(ai+1)%3;if(turn!==0&&!gover)setTimeout(function(){aiTurn(turn);},700);
+    if(!gover)render();
   }
 
   function resolveFight(playerFolds){
     if(!pendingDraw)return;
-    var caller=pendingDraw.caller;
-    var callerDW=pendingDraw.dw;
-    var playerDW=deadwood(hands[0]);
-    pendingDraw=null;gover=true;
+    var caller=pendingDraw.caller;var callerDW=pendingDraw.dw;
+    var playerDW=deadwood(hands[0]);pendingDraw=null;gover=true;
     if(playerFolds){SND.wrong();setScore(AI[caller-1]+' wins — you folded');}
-    else{
-      /* Burn check: if player has no exposed meld and no protection, they lose outright */
-      if(!isBurnProtected(0)){SND.wrong();setScore('You\'re burned! '+AI[caller-1]+' wins (you had no protection).');return;}
-      if(playerDW<callerDW){SND.win();setScore('You win! DW '+playerDW+' < '+callerDW);saveScore('tongits',playerDW,false);}
-      else if(playerDW>callerDW){SND.wrong();setScore(AI[caller-1]+' wins (DW '+callerDW+' vs your '+playerDW+')');}
-      else{SND.card();setScore('Draw! (tied at '+playerDW+')');}
-    }
+    else if(!isBurnProtected(0)){SND.wrong();setScore('Burned! '+AI[caller-1]+' wins — you had no protection.');}
+    else if(playerDW<callerDW){SND.win();setScore('You win the fight! DW '+playerDW+' < '+callerDW);saveScore('tongits',playerDW,false);}
+    else if(playerDW>callerDW){SND.wrong();setScore(AI[caller-1]+' wins (DW '+callerDW+' vs your '+playerDW+')');}
+    else{SND.card();setScore('Draw! (tied at '+playerDW+')');}
     render();
   }
 
   function render(){
     var wrap=document.createElement('div');
+    wrap.style.cssText='font-size:12px;width:100%;max-width:700px;margin:0 auto';
 
-    /* AI areas — exposed melds + hand count */
-    var topRow=document.createElement('div');
-    topRow.style.cssText='display:flex;gap:10px;justify-content:center;margin-bottom:8px;flex-wrap:wrap';
-    [1,2].forEach(function(i){
-      var box=document.createElement('div');box.style.cssText='text-align:center;min-width:100px';
-      var lbl=document.createElement('div');lbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';
-      lbl.textContent=AI[i-1]+(turn===i?' ←':'')+(i===2?' (Dealer)':'')+' ('+hands[i].length+')';
-      if(turn===i)lbl.style.color='var(--accent)';
-      var row=document.createElement('div');row.style.cssText='display:flex;gap:2px;justify-content:center';
-      hands[i].slice(0,5).forEach(function(){row.appendChild(_cardEl(null,22,32,true));});
-      if(hands[i].length>5){var m=document.createElement('span');m.style.cssText='font-size:10px;color:var(--muted);align-self:center;margin-left:2px';m.textContent='+'+( hands[i].length-5);row.appendChild(m);}
-      box.appendChild(lbl);box.appendChild(row);
-      /* Show AI exposed melds */
-      if(allExposedMelds[i].length){
-        allExposedMelds[i].forEach(function(meld){
-          var mRow=document.createElement('div');mRow.style.cssText='display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap';
-          meld.forEach(function(c){mRow.appendChild(_cardEl(c,22,32));});
-          box.appendChild(mRow);
-        });
-      }
-      topRow.appendChild(box);
-    });
-    wrap.appendChild(topRow);
+    /* ── TABLE LAYOUT ──
+       [Dodong - LEFT]    [STOCK | DISCARD]    [Nene - RIGHT]
+                               [Player]
+    */
 
-    /* Stock + Discard */
-    var piles=document.createElement('div');
-    piles.style.cssText='display:flex;gap:10px;justify-content:center;align-items:flex-start;margin-bottom:8px';
+    /* TOP ROW: Dodong(left) | center | Nene(right) */
+    var tableRow=document.createElement('div');
+    tableRow.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;width:100%';
 
+    /* Dodong - LEFT (index 2) */
+    var dodongBox=document.createElement('div');
+    dodongBox.style.cssText='flex:1;text-align:center;min-width:0';
+    var dodLbl=document.createElement('div');dodLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600';
+    dodLbl.textContent='Dodong (Left)'+(turn===2?' ←':'');
+    if(turn===2)dodLbl.style.color='var(--accent)';
+    dodongBox.appendChild(dodLbl);
+    var dodRow=document.createElement('div');dodRow.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
+    hands[2].slice(0,6).forEach(function(){dodRow.appendChild(_cardEl(null,20,30,true));});
+    if(hands[2].length>6){var dm=document.createElement('span');dm.style.cssText='font-size:10px;color:var(--muted);align-self:center';dm.textContent='+'+( hands[2].length-6);dodRow.appendChild(dm);}
+    dodongBox.appendChild(dodRow);
+    if(allExposedMelds[2].length){
+      allExposedMelds[2].forEach(function(meld){
+        var mr=document.createElement('div');mr.style.cssText='display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap';
+        meld.forEach(function(c){mr.appendChild(_cardEl(c,20,30));});
+        dodongBox.appendChild(mr);
+      });
+    }
+    tableRow.appendChild(dodongBox);
+
+    /* CENTER: Stock + Discard */
+    var center=document.createElement('div');
+    center.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0';
+
+    var pilesRow=document.createElement('div');pilesRow.style.cssText='display:flex;gap:8px;align-items:flex-start';
+
+    /* Stock */
     var sWrap=document.createElement('div');sWrap.style.cssText='text-align:center';
-    var sLbl=document.createElement('div');sLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';sLbl.textContent='Stock ('+stock.length+')';
-    var sEl=_cardEl(null,42,62,true);
-    if(turn===0&&!gover&&!pendingDraw&&!drawn){sEl.style.cursor='pointer';sEl.onclick=playerDraw;}
-    var sHint=document.createElement('div');sHint.style.cssText='font-size:9px;color:var(--muted);margin-top:3px';sHint.textContent='Tap to Draw';
-    sWrap.appendChild(sLbl);sWrap.appendChild(sEl);sWrap.appendChild(sHint);piles.appendChild(sWrap);
+    var sLbl=document.createElement('div');sLbl.style.cssText='font-size:9px;color:var(--muted);margin-bottom:2px';sLbl.textContent='Stock ('+stock.length+')';
+    var sEl=_cardEl(null,44,64,true);
+    if(turn===0&&!gover&&!pendingDraw&&!drawn){sEl.style.cursor='pointer';sEl.style.opacity='1';sEl.onclick=playerDraw;}
+    else sEl.style.opacity='0.6';
+    sWrap.appendChild(sLbl);sWrap.appendChild(sEl);pilesRow.appendChild(sWrap);
 
+    /* Discard */
     var dWrap=document.createElement('div');dWrap.style.cssText='text-align:center';
-    var dLbl=document.createElement('div');dLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';
-    /* Clickable label to show all discarded */
-    var dLblText='Discard'+(lastDiscardCard?' ('+lastDiscardCard.v+lastDiscardCard.s+')':'');
-    var dLblBtn=document.createElement('span');dLblBtn.style.cssText='cursor:pointer;text-decoration:underline;font-size:10px;color:var(--accent)';
-    dLblBtn.textContent=dLblText;
-    dLblBtn.onclick=function(){showDiscardPile=!showDiscardPile;render();};
-    dWrap.appendChild(dLblBtn);
-    var chowAvail=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length&&canChow(discard[discard.length-1],hands[0]));
-    var chowVisible=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length);
-    var dEl=discard.length?_cardEl(discard[discard.length-1],42,62):_cardEl(null,42,62,true);
-    if(chowAvail){dEl.style.cursor='pointer';dEl.style.boxShadow='0 0 0 2px var(--accent)';}
-    else if(chowVisible){dEl.style.opacity='0.5';dEl.style.cursor='not-allowed';}
-    dEl.onclick=function(){if(turn===0&&!gover&&!pendingDraw&&!drawn)playerChow();};
-    var chowHint=document.createElement('div');
-    chowHint.style.cssText='font-size:9px;margin-top:3px;font-weight:600;color:'+(chowAvail?'var(--accent)':'var(--muted)');
-    chowHint.textContent=chowAvail?'✓ Chow':'✗ No meld';
-    dWrap.appendChild(dEl);dWrap.appendChild(chowHint);piles.appendChild(dWrap);
-    wrap.appendChild(piles);
+    var chowOk=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length&&canChow(discard[discard.length-1],hands[0]));
+    var dLblSpan=document.createElement('span');dLblSpan.style.cssText='font-size:9px;cursor:pointer;color:var(--accent);text-decoration:underline';
+    dLblSpan.textContent='Discard'+(discardHistory.length?' ('+discardHistory.length+')':'');
+    dLblSpan.onclick=function(){showDiscardPile=!showDiscardPile;render();};
+    dWrap.appendChild(dLblSpan);
+    var dEl=discard.length?_cardEl(discard[discard.length-1],44,64):_cardEl(null,44,64,true);
+    if(chowOk){dEl.style.cursor='pointer';dEl.style.boxShadow='0 0 0 3px var(--accent)';}
+    else if(turn===0&&!drawn&&!gover){dEl.style.opacity='0.55';dEl.style.cursor='not-allowed';}
+    dEl.onclick=function(){if(chowOk)playerChow();};
+    var chowHint=document.createElement('div');chowHint.style.cssText='font-size:9px;margin-top:2px;font-weight:600;color:'+(chowOk?'var(--accent)':'var(--muted)');
+    chowHint.textContent=chowOk?'✓ Chow':'';
+    dWrap.appendChild(dEl);dWrap.appendChild(chowHint);pilesRow.appendChild(dWrap);
+    center.appendChild(pilesRow);
 
-    /* Discard pile history popup */
+    /* DW display */
+    var dwEl=document.createElement('div');dwEl.style.cssText='font-size:10px;color:var(--muted);text-align:center';
+    dwEl.textContent='DW: '+deadwood(hands[0]);
+    center.appendChild(dwEl);
+    tableRow.appendChild(center);
+
+    /* Nene - RIGHT (index 1) */
+    var neneBox=document.createElement('div');
+    neneBox.style.cssText='flex:1;text-align:center;min-width:0';
+    var nenLbl=document.createElement('div');nenLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600';
+    nenLbl.textContent='Nene (Right)'+(turn===1?' ←':'');
+    if(turn===1)nenLbl.style.color='var(--accent)';
+    neneBox.appendChild(nenLbl);
+    var nenRow=document.createElement('div');nenRow.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
+    hands[1].slice(0,6).forEach(function(){nenRow.appendChild(_cardEl(null,20,30,true));});
+    if(hands[1].length>6){var nm=document.createElement('span');nm.style.cssText='font-size:10px;color:var(--muted);align-self:center';nm.textContent='+'+( hands[1].length-6);nenRow.appendChild(nm);}
+    neneBox.appendChild(nenRow);
+    if(allExposedMelds[1].length){
+      allExposedMelds[1].forEach(function(meld){
+        var mr=document.createElement('div');mr.style.cssText='display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap';
+        meld.forEach(function(c){mr.appendChild(_cardEl(c,20,30));});
+        neneBox.appendChild(mr);
+      });
+    }
+    tableRow.appendChild(neneBox);
+    wrap.appendChild(tableRow);
+
+    /* Discard pile popup */
     if(showDiscardPile&&discardHistory.length){
       var dpBox=document.createElement('div');
       dpBox.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px';
-      var dpLbl=document.createElement('div');dpLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:600';dpLbl.textContent='All Discarded Cards ('+discardHistory.length+') — tap to close';
-      dpLbl.style.cursor='pointer';dpLbl.onclick=function(){showDiscardPile=false;render();};
+      var dpLbl=document.createElement('div');dpLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:600;cursor:pointer';
+      dpLbl.textContent='Discard history ('+discardHistory.length+') — tap to close';
+      dpLbl.onclick=function(){showDiscardPile=false;render();};
       dpBox.appendChild(dpLbl);
       var dpRow=document.createElement('div');dpRow.style.cssText='display:flex;gap:3px;flex-wrap:wrap';
       discardHistory.forEach(function(c){dpRow.appendChild(_cardEl(c,28,40));});
       dpBox.appendChild(dpRow);wrap.appendChild(dpBox);
     }
 
-    /* Player's exposed melds */
-    if(allExposedMelds[0].length){
-      var expBox=document.createElement('div');
-      expBox.style.cssText='background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px;padding:8px;margin-bottom:8px;text-align:center';
-      var expLbl=document.createElement('div');expLbl.style.cssText='font-size:10px;color:var(--green);font-weight:600;margin-bottom:5px';
-      expLbl.textContent='✅ Your Exposed Melds'+(playerGotSapawed?' (Sapawed — no draw)':'');
-      expBox.appendChild(expLbl);
-      allExposedMelds[0].forEach(function(meld,mi){
-        var mRow=document.createElement('div');mRow.style.cssText='display:flex;gap:3px;justify-content:center;margin-bottom:3px';
-        meld.forEach(function(c){mRow.appendChild(_cardEl(c,30,44));});
-        expBox.appendChild(mRow);
-      });
-      wrap.appendChild(expBox);
-    }
-
-    /* Sapaw opportunities from hand — show when drawn */
-    if(drawn&&!gover&&!pendingDraw){
-      var sapawOpts=[];
-      hands[0].forEach(function(card){
-        for(var owner=0;owner<3;owner++){
-          var sr=canSapaw(card,owner);
-          if(sr)sapawOpts.push({card:card,owner:owner,meldIdx:sr.meldIdx});
-        }
-      });
-      if(sapawOpts.length){
-        var spBox=document.createElement('div');
-        spBox.style.cssText='background:rgba(253,203,110,.08);border:1px solid rgba(253,203,110,.2);border-radius:8px;padding:8px;margin-bottom:8px;text-align:center';
-        var spLbl=document.createElement('div');spLbl.style.cssText='font-size:10px;color:var(--amber);font-weight:600;margin-bottom:5px';spLbl.textContent='Sapaw Available!';
-        spBox.appendChild(spLbl);
-        sapawOpts.forEach(function(opt){
-          var sb=document.createElement('button');sb.className='btn btn-outline';sb.style.cssText='font-size:10px;padding:3px 8px;margin:2px';
-          sb.textContent='Add '+opt.card.v+opt.card.s+' to '+(opt.owner===0?'your':AI[opt.owner-1]+'\'s')+' meld';
-          sb.onclick=(function(o){return function(){playerSapaw(o.card,o.owner,o.meldIdx);};})(opt);
-          spBox.appendChild(sb);
-        });
-        wrap.appendChild(spBox);
-      }
-    }
-
-    /* Challenge pending */
+    /* AI draw challenge */
     if(pendingDraw&&pendingDraw.caller!==0){
       var cb=document.createElement('div');
-      cb.style.cssText='background:rgba(253,203,110,.12);border:1px solid rgba(253,203,110,.3);border-radius:10px;padding:10px;text-align:center;margin-bottom:8px';
-      var cm=document.createElement('div');cm.style.cssText='font-size:13px;font-weight:700;color:var(--amber);margin-bottom:3px';
-      cm.textContent=AI[pendingDraw.caller-1]+' calls DRAW (DW: '+pendingDraw.dw+')';
+      cb.style.cssText='background:rgba(253,203,110,.12);border:1px solid rgba(253,203,110,.3);border-radius:8px;padding:10px;text-align:center;margin-bottom:8px';
       var prot=isBurnProtected(0);
-      var cs=document.createElement('div');cs.style.cssText='font-size:11px;color:var(--muted);margin-bottom:8px';
-      cs.textContent='Your DW: '+deadwood(hands[0])+(prot?' — You\'re protected':' — ⚠️ No protection! Fighting = burn');
+      cb.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:3px">'+AI[pendingDraw.caller-1]+' calls DRAW (DW: '+pendingDraw.dw+')</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Your DW: '+deadwood(hands[0])+(prot?' ✅ Protected':'⚠️ No protection — fight = burn')+'</div>';
       var br=document.createElement('div');br.style.cssText='display:flex;gap:8px;justify-content:center';
-      var fb=document.createElement('button');fb.className='btn btn-primary';fb.textContent='⚔️ Fight'+(prot?'':' (Risk burn)');fb.onclick=function(){resolveFight(false);};
+      var fb=document.createElement('button');fb.className='btn btn-primary';fb.textContent='⚔️ Fight'+(prot?'':' (Burns!)');fb.onclick=function(){resolveFight(false);};
       var fl=document.createElement('button');fl.className='btn btn-outline';fl.textContent='🏳️ Fold';fl.onclick=function(){resolveFight(true);};
-      br.appendChild(fb);br.appendChild(fl);cb.appendChild(cm);cb.appendChild(cs);cb.appendChild(br);wrap.appendChild(cb);
+      br.appendChild(fb);br.appendChild(fl);cb.appendChild(br);wrap.appendChild(cb);
+    }
+
+    /* Player exposed melds (left to right, horizontal) */
+    if(allExposedMelds[0].length){
+      var expWrap=document.createElement('div');
+      expWrap.style.cssText='display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap;margin-bottom:6px;padding:6px 8px;background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px';
+      var expTitle=document.createElement('div');expTitle.style.cssText='width:100%;font-size:9px;color:var(--green);font-weight:600;margin-bottom:3px';
+      expTitle.textContent='✅ Your Exposed Melds'+(playerGotSapawed?' · Sapawed':'');
+      expWrap.appendChild(expTitle);
+      allExposedMelds[0].forEach(function(meld){
+        var mRow=document.createElement('div');mRow.style.cssText='display:flex;gap:2px';
+        meld.forEach(function(c){mRow.appendChild(_cardEl(c,32,46));});
+        expWrap.appendChild(mRow);
+      });
+      wrap.appendChild(expWrap);
     }
 
     /* Player hand */
-    var melded=getMelded(hands[0]);var dw=deadwood(hands[0]);
-    var chowAvailForLabel=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length&&canChow(discard[discard.length-1],hands[0]));
-    var hLabel=document.createElement('div');hLabel.style.cssText='font-size:11px;color:var(--muted);margin-bottom:5px;text-align:center';
-    hLabel.textContent='Your hand · DW: '+dw+(drawn?' — tap card to discard':turn===0?(chowAvailForLabel?' — Draw or Chow':' — Draw (no Chow)'):'');
+    var hLabel=document.createElement('div');
+    hLabel.style.cssText='font-size:11px;color:var(--muted);margin-bottom:5px;text-align:center';
+    var selArr=Array.from(selectedCards);
+    var selMelds=selArr.length>=3?findMelds(selArr):[];
+    var selIsMeld=selMelds.length>0&&selMelds[0].length===selArr.length;
+    var selSapaw=selArr.length===1?anySapawTarget(selArr[0]):null;
+    if(selArr.length>0){
+      var selDesc=selArr.length===1
+        ?('1 card raised — '+(drawn?'Discard, ':'Draw first · ')+(selSapaw?'Sapaw available':'no Sapaw'))
+        :(selArr.length+' cards raised — '+(selIsMeld?'valid meld! Expose it':'not a valid meld yet'));
+      hLabel.textContent=selDesc;
+    } else if(drawn){
+      hLabel.textContent='Tap a card to raise it — then Discard, Meld, or Sapaw';
+    } else if(turn===0){
+      hLabel.textContent=chowOk?'Draw from stock or Chow the discard':'Draw from stock (Chow not available)';
+    } else {
+      hLabel.textContent='Waiting for '+AI[turn-1]+'…';
+    }
     wrap.appendChild(hLabel);
 
-    var hRow=document.createElement('div');hRow.style.cssText='display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-bottom:8px';
+    var hRow=document.createElement('div');hRow.style.cssText='display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-bottom:6px';
+    var melded=getMelded(hands[0]);
     sortHand(hands[0]).forEach(function(c){
-      var ce=_cardEl(c,40,58);
-      if(melded.has(c)){ce.style.boxShadow='0 0 0 2px var(--green)';}
-      if(drawn&&!pendingDraw&&!gover)(function(card){ce.style.cursor='pointer';ce.onclick=function(){playerDiscard(card);};})(c);
+      var isSel=selectedCards.has(c);
+      var isMelded=melded.has(c);
+      var ce=_cardEl(c,44,64);
+      ce.style.cssText+=';transition:transform .1s,box-shadow .1s;overflow:hidden';
+      if(isSel){ce.style.transform='translateY(-12px)';ce.style.boxShadow='0 6px 16px rgba(18,140,126,.5)';}
+      if(isMelded&&!isSel){ce.style.boxShadow='0 0 0 2px var(--green)';}
+      if(turn===0&&!gover&&!pendingDraw){
+        ce.style.cursor='pointer';
+        (function(card){ce.onclick=function(){playerToggleCard(card);};})(c);
+      }
       hRow.appendChild(ce);
     });
     wrap.appendChild(hRow);
 
-    /* Action buttons */
-    if(!gover&&turn===0&&!pendingDraw){
-      var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:5px';
+    /* Action panel for selected cards — shows whenever cards are raised */
+    if(selArr.length>0&&turn===0&&!gover&&!pendingDraw){
+      var actBox=document.createElement('div');
+      actBox.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;padding:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)';
+      /* Meld button — available pre and post draw */
+      if(selArr.length>=3&&selIsMeld){
+        var meldBtn=document.createElement('button');meldBtn.className='btn btn-primary';meldBtn.style.cssText='font-size:10px;padding:5px 12px';
+        if(!drawn){meldBtn.disabled=true;meldBtn.title='Draw first before exposing a meld';}
+        meldBtn.textContent='Expose Meld ('+selArr.length+')';meldBtn.onclick=playerConfirmMeld;actBox.appendChild(meldBtn);
+      }
+      /* Sapaw button */
+      if(selArr.length===1&&selSapaw){
+        var sapBtn=document.createElement('button');sapBtn.className='btn btn-outline';sapBtn.style.cssText='font-size:10px;padding:5px 12px';
+        if(!drawn){sapBtn.disabled=true;sapBtn.title='Draw first';}
+        sapBtn.textContent='Sapaw → '+(selSapaw.owner===0?'your':AI[selSapaw.owner-1]+'\'s')+' meld';
+        sapBtn.onclick=(function(t){return function(){playerConfirmSapaw(t);};})(selSapaw);actBox.appendChild(sapBtn);
+      }
+      /* Discard button — only post draw */
+      if(selArr.length===1&&drawn){
+        var discBtn=document.createElement('button');discBtn.className='btn btn-outline';discBtn.style.cssText='font-size:10px;padding:5px 12px';
+        discBtn.textContent='Discard '+selArr[0].v+selArr[0].s;discBtn.onclick=playerConfirmDiscard;actBox.appendChild(discBtn);
+      }
+      /* Clear */
+      var clrBtn=document.createElement('button');clrBtn.className='btn btn-outline';clrBtn.style.cssText='font-size:10px;padding:5px 12px';
+      clrBtn.textContent='✕ Clear';clrBtn.onclick=function(){selectedCards=new Set();render();};actBox.appendChild(clrBtn);
+      wrap.appendChild(actBox);
+    }
+
+    /* Action buttons — sort always visible, call draw when drawn */
+    if(!gover&&!pendingDraw){
+      var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:4px';
+      /* Sort — always available */
       var sortBtn=document.createElement('button');sortBtn.className='btn btn-outline';sortBtn.style.cssText='font-size:10px;padding:3px 8px';
-      sortBtn.textContent='Sort: '+(sortMode==='face'?'By Face':'By Order');
-      sortBtn.onclick=function(){sortMode=sortMode==='face'?'order':'face';hands[0]=sortHand(hands[0]);render();};
+      sortBtn.textContent='Sort: '+(sortMode==='face'?'By Face ▼':'By Order ▼');
+      sortBtn.onclick=function(){sortMode=sortMode==='face'?'order':'face';selectedCards=new Set();render();};
       btnRow.appendChild(sortBtn);
-      if(drawn){
-        var canExp=findMelds(hands[0]).length>0&&!playerGotSapawed&&allExposedMelds[0].length===0;
-        var expBtn=document.createElement('button');expBtn.className='btn btn-outline';expBtn.style.cssText='font-size:10px;padding:3px 8px';expBtn.textContent='Expose Meld';
-        if(!canExp){expBtn.disabled=true;expBtn.title=playerGotSapawed?'Sapawed — cannot expose':'No meld to expose';}
-        expBtn.onclick=playerExpose;btnRow.appendChild(expBtn);
-        var canCall=allExposedMelds[0].length===0&&!playerGotSapawed;
-        var callBtn=document.createElement('button');callBtn.className='btn btn-outline';callBtn.style.cssText='font-size:10px;padding:3px 8px';callBtn.textContent='Call Draw';
-        if(!canCall){callBtn.disabled=true;callBtn.title=playerGotSapawed?'Sapawed — cannot call draw':'Cannot call draw with exposed melds';}
+      /* Call Draw — only when drawn and eligible */
+      if(drawn&&turn===0){
+        var canCall=!playerGotSapawed&&!drawnByChow&&!didSapawThisTurn;
+        var callBtn=document.createElement('button');callBtn.className='btn btn-outline';callBtn.style.cssText='font-size:10px;padding:3px 8px';
+        callBtn.textContent='Call Draw';
+        var whyCant=drawnByChow?'Took a Chow this turn':didSapawThisTurn?'Did a Sapaw this turn':'Your meld was sapawed this turn';
+        if(!canCall){callBtn.disabled=true;callBtn.title=whyCant;}
         callBtn.onclick=playerCallDraw;btnRow.appendChild(callBtn);
       }
       wrap.appendChild(btnRow);
     }
-    if(turn!==0&&!gover&&!pendingDraw){var wait=document.createElement('div');wait.style.cssText='font-size:11px;color:var(--muted);text-align:center;margin-top:4px';wait.textContent=AI[turn-1]+' is thinking…';wrap.appendChild(wait);}
+    if(turn!==0&&!gover&&!pendingDraw){
+      var wait=document.createElement('div');wait.style.cssText='font-size:11px;color:var(--muted);text-align:center;margin-top:4px';
+      wait.textContent=AI[turn-1]+' is thinking…';wrap.appendChild(wait);
+    }
     if(gover){
       var showRow=document.createElement('div');showRow.style.cssText='display:flex;gap:8px;justify-content:center;margin:8px 0;flex-wrap:wrap';
       [1,2].forEach(function(i){
         var box=document.createElement('div');box.style.cssText='text-align:center';
         var lbl2=document.createElement('div');lbl2.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';lbl2.textContent=AI[i-1]+' DW:'+deadwood(hands[i]);
-        var row=document.createElement('div');row.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
-        hands[i].forEach(function(c){row.appendChild(_cardEl(c,26,38));});
-        box.appendChild(lbl2);box.appendChild(row);showRow.appendChild(box);
+        var row2=document.createElement('div');row2.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
+        hands[i].forEach(function(c){row2.appendChild(_cardEl(c,28,40));});
+        box.appendChild(lbl2);box.appendChild(row2);showRow.appendChild(box);
       });
       wrap.appendChild(showRow);
       var nb=document.createElement('button');nb.className='btn btn-primary';nb.style.marginTop='8px';nb.textContent='New Game';nb.onclick=deal;wrap.appendChild(nb);
