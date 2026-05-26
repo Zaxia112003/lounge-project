@@ -7590,6 +7590,13 @@ function openAI(){
   var msgs=G('ai-messages');
   msgs.innerHTML='';
   msgs.innerHTML+=aiKobyBubble('Hey! Ask me anything about contracts, vendors, addresses, or escalation procedures. Fair warning: I might sneak in a pun. 🐸');
+  /* Games hint always shows on startup as the second message */
+  setTimeout(function(){
+    if(!aiOpen)return;
+    var m=G('ai-messages');if(!m)return;
+    m.innerHTML+=aiKobyBubble('On a break? Type <strong>games</strong> and I\'ll take you to Game Corner 🎮');
+    m.scrollTop=m.scrollHeight;
+  },800);
   setTimeout(function(){G('ai-input').focus();},300);
   _kobyResetIdleTimer();
 }
