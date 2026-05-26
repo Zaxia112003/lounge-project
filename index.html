@@ -1100,6 +1100,7 @@ window.dispatchEvent(new Event('firebase-ready'));
         <div class="stab active" onclick="switchStab('appearance',this)"><span class="stab-icon">🎨</span>Appearance</div>
         <div class="stab" onclick="switchStab('profile',this)"><span class="stab-icon">👤</span>Profile</div>
         <div class="stab" onclick="switchStab('security',this)"><span class="stab-icon">🔐</span>Security</div>
+        <div class="stab" id="stab-testmode" style="display:none" onclick="switchStab('testmode',this)"><span class="stab-icon">🧪</span>Test Mode</div>
       </div>
       <div class="settings-pane">
         <!-- APPEARANCE -->
@@ -1230,6 +1231,40 @@ window.dispatchEvent(new Event('firebase-ready'));
             </div>
           </div>
         </div>
+        <!-- TEST MODE -->
+        <div class="spane" id="spane-testmode">
+          <div class="s-section">
+            <div class="s-section-title">🧪 Test Mode</div>
+            <div class="s-row-desc" style="margin-bottom:16px">Simulate the uploader or escalation experience without affecting real data, stats, or performance records. Workflow runs normally — check-ins, quality remarks, KB quiz, and Koby all work. Nothing is counted in reports while test mode is active.</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="s-row" style="padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
+                <div class="s-row-info">
+                  <div class="s-row-label">Uploader mode</div>
+                  <div class="s-row-desc">View and interact as an uploader team member</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                  <select id="tm-upl-select" class="form-input" style="font-size:11px;padding:4px 8px;width:160px"></select>
+                  <button class="btn btn-outline btn-sm" onclick="activateTestMode('uploader')" style="font-size:11px;width:160px">Enter as Uploader</button>
+                </div>
+              </div>
+              <div class="s-row" style="padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">
+                <div class="s-row-info">
+                  <div class="s-row-label">Escalation mode</div>
+                  <div class="s-row-desc">View and interact as an escalation team member</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                  <select id="tm-esc-select" class="form-input" style="font-size:11px;padding:4px 8px;width:160px"></select>
+                  <button class="btn btn-outline btn-sm" onclick="activateTestMode('escalation')" style="font-size:11px;width:160px">Enter as Escalation</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="s-section" id="tm-active-section" style="display:none">
+            <div class="s-section-title" style="color:var(--amber)">&#9888; Test Mode Active</div>
+            <div class="s-row-desc" id="tm-active-desc" style="margin-bottom:12px"></div>
+            <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:rgba(255,61,61,.3)" onclick="deactivateTestMode()">Exit Test Mode &#8594; Back to Manager</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1357,6 +1392,11 @@ async function fsLoadCollection(colName,localRef,mapFn){
 
 /* Generic write doc (upsert by _fsId or add new) */
 async function fsWriteDoc(colName,data){
+  /* Block stat-collecting writes in test mode */
+  if(_testModeGuard&&_testModeGuard()){
+    var blocked=['perfData','attendanceLog','kc_results','moodLog','timerSessions','player_credits','slaLog'];
+    if(blocked.indexOf(colName)>-1)return;
+  }
   try{
     var db=fsDb();
     var payload=Object.assign({},data);
@@ -1595,13 +1635,19 @@ function fsStopListeners(){
 
 function fsSavePerfData(nick){
   if(!fsDb())return;
+  if(_testModeGuard())return; /* test mode: no real data writes */
   fsWriteDoc('perfData',Object.assign({_fsId:nick},perfData[nick]||{}));
 }
 
-function fsSaveCallout(c){
+async function fsSaveCallout(c){
   if(!fsDb())return;
-  if(c._fsId){/* Already saved via direct addDoc */try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',c._fsId),(function(){var pl=Object.assign({},c);delete pl._fsId;return pl;})());}catch(e){}return;}
-  fsWriteDoc('callouts',c);
+  if(_testModeGuard())return; /* test mode: no real callout writes */
+  if(c._fsId){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',c._fsId),(function(){var pl=Object.assign({},c);delete pl._fsId;return pl;})());}catch(e){}return;}
+  /* New callout — addDoc and store the returned _fsId */
+  try{
+    var ref=await window._fsAddDoc(window._fsColl(fsDb(),'callouts'),(function(){var pl=Object.assign({},c);delete pl._fsId;return pl;})());
+    c._fsId=ref.id;
+  }catch(e){console.warn('fsSaveCallout',e);}
 }
 
 function fsDeleteCallout(fsId){
@@ -2380,7 +2426,7 @@ function openReviewModal(thread){
   G('rev-modal-feedback').value=thread.feedback||'';
   if(thread.screenshot){var ssEl=G('rev-modal-ss');var firstSrc=thread.screenshot.split('||')[0];ssEl.src=firstSrc;ssEl.style.display='';ssEl.style.cursor='pointer';ssEl.title='Click to view full size';ssEl.dataset.src=firstSrc;ssEl.onclick=function(){window.open(this.dataset.src,'_blank');};}
   else{G('rev-modal-ss').style.display='none';}
-  G('modal-error-review').dataset.threadId=thread.id;
+  G('modal-error-review').dataset.threadId=thread._fsId||thread.id||'';
   G('modal-error-review').classList.add('open');
   thread.unread=false;updateReviewBadge();
   var upBtn=document.querySelector('#modal-error-review button[onclick*="upgradeToEscalation"]');
@@ -2416,14 +2462,12 @@ function openReviewByIdx(el){
 async function submitReview(){
   var modal=G('modal-error-review');
   var threadId=modal.dataset.threadId;
-  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  var thread=(window._pendingReviews||[]).find(function(r){return r._fsId===threadId||r.id===threadId;});
   if(!thread)return;
   var editedFeedback=G('rev-modal-feedback').value.trim();
   if(!editedFeedback){G('rev-modal-err').textContent='Please add an error description.';return;}
-  /* Find the callout and update it */
-  /* Remove from pending list FIRST — before any async writes — to prevent snapshot race */
   thread.status='approved';
-  if(window._pendingReviews){window._pendingReviews=window._pendingReviews.filter(function(r){return r.id!==threadId;});}
+  if(window._pendingReviews){window._pendingReviews=window._pendingReviews.filter(function(r){return r._fsId!==threadId&&r.id!==threadId;});}
   updateReviewBadge();updateNotifBell();
   /* Find callout: try Firestore ID first (most reliable), then numeric id */
   var co=null;
@@ -2481,7 +2525,7 @@ async function submitReview(){
 async function upgradeToEscalation(){
   var modal=G('modal-error-review');
   var threadId=modal.dataset.threadId;
-  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  var thread=(window._pendingReviews||[]).find(function(r){return r._fsId===threadId||r.id===threadId;});
   if(!thread){alert('Thread not found.');return;}
   if(!confirm('Upgrade this error to a Critical Escalation?'))return;
   var editedFeedback=G('rev-modal-feedback').value.trim()||thread.feedback;
@@ -2494,7 +2538,7 @@ async function upgradeToEscalation(){
   if(calloutFsId&&fsDb()){try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',calloutFsId),{type:'qesc',feedback:editedFeedback,status:'Pending',managerReviewed:true,reviewedAt:reviewedAt});}catch(e){}}
   if(thread._fsId&&fsDb()){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'approved'});}catch(e){}}
   thread.status='approved';
-  if(window._pendingReviews)window._pendingReviews=window._pendingReviews.filter(function(r){return r.id!==threadId;});
+  if(window._pendingReviews)window._pendingReviews=window._pendingReviews.filter(function(r){return r._fsId!==threadId&&r.id!==threadId;});
   updateMemberBell();updateNotifBell();
   G('modal-error-review').classList.remove('open');G('modal-reviews').classList.remove('open');
   pushNotif('🚨','Error upgraded to Critical Escalation for '+thread.uploaderFull,'qesc');
@@ -2502,28 +2546,33 @@ async function upgradeToEscalation(){
 async function discardReview(){
   var modal=G('modal-error-review');
   var threadId=modal.dataset.threadId;
-  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
-  if(!thread)return;
+  /* _pendingReviews entries use _fsId as their document ID */
+  var thread=(window._pendingReviews||[]).find(function(r){return r._fsId===threadId||r.id===threadId;});
+  if(!thread){console.warn('discardReview: thread not found for threadId',threadId);return;}
   if(!confirm('Discard this error? It will be kept as a hidden record but never shown to the uploader.'))return;
-  /* Mark callout as discarded — not deleted */
-  var co=callouts.find(function(c){return c.id===thread.calloutId;});
+  /* Mark in local array immediately so UI updates before Firestore confirms */
+  thread.status='discarded';
+  window._pendingReviews=window._pendingReviews.filter(function(r){return r._fsId!==threadId&&r.id!==threadId;});
+  /* Find matching callout by calloutId (_fsId or numeric) */
+  var co=callouts.find(function(c){
+    return c._fsId===String(thread.calloutId)||c._fsId===thread.calloutFsId||String(c.id)===String(thread.calloutId);
+  });
   if(co){
     co.status='discarded';
     if(co._fsId){
       try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'discarded'});}
-      catch(e){console.warn('discard',e);}
+      catch(e){console.warn('discard callout',e);}
     }
   }
-  thread.status='discarded';
-  if(thread._fsId){try{window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}catch(e){}}
-  /* Mark callout as discarded — do NOT delete it permanently so it can be audited */
-  if(co&&co._fsId&&fsDb()){
-    try{window._fsUpdateDoc(window._fsDoc(fsDb(),'callouts',co._fsId),{status:'discarded'});}catch(e){}
+  /* Mark errorReviews doc as discarded */
+  if(thread._fsId){
+    try{await window._fsUpdateDoc(window._fsDoc(fsDb(),'errorReviews',thread._fsId),{status:'discarded'});}
+    catch(e){console.warn('discard review',e);}
   }
-  if(co){co.status='discarded';}
   G('modal-error-review').classList.remove('open');
   G('modal-reviews').classList.remove('open');
   updateReviewBadge();
+  if(typeof renderQualityPortal==='function')renderQualityPortal();
 }
 
 /* Load pending reviews from Firestore on login */
@@ -2642,7 +2691,7 @@ function navigateToQuality(){
 }
 
 function openMemberCompleteView(id){
-  var co=callouts.find(function(x){return x.id===id;});if(!co)return;
+  var co=callouts.find(function(x){return x._fsId===String(id)||String(x.id)===String(id)||x.id===id;});if(!co)return;
   G('mcv-address').textContent=co.address;
   G('mcv-date').textContent=fmtDate(co.date);
   G('mcv-feedback').textContent=co.feedback||'—';
@@ -2665,7 +2714,7 @@ function openAckedReview(el){
   G('acked-modal-insight').textContent=(co&&co.insight)||thread.insight||'—';
   G('acked-modal-remarks').value='';
   G('acked-modal-err').textContent='';
-  G('modal-acked-review').dataset.threadId=thread.id;
+  G('modal-acked-review').dataset.threadId=thread._fsId||thread.id||'';
   G('modal-acked-review').dataset.calloutId=co?co.id:'';
   G('modal-acked-review').dataset.calloutFsId=co?co._fsId:'';
   G('modal-acked-review').classList.add('open');
@@ -2677,7 +2726,7 @@ async function completeError(){
   var calloutId=parseInt(modal.dataset.calloutId);
   var calloutFsId=modal.dataset.calloutFsId;
   var remarks=G('acked-modal-remarks').value.trim();
-  var thread=(window._pendingReviews||[]).find(function(r){return r.id===threadId;});
+  var thread=(window._pendingReviews||[]).find(function(r){return r._fsId===threadId||r.id===threadId;});
   var co=callouts.find(function(x){return x.id===calloutId||x._fsId===calloutFsId;});
   if(!co&&!thread){G('acked-modal-err').textContent='Error: callout not found.';return;}
   /* Update callout */
@@ -2716,7 +2765,83 @@ function openSettings(){
   var cn=G('s-cur-nick');if(cn&&cu)cn.textContent=cu.nickname;
   var nn=G('s-new-nick');if(nn)nn.value='';
   var ne=G('s-nick-err');if(ne){ne.textContent='';ne.style.color='var(--red)';}
+  /* Show Test Mode tab for managers (real or test-mode-exited) */
+  var isRealManager=window._testMode?window._testModeManagerCu&&window._testModeManagerCu.role==='manager':cu&&cu.role==='manager';
+  var tmTab=G('stab-testmode');if(tmTab)tmTab.style.display=isRealManager?'':'none';
+  /* Populate test mode selects */
+  if(isRealManager){
+    var upls=TEAM.filter(function(m){return m.role==='uploader';});
+    var escs=TEAM.filter(function(m){return m.role==='escalation';});
+    var uplSel=G('tm-upl-select');
+    var escSel=G('tm-esc-select');
+    if(uplSel)uplSel.innerHTML=upls.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
+    if(escSel)escSel.innerHTML=escs.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
+    var tmSect=G('tm-active-section');
+    if(tmSect)tmSect.style.display=window._testMode?'':'none';
+    if(window._testMode){
+      var desc=G('tm-active-desc');
+      if(desc)desc.textContent='Currently simulating: '+cu.fullName+' ('+cu.role+'). Real data writes are blocked.';
+    }
+  }
   G('settings-overlay').classList.add('open');
+}
+
+/* ── TEST MODE ── */
+var _testMode=false;
+var _testModeManagerCu=null;
+
+function activateTestMode(role){
+  if(!cu||cu.role!=='manager')return;
+  var selId=role==='uploader'?'tm-upl-select':'tm-esc-select';
+  var sel=G(selId);if(!sel||!sel.value)return;
+  var nick=sel.value;
+  var member=TEAM.find(function(m){return m.nickname===nick;});
+  if(!member){alert('Member not found.');return;}
+  /* Store real manager */
+  _testModeManagerCu=Object.assign({},cu);
+  _testMode=true;
+  /* Switch cu to simulate member */
+  cu={nickname:member.nickname,fullName:member.fullName,role:member.role,firstLogin:false,_isTestMode:true};
+  localStorage.setItem('lounge_nick',cu.nickname);
+  localStorage.setItem('lounge_full',cu.fullName);
+  localStorage.setItem('lounge_role',cu.role);
+  closeSettings();
+  /* Re-render entire app as this member */
+  buildSidebar();buildMain();
+  setTimeout(function(){
+    /* Show test mode banner */
+    _showTestBanner();
+  },200);
+}
+
+function deactivateTestMode(){
+  if(!_testModeManagerCu)return;
+  _testMode=false;
+  cu=Object.assign({},_testModeManagerCu);
+  _testModeManagerCu=null;
+  localStorage.setItem('lounge_nick',cu.nickname);
+  localStorage.setItem('lounge_full',cu.fullName);
+  localStorage.setItem('lounge_role',cu.role);
+  var banner=G('test-mode-banner');if(banner)banner.remove();
+  buildSidebar();buildMain();
+}
+
+function _showTestBanner(){
+  var existing=G('test-mode-banner');if(existing)existing.remove();
+  var bar=document.createElement('div');
+  bar.id='test-mode-banner';
+  bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fef3c7;font-size:11px;font-weight:700;text-align:center;padding:5px 12px;display:flex;align-items:center;justify-content:center;gap:12px;letter-spacing:.3px';
+  bar.innerHTML='&#9888; TEST MODE — Simulating '+cu.fullName+' ('+cu.role+') — Real data writes blocked '
+    +'<button onclick="deactivateTestMode()" style="font-size:10px;padding:2px 10px;border-radius:5px;border:1px solid rgba(255,255,255,.4);background:rgba(0,0,0,.2);color:#fef3c7;cursor:pointer;font-weight:700">Exit</button>';
+  document.body.appendChild(bar);
+  /* Push body down so banner doesn't cover content */
+  document.body.style.paddingTop='28px';
+  bar._removeListener=function(){document.body.style.paddingTop='';};
+}
+
+/* Guard: block Firestore writes in test mode */
+function _testModeGuard(){
+  return window._testMode&&cu&&cu._isTestMode;
 }
 function closeSettings(){G('settings-overlay').classList.remove('open');}
 function switchStab(id,btn){
@@ -4490,6 +4615,7 @@ function kcGetState(nick){
 
 async function kcSaveState(nick,state){
   if(!nick)nick=cu?cu.nickname:'';
+  if(_testModeGuard())return; /* test mode: don't record KC results */
   var week=kcWeekId();
   /* Write to Firestore */
   if(fsDb()){
@@ -8499,10 +8625,11 @@ async function mwSubmitError(){
   if(!upl||!addr||!date||!desc){msg.textContent='Please fill in all required fields.';return;}
   var ss=G('mw-err-file').files[0]?await uploadScreenshot(G('mw-err-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
-  var newCallout={id:nextId++,type:'qscore',uploader:upl,category:mwErrCat||'Others',address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  var newCallout={id:nextId++,type:'qscore',uploader:upl,category:mwErrCat||'Others',address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
   callouts.push(newCallout);
-  fsSaveCallout(newCallout);
-  pushNotif('📋','Contract error logged for '+uplMem.fullName+': "'+addr+'".','qscore');
+  await fsSaveCallout(newCallout);
+  sendManagerReviewNotif(newCallout);
+  pushNotif('📋','Contract error logged for '+uplMem.fullName+': "'+addr+'". Pending your review.','qscore');
   if(typeof renderQualityPortal==='function')renderQualityPortal();
   closeMgrWrite();
 }
@@ -9828,15 +9955,17 @@ async function submitQScore(){
   const ss=G('qscore-file').files[0]?await uploadScreenshot(G('qscore-file').files[0]):null;
   const uplMem=TEAM.find(m=>m.nickname===upl);
   var qscoreCat=G('qscore-cat')?G('qscore-cat').value:'Others';
-  callouts.push({id:nextId++,type:'qscore',uploader:upl,address:addr,date,feedback:err,category:qscoreCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''});
+  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date,feedback:err,category:qscoreCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
+  callouts.push(newCo);
+  await fsSaveCallout(newCo);
+  sendManagerReviewNotif(newCo);
   closeModal('modal-qscore');
   ['qscore-addr','qscore-date','qscore-err'].forEach(id=>G(id).value='');G('qscore-file').value='';G('qscore-prev').innerHTML='';
-  pushNotif('📋',`Escalation team logged a contract error for ${uplMem?.fullName||upl}: "${addr}". Review required.`,'qscore');
+  pushNotif('📋','Contract error logged for '+(uplMem?.fullName||upl)+': "'+addr+'". Pending manager review.','qscore');
   renderQualityPortal();if(cu.role!=='manager')renderDashboard();
   if(cu.role==='escalation')renderDailyLogErrors();
 }
 
-const stBadge=s=>({Pending:`<span class="st-pending">Pending</span>`,'In Review':`<span class="st-review">In Review</span>`,Acknowledged:`<span class="st-review" style="background:rgba(34,197,94,.12);color:var(--green)">Acknowledged</span>`,Completed:`<span class="st-done">Completed</span>`}[s]||s);
 
 function renderQualityPortal(){
   const nick=cu.nickname,role=cu.role;
