@@ -362,6 +362,141 @@ textarea.form-input{resize:vertical;min-height:80px;}
 body.theme-dark{--bg:#07080f;--bg2:#0e1020;--bg3:#13152a;}
 body.theme-light{--bg:#f0f2ff;--bg2:#ffffff;--bg3:#e8eaf6;--text:#1a1b2e;--muted:rgba(26,27,46,0.5);--muted2:rgba(26,27,46,0.25);--border:rgba(26,27,46,0.12);--border2:rgba(26,27,46,0.22);}
 body.theme-midnight{--bg:#02030a;--bg2:#07080f;--bg3:#0d0e1a;}
+
+/* ── WhatsApp theme ── */
+body.theme-whatsapp{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f0f2f5;
+  --text:#111b21;--muted:rgba(17,27,33,0.55);--muted2:rgba(17,27,33,0.3);
+  --border:rgba(17,27,33,0.1);--border2:rgba(17,27,33,0.2);
+  --accent:#128c7e;--grad:linear-gradient(135deg,#128c7e,#075e54);--grad2:linear-gradient(90deg,#128c7e,#25d366);
+  --green:#25d366;--pink:#075e54;--purple:#128c7e;--blue:#34b7f1;
+}
+/* ── Login page ── */
+body.theme-whatsapp #pg-login{background:linear-gradient(160deg,#075e54 0%,#128c7e 50%,#25d366 100%);}
+body.theme-whatsapp .bg-fixed{display:none;}
+body.theme-whatsapp .login-card{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3);box-shadow:0 24px 80px rgba(0,0,0,.25);backdrop-filter:blur(24px);}
+body.theme-whatsapp .login-card::before{background:linear-gradient(135deg,rgba(255,255,255,.4),rgba(37,211,102,.3),rgba(255,255,255,.2));}
+body.theme-whatsapp .brand-name{color:#fff;}
+body.theme-whatsapp .brand-sub{background:linear-gradient(90deg,#fff,rgba(255,255,255,.7));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+body.theme-whatsapp .brand-logo{background:linear-gradient(135deg,#075e54,#128c7e);box-shadow:0 8px 28px rgba(0,0,0,.25);}
+body.theme-whatsapp .stitle{color:#fff;}
+body.theme-whatsapp .sdesc{color:rgba(255,255,255,.75);}
+body.theme-whatsapp .flabel{color:rgba(255,255,255,.75);}
+body.theme-whatsapp .finput{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.35);color:#fff;}
+body.theme-whatsapp .finput::placeholder{color:rgba(255,255,255,.55);}
+body.theme-whatsapp .finput:focus{border-color:#fff;background:rgba(255,255,255,.28);box-shadow:0 0 0 3px rgba(255,255,255,.15);}
+body.theme-whatsapp .pin-box{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.35);color:#fff;caret-color:#fff;}
+body.theme-whatsapp .pin-box:focus{border-color:#fff;background:rgba(255,255,255,.28);box-shadow:0 0 0 3px rgba(255,255,255,.15);}
+body.theme-whatsapp .btn-grad{background:linear-gradient(135deg,#fff,#e8f5e9);color:#075e54;box-shadow:0 6px 24px rgba(0,0,0,.2);}
+body.theme-whatsapp .err-msg{color:#ffcdd2;}
+body.theme-whatsapp .hint-msg{color:rgba(255,255,255,.6);}
+body.theme-whatsapp .badge-new{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.3);color:#fff;}
+/* ── Dashboard header ── */
+body.theme-whatsapp .main-brand-header{background:#075e54;border-bottom-color:rgba(0,0,0,.1);}
+body.theme-whatsapp .main-brand-title,body.theme-whatsapp #main-loggedin{color:#fff;}
+body.theme-whatsapp .main-brand-sub{color:rgba(255,255,255,.7)!important;}
+body.theme-whatsapp #last-sync-label{color:rgba(255,255,255,.5)!important;}
+body.theme-whatsapp .main-brand-header .btn-outline{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;}
+body.theme-whatsapp .main-brand-header .btn-outline:hover{background:rgba(255,255,255,.25);}
+/* ── Lounge tabs (green header bar) ── */
+body.theme-whatsapp .lounge-tabs{background:#075e54;border-bottom-color:rgba(0,0,0,.1);padding:0 20px;margin:-28px -32px 20px;}
+body.theme-whatsapp .lounge-tab{color:rgba(255,255,255,.65);}
+body.theme-whatsapp .lounge-tab:hover{color:#fff;}
+body.theme-whatsapp .lounge-tab.active{color:#fff;border-bottom-color:#25d366;}
+/* ── Full green sidebar ── */
+body.theme-whatsapp .sidebar{background:linear-gradient(180deg,#075e54 0%,#128c7e 100%);border-right-color:rgba(0,0,0,.12);}
+body.theme-whatsapp .sb-topbar{background:transparent;border-bottom-color:rgba(255,255,255,.12);}
+body.theme-whatsapp .sb-avatar{border-color:rgba(255,255,255,.4);}
+body.theme-whatsapp .sb-avatar-init{background:rgba(255,255,255,.2);}
+body.theme-whatsapp .sb-name{color:#fff;}
+body.theme-whatsapp .sb-role{color:rgba(255,255,255,.65);}
+body.theme-whatsapp .sb-divider{background:rgba(255,255,255,.15);}
+body.theme-whatsapp .nav-item{color:rgba(255,255,255,.75);}
+body.theme-whatsapp .nav-item:hover{background:rgba(255,255,255,.12);color:#fff;}
+body.theme-whatsapp .nav-item.active{background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.3);}
+body.theme-whatsapp .nav-icon{color:inherit;}
+body.theme-whatsapp .sb-icon-btn{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.2);}
+body.theme-whatsapp .sb-icon-btn:hover{background:rgba(255,255,255,.25);border-color:rgba(255,255,255,.3);}
+body.theme-whatsapp .sb-icon-btn svg{stroke:rgba(255,255,255,.85);}
+body.theme-whatsapp .sb-icon-btn:hover svg{stroke:#fff;}
+body.theme-whatsapp .sb-settings-nav{background:transparent;}
+body.theme-whatsapp .sb-signout{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.8);}
+body.theme-whatsapp .sb-signout:hover{background:rgba(255,255,255,.2);color:#fff;}
+body.theme-whatsapp .notif-dot{border-color:#128c7e;}
+/* ── Notification dropdown ── */
+body.theme-whatsapp .notif-dropdown{background:#fff;border-color:#e9edef;box-shadow:0 16px 48px rgba(0,0,0,.15);}
+body.theme-whatsapp .notif-dd-title{color:#111b21;}
+body.theme-whatsapp .notif-msg{color:#111b21;}
+body.theme-whatsapp .notif-time{color:#54656f;}
+body.theme-whatsapp .notif-item{border-bottom-color:#f0f2f5;}
+body.theme-whatsapp .notif-item:hover{background:#f5f6f6;}
+body.theme-whatsapp .notif-empty{color:#54656f;}
+/* ── Main content ── */
+body.theme-whatsapp .sect{background:#fff;border-color:#e9edef;}
+body.theme-whatsapp .sect-head{border-bottom-color:#e9edef;}
+body.theme-whatsapp .sect-title{color:#111b21;}
+body.theme-whatsapp .kpi-card{background:#fff;border-color:#e9edef;}
+body.theme-whatsapp .kpi-card::after{background:linear-gradient(90deg,#128c7e,#25d366);}
+body.theme-whatsapp .kpi-label{color:#54656f;}
+body.theme-whatsapp .kpi-value{color:#111b21;}
+body.theme-whatsapp .kpi-sub{color:#54656f;}
+body.theme-whatsapp .sub-tab{color:#54656f;}
+body.theme-whatsapp .sub-tab:hover{color:#111b21;}
+body.theme-whatsapp .sub-tab.active{color:#128c7e;border-bottom-color:#128c7e;}
+body.theme-whatsapp .filter-pill{background:#fff;border-color:#d1d7db;color:#54656f;}
+body.theme-whatsapp .filter-pill:hover{border-color:#128c7e;color:#128c7e;}
+body.theme-whatsapp .filter-pill.active{background:rgba(18,140,126,.1);border-color:rgba(18,140,126,.35);color:#128c7e;}
+body.theme-whatsapp .panel-title{color:#111b21;}
+body.theme-whatsapp .panel-sub{color:#54656f;}
+body.theme-whatsapp th{color:#54656f;}
+body.theme-whatsapp td{color:#111b21;}
+body.theme-whatsapp tr:hover td{background:rgba(0,0,0,.02);}
+/* ── Buttons ── */
+body.theme-whatsapp .btn-primary{background:linear-gradient(135deg,#128c7e,#075e54);box-shadow:0 4px 14px rgba(18,140,126,.3);}
+body.theme-whatsapp .btn-grad{background:linear-gradient(135deg,#128c7e,#075e54);box-shadow:0 6px 24px rgba(18,140,126,.35);}
+body.theme-whatsapp .btn-outline{background:rgba(0,0,0,.04);border-color:#d1d7db;color:#54656f;}
+body.theme-whatsapp .btn-outline:hover{border-color:#128c7e;color:#128c7e;}
+body.theme-whatsapp .btn-green{background:rgba(37,211,102,.12);border-color:rgba(37,211,102,.3);color:#128c7e;}
+/* ── Quality portal ── */
+body.theme-whatsapp .qp-card{background:#fff;border-color:#e9edef;}
+body.theme-whatsapp .qp-address{color:#111b21;}
+body.theme-whatsapp .qp-detail{color:#54656f;}
+body.theme-whatsapp .qp-body{background:#f0f2f5;border-left-color:#128c7e;color:#111b21;}
+body.theme-whatsapp .ack-wrap{background:rgba(18,140,126,.06);border-color:rgba(18,140,126,.2);}
+body.theme-whatsapp .ack-label{color:#128c7e;}
+body.theme-whatsapp .ack-ta{color:#111b21;}
+body.theme-whatsapp .insight-box{background:rgba(37,211,102,.06);border-color:rgba(37,211,102,.2);}
+body.theme-whatsapp .insight-lbl{color:#128c7e;}
+body.theme-whatsapp .insight-txt{color:#111b21;}
+/* ── Settings modal ── */
+body.theme-whatsapp .settings-modal{background:#fff;border-color:#e9edef;}
+body.theme-whatsapp .settings-header{border-bottom-color:#e9edef;}
+body.theme-whatsapp .settings-title{color:#111b21;}
+body.theme-whatsapp .settings-tabs{border-right-color:#e9edef;}
+body.theme-whatsapp .stab{color:#54656f;}
+body.theme-whatsapp .stab:hover{background:#f0f2f5;color:#111b21;}
+body.theme-whatsapp .stab.active{background:rgba(18,140,126,.1);color:#128c7e;border-color:rgba(18,140,126,.25);}
+body.theme-whatsapp .s-section-title{color:#54656f;}
+body.theme-whatsapp .s-row{background:#f0f2f5;border-color:#e9edef;}
+body.theme-whatsapp .s-row-label{color:#111b21;}
+body.theme-whatsapp .s-row-desc{color:#54656f;}
+body.theme-whatsapp .s-pin-box{background:#f0f2f5;border-color:#d1d7db;color:#111b21;}
+body.theme-whatsapp .s-pin-box:focus{border-color:#128c7e;}
+body.theme-whatsapp .theme-prev{border-color:#e9edef;}
+body.theme-whatsapp .theme-prev:hover{border-color:#128c7e;}
+body.theme-whatsapp .theme-prev.active{border-color:#128c7e;}
+body.theme-whatsapp .theme-prev-label{color:#54656f;}
+body.theme-whatsapp .s-select{background:#f0f2f5;border-color:#d1d7db;color:#111b21;}
+/* ── Misc text fixes ── */
+body.theme-whatsapp .muted,body.theme-whatsapp [style*="color:var(--muted)"]{color:#54656f!important;}
+body.theme-whatsapp .ann-card-body{color:#54656f;}
+body.theme-whatsapp .empty-txt{color:#54656f;}
+body.theme-whatsapp .kc-progress-fill{background:linear-gradient(90deg,#128c7e,#25d366);}
+body.theme-whatsapp .ai-msg.koby .ai-bubble{background:#d9fdd3;color:#111b21;border-color:#c3f0c8;}
+body.theme-whatsapp .ai-msg:not(.koby) .ai-bubble{background:#fff;color:#111b21;border-color:#e9edef;}
+body.theme-whatsapp .ai-input{background:#f0f2f5;border-color:#d1d7db;color:#111b21;}
+body.theme-whatsapp .ai-input::placeholder{color:#8696a0;}
+body.theme-whatsapp .sect-head .btn-outline,body.theme-whatsapp .filter-bar .btn-outline{color:#54656f;}
 /* ── THEME SKINS ── */
 body.theme-ocean{--bg:#0a1628;--bg2:#0d2040;--bg3:#112a52;--text:#e0f0ff;--muted:rgba(180,210,255,0.55);--muted2:rgba(180,210,255,0.25);--border:rgba(100,160,255,0.18);--border2:rgba(100,160,255,0.32);--accent:#38b2ff;}
 body.theme-forest{--bg:#0a1a0f;--bg2:#0f2416;--bg3:#142e1c;--text:#d4edda;--muted:rgba(180,230,190,0.55);--muted2:rgba(180,230,190,0.25);--border:rgba(80,180,100,0.18);--border2:rgba(80,180,100,0.32);--accent:#2ecc71;}
@@ -1136,6 +1271,10 @@ window.dispatchEvent(new Event('firebase-ready'));
                 <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#ede8ff,#7c3aed)"></div>
                 <div class="theme-prev-label" style="color:#2d1b6e">Lavender</div>
               </div>
+              <div class="theme-prev" id="theme-whatsapp" onclick="setTheme('whatsapp',this)">
+                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#128c7e,#25d366)"></div>
+                <div class="theme-prev-label" style="color:#075e54">WhatsApp</div>
+              </div>
             </div>
           </div>
           <div class="s-section">
@@ -1749,7 +1888,7 @@ let nextId=1;
 let activeDateFilter='month';
 let customRange={from:'',to:''};
 let attCalNick=null,attCalYear=null,attCalMonth=null,attPending=null;
-let settings={theme:'light',accent:'#8b2dff',compact:true,noMotion:false,use24h:false};
+let settings={theme:'whatsapp',accent:'#128c7e',compact:true,noMotion:false,use24h:false};
 let qpDateFilter='all';
 var mdAnnouncements=[];
 var mdAwards={quality:null,uploads:null,hero:null,quarter:null};
@@ -1891,6 +2030,13 @@ function goDash(){
   G('pg-login').classList.remove('active');
   var kfab=G('koby-fab');if(kfab)kfab.style.display='flex';
   G('pg-dash').classList.add('active');
+  /* Load persisted theme + accent per user */
+  try{
+    var savedTheme=localStorage.getItem('lounge_theme_'+cu.nickname);
+    if(savedTheme)settings.theme=savedTheme;
+    var savedAccent=localStorage.getItem('lounge_accent_'+cu.nickname);
+    if(savedAccent){settings.accent=savedAccent;document.documentElement.style.setProperty('--accent',savedAccent);}
+  }catch(e){}
   /* Apply saved theme */
   if(settings.theme)setTheme(settings.theme,null);
   /* Bell shown/hidden dynamically via updateNotifBell() and updateMemberBell() */
@@ -2242,6 +2388,11 @@ async function fsSavePin(nickname,pin){
   catch(e){console.warn('fsSavePin',e);}
 }
 function showPinScreen(){
+  /* Apply this user's saved theme before PIN screen appears */
+  try{
+    var saved=localStorage.getItem('lounge_theme'+(cu?'_'+cu.nickname:''));
+    if(saved)setTheme(saved,null);
+  }catch(e){}
   _pinMode='verify';_pinBuffer='';renderPinPad();showScr('scr-pin');setupPinKeyboard();
 }
 function renderPinPad(){
@@ -2861,11 +3012,19 @@ function setTheme(t,el){
   if(el)el.classList.add('active');
   else{var btn=G('theme-'+t);if(btn)btn.classList.add('active');}
   settings.theme=t;
+  /* Persist per user and as global default for login page */
+  try{
+    var key='lounge_theme'+(cu?'_'+cu.nickname:'');
+    localStorage.setItem(key,t);
+    localStorage.setItem('lounge_theme_default',t);
+  }catch(e){}
 }
 function setAccent(color,el){
   document.documentElement.style.setProperty('--accent',color);
   document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
   el.classList.add('active');settings.accent=color;
+  /* Persist per user */
+  try{var key='lounge_accent'+(cu?'_'+cu.nickname:'');localStorage.setItem(key,color);}catch(e){}
 }
 function toggleCompact(inp){
   const sb=document.querySelector('.sidebar');
@@ -10301,6 +10460,11 @@ function devEnter(){
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded',function(){
+  /* Apply theme immediately on load (login screen visible) — use saved global or default */
+  try{
+    var globalTheme=localStorage.getItem('lounge_theme_default')||'whatsapp';
+    setTheme(globalTheme,null);
+  }catch(e){setTheme('whatsapp',null);}
   document.addEventListener('keydown',function(e){
     var tag=document.activeElement?document.activeElement.tagName:'';
     var inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(document.activeElement&&document.activeElement.isContentEditable);
