@@ -5725,58 +5725,6 @@ function setArticleSearch(val){
   if(secEl)renderArticlesInto(secEl);
 }
 
-function openMgrOwnUploadLog(){
-  var today=new Date().toISOString().split('T')[0];
-  var existing=perfData[cu.nickname]&&perfData[cu.nickname][today]?perfData[cu.nickname][today].uploadsTotal||0:0;
-  var html='<div style="padding:4px 0">'
-    +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Log your own uploads for today. These appear in the Performance tab and count toward Game Corner credits.</div>'
-    +'<div class="form-group"><label class="flabel">Date</label><input class="form-input" id="mgr-own-date" type="date" value="'+today+'"/></div>'
-    +'<div class="form-group"><label class="flabel">Total Uploads</label><input class="form-input" id="mgr-own-total" type="number" min="0" placeholder="e.g. 45" value="'+existing+'"/></div>'
-    +'<div class="form-group"><label class="flabel">In-Shift Uploads</label><input class="form-input" id="mgr-own-inshift" type="number" min="0" placeholder="e.g. 38" value="'+(perfData[cu.nickname]&&perfData[cu.nickname][today]?perfData[cu.nickname][today].uploadsInShift||0:0)+'"/></div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Off-shift = Total − In-shift</div>'
-    +'<div style="display:flex;gap:8px">'
-    +'<button class="btn btn-primary btn-sm" onclick="saveMgrOwnUploads()">Save</button>'
-    +'<button class="btn btn-outline btn-sm" onclick="closeModal(\'modal-mgr-own-upload\')">Cancel</button>'
-    +'</div>'
-    +'</div>';
-  openGenericModal('📊 Log My Uploads','modal-mgr-own-upload',html);
-}
-
-function saveMgrOwnUploads(){
-  var date=G('mgr-own-date').value;
-  var total=parseInt(G('mgr-own-total').value)||0;
-  var inShift=parseInt(G('mgr-own-inshift').value)||0;
-  var offShift=Math.max(0,total-inShift);
-  if(!date){toast('Please select a date.');return;}
-  if(!perfData[cu.nickname])perfData[cu.nickname]={};
-  perfData[cu.nickname][date]={uploadsTotal:total,uploadsInShift:inShift,uploadsOffShift:offShift};
-  fsSavePerfData(cu.nickname);
-  closeModal('modal-mgr-own-upload');
-  renderMgrHubPerformance();
-  toast('✅ Your uploads saved for '+date+'.');
-}
-
-function openGenericModal(title,id,html){
-  /* Re-use existing modal infrastructure */
-  var overlay=document.createElement('div');
-  overlay.className='modal-overlay open';overlay.id=id+'-overlay';
-  overlay.onclick=function(e){if(e.target===overlay)closeModal(id);};
-  var modal=document.createElement('div');modal.className='modal';modal.id=id;
-  var head=document.createElement('div');head.className='modal-head';
-  head.innerHTML='<div class="modal-title">'+title+'</div><button class="modal-close" onclick="closeModal(\''+id+'\')">&#10005;</button>';
-  var body=document.createElement('div');body.className='modal-body';body.innerHTML=html;
-  modal.appendChild(head);modal.appendChild(body);overlay.appendChild(modal);
-  /* Remove existing if any */
-  var ex=G(id+'-overlay');if(ex)ex.remove();
-  document.body.appendChild(overlay);
-}
-
-function closeModal(id){
-  var overlay=G(id+'-overlay');
-  if(overlay)overlay.remove();
-  /* Also handle static modals */
-  var m=G(id);if(m)m.classList.remove('open');
-}
 var _currentViewId=null;
 
 function mgrDeleteById(aid){
@@ -7260,34 +7208,7 @@ function renderMgrHubPerformance(){
     +'</div></div>'
     +'</div>';
 
-  /* ── Manager's own upload section ── */
-  var mgrUplDays=Object.keys(perfData[cu.nickname]||{}).filter(function(d){return mgrHubInRange(d);});
-  var mgrUplTotal=mgrUplDays.reduce(function(s,d){return s+(perfData[cu.nickname][d].uploadsTotal||0);},0);
-  var mgrDayCount=mgrUplDays.length||1;
-  var mgrAvgDaily=(mgrUplTotal/mgrDayCount).toFixed(1);
-  var mgrSection='<div class="sect" style="margin-top:16px">'
-    +'<div class="sect-head" style="display:flex;align-items:center;justify-content:space-between">'
-    +'<span class="sect-title">👑 My Uploads ('+cu.fullName+')</span>'
-    +'<button class="btn btn-outline btn-sm" onclick="openMgrOwnUploadLog()" style="font-size:11px">Log My Uploads</button>'
-    +'</div>'
-    +'<div style="display:flex;gap:16px;padding:14px 0;flex-wrap:wrap">'
-    +'<div class="kpi-card" style="flex:1;min-width:120px;text-align:center;padding:14px">'
-    +'<div class="kpi-value" style="font-size:24px;font-weight:700;color:var(--text)">'+mgrUplTotal+'</div>'
-    +'<div class="kpi-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Total Uploads</div>'
-    +'</div>'
-    +'<div class="kpi-card" style="flex:1;min-width:120px;text-align:center;padding:14px">'
-    +'<div class="kpi-value" style="font-size:24px;font-weight:700;color:var(--text)">'+mgrAvgDaily+'</div>'
-    +'<div class="kpi-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Avg Daily</div>'
-    +'</div>'
-    +'<div class="kpi-card" style="flex:1;min-width:120px;text-align:center;padding:14px">'
-    +'<div class="kpi-value" style="font-size:24px;font-weight:700;color:var(--text)">'+mgrUplDays.length+'</div>'
-    +'<div class="kpi-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Active Days</div>'
-    +'</div>'
-    +'</div>'
-    +'<div style="font-size:11px;color:var(--muted);padding:0 0 12px">Uploads count toward Game Corner credits and the overall team KPI.</div>'
-    +'</div>';
-
-  el.innerHTML=filterBar+memberDropdown+uplSection+escSection+mgrSection+renderMgrKCSummaryCard();
+  el.innerHTML=filterBar+memberDropdown+uplSection+escSection+renderMgrKCSummaryCard();
 
   /* Restore custom date inputs if active */
   if(mgrHubDateFilter==='custom'){
@@ -9163,8 +9084,8 @@ async function dlHandleFile(file){
 }
 
 function dlProcessExtracted(rows){
-  /* Map emails to nicknames, skip unknowns and non-uploaders */
-  var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return m.nickname;});
+  /* Map emails to nicknames — include ALL team members including manager */
+  var allNicks=TEAM.map(function(m){return m.nickname;});
   var mapped=[];
   rows.forEach(function(r){
     if(!r.email)return;
@@ -9183,7 +9104,7 @@ function dlProcessExtracted(rows){
       nick=bestMatch;
     }
     if(!nick)return;
-    if(!uploaderNicks.includes(nick))return;
+    if(!allNicks.includes(nick))return;
     var sh=SHIFTS[nick]||{start:9,end:18};
     /* Parse earliest/latest to hours (decimal) */
     var earliest=dlParseTime(r.earliest);
@@ -9205,7 +9126,7 @@ function dlProcessExtracted(rows){
   });
 
   if(!mapped.length){
-    G('dl-extract-status').textContent='No matching uploaders found in screenshot.';
+    G('dl-extract-status').textContent='No matching team members found in screenshot.';
     var dz=G('dl-drop-zone');if(dz)dz.style.display='';
     return;
   }
