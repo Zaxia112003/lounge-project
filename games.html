@@ -437,7 +437,6 @@ function saveScore(gameId,score,higher){
    LAUNCH
 ═══════════════════════════════════════════════════ */
 function launchGame(id,title){
-  if(id==='voidhorizons'){window.location.href='rpg.html';return;}
   var cost=CARD_GAME_IDS.indexOf(id)>-1?CREDIT_COST_CARD:CREDIT_COST_NORMAL;
   spendCredit(cost,function(){
     openModal(id,title);
@@ -452,7 +451,6 @@ function launchGame(id,title){
       else if(id==='uno')gameUNO(body);
       else if(id==='pusoy')gamePusoyDos(body);
       else if(id==='tongits')gameTongIts(body);
-      else if(id==='voidhorizons'){closeModal();window.location.href='rpg.html';}
     },60);
   });
 }
@@ -468,7 +466,6 @@ function renderGrid(){
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
     {id:'pusoy',e:'🂢',n:'Pusoy Dos',d:'Big Two vs 3 AI · 3 credits',card:true},
     {id:'tongits',e:'🀄',n:'Tong Its',d:'Filipino card game vs 2 AI · 3 credits',card:true},
-    {id:'voidhorizons',e:'📖',n:'Void Horizons',d:'Your character · stats · equipment',rpg:true},
   ];
   var multi=[
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base · 1 credit'},
@@ -476,20 +473,6 @@ function renderGrid(){
   ];
   function makeTile(g,mp){
     var div=document.createElement('div');
-    if(g.rpg){
-      /* Only visible to managers — still in development */
-      if(!cu||cu.role!=='manager') return null;
-      div.className='tile';
-      div.style.cssText='border-color:rgba(201,168,76,.35);background:linear-gradient(135deg,rgba(201,168,76,.06),transparent);';
-      div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
-        +'<div class="tile-name">'+g.n
-        +'<span class="badge" style="background:rgba(201,168,76,.15);color:#c9a84c;">RPG</span>'
-        +'<span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444;margin-left:4px;">DEV</span></div>'
-        +'<div class="tile-desc">'+g.d+'</div>'
-        +'<div style="font-size:10px;color:rgba(201,168,76,.6);margin-top:6px;letter-spacing:.5px;">Opens Void Horizons ↗</div>';
-      div.addEventListener('click',(function(id,title){return function(){launchGame(id,title);};})(g.id,g.e+' '+g.n));
-      return div;
-    }
     div.className='tile'+(mp?' multi':'')+(g.card?' card-tile':'');
     div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
       +'<div class="tile-name">'+g.n+'<span class="badge '+(mp?'multi-b':'solo-b')+'">'+(mp?'Multi':'Solo')+'</span></div>'
@@ -499,8 +482,8 @@ function renderGrid(){
   }
   var sg=G('solo-grid'),mg=G('multi-grid');
   sg.innerHTML='';mg.innerHTML='';
-  solo.forEach(function(g){var t=makeTile(g,false);if(t)sg.appendChild(t);});
-  multi.forEach(function(g){var t=makeTile(g,true);if(t)mg.appendChild(t);});
+  solo.forEach(function(g){sg.appendChild(makeTile(g,false));});
+  multi.forEach(function(g){mg.appendChild(makeTile(g,true));});
 }
 
 function renderCardLock(){/* no-op — locked section removed */}
@@ -1919,13 +1902,13 @@ function gameTongIts(C){
     return findMelds(testHand).some(function(m){return m.some(function(c){return c===card;});});
   }
 
-  var stock,discard,hands,turn,gover,drawn,drawnByChow,didSapawThisTurn,pendingDraw,lastDiscardCard,discardHistory,showDiscardPile;
+  var stock,discard,hands,turn,gover,drawn,drawnByChow,drawnByStock,didSapawThisTurn,pendingDraw,lastDiscardCard,discardHistory,showDiscardPile;
 
   function deal(){
     var deck=_mkDeck();
     hands=[[],[],[]];allExposedMelds=[[],[],[]];
     playerGotSapawed=false;showDiscardPile=false;selectedCards=new Set();
-    drawnByChow=false;didSapawThisTurn=false;
+    drawnByChow=false;drawnByStock=false;didSapawThisTurn=false;
     /* Dodong=dealer(index 2) gets 13 */
     hands[2]=deck.splice(0,13);
     hands[0]=deck.splice(0,12);
@@ -2019,14 +2002,14 @@ function gameTongIts(C){
     if(drawn){toast('Already drew!');return;}
     if(!stock.length){endStockEmpty();return;}
     hands[0].push(stock.pop());hands[0]=sortHand(hands[0]);
-    drawn=true;selectedCards=new Set();SND.card();render();
+    drawn=true;drawnByStock=true;selectedCards=new Set();SND.card();render();
   }
 
   function playerDiscard(c){
     if(!drawn){toast('Draw or Chow first!');return;}
     lastDiscardCard=c;discard.push(c);discardHistory.push(c);
     hands[0]=hands[0].filter(function(x){return x!==c;});
-    selectedCards=new Set();drawn=false;drawnByChow=false;didSapawThisTurn=false;
+    selectedCards=new Set();drawn=false;drawnByChow=false;drawnByStock=false;didSapawThisTurn=false;
     if(hands[0].length===0){gover=true;SND.win();setScore('Tong-Its! 🏆');saveScore('tongits',0,false);render();return;}
     checkDW0Win(0);
     if(!gover){turn=1;setTimeout(function(){aiTurn(1);},700);}
@@ -2042,8 +2025,12 @@ function gameTongIts(C){
   }
 
   function playerCallDraw(){
-    if(!drawn){toast('Draw or Chow first!');return;}
-    if(drawnByChow){toast('Cannot call draw — you took a Chow this turn!');return;}
+    /* Call Draw is valid at START of turn — before drawing */
+    if(drawn){
+      if(drawnByStock){toast('Cannot call draw — you already drew from stock this turn!');return;}
+      else if(drawnByChow){toast('Cannot call draw — you took a Chow this turn!');return;}
+      else{toast('Cannot call draw after drawing.');return;}
+    }
     if(didSapawThisTurn){toast('Cannot call draw — you did a Sapaw this turn!');return;}
     if(playerGotSapawed){toast('Cannot call draw — your meld was sapawed this turn!');return;}
     var playerDW=deadwood(hands[0]);
@@ -2342,12 +2329,12 @@ function gameTongIts(C){
       sortBtn.textContent='Sort: '+(sortMode==='face'?'By Face ▼':'By Order ▼');
       sortBtn.onclick=function(){sortMode=sortMode==='face'?'order':'face';selectedCards=new Set();render();};
       btnRow.appendChild(sortBtn);
-      /* Call Draw — only when drawn and eligible */
-      if(drawn&&turn===0){
-        var canCall=!playerGotSapawed&&!drawnByChow&&!didSapawThisTurn;
+      /* Call Draw — valid at START of turn before drawing */
+      if(!drawn&&turn===0){
+        var canCall=!playerGotSapawed&&!didSapawThisTurn;
         var callBtn=document.createElement('button');callBtn.className='btn btn-outline';callBtn.style.cssText='font-size:10px;padding:3px 8px';
         callBtn.textContent='Call Draw';
-        var whyCant=drawnByChow?'Took a Chow this turn':didSapawThisTurn?'Did a Sapaw this turn':'Your meld was sapawed this turn';
+        var whyCant=didSapawThisTurn?'Did a Sapaw this turn':playerGotSapawed?'Your meld was sapawed':'';
         if(!canCall){callBtn.disabled=true;callBtn.title=whyCant;}
         callBtn.onclick=playerCallDraw;btnRow.appendChild(callBtn);
       }
