@@ -1318,12 +1318,27 @@ window.rpgSignout=function(){
 async function enterRealm(){
   document.getElementById('pg-login').classList.add('hidden');
   document.getElementById('loading-overlay').classList.remove('hidden');
-  if(!Object.keys(teamDir).length){const snap=await getDocs(collection(db,'team'));snap.forEach(d=>{const data=d.data();if(data.nickname)teamDir[data.nickname]=data;});}
-  rpgData[cu.nickname]=await ensureRpgProfile(cu.nickname);
-  document.getElementById('loading-overlay').classList.add('hidden');
-  const profile=rpgData[cu.nickname];
-  if(!profile.class&&cu.role!=='manager'){showCharSelect(true);return;}
-  enterRealmFull();
+  try{
+    if(!Object.keys(teamDir).length){
+      const snap=await getDocs(collection(db,'team'));
+      snap.forEach(d=>{const data=d.data();if(data.nickname)teamDir[data.nickname]=data;});
+    }
+    rpgData[cu.nickname]=await ensureRpgProfile(cu.nickname);
+    document.getElementById('loading-overlay').classList.add('hidden');
+    const profile=rpgData[cu.nickname];
+    if(!profile.class&&cu.role!=='manager'){showCharSelect(true);return;}
+    enterRealmFull();
+  }catch(err){
+    console.error('enterRealm failed:',err);
+    document.getElementById('loading-overlay').classList.add('hidden');
+    // If Firestore fails, fall back to login screen with a message
+    const loginEl=document.getElementById('pg-login');
+    const errEl=document.getElementById('login-err');
+    if(loginEl) loginEl.classList.remove('hidden');
+    if(errEl) errEl.textContent='Connection error — check your network and try again.';
+    cu=null;
+    localStorage.removeItem('rpg_session');
+  }
 }
 
 function enterRealmFull(){
@@ -1339,13 +1354,64 @@ function enterRealmFull(){
 
 /* ── Boot ── */
 (async function boot(){
+  function showLogin(msg){
+    document.getElementById('loading-overlay').classList.add('hidden');
+    document.getElementById('pg-login').classList.remove('hidden');
+    if(msg){const el=document.getElementById('login-err');if(el)el.textContent=msg;}
+  }
+  // Try existing rpg_session first
   const stored=localStorage.getItem('rpg_session');
-  if(stored){try{const p=JSON.parse(stored);if(p?.nickname&&p?.role){cu=p;await enterRealm();return;}}catch(e){localStorage.removeItem('rpg_session');}}
+  if(stored){
+    try{
+      const p=JSON.parse(stored);
+      if(p?.nickname&&p?.role){cu=p;await enterRealm();return;}
+    }catch(e){console.warn('rpg_session invalid:',e);localStorage.removeItem('rpg_session');}
+  }
+  // Try bridging from main app session (rta_last_nick + rta_TEAM)
   const lastNick=localStorage.getItem('rta_last_nick');
   const teamCache=localStorage.getItem('rta_TEAM');
-  if(lastNick&&teamCache){try{const team=JSON.parse(teamCache);const member=team.find(m=>m.nickname===lastNick);if(member){cu={nickname:member.nickname,fullName:member.fullName,role:member.role};localStorage.setItem('rpg_session',JSON.stringify(cu));await enterRealm();return;}}catch(e){}}
-  document.getElementById('loading-overlay').classList.add('hidden');
-  document.getElementById('pg-login').classList.remove('hidden');
+  if(lastNick&&teamCache){
+    try{
+      const team=JSON.parse(teamCache);
+      const member=team.find(m=>m.nickname===lastNick);
+      if(member){
+        cu={nickname:member.nickname,fullName:member.fullName,role:member.role};
+        localStorage.setItem('rpg_session',JSON.stringify(cu));
+        await enterRealm();
+        return;
+      }
+    }catch(e){console.warn('rta_TEAM bridge failed:',e);}
+  }
+  // Try rta_last_nick alone — fetch team from Firestore
+  if(lastNick){
+    try{
+      document.getElementById('loading-overlay').classList.remove('hidden');
+      const snap=await getDocs(collection(db,'team'));
+      snap.forEach(d=>{const data=d.data();if(data.nickname)teamDir[data.nickname]=data;});
+      const member=teamDir[lastNick];
+      if(member){
+        cu={nickname:lastNick,fullName:member.fullName,role:member.role};
+        localStorage.setItem('rpg_session',JSON.stringify(cu));
+        await enterRealm();
+        return;
+      }
+    }catch(e){console.warn('Firestore team fetch failed:',e);}
+  }
+  // Try games.html / Game Corner session keys (lounge_nick, lounge_role, lounge_full)
+  // These are set by games.html which is the current entry point to the RPG
+  const loungeNick=localStorage.getItem('lounge_nick');
+  const loungeRole=localStorage.getItem('lounge_role');
+  const loungeFull=localStorage.getItem('lounge_full');
+  if(loungeNick&&loungeRole){
+    try{
+      cu={nickname:loungeNick,fullName:loungeFull||loungeNick,role:loungeRole};
+      localStorage.setItem('rpg_session',JSON.stringify(cu));
+      await enterRealm();
+      return;
+    }catch(e){console.warn('lounge_* session bridge failed:',e);}
+  }
+  // Nothing worked — show login
+  showLogin('');
 })();
 
 document.getElementById('login-nick').addEventListener('keydown',e=>{if(e.key==='Enter')window.doRpgLogin();});
