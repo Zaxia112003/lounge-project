@@ -1246,7 +1246,7 @@ window.toggleTestMode=function(){
     showToast('Test mode OFF — data is now live');
   }
 };
-toggleGMMode=function(){
+window.toggleGMMode=function(){
   const btn=document.getElementById('gm-toggle-btn');
   if(btn.textContent.includes('GM Console')){btn.textContent='My Character';renderManagerView();}
   else{btn.textContent='GM Console';_activeTab='character';renderCharacter(cu.nickname);}
