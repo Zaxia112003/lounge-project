@@ -1359,15 +1359,23 @@ function enterRealmFull(){
     document.getElementById('pg-login').classList.remove('hidden');
     if(msg){const el=document.getElementById('login-err');if(el)el.textContent=msg;}
   }
-  // Try existing rpg_session first
-  const stored=localStorage.getItem('rpg_session');
-  if(stored){
+
+  // Priority 1 — Game Corner live session (lounge_nick/role/full)
+  // Always checked first — represents whoever is actively logged in right now
+  const loungeNick=localStorage.getItem('lounge_nick');
+  const loungeRole=localStorage.getItem('lounge_role');
+  const loungeFull=localStorage.getItem('lounge_full');
+  if(loungeNick&&loungeRole){
     try{
-      const p=JSON.parse(stored);
-      if(p?.nickname&&p?.role){cu=p;await enterRealm();return;}
-    }catch(e){console.warn('rpg_session invalid:',e);localStorage.removeItem('rpg_session');}
+      cu={nickname:loungeNick,fullName:loungeFull||loungeNick,role:loungeRole};
+      // Overwrite any stale rpg_session with the current active user
+      localStorage.setItem('rpg_session',JSON.stringify(cu));
+      await enterRealm();
+      return;
+    }catch(e){console.warn('lounge_* session bridge failed:',e);}
   }
-  // Try bridging from main app session (rta_last_nick + rta_TEAM)
+
+  // Priority 2 — Main Lounge app session (rta_last_nick + rta_TEAM cache)
   const lastNick=localStorage.getItem('rta_last_nick');
   const teamCache=localStorage.getItem('rta_TEAM');
   if(lastNick&&teamCache){
@@ -1382,7 +1390,8 @@ function enterRealmFull(){
       }
     }catch(e){console.warn('rta_TEAM bridge failed:',e);}
   }
-  // Try rta_last_nick alone — fetch team from Firestore
+
+  // Priority 3 — rta_last_nick alone, fetch team from Firestore
   if(lastNick){
     try{
       document.getElementById('loading-overlay').classList.remove('hidden');
@@ -1397,19 +1406,17 @@ function enterRealmFull(){
       }
     }catch(e){console.warn('Firestore team fetch failed:',e);}
   }
-  // Try games.html / Game Corner session keys (lounge_nick, lounge_role, lounge_full)
-  // These are set by games.html which is the current entry point to the RPG
-  const loungeNick=localStorage.getItem('lounge_nick');
-  const loungeRole=localStorage.getItem('lounge_role');
-  const loungeFull=localStorage.getItem('lounge_full');
-  if(loungeNick&&loungeRole){
+
+  // Priority 4 — Stale rpg_session (last resort, may be a different user)
+  // Only used if no live session found above
+  const stored=localStorage.getItem('rpg_session');
+  if(stored){
     try{
-      cu={nickname:loungeNick,fullName:loungeFull||loungeNick,role:loungeRole};
-      localStorage.setItem('rpg_session',JSON.stringify(cu));
-      await enterRealm();
-      return;
-    }catch(e){console.warn('lounge_* session bridge failed:',e);}
+      const p=JSON.parse(stored);
+      if(p?.nickname&&p?.role){cu=p;await enterRealm();return;}
+    }catch(e){console.warn('rpg_session invalid:',e);localStorage.removeItem('rpg_session');}
   }
+
   // Nothing worked — show login
   showLogin('');
 })();
