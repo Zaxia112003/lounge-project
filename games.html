@@ -437,6 +437,7 @@ function saveScore(gameId,score,higher){
    LAUNCH
 ═══════════════════════════════════════════════════ */
 function launchGame(id,title){
+  if(id==='voidhorizons'){window.location.href='rpg.html';return;}
   var cost=CARD_GAME_IDS.indexOf(id)>-1?CREDIT_COST_CARD:CREDIT_COST_NORMAL;
   spendCredit(cost,function(){
     openModal(id,title);
@@ -466,6 +467,7 @@ function renderGrid(){
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
     {id:'pusoy',e:'🂢',n:'Pusoy Dos',d:'Big Two vs 3 AI · 3 credits',card:true},
     {id:'tongits',e:'🀄',n:'Tong Its',d:'Filipino card game vs 2 AI · 3 credits',card:true},
+    {id:'voidhorizons',e:'📖',n:'Void Horizons',d:'Your character · stats · equipment',rpg:true},
   ];
   var multi=[
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base · 1 credit'},
@@ -473,6 +475,19 @@ function renderGrid(){
   ];
   function makeTile(g,mp){
     var div=document.createElement('div');
+    if(g.rpg){
+      if(!cu||cu.role!=='manager') return null;
+      div.className='tile';
+      div.style.cssText='border-color:rgba(201,168,76,.35);background:linear-gradient(135deg,rgba(201,168,76,.06),transparent);';
+      div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
+        +'<div class="tile-name">'+g.n
+        +'<span class="badge" style="background:rgba(201,168,76,.15);color:#c9a84c;margin-left:4px;">RPG</span>'
+        +'<span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444;margin-left:4px;">DEV</span></div>'
+        +'<div class="tile-desc">'+g.d+'</div>'
+        +'<div style="font-size:10px;color:rgba(201,168,76,.6);margin-top:6px;letter-spacing:.5px;">Opens Void Horizons ↗</div>';
+      div.addEventListener('click',(function(id,title){return function(){launchGame(id,title);};})(g.id,g.e+' '+g.n));
+      return div;
+    }
     div.className='tile'+(mp?' multi':'')+(g.card?' card-tile':'');
     div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
       +'<div class="tile-name">'+g.n+'<span class="badge '+(mp?'multi-b':'solo-b')+'">'+(mp?'Multi':'Solo')+'</span></div>'
@@ -482,7 +497,7 @@ function renderGrid(){
   }
   var sg=G('solo-grid'),mg=G('multi-grid');
   sg.innerHTML='';mg.innerHTML='';
-  solo.forEach(function(g){sg.appendChild(makeTile(g,false));});
+  solo.forEach(function(g){var t=makeTile(g,false);if(t)sg.appendChild(t);});
   multi.forEach(function(g){mg.appendChild(makeTile(g,true));});
 }
 

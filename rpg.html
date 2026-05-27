@@ -314,7 +314,7 @@ body{min-height:100vh;font-family:var(--font-b);background:var(--bg);color:var(-
   <div id="test-banner" class="test-banner" style="display:none;">
     <div>
       <div class="test-banner-txt">&#x1f9ea; Test Mode Active</div>
-      <div class="test-banner-sub">No data is being saved &mdash; all progress resets on refresh</div>
+      <div class="test-banner-sub">Unlimited credits &middot; no data saved &middot; resets on refresh</div>
     </div>
     <button class="test-mode-btn on" onclick="toggleTestMode()">Exit Test Mode</button>
   </div>
@@ -627,7 +627,10 @@ function calcAGI(nick){return calcStat(nick,'agi').total;}
 function calcLCK(nick){return calcStat(nick,'lck').total;}
 function calcXP(nick){try{return Object.values(perfData[nick]||{}).reduce((s,d)=>s+(typeof d==='object'?d.uploadsTotal||0:0),0)*10;}catch(e){return 0;}}
 function calcLevel(xp){let l=1,n=500,c=xp;while(c>=n){c-=n;l++;n+=200;if(l>=40)break;}return{level:l,current:c,needed:n};}
-function calcCredits(nick){return credData[nick]?.credits||0;}
+function calcCredits(nick){
+  if(TEST_MODE) return 999999; // unlimited credits in test mode
+  return credData[nick]?.credits||0;
+}
 function todayUploads(nick){return perfData[nick]?.[todayKey()]?.uploadsTotal||0;}
 function monthUploads(nick){return Object.keys(perfData[nick]||{}).filter(d=>inThisMonth(d)).reduce((s,d)=>s+(perfData[nick][d]?.uploadsTotal||0),0);}
 
@@ -1238,7 +1241,7 @@ window.toggleTestMode=function(){
     if(btn){btn.className='test-mode-btn on';btn.textContent='Test Mode ON';}
     if(banner) banner.style.display='flex';
     if(main) main.style.paddingTop='72px';
-    showToast('Test mode ON — no data will be saved');
+    showToast('Test mode ON — unlimited credits, no data saved');
   } else {
     if(btn){btn.className='test-mode-btn off';btn.innerHTML='&#x1f9ea; Test Mode';}
     if(banner) banner.style.display='none';
