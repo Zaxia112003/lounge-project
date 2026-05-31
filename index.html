@@ -2499,15 +2499,14 @@ async function sendManagerReviewNotif(callout){
     unread:true,
     status:'pending_review'
   };
-  /* Save to Firestore errorReviews — await so _fsId is set before push */
+  /* Save to Firestore errorReviews — onSnapshot will populate _pendingReviews */
   if(fsDb()){
     try{
       var ref=await window._fsAddDoc(window._fsColl(fsDb(),'errorReviews'),thread);
       thread._fsId=ref.id;
     }catch(e){console.warn('errorReview save',e);}
   }
-  window._pendingReviews=window._pendingReviews||[];
-  window._pendingReviews.push(thread);
+  /* Do NOT push to _pendingReviews here — onSnapshot is the single source of truth */
   updateReviewBadge();
 }
 
@@ -4121,13 +4120,17 @@ function renderMgrKpiCard(){
     var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth(c.date);}).length;
     var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
     var qScore=tot>0?((tot-errs-qEsc)/tot*100):null;
-    return{tot:tot,avg:avg,qEsc:qEsc,qScore:qScore};
+    return{tot:tot,avg:avg,qEsc:qEsc,errs:errs,qScore:qScore};
   });
   var gtUplTotal=uplRows.reduce(function(s,r){return s+r.tot;},0);
   var gtUplAvgArr=uplRows.filter(function(r){return r.avg!==null;});
   var gtUplAvg=gtUplAvgArr.length?(gtUplAvgArr.reduce(function(s,r){return s+r.avg;},0)/gtUplAvgArr.length):null;
   var gtUplQArr=uplRows.filter(function(r){return r.qScore!==null;});
   var gtUplQ=gtUplQArr.length?(gtUplQArr.reduce(function(s,r){return s+r.qScore;},0)/gtUplQArr.length):null;
+  /* Grand total defect density: aggregate (all errors + all escalations) / all uploader uploads × 1000 */
+  var gtTotalErrs=uplRows.reduce(function(s,r){return s+r.errs;},0);
+  var gtTotalQEsc=uplRows.reduce(function(s,r){return s+r.qEsc;},0);
+  var gtDD=gtUplTotal>0?Math.round((gtTotalErrs+gtTotalQEsc)/gtUplTotal*10000)/10:null;
 
   /* Escalation total uploads (added to grand total only) */
   var escalators=TEAM.filter(function(t){return t.role&&t.role.toLowerCase()==='escalation';});
@@ -4145,6 +4148,7 @@ function renderMgrKpiCard(){
 
   var qColor=gtUplQ!==null?(gtUplQ>=95?'var(--green)':gtUplQ>=80?'var(--amber)':'var(--red)'):'var(--muted)';
   var slaColor=avgSLA!==null?(avgSLA>=75?'var(--green)':'var(--red)'):'var(--muted)';
+  var ddColor=gtDD!==null?(gtDD<=2?'var(--green)':gtDD<=5?'var(--amber)':'var(--red)'):'var(--muted)';
 
   function kpiTile(emoji,val,label,color){
     return '<div style="flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;">'
@@ -4160,6 +4164,7 @@ function renderMgrKpiCard(){
     +'<div style="display:flex;gap:10px;padding:0 14px 16px;flex-wrap:wrap">'
     +kpiTile('📤', totalUploads.toLocaleString(), 'Total Uploads', 'var(--text)')
     +kpiTile('📊', gtUplAvg!==null?gtUplAvg.toFixed(1):'—', 'Avg Daily (ADU)', 'var(--text)')
+    +kpiTile('🔬', gtDD!==null?gtDD.toFixed(1):'—', 'Defect Density', ddColor)
     +kpiTile('✅', gtUplQ!==null?gtUplQ.toFixed(1)+'%':'—', 'Quality %', qColor)
     +kpiTile('🎯', avgSLA!==null?avgSLA.toFixed(1)+'%':'—', 'Esc. SLA %', slaColor)
     +'</div>';
