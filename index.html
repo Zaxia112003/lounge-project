@@ -2030,15 +2030,27 @@ function goDash(){
   G('pg-login').classList.remove('active');
   var kfab=G('koby-fab');if(kfab)kfab.style.display='flex';
   G('pg-dash').classList.add('active');
-  /* Load persisted theme + accent per user */
+  /* Load persisted theme + accent per user — localStorage first (instant), Firestore as source of truth */
   try{
     var savedTheme=localStorage.getItem('lounge_theme_'+cu.nickname);
     if(savedTheme)settings.theme=savedTheme;
     var savedAccent=localStorage.getItem('lounge_accent_'+cu.nickname);
     if(savedAccent){settings.accent=savedAccent;document.documentElement.style.setProperty('--accent',savedAccent);}
   }catch(e){}
-  /* Apply saved theme */
+  /* Apply saved theme immediately */
   if(settings.theme)setTheme(settings.theme,null);
+  /* Then check Firestore for the authoritative value (overrides localStorage if different) */
+  if(fsDb()){
+    try{
+      window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname)).then(function(snap){
+        if(snap&&snap.exists&&snap.exists()){
+          var d=snap.data();
+          if(d.theme&&d.theme!==settings.theme){setTheme(d.theme,null);try{localStorage.setItem('lounge_theme_'+cu.nickname,d.theme);}catch(ex){}}
+          if(d.accent&&d.accent!==settings.accent){settings.accent=d.accent;document.documentElement.style.setProperty('--accent',d.accent);try{localStorage.setItem('lounge_accent_'+cu.nickname,d.accent);}catch(ex){}}
+        }
+      }).catch(function(){});
+    }catch(e){}
+  }
   /* Bell shown/hidden dynamically via updateNotifBell() and updateMemberBell() */
   try{var saved=localStorage.getItem('avatar_'+cu.fullName);if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[cu.fullName]=saved;}}catch(e){}
   if(fsDb()){try{window._fsGetDocs(window._fsColl(fsDb(),'avatars')).then(function(snap){
@@ -3012,12 +3024,13 @@ function setTheme(t,el){
   if(el)el.classList.add('active');
   else{var btn=G('theme-'+t);if(btn)btn.classList.add('active');}
   settings.theme=t;
-  /* Persist per user and as global default for login page */
+  /* Persist to localStorage and Firestore */
   try{
     var key='lounge_theme'+(cu?'_'+cu.nickname:'');
     localStorage.setItem(key,t);
     localStorage.setItem('lounge_theme_default',t);
   }catch(e){}
+  if(cu&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{theme:t},{merge:true}).catch(function(){});}catch(e){}}
 }
 function setAccent(color,el){
   document.documentElement.style.setProperty('--accent',color);
@@ -3025,6 +3038,7 @@ function setAccent(color,el){
   el.classList.add('active');settings.accent=color;
   /* Persist per user */
   try{var key='lounge_accent'+(cu?'_'+cu.nickname:'');localStorage.setItem(key,color);}catch(e){}
+  if(cu&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{accent:color},{merge:true}).catch(function(){});}catch(e){}}
 }
 function toggleCompact(inp){
   const sb=document.querySelector('.sidebar');
@@ -3852,10 +3866,6 @@ function renderMyDay(){
     /* Manager: KPI quick view */
     +(isManager?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>':'')
 
-    /* Status handled via avatar click — no inline section needed */
-
-    /* Manager status handled via avatar click */
-
     /* Knowledge Check — compact horizontal strip (non-manager) */
     +(cu&&!isManager
       ?'<div class="sect" style="padding:0;margin-bottom:14px;overflow:visible">'
@@ -3866,6 +3876,7 @@ function renderMyDay(){
         +'<div id="kc-tile-body"></div>'
         +'</div>'
       :'')
+  ;
 
 
   var _prevAnnCount=mdAnnouncements.length;
@@ -3898,32 +3909,16 @@ function annUpdateBadge(){
   if(cnt>0){badge.textContent=cnt+' new';badge.classList.add('show');}
   else{badge.textContent='';badge.classList.remove('show');}
 }
-function deleteAnnouncement(id){
+function deleteAnnouncement(fsId){
   if(!confirm('Remove this announcement?'))return;
-  var rawId=String(id).replace(/^ann-/,'');
-  /* Find in local array by any matching key */
+  /* Find by _fsId (primary) or fallback to numeric id */
   var idx=mdAnnouncements.findIndex(function(a){
-    return String(a.id)===rawId||a._fsId===rawId||String(a.id)===String(id)||a._fsId===String(id);
+    return a._fsId===String(fsId)||String(a.id)===String(fsId);
   });
-  var ann=idx>-1?mdAnnouncements[idx]:null;
-  var fsDocId=ann?(ann._fsId||rawId):rawId;
   if(idx>-1)mdAnnouncements.splice(idx,1);
-  if(fsDb()){
-    /* Try articles collection first (primary store) */
-    if(ann&&ann._fsId){
-      try{window._fsDeleteDoc(window._fsDoc(fsDb(),'articles',ann._fsId)).catch(function(){});}catch(e){}
-    }
-    /* Also scan articles collection for matching doc */
-    try{
-      window._fsGetDocs(window._fsColl(fsDb(),'articles')).then(function(snap){
-        snap.forEach(function(d){
-          var data=d.data();
-          if(d.id===fsDocId||String(data.id)===rawId||(data.category==='ann'&&String(data.id)===rawId)){
-            window._fsDeleteDoc(d.ref);
-          }
-        });
-      });
-    }catch(e){}
+  /* Delete from Firestore mdAnnouncements collection */
+  if(fsDb()&&fsId){
+    try{window._fsDeleteDoc(window._fsDoc(fsDb(),'mdAnnouncements',String(fsId))).catch(function(){});}catch(e){}
   }
   renderAnnouncements();
 }
@@ -4292,6 +4287,8 @@ function renderGamesGrid(){
 function gamesScrollLeft(){var r=G('games-scroll-row');if(r)r.scrollBy({left:-200,behavior:'smooth'});}
 function gamesScrollRight(){var r=G('games-scroll-row');if(r)r.scrollBy({left:200,behavior:'smooth'});}
 
+function moodTodayKey(){return getSydneyDate().toISOString().slice(0,10);}
+
 function moodLoadAggregate(cb){
   if(!fsDb()){cb(null);return;}
   var todayKey=moodTodayKey();
@@ -4561,7 +4558,7 @@ function renderMgrHubQuality(){
     var parts=col.split(':');
     return '<div class="qual-err-row">'
       +'<span class="qual-err-badge" style="background:'+parts[0]+';color:'+parts[1]+'">'+k+'</span>'
-      +'<span style="color:var(--text);font-size:12px">'+k+' error</span>'
+      +'<span style="color:var(--text);font-size:12px">'+k+'</span>'
       +'<span class="qual-err-count">'+errTypes[k]+'</span>'
       +'</div>';
   }).join('');
@@ -5294,7 +5291,7 @@ function renderAnnouncements(){
     var managerActions=isManager
       ?seenLine+'<div style="display:flex;gap:6px;margin-top:6px">'
         +'<button onclick="event.stopPropagation();openEditAnn('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer">Edit</button>'
-        +'<button onclick="event.stopPropagation();deleteAnnouncement('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
+        +'<button onclick="event.stopPropagation();deleteAnnouncement(\''+( a._fsId||a.id)+'\')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
         +'</div>'
       :'';
     return '<div class="ann-card'+(unseen?' unread':'')+'" data-id="'+a.id+'" onclick="viewAnn('+a.id+')">'
@@ -6143,7 +6140,9 @@ var ratingsState={
   bands:{
     uploads: {5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]},
     quality: {5:[100,9999],4:[99,99],3:[98,98],2:[93,97],1:[0,92]},
-    escalation:{5:[0,0],4:[1,1],3:[2,3],2:[4,5],1:[6,9999]}
+    escalation:{5:[0,0],4:[1,1],3:[2,3],2:[4,5],1:[6,9999]},
+    /* Defect density: lower = better. Key = score directly (1=worst/highest DD, 5=best/lowest DD) */
+    defect:{1:[21,9999],2:[11,20],3:[6,10],4:[3,5],5:[0,2]}
   },
   /* Saved competency scores: {nick: {c1,c2,c3}} */
   competency:{},
@@ -6192,15 +6191,17 @@ function ratingsGetKPIs(nick){
   var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&ratingsInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
   var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&ratingsInRange(c.date);}).length;
   var qScore=totalUpl>0?Math.round(((totalUpl-errs-qEsc)/totalUpl)*1000)/10:null;
-  return{avgDaily:avgDaily,qScore:qScore,qEsc:qEsc,totalUpl:totalUpl,dayCount:dayCount};
+  var defectDensity=totalUpl>0?Math.round(((errs+qEsc)/totalUpl)*10000)/10:null;
+  return{avgDaily:avgDaily,qScore:qScore,qEsc:qEsc,totalUpl:totalUpl,dayCount:dayCount,defectDensity:defectDensity};
 }
 
 function ratingsBandScore(metric,val){
-  if(val===null)return null;
+  if(val===null||val===undefined)return null;
   var bands=ratingsState.bands[metric];
+  if(!bands)return null; /* guard: missing band key (e.g. old Firestore data) */
   for(var r=5;r>=1;r--){
     var b=bands[r];
-    if(val>=b[0]&&val<=b[1])return r;
+    if(b&&val>=b[0]&&val<=b[1])return r;
   }
   return 1;
 }
@@ -6208,7 +6209,8 @@ function ratingsBandScore(metric,val){
 function ratingsCalcPerformance(nick){
   var kpi=ratingsGetKPIs(nick);
   var su=ratingsBandScore('uploads',kpi.avgDaily);
-  var sq=ratingsBandScore('quality',kpi.qScore);
+  /* Defect density bands are defined so rating key = score directly (lower DD = higher key) */
+  var sq=ratingsBandScore('defect',kpi.defectDensity);
   var se=ratingsBandScore('escalation',kpi.qEsc);
   if(su===null&&sq===null&&se===null)return null;
   su=su||1;sq=sq||1;se=se||1;
@@ -6261,7 +6263,18 @@ async function ratingsLoad(quarter,year){
       if(d.wUploads!==undefined)ratingsState.wUploads=d.wUploads;
       if(d.wQuality!==undefined)ratingsState.wQuality=d.wQuality;
       if(d.wEscalation!==undefined)ratingsState.wEscalation=d.wEscalation;
-      if(d.bands)ratingsState.bands=d.bands;
+      if(d.bands){
+        ratingsState.bands=d.bands;
+        /* Migrate: old saves used 'quality' key; new code uses 'defect' */
+        if(!ratingsState.bands.defect&&ratingsState.bands.quality){
+          ratingsState.bands.defect=ratingsState.bands.quality;
+          delete ratingsState.bands.quality;
+        }
+        /* Ensure defect band always exists (fallback defaults) */
+        if(!ratingsState.bands.defect){
+          ratingsState.bands.defect={1:[21,9999],2:[11,20],3:[6,10],4:[3,5],5:[0,2]};
+        }
+      }
       if(d.competency)ratingsState.competency=d.competency;
     }
   }catch(e){}
@@ -6393,7 +6406,7 @@ function renderRatingsTable(){
     +'<tr>'
     /* performance sub-headers */
     +'<th class="th-perf">Avg Daily<br>Uploads<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
-    +'<th class="th-perf">Quality<br>Score %<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
+    +'<th class="th-perf">Defect<br>Density<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
     +'<th class="th-perf">Quality<br>Escalation<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
     +'<th class="th-perf">Perf<br>Score</th>'
     +'<th class="th-perf">Perf<br>Rating</th>'
@@ -6410,7 +6423,7 @@ function renderRatingsTable(){
     var nick=m.nickname;
     var kpi=ratingsGetKPIs(nick);
     var su=ratingsBandScore('uploads',kpi.avgDaily);
-    var sq=ratingsBandScore('quality',kpi.qScore);
+    var sq=ratingsBandScore('defect',kpi.defectDensity);
     var se=ratingsBandScore('escalation',kpi.qEsc);
     var perfScore=ratingsCalcPerformance(nick);
     var perfRating=ratingsLabel(perfScore);
@@ -6427,7 +6440,7 @@ function renderRatingsTable(){
       +'<div style="font-size:10px;color:var(--muted)">'+m.role+'</div></div></div></td>'
       /* KPI values */
       +'<td>'+((kpi.avgDaily||kpi.totalUpl)?kpi.avgDaily:'—')+'</td>'
-      +'<td>'+(kpi.qScore!==null?(kpi.qScore>=99.5?kpi.qScore.toFixed(2)+'%':kpi.qScore.toFixed(1)+'%'):'—')+'</td>'
+      +'<td>'+(kpi.defectDensity!==null?kpi.defectDensity.toFixed(1):'—')+'</td>'
       +'<td>'+kpi.qEsc+'</td>'
       /* perf score & rating */
       +'<td><span class="rt-score">'+(perfScore!==null?perfScore.toFixed(2):'—')+'</span></td>'
@@ -6513,7 +6526,7 @@ function ratingsOpenBands(){
   var body=G('rt-bands-body');if(!body)return;
   var metrics=[
     {key:'uploads',label:'Avg Daily Uploads',hint:'Number of uploads per day'},
-    {key:'quality',label:'Quality Score %',hint:'(Total - Errors - Escalations) / Total × 100'},
+    {key:'defect',label:'Defect Density',hint:'(Errors + Escalations) / Total × 1000 — Rating 5 = lowest DD (best), Rating 1 = highest DD (worst)'},
     {key:'escalation',label:'Quality Escalation',hint:'Count of quality escalations (lower = better)'}
   ];
   var html='';
@@ -6525,8 +6538,10 @@ function ratingsOpenBands(){
       +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Min</th>'
       +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>';
     var labels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
+    var bandDef=ratingsState.bands[m.key];
+    if(!bandDef){html+='</table></div>';return;} /* skip unknown key */
     for(var r=5;r>=1;r--){
-      var b=ratingsState.bands[m.key][r];
+      var b=bandDef[r];
       var maxDisplay=b[1]>=9000?'∞':b[1];
       html+='<tr>'
         +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text)">'+labels[r]+'</td>'
@@ -6569,11 +6584,10 @@ function ratingsSubTab(tab,btn){
    ══════════════════════════════════════════════════ */
 var escRatingsState={
   quarter:null, year:null, month:null, memberFilter:null,
-  /* KPI weightages for escalation — SLA + Quality Esc handled (must = 100) */
   wSLA:60, wQEsc:40,
   bands:{
-    sla:   {5:[95,9999],4:[90,94],3:[80,89],2:[70,79],1:[0,69]},
-    qesc:  {5:[20,9999],4:[15,19],3:[10,14],2:[5,9],1:[0,4]}
+    sla:    {5:[95,9999],4:[90,94],3:[80,89],2:[70,79],1:[0,69]},
+    avgDaily:{5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]}
   },
   competency:{},
 };
@@ -6598,23 +6612,21 @@ function escRatingsInRange(dateStr){
 }
 
 function escRatingsGetKPIs(nick){
-  /* SLA % — team-wide from slaLog, filtered to date range */
   var slaEntries=slaLog.filter(function(e){return escRatingsInRange(e.date);});
   var avgSLA=slaEntries.length
     ? Math.round(slaEntries.reduce(function(s,e){return s+(e.pct||0);},0)/slaEntries.length*10)/10
     : null;
-  /* Quality Escalation handled — callouts where escalationMember===nick */
-  var handled=callouts.filter(function(c){
-    return (c.type==='qesc'||c.type==='qesc_esc')
-      &&c.escalationMember===nick
-      &&escRatingsInRange(c.date||c.loggedAt||'');
-  }).length;
-  return{avgSLA:avgSLA,handled:handled};
+  /* Avg Daily Uploads for this escalation member */
+  var uplDays=Object.keys(perfData[nick]||{}).filter(function(d){return escRatingsInRange(d);});
+  var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+  var avgDaily=uplDays.length>0?Math.round((uplTotal/uplDays.length)*10)/10:null;
+  return{avgSLA:avgSLA,avgDaily:avgDaily,uplTotal:uplTotal,uplDays:uplDays.length};
 }
 
 function escRatingsBandScore(metric,val){
   if(val===null||val===undefined)return null;
   var bands=escRatingsState.bands[metric];
+  if(!bands)return null; /* guard: missing band key */
   for(var r=5;r>=1;r--){
     var b=bands[r];
     if(val>=b[0]&&val<=b[1])return r;
@@ -6625,7 +6637,7 @@ function escRatingsBandScore(metric,val){
 function escRatingsCalcPerformance(nick){
   var kpi=escRatingsGetKPIs(nick);
   var ss=escRatingsBandScore('sla',kpi.avgSLA);
-  var sq=escRatingsBandScore('qesc',kpi.handled);
+  var sq=escRatingsBandScore('avgDaily',kpi.avgDaily);
   if(ss===null&&sq===null)return null;
   ss=ss||1;sq=sq||1;
   var w=escRatingsState;
@@ -6673,7 +6685,18 @@ async function escRatingsLoad(quarter,year){
       var d=snap.data();
       if(d.wSLA!==undefined)escRatingsState.wSLA=d.wSLA;
       if(d.wQEsc!==undefined)escRatingsState.wQEsc=d.wQEsc;
-      if(d.bands)escRatingsState.bands=d.bands;
+      if(d.bands){
+        escRatingsState.bands=d.bands;
+        /* Migrate: old saves used 'qesc' key; new code uses 'avgDaily' */
+        if(!escRatingsState.bands.avgDaily&&escRatingsState.bands.qesc){
+          escRatingsState.bands.avgDaily=escRatingsState.bands.qesc;
+          delete escRatingsState.bands.qesc;
+        }
+        /* Ensure avgDaily band always exists */
+        if(!escRatingsState.bands.avgDaily){
+          escRatingsState.bands.avgDaily={5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]};
+        }
+      }
       if(d.competency)escRatingsState.competency=d.competency;
     }
   }catch(e){}
@@ -6710,7 +6733,7 @@ function renderEscRatingsPane(){
     +'<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Performance Weightage (must = 100%)</span>'
     +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Escalation SLA %</span>'
     +'<input id="ert-w-sla" type="number" min="0" max="100" value="'+escRatingsState.wSLA+'" oninput="escRatingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
-    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Esc Handled</span>'
+    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Avg Daily Uploads</span>'
     +'<input id="ert-w-qesc" type="number" min="0" max="100" value="'+escRatingsState.wQEsc+'" oninput="escRatingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
     +'<span id="ert-w-total" style="font-size:11px;font-weight:700;color:var(--green);margin-left:6px">= 100%</span>'
     +'</div></div>'
@@ -6746,7 +6769,7 @@ function renderEscRatingsTable(){
     +'<th rowspan="2" class="th-final" style="min-width:100px">Final<br>Rating</th>'
     +'</tr><tr>'
     +'<th class="th-perf">Escalation SLA %<br><span style="font-weight:400;color:#5a8a3a">team avg · auto</span></th>'
-    +'<th class="th-perf">Esc Handled<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
+    +'<th class="th-perf">Avg Daily<br>Uploads<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
     +'<th class="th-perf">Perf<br>Score</th>'
     +'<th class="th-perf">Perf<br>Rating</th>'
     +'<th class="th-comp">Core<br>Skills</th>'
@@ -6776,7 +6799,7 @@ function renderEscRatingsTable(){
       +'<div style="font-size:10px;color:var(--muted)">escalation</div></div></div></td>'
       /* KPIs */
       +'<td>'+(kpi.avgSLA!==null?kpi.avgSLA+'%':'—')+'<div style="font-size:9px;color:var(--muted2)">team avg</div></td>'
-      +'<td>'+kpi.handled+'</td>'
+      +'<td>'+(kpi.avgDaily!==null?kpi.avgDaily.toFixed(1):'—')+'</td>'
       /* perf */
       +'<td><span class="rt-score">'+(perfScore!==null?perfScore.toFixed(2):'—')+'</span></td>'
       +'<td><span class="r-pill '+perfRating.cls+'">'+perfRating.label+'</span></td>'
@@ -6794,7 +6817,7 @@ function renderEscRatingsTable(){
   html+='</tbody></table>';
   html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--muted)">'
     +'<span>Formula: <strong>Final = (Perf Score × 60%) + (Comp Score × 40%)</strong></span>'
-    +'<span style="margin-left:auto">Perf Score = (SLA×'+escRatingsState.wSLA+'% + Esc Handled×'+escRatingsState.wQEsc+'%)</span>'
+    +'<span style="margin-left:auto">Perf Score = (SLA×'+escRatingsState.wSLA+'% + Avg Daily Uploads×'+escRatingsState.wQEsc+'%)</span>'
     +'</div>'
     +'<div style="margin-top:8px;font-size:10px;color:var(--muted2)">&#9432; Escalation SLA % is a team-wide metric logged by the manager. It applies equally across all escalation members for the selected period.</div>';
 
@@ -6822,7 +6845,7 @@ function escRatingsOpenBands(){
   var body=G('ert-bands-body');if(!body)return;
   var metrics=[
     {key:'sla',label:'Escalation SLA %',hint:'Average team SLA % for the period (logged by manager)'},
-    {key:'qesc',label:'Escalations Handled',hint:'Count of quality escalations handled by this member'},
+    {key:'avgDaily',label:'Avg Daily Uploads',hint:'Average uploads per active day in rating period — individual per member'},
   ];
   var html='';
   var labels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
@@ -6833,8 +6856,10 @@ function escRatingsOpenBands(){
       +'<tr><th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Rating</th>'
       +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Min</th>'
       +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>';
+    var bandDef=escRatingsState.bands[m.key];
+    if(!bandDef){html+='</table></div>';return;}
     for(var r=5;r>=1;r--){
-      var b=escRatingsState.bands[m.key][r];
+      var b=bandDef[r];
       html+='<tr>'
         +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text)">'+labels[r]+'</td>'
         +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-emetric="'+m.key+'" data-er="'+r+'" data-epos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
@@ -6849,6 +6874,7 @@ function escRatingsOpenBands(){
 function escRatingsSaveBands(){
   G('ert-bands-body').querySelectorAll('input[data-emetric]').forEach(function(inp){
     var metric=inp.dataset.emetric,r=parseInt(inp.dataset.er),pos=parseInt(inp.dataset.epos);
+    if(!escRatingsState.bands[metric])return; /* skip unknown keys */
     escRatingsState.bands[metric][r][pos]=parseFloat(inp.value)||0;
   });
   escRatingsCloseBands();
@@ -7042,22 +7068,37 @@ function renderMgrHubPerformance(){
 
   var uplRows=uplData.map(function(r){
     var avgStr=r.avgDaily!==null?r.avgDaily.toFixed(1):'—';
+    /* Defect density: (errors + escalations) / total uploads * 1000 */
+    var errCount=callouts.filter(function(c){
+      if(c.status==='discarded')return false;
+      if(!mgrHubInRange((c.date||'').slice(0,10)))return false;
+      return (c.type==='qscore')&&(c.uploader===r.nick||c.uploader===r.m.fullName);
+    }).length;
+    var defectDensity=r.totalUploads>0?((errCount+r.qualEsc)/r.totalUploads*1000):null;
+    r.errCount=errCount; /* expose for grand total */
+    var ddStr=defectDensity!==null?defectDensity.toFixed(1):'—';
+    var ddColor=defectDensity===null?'var(--muted)':defectDensity<=5?'var(--green)':defectDensity<=15?'var(--amber)':'var(--red)';
     var qStr=r.qScore!==null?(r.qScore>=99.5?r.qScore.toFixed(2)+'%':r.qScore.toFixed(1)+'%'):'—';
     var qColor=r.qScore!==null?(r.qScore>=95?'var(--green)':r.qScore>=80?'var(--amber)':'var(--red)'):'var(--muted)';
-    return '<div style="display:grid;grid-template-columns:140px repeat(4,1fr);align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px">'
+    return '<div style="display:grid;grid-template-columns:140px repeat(5,1fr);align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px">'
       +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.totalUploads+'</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.qualEsc+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
+      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+ddColor+'">'+ddStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+qColor+'">'+qStr+'</div><div style="font-size:10px;color:var(--muted)">quality score</div></div>'
       +'</div>';
   }).join('');
 
-  /* Uploader grand total row */
+  /* Uploader grand total row — cross-team aggregate defect density */
   var gtUplTotal=uplData.reduce(function(s,r){return s+r.totalUploads;},0);
   var gtUplAvgArr=uplData.filter(function(r){return r.avgDaily!==null;});
   var gtUplAvg=gtUplAvgArr.length?(gtUplAvgArr.reduce(function(s,r){return s+r.avgDaily;},0)/gtUplAvgArr.length).toFixed(1):'—';
   var gtUplEsc=uplData.reduce(function(s,r){return s+r.qualEsc;},0);
+  /* Grand total defect density = (all errors + all escalations) / all uploads × 1000 */
+  var gtAllErrors=uplData.reduce(function(s,r){return s+r.errCount;},0);
+  var gtDDStr=gtUplTotal>0?((gtAllErrors+gtUplEsc)/gtUplTotal*1000).toFixed(1):'—';
+  var gtDDColor=gtUplTotal>0?((gtAllErrors+gtUplEsc)/gtUplTotal*1000<=5?'var(--green)':(gtAllErrors+gtUplEsc)/gtUplTotal*1000<=15?'var(--amber)':'var(--red)'):'var(--muted)';
   var gtUplQArr=uplData.filter(function(r){return r.qScore!==null;});
   var gtUplQ=gtUplQArr.length?(function(){var v=gtUplQArr.reduce(function(s,r){return s+r.qScore;},0)/gtUplQArr.length;return v>=99.5?v.toFixed(2)+'%':v.toFixed(1)+'%';})():'—';
   var gtUplQColor=gtUplQArr.length?(parseFloat(gtUplQ)>=95?'var(--green)':parseFloat(gtUplQ)>=80?'var(--amber)':'var(--red)'):'var(--muted)';
@@ -7072,15 +7113,23 @@ function renderMgrHubPerformance(){
 
   var uplSection='<div class="sect" style="margin-bottom:20px">'
     +'<div class="sect-head"><span class="sect-title">&#128188; Uploaders</span></div>'
-    +'<div style="display:grid;grid-template-columns:140px repeat(4,1fr);gap:8px;padding:8px 12px;border-bottom:1px solid var(--border2)">'
+    +'<div style="display:grid;grid-template-columns:140px repeat(5,1fr);gap:8px;padding:8px 12px;border-bottom:1px solid var(--border2)">'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase">Member</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Avg Daily</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</div>'
+    +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Defect Density</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Score</div>'
     +'</div>'
     +uplRows
-    +uplGrandTotal
+    +'<div style="display:grid;grid-template-columns:140px repeat(5,1fr);align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);font-size:12px;border-top:2px solid var(--border2)">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplAvg+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+gtDDColor+'">'+gtDDStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000 (team)</div></div>'
+    +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+gtUplQColor+'">'+gtUplQ+'</div><div style="font-size:10px;color:var(--muted)">avg quality score</div></div>'
+    +'</div>'
     +'</div>';
 
   /* ── ESCALATION ── */
@@ -7094,16 +7143,17 @@ function renderMgrHubPerformance(){
     var nick=m.nickname;
     var uplDays=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
     var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+    var dayCount=uplDays.length||1;
+    var avgDaily=uplTotal>0?(uplTotal/dayCount):null;
     var memberSecs=(allTimerSessions||[]).filter(function(s){return s.nick===nick&&mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
     var memberHrs=memberSecs/3600;
-    var rate=memberHrs>0?(uplTotal/memberHrs):null;
     var qualEsc=callouts.filter(function(c){
       if(!(c.type==='qesc'||c.type==='qesc_esc'))return false;
       if(c.status==='discarded')return false;
       if(!mgrHubInRange(c.date))return false;
       return c.uploader===nick||c.escalationMember===nick||c.uploader===m.fullName||c.escalationMember===m.fullName;
     }).length;
-    return {m:m,nick:nick,uplTotal:uplTotal,rate:rate,memberHrs:memberHrs,qualEsc:qualEsc};
+    return {m:m,nick:nick,uplTotal:uplTotal,avgDaily:avgDaily,dayCount:dayCount,memberHrs:memberHrs,qualEsc:qualEsc};
   });
 
   /* Build SLA badge BEFORE escRows so it's defined when rows render */
@@ -7114,21 +7164,19 @@ function renderMgrHubPerformance(){
     :'<span class="esc-metric-badge warn">No Data</span><div style="font-size:10px;color:var(--muted);margin-top:4px">Target: ≥75%</div>';
 
   var escRows=escData.map(function(r,i){
-    var rateSuspect=r.memberHrs>0&&r.memberHrs<0.05;
-    var rateStr=(r.rate!==null&&!rateSuspect)?r.rate.toFixed(1):'—';
+    var avgDailyStr=r.avgDaily!==null?r.avgDaily.toFixed(1):'—';
     var qualBadge=r.qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
       :r.qualEsc<=3
       ?'<span class="esc-metric-badge warn">'+r.qualEsc+'</span>'
       :'<span class="esc-metric-badge bad">'+r.qualEsc+'</span>';
-    /* SLA: true rowspan on first row only, omit cell on subsequent rows */
     var slaCell=i===0
       ?'<td rowspan="'+escData.length+'" style="text-align:center;vertical-align:middle;padding:10px 12px">'+sharedSlaBadge+'</td>'
       :'';
     return '<tr style="border-bottom:1px solid var(--border)">'
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+rateStr+'</div><div style="font-size:10px"><span data-nick=\"'+r.nick+'\" onclick=\"openMgrTimerLog(this.dataset.nick)\" style=\"color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-style:dotted\">uploads/hr · '+(r.memberHrs>0?r.memberHrs.toFixed(1)+'h':'0.0h')+'</span></div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgDailyStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -7136,14 +7184,14 @@ function renderMgrHubPerformance(){
 
   /* Escalation grand total row */
   var gtEscTotal=escData.reduce(function(s,r){return s+r.uplTotal;},0);
-  var gtEscRateArr=escData.filter(function(r){return r.rate!==null;});
-  var gtEscRate=gtEscRateArr.length?(gtEscRateArr.reduce(function(s,r){return s+r.rate;},0)/gtEscRateArr.length).toFixed(1):'—';
+  var gtEscAvgArr=escData.filter(function(r){return r.avgDaily!==null;});
+  var gtEscAvg=gtEscAvgArr.length?(gtEscAvgArr.reduce(function(s,r){return s+r.avgDaily;},0)/gtEscAvgArr.length).toFixed(1):'—';
   var gtEscEsc=escData.reduce(function(s,r){return s+r.qualEsc;},0);
 
   var escGrandTotal='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">'
     +'<td style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
-    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscRate+'</div><div style="font-size:10px;color:var(--muted)">avg upload rate</div></td>'
+    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscAvg+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></td>'
     +'<td style="text-align:center;padding:10px 12px">'+sharedSlaBadge+'</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></td>'
     +'</tr>';
@@ -7195,7 +7243,7 @@ function renderMgrHubPerformance(){
     +'<thead><tr style="border-bottom:1px solid var(--border2)">'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:left">Member</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</th>'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Upload Rate</th>'
+    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Avg Daily</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Escalation SLA</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</th>'
     +'</tr></thead>'
@@ -8777,7 +8825,7 @@ async function mwSubmitError(){
   var ss=G('mw-err-file').files[0]?await uploadScreenshot(G('mw-err-file').files[0]):null;
   var uplMem=TEAM.find(function(m){return m.nickname===upl;})||{fullName:upl};
   var newCallout={id:nextId++,type:'qscore',uploader:upl,category:mwErrCat||'Others',address:addr,date:date,feedback:desc,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
-  callouts.push(newCallout);
+  /* Do NOT push to local array — onSnapshot will add it when Firestore confirms */
   await fsSaveCallout(newCallout);
   sendManagerReviewNotif(newCallout);
   pushNotif('📋','Contract error logged for '+uplMem.fullName+': "'+addr+'". Pending your review.','qscore');
@@ -8998,8 +9046,7 @@ async function submitQScoreFromOverlay(){
   var uplMem=TEAM.find(function(m){return m.nickname===upl;});
   var cat2=G('qscore-cat2')?G('qscore-cat2').value:'Others';
   var newCo={id:nextId++,type:'qscore',uploader:upl,category:cat2||'Others',address:addr,date:date,feedback:err,screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
-  callouts.push(newCo);
-  /* Save callout and wait for Firestore ID before sending review notif */
+  /* Do NOT push locally — onSnapshot handles it to avoid duplicates */
   if(fsDb()){
     try{
       var coRef=await window._fsAddDoc(window._fsColl(fsDb(),'callouts'),
@@ -9403,12 +9450,10 @@ function renderEscalationHub(){
   },100);
   var sh=SHIFTS[cu.nickname];
   var shLabel=sh?'Shift: '+sh.start+':00–'+sh.end+':00 AEST':'';
-  /* Default view: all-time sessions and uploads */
-  var totalSecs=timerSessions.reduce(function(a,b){return a+b.seconds;},0);
-  var timerHrs=totalSecs/3600;
   var allUploads=Object.values(perfData[cu.nickname]||{});
   var inShiftTotal=allUploads.reduce(function(a,d){return a+(d.uploadsTotal||0);},0);
-  var uploadRate=timerHrs>0?(inShiftTotal/timerHrs).toFixed(1):'—';
+  var activeDays=Object.keys(perfData[cu.nickname]||{}).length||1;
+  var avgDailyUpload=inShiftTotal>0?(inShiftTotal/activeDays).toFixed(1):'—';
   var latest=getLatestSLA();
   var slaPct=latest?latest.pct:null;
   var slaBadgeCls=slaPct===null?'warn':slaPct>=75?'good':'bad';
@@ -9454,16 +9499,6 @@ function renderEscalationHub(){
     +'<div class="filter-sep"></div>'
     +'<div class="range-cal" id="rcal-esc-perf"><div class="range-cal-trigger" id="rcal-esc-perf-trigger">&#128197; Custom range</div><div class="range-cal-popup" id="rcal-esc-perf-popup"></div></div>'
     +'</div>'
-    +'<div class="timer-card" style="margin-bottom:16px">'
-    +'<div><div class="timer-lbl">&#9201; Upload Session Timer</div>'
-    +'<div class="timer-display" id="timer-disp">00:00:00</div></div>'
-    +'<div class="timer-info"><div class="timer-lbl">Status</div>'
-    +'<div class="timer-status" id="timer-txt">Not running</div></div>'
-    +'<div style="display:flex;gap:8px">'
-    +'<button class="btn btn-green btn-sm" id="t-start" onclick="startTimer()">&#9654; Start</button>'
-    +'<button class="btn btn-red btn-sm" id="t-stop" onclick="stopTimer()" style="display:none">&#9632; Stop</button>'
-    +'</div></div>'
-
     +'<div class="kpi-grid" style="margin-bottom:16px">'
     +'<div class="kpi-card">'
     +'<div class="kpi-label">&#128247; Escalation SLA</div>'
@@ -9473,10 +9508,10 @@ function renderEscalationHub(){
     +'<div class="prog-wrap"><div class="prog-bar" id="esc-sla-kpi-bar" style="width:'+Math.min(slaPct||0,100)+'%;background:'+(slaPct!==null&&slaPct>=75?'var(--green)':'var(--red)')+'"></div></div>'
     +'</div>'
     +'<div class="kpi-card">'
-    +'<div class="kpi-label">&#128200; Upload Rate</div>'
-    +'<div class="kpi-value" id="esc-rate-val">'+uploadRate+'</div>'
-    +'<div class="kpi-sub" id="esc-rate-sub">uploads / hour active</div>'
-    +'<div class="kpi-sub" style="margin-top:4px" id="esc-rate-detail"><span id="esc-rate-active-link" onclick="openTimerLog()" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:var(--muted)">Active: '+(timerHrs>0?timerHrs.toFixed(1)+'h':'0h')+'</span> · Uploads: '+inShiftTotal+'</div>'
+    +'<div class="kpi-label">&#128200; Avg Daily Upload</div>'
+    +'<div class="kpi-value" id="esc-rate-val">'+avgDailyUpload+'</div>'
+    +'<div class="kpi-sub" id="esc-rate-sub">uploads per active day</div>'
+    +'<div class="kpi-sub" style="margin-top:4px">Total: '+inShiftTotal+' uploads · '+activeDays+' days</div>'
     +'<div class="prog-wrap"><div class="prog-bar" id="esc-rate-bar" style="width:'+Math.min((inShiftTotal/20)*100,100)+'%"></div></div>'
     +'</div></div>'
 
@@ -9745,27 +9780,19 @@ function renderEscPerfFiltered(){
     }
   }
 
-  /* ── Filter timer sessions → recalculate Upload Rate ── */
-  var filteredSecs=timerSessions
-    .filter(function(s){return inFilterRange(s.date);})
-    .reduce(function(a,s){return a+s.seconds;},0);
-  var filteredHrs=filteredSecs/3600;
-
-  /* Sum in-shift uploads from perfData for same date range */
+  /* ── Filter uploads → recalculate Avg Daily ── */
   var nick=cu?cu.nickname:'';
   var dayData=perfData[nick]||{};
-  var filteredUploads=Object.keys(dayData).reduce(function(acc,date){
-    if(!inFilterRange(date))return acc;
-    return acc+(dayData[date].uploadsTotal||0);
-  },0);
-
-  var rate=filteredHrs>0?(filteredUploads/filteredHrs).toFixed(1):'—';
+  var filteredDays=Object.keys(dayData).filter(function(date){return inFilterRange(date);});
+  var filteredUploads=filteredDays.reduce(function(acc,date){return acc+(dayData[date].uploadsTotal||0);},0);
+  var filteredDayCount=filteredDays.length||1;
+  var avgDaily=filteredUploads>0?(filteredUploads/filteredDayCount).toFixed(1):'—';
 
   var rateVal=G('esc-rate-val');
-  var rateSub=G('esc-rate-detail');
+  var rateSub=G('esc-rate-sub');
   var rateBar=G('esc-rate-bar');
-  if(rateVal)rateVal.textContent=rate;
-  if(rateSub)rateSub.innerHTML='<span id="esc-rate-active-link" onclick="openTimerLog()" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;color:var(--muted)">Active: '+(filteredHrs>0?filteredHrs.toFixed(1)+'h':'0h')+'</span> · Uploads: '+filteredUploads;
+  if(rateVal)rateVal.textContent=avgDaily;
+  if(rateSub)rateSub.textContent='uploads per active day';
   if(rateBar)rateBar.style.width=Math.min((filteredUploads/20)*100,100)+'%';
 
   /* Update SLA KPI card from filtered data */
@@ -9906,7 +9933,8 @@ function getStats(nick,range){
   const myQEsc=callouts.filter(c=>c.type==='qesc'&&(c.uploader===nick||c.escalationMember===nick)&&inRange(c.date,range));
   const myErr=callouts.filter(c=>c.type==='qscore'&&c.uploader===nick&&inRange(c.date,range)&&c.status!=='pending_review'&&c.status!=='discarded');
   const qScore=uploadsTotal>0?((uploadsTotal-myErr.length-myQEsc.length)/uploadsTotal*100):null;
-  return{uploadsTotal,uploadsInShift,uploadsOffShift:uploadsTotal-uploadsInShift,adu:Math.round(adu*10)/10,weightedDays:Math.round(weightedDays*10)/10,qEsc:myQEsc.length,errors:myErr.length,qScore};
+  const defectDensity=uploadsTotal>0?((myErr.length+myQEsc.length)/uploadsTotal*1000):null;
+  return{uploadsTotal,uploadsInShift,uploadsOffShift:uploadsTotal-uploadsInShift,adu:Math.round(adu*10)/10,weightedDays:Math.round(weightedDays*10)/10,qEsc:myQEsc.length,errors:myErr.length,qScore,defectDensity};
 }
 
 /* ── RENDER DASHBOARD ── */
@@ -9914,8 +9942,10 @@ function renderDashboard(){
   const nick=cu.nickname;const range=getDateRange();const s=getStats(nick,range);const q=currentQuarter();
   const sub=G('dash-sub');
   if(sub){const sh=SHIFTS[nick];const lbl={today:'Today',week:'This Week',month:'This Month',quarter:q.label,custom:`${fmtDate(customRange.from)} – ${fmtDate(customRange.to)}`};sub.textContent=(sh?`Shift: ${sh.start}:00–${sh.end}:00 AEST  ·  `:'')+(lbl[activeDateFilter]||'');}
-  const qB=s.qScore===null?`<span class="kpi-badge kb-amber">No Data</span>`:s.qScore>=95?`<span class="kpi-badge kb-green">✓ On Target</span>`:`<span class="kpi-badge kb-red">⚠ Below Target</span>`;
   const eB=s.qEsc>3?`<span class="kpi-badge kb-red">⚠ Exceeded</span>`:`<span class="kpi-badge kb-green">✓ On Track</span>`;
+  const dd=s.defectDensity;
+  const ddB=dd===null?`<span class="kpi-badge kb-amber">No Data</span>`:dd<=5?`<span class="kpi-badge kb-green">✓ On Target</span>`:dd<=15?`<span class="kpi-badge kb-amber">⚠ Watch</span>`:`<span class="kpi-badge kb-red">⚠ High</span>`;
+  const ddColor=dd===null?'var(--text)':dd<=5?'var(--green)':dd<=15?'var(--amber)':'var(--red)';
   const kpi=G('kpi-grid');
   if(kpi)kpi.innerHTML=`
     <div class="kpi-card">
@@ -9937,11 +9967,11 @@ function renderDashboard(){
       <div class="prog-wrap"><div class="prog-bar" style="width:${Math.min(s.qEsc/3*100,100)}%;background:${s.qEsc>3?'var(--red)':'var(--green)'}"></div></div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Quality Score</div>
-      <div class="kpi-value">${s.qScore!==null?s.qScore.toFixed(1)+'%':'—'}</div>
-      ${qB}
-      <div class="kpi-sub">Target: ≥95% per quarter</div>
-      <div class="prog-wrap"><div class="prog-bar" style="width:${Math.min(s.qScore||0,100)}%"></div></div>
+      <div class="kpi-label">Defect Density</div>
+      <div class="kpi-value" style="color:${ddColor}">${dd!==null?dd.toFixed(1):'—'}</div>
+      ${ddB}
+      <div class="kpi-sub">Target: 3.0–5.0 per 1,000 uploads</div>
+      <div class="prog-wrap"><div class="prog-bar" style="width:${Math.min((dd||0)/20*100,100)}%;background:${ddColor}"></div></div>
     </div>`;
   renderDailyTbl(nick,range);
   /* Re-init custom range calendar after render (DOM re-clones) */
@@ -10094,7 +10124,9 @@ async function submitQEsc(){
   const ss=G('qesc-file').files[0]?await uploadScreenshot(G('qesc-file').files[0]):null;
   const uplMem=TEAM.find(m=>m.nickname===upl);
   var qescCat=G('qesc-cat')?G('qesc-cat').value:'Others';
-  callouts.push({id:nextId++,type:'qesc',uploader:upl,address:addr,date,feedback:fb,category:qescCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''});
+  var qescCo={id:nextId++,type:'qesc',uploader:upl,address:addr,date:date,feedback:fb,category:qescCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  /* Do NOT push locally — onSnapshot handles it */
+  await fsSaveCallout(qescCo);
   closeModal('modal-qesc');
   ['qesc-addr','qesc-date','qesc-fb'].forEach(id=>G(id).value='');G('qesc-file').value='';G('qesc-prev').innerHTML='';
   pushNotif('🚨',`Manager logged a Critical escalation for ${uplMem?.fullName||upl}: "${addr}". Action required.`,'qesc');
@@ -10106,8 +10138,8 @@ async function submitQScore(){
   const ss=G('qscore-file').files[0]?await uploadScreenshot(G('qscore-file').files[0]):null;
   const uplMem=TEAM.find(m=>m.nickname===upl);
   var qscoreCat=G('qscore-cat')?G('qscore-cat').value:'Others';
-  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date,feedback:err,category:qscoreCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
-  callouts.push(newCo);
+  var newCo={id:nextId++,type:'qscore',uploader:upl,address:addr,date:date,feedback:err,category:qscoreCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'pending_review',insight:''};
+  /* Do NOT push locally — onSnapshot handles it */
   await fsSaveCallout(newCo);
   sendManagerReviewNotif(newCo);
   closeModal('modal-qscore');
