@@ -59,11 +59,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;width:min(98vw,1100px);height:min(96vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+.modal.modal-sm{width:min(96vw,520px);height:auto;max-height:80vh;}
 .modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .modal-title{font-family:var(--fd);font-size:15px;font-weight:700;}
 .score-chip{font-size:11px;color:var(--muted);padding:2px 8px;background:var(--surface2);border-radius:10px;}
 .modal-close{margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;padding:2px 6px;}
-.modal-body{padding:20px 28px;overflow-y:auto;flex:1;display:flex;flex-direction:column;align-items:center;}
+.modal-body{padding:0;overflow-y:auto;flex:1;display:flex;flex-direction:column;align-items:stretch;}
+.modal.modal-sm .modal-body{padding:20px 28px;align-items:center;}
 /* buttons */
 .btn{font-family:var(--font);font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;padding:7px 14px;transition:opacity .15s,background .15s;}
 .btn-primary{background:var(--accent);color:#fff;border:none;}
@@ -412,6 +414,10 @@ function openModal(id,title){
   currentGame=id;G('modal-title').textContent=title;
   G('cur-score').textContent='';G('best-score').textContent='';
   G('modal-body').innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Loading…</div>';
+  /* KB Quiz uses a compact modal; all other games fill the full modal */
+  var modal=G('game-modal').querySelector('.modal');
+  if(id==='kbquiz'){modal.classList.add('modal-sm');}
+  else{modal.classList.remove('modal-sm');}
   G('game-modal').classList.add('open');if(musicOn)stopMusic();
 }
 function closeModal(){
@@ -451,6 +457,7 @@ function launchGame(id,title){
       else if(id==='uno')gameUNO(body);
       else if(id==='pusoy')gamePusoyDos(body);
       else if(id==='tongits')gameTongIts(body);
+      else if(id==='contexto')gameContexto(body);
     },60);
   });
 }
@@ -464,6 +471,7 @@ function renderGrid(){
     {id:'wordguess',e:'📝',n:'Word Guess',d:'Guess the 5-letter word · 1 credit'},
     {id:'chess',e:'♟️',n:'Chess',d:'Play vs AI · 1 credit'},
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
+    {id:'contexto',e:'🧠',n:'Contexto',d:'Find the secret word by semantic similarity · 1 credit'},
     {id:'pusoy',e:'🂢',n:'Pusoy Dos',d:'Big Two vs 3 AI · 3 credits',card:true},
     {id:'tongits',e:'🀄',n:'Tong Its',d:'Filipino card game vs 2 AI · 3 credits',card:true},
   ];
@@ -587,6 +595,7 @@ function init(){
    ══ MINESWEEPER ══
 ═══════════════════════════════════════════════════ */
 function gameMinesweeper(C){
+  C.style.cssText='padding:16px 20px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
   var CFGS={easy:{r:9,c:9,m:10},medium:{r:16,c:16,m:40},hard:{r:16,c:30,m:99}};
   var diff='medium',board,rev,flag,over,first,t0;
   function cfg(){return CFGS[diff];}
@@ -656,6 +665,7 @@ function gameMinesweeper(C){
    ══ WORD GUESS ══
 ═══════════════════════════════════════════════════ */
 function gameWordGuess(C){
+  C.style.cssText='padding:16px 20px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
   var WORDS=['AUDIT','CLAIM','DRAFT','LEASE','LEGAL','TITLE','BUYER','OFFER','PRICE','AGENT','LODGE','LOANS','RATES','BONDS','TRUST','YIELD','GRANT','QUOTE','DEBIT','ESCROW','VENDOR','ZONING','PROXY','LIEN','DEED'];
   var ans=WORDS[Math.floor(Math.random()*WORDS.length)];
   var guesses=[],cur='',MAX=6,done=false;
@@ -721,6 +731,7 @@ function gameWordGuess(C){
    ══ CHESS — distinctive pieces ══
 ═══════════════════════════════════════════════════ */
 function gameChess(C){
+  C.style.cssText='padding:16px 20px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
   var playerIsWhite=Math.random()<0.5;
   var board,turn,sel,moves,over,enPassant,castleRights,promoted,inCheck;
 
@@ -973,6 +984,7 @@ function gameChess(C){
 
 
 function gameSolitaire(C){
+  C.style.cssText='padding:12px 16px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
   var SUITS=['♠','♥','♦','♣'],VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
   var RED=['♥','♦'];
   function isRed(s){return RED.includes(s);}
@@ -1237,6 +1249,7 @@ function gameKBQuiz(C){
    ══ UNO — 1 player vs 1–3 AI opponents ══
 ═══════════════════════════════════════════════════ */
 function gameUNO(C){
+  C.style.cssText='padding:12px 16px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
   /* Setup screen first */
   var aiCount=1;
   function showSetup(){
@@ -1561,6 +1574,7 @@ function gameLucky9(C){
    First play must include 3♣. Whoever holds 3♣ goes first.
 ═══════════════════════════════════════════════════ */
 function gamePusoyDos(C){
+  C.style.cssText='padding:12px 16px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
   var ORDER=['3','4','5','6','7','8','9','10','J','Q','K','A','2'];
   var SUIT_ORDER=['♣','♠','♥','♦']; /* ♣ lowest, ♦ highest */
   var AI_NAMES=['🤖 Ana','🤖 Ben','🤖 Ces'];
@@ -2125,237 +2139,270 @@ function gameTongIts(C){
   }
 
   function render(){
-    var wrap=document.createElement('div');
-    wrap.style.cssText='font-size:12px;width:100%;max-width:700px;margin:0 auto';
+    /* ══════════════════════════════════════════════
+       TONGITS — CARDINAL TABLE LAYOUT
+       N: Pot / credits
+       W: Neneng (index 1) — vertical hand + vertical exposed melds
+       E: Dodong (index 2) — vertical hand + vertical exposed melds
+       Center: Stock + Discard pile
+       S: Player — horizontal hand + horizontal exposed melds
+       ══════════════════════════════════════════════ */
+    C.style.cssText='padding:0;display:flex;flex-direction:column;height:100%;overflow:hidden;background:var(--surface);';
 
-    /* ── TABLE LAYOUT ──
-       [Dodong - LEFT]    [STOCK | DISCARD]    [Nene - RIGHT]
-                               [Player]
-    */
-
-    /* TOP ROW: Dodong(left) | center | Nene(right) */
-    var tableRow=document.createElement('div');
-    tableRow.style.cssText='display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;width:100%';
-
-    /* Dodong - LEFT (index 2) */
-    var dodongBox=document.createElement('div');
-    dodongBox.style.cssText='flex:1;text-align:center;min-width:0';
-    var dodLbl=document.createElement('div');dodLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600';
-    dodLbl.textContent='Dodong (Left)'+(turn===2?' ←':'');
-    if(turn===2)dodLbl.style.color='var(--accent)';
-    dodongBox.appendChild(dodLbl);
-    var dodRow=document.createElement('div');dodRow.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
-    hands[2].slice(0,6).forEach(function(){dodRow.appendChild(_cardEl(null,20,30,true));});
-    if(hands[2].length>6){var dm=document.createElement('span');dm.style.cssText='font-size:10px;color:var(--muted);align-self:center';dm.textContent='+'+( hands[2].length-6);dodRow.appendChild(dm);}
-    dodongBox.appendChild(dodRow);
-    if(allExposedMelds[2].length){
-      allExposedMelds[2].forEach(function(meld){
-        var mr=document.createElement('div');mr.style.cssText='display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap';
-        meld.forEach(function(c){mr.appendChild(_cardEl(c,20,30));});
-        dodongBox.appendChild(mr);
-      });
-    }
-    tableRow.appendChild(dodongBox);
-
-    /* CENTER: Stock + Discard */
-    var center=document.createElement('div');
-    center.style.cssText='display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0';
-
-    var pilesRow=document.createElement('div');pilesRow.style.cssText='display:flex;gap:8px;align-items:flex-start';
-
-    /* Stock */
-    var sWrap=document.createElement('div');sWrap.style.cssText='text-align:center';
-    var sLbl=document.createElement('div');sLbl.style.cssText='font-size:9px;color:var(--muted);margin-bottom:2px';sLbl.textContent='Stock ('+stock.length+')';
-    var sEl=_cardEl(null,44,64,true);
-    if(turn===0&&!gover&&!pendingDraw&&!drawn){sEl.style.cursor='pointer';sEl.style.opacity='1';sEl.onclick=playerDraw;}
-    else sEl.style.opacity='0.6';
-    sWrap.appendChild(sLbl);sWrap.appendChild(sEl);pilesRow.appendChild(sWrap);
-
-    /* Discard */
-    var dWrap=document.createElement('div');dWrap.style.cssText='text-align:center';
     var chowOk=!!(turn===0&&!gover&&!pendingDraw&&!drawn&&discard.length&&canChow(discard[discard.length-1],hands[0]));
-    var dLblSpan=document.createElement('span');dLblSpan.style.cssText='font-size:9px;cursor:pointer;color:var(--accent);text-decoration:underline';
-    dLblSpan.textContent='Discard'+(discardHistory.length?' ('+discardHistory.length+')':'');
-    dLblSpan.onclick=function(){showDiscardPile=!showDiscardPile;render();};
-    dWrap.appendChild(dLblSpan);
-    var dEl=discard.length?_cardEl(discard[discard.length-1],44,64):_cardEl(null,44,64,true);
-    if(chowOk){dEl.style.cursor='pointer';dEl.style.boxShadow='0 0 0 3px var(--accent)';}
-    else if(turn===0&&!drawn&&!gover){dEl.style.opacity='0.55';dEl.style.cursor='not-allowed';}
-    dEl.onclick=function(){if(chowOk)playerChow();};
-    var chowHint=document.createElement('div');chowHint.style.cssText='font-size:9px;margin-top:2px;font-weight:600;color:'+(chowOk?'var(--accent)':'var(--muted)');
-    chowHint.textContent=chowOk?'✓ Chow':'';
-    dWrap.appendChild(dEl);dWrap.appendChild(chowHint);pilesRow.appendChild(dWrap);
-    center.appendChild(pilesRow);
-
-    /* DW display */
-    var dwEl=document.createElement('div');dwEl.style.cssText='font-size:10px;color:var(--muted);text-align:center';
-    dwEl.textContent='DW: '+deadwood(hands[0]);
-    center.appendChild(dwEl);
-    tableRow.appendChild(center);
-
-    /* Nene - RIGHT (index 1) */
-    var neneBox=document.createElement('div');
-    neneBox.style.cssText='flex:1;text-align:center;min-width:0';
-    var nenLbl=document.createElement('div');nenLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600';
-    nenLbl.textContent='Nene (Right)'+(turn===1?' ←':'');
-    if(turn===1)nenLbl.style.color='var(--accent)';
-    neneBox.appendChild(nenLbl);
-    var nenRow=document.createElement('div');nenRow.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
-    hands[1].slice(0,6).forEach(function(){nenRow.appendChild(_cardEl(null,20,30,true));});
-    if(hands[1].length>6){var nm=document.createElement('span');nm.style.cssText='font-size:10px;color:var(--muted);align-self:center';nm.textContent='+'+( hands[1].length-6);nenRow.appendChild(nm);}
-    neneBox.appendChild(nenRow);
-    if(allExposedMelds[1].length){
-      allExposedMelds[1].forEach(function(meld){
-        var mr=document.createElement('div');mr.style.cssText='display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap';
-        meld.forEach(function(c){mr.appendChild(_cardEl(c,20,30));});
-        neneBox.appendChild(mr);
-      });
-    }
-    tableRow.appendChild(neneBox);
-    wrap.appendChild(tableRow);
-
-    /* Discard pile popup */
-    if(showDiscardPile&&discardHistory.length){
-      var dpBox=document.createElement('div');
-      dpBox.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px';
-      var dpLbl=document.createElement('div');dpLbl.style.cssText='font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:600;cursor:pointer';
-      dpLbl.textContent='Discard history ('+discardHistory.length+') — tap to close';
-      dpLbl.onclick=function(){showDiscardPile=false;render();};
-      dpBox.appendChild(dpLbl);
-      var dpRow=document.createElement('div');dpRow.style.cssText='display:flex;gap:3px;flex-wrap:wrap';
-      discardHistory.forEach(function(c){dpRow.appendChild(_cardEl(c,28,40));});
-      dpBox.appendChild(dpRow);wrap.appendChild(dpBox);
-    }
-
-    /* AI draw challenge */
-    if(pendingDraw&&pendingDraw.caller!==0){
-      var cb=document.createElement('div');
-      cb.style.cssText='background:rgba(253,203,110,.12);border:1px solid rgba(253,203,110,.3);border-radius:8px;padding:10px;text-align:center;margin-bottom:8px';
-      var prot=isBurnProtected(0);
-      cb.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:3px">'+AI[pendingDraw.caller-1]+' calls DRAW (DW: '+pendingDraw.dw+')</div>'
-        +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Your DW: '+deadwood(hands[0])+(prot?' ✅ Protected':'⚠️ No protection — fight = burn')+'</div>';
-      var br=document.createElement('div');br.style.cssText='display:flex;gap:8px;justify-content:center';
-      var fb=document.createElement('button');fb.className='btn btn-primary';fb.textContent='⚔️ Fight'+(prot?'':' (Burns!)');fb.onclick=function(){resolveFight(false);};
-      var fl=document.createElement('button');fl.className='btn btn-outline';fl.textContent='🏳️ Fold';fl.onclick=function(){resolveFight(true);};
-      br.appendChild(fb);br.appendChild(fl);cb.appendChild(br);wrap.appendChild(cb);
-    }
-
-    /* Player exposed melds (left to right, horizontal) */
-    if(allExposedMelds[0].length){
-      var expWrap=document.createElement('div');
-      expWrap.style.cssText='display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap;margin-bottom:6px;padding:6px 8px;background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:8px';
-      var expTitle=document.createElement('div');expTitle.style.cssText='width:100%;font-size:9px;color:var(--green);font-weight:600;margin-bottom:3px';
-      expTitle.textContent='✅ Your Exposed Melds'+(playerGotSapawed?' · Sapawed':'');
-      expWrap.appendChild(expTitle);
-      allExposedMelds[0].forEach(function(meld){
-        var mRow=document.createElement('div');mRow.style.cssText='display:flex;gap:2px';
-        meld.forEach(function(c){mRow.appendChild(_cardEl(c,32,46));});
-        expWrap.appendChild(mRow);
-      });
-      wrap.appendChild(expWrap);
-    }
-
-    /* Player hand */
-    var hLabel=document.createElement('div');
-    hLabel.style.cssText='font-size:11px;color:var(--muted);margin-bottom:5px;text-align:center';
     var selArr=Array.from(selectedCards);
     var selMelds=selArr.length>=3?findMelds(selArr):[];
     var selIsMeld=selMelds.length>0&&selMelds[0].length===selArr.length;
     var selSapaw=selArr.length===1?anySapawTarget(selArr[0]):null;
-    if(selArr.length>0){
-      var selDesc=selArr.length===1
-        ?('1 card raised — '+(drawn?'Discard, ':'Draw first · ')+(selSapaw?'Sapaw available':'no Sapaw'))
-        :(selArr.length+' cards raised — '+(selIsMeld?'valid meld! Expose it':'not a valid meld yet'));
-      hLabel.textContent=selDesc;
-    } else if(drawn){
-      hLabel.textContent='Tap a card to raise it — then Discard, Meld, or Sapaw';
-    } else if(turn===0){
-      hLabel.textContent=chowOk?'Draw from stock or Chow the discard':'Draw from stock (Chow not available)';
-    } else {
-      hLabel.textContent='Waiting for '+AI[turn-1]+'…';
-    }
-    wrap.appendChild(hLabel);
-
-    var hRow=document.createElement('div');hRow.style.cssText='display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin-bottom:6px';
     var melded=getMelded(hands[0]);
+
+    /* helper: vertical card stack (face-down or face-up), returns a flex-col div */
+    function vCards(cardArr, faceDown, w, h, gap){
+      var col=document.createElement('div');
+      col.style.cssText='display:flex;flex-direction:column;align-items:center;gap:'+(gap||2)+'px;';
+      cardArr.forEach(function(c){col.appendChild(_cardEl(faceDown?null:c,w,h,faceDown));});
+      return col;
+    }
+    /* helper: horizontal card row */
+    function hCards(cardArr, faceDown, w, h, gap, onClick){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;flex-direction:row;align-items:center;gap:'+(gap||3)+'px;flex-wrap:wrap;justify-content:center;';
+      cardArr.forEach(function(c){
+        var el=_cardEl(faceDown?null:c,w,h,faceDown);
+        if(onClick)onClick(el,c);
+        row.appendChild(el);
+      });
+      return row;
+    }
+    /* label */
+    function lbl(txt,color,size){
+      var d=document.createElement('div');
+      d.style.cssText='font-size:'+(size||10)+'px;font-weight:700;color:'+(color||'var(--muted)')+';text-transform:uppercase;letter-spacing:.5px;text-align:center;margin-bottom:2px;';
+      d.textContent=txt;return d;
+    }
+    /* section box */
+    function box(styles){var d=document.createElement('div');d.style.cssText=styles||'';return d;}
+
+    var wrap=box('display:flex;flex-direction:column;height:100%;width:100%;font-size:12px;user-select:none;');
+
+    /* ── NORTH: Pot info + game status ── */
+    var north=box('display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border);flex-shrink:0;gap:8px;');
+    var potInfo=box('display:flex;align-items:center;gap:10px;');
+    var potLbl=document.createElement('span');
+    potLbl.style.cssText='font-size:11px;color:var(--amber);font-weight:700;';
+    potLbl.textContent='🏆 Pot: 3 credits';
+    potInfo.appendChild(potLbl);
+    /* Stock count */
+    var stockLbl=document.createElement('span');stockLbl.style.cssText='font-size:10px;color:var(--muted);';
+    stockLbl.textContent='📦 Stock: '+stock.length;
+    potInfo.appendChild(stockLbl);
+    /* Turn indicator */
+    var turnLbl=document.createElement('span');
+    var tNames=['You','Neneng','Dodong'];
+    turnLbl.style.cssText='font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:rgba(124,58,237,.2);color:var(--accent2);';
+    turnLbl.textContent=gover?'Game Over':(pendingDraw?'⚔️ Draw Challenge':tNames[turn]+'\'s turn');
+    potInfo.appendChild(turnLbl);
+    north.appendChild(potInfo);
+    /* DW */
+    var dwLbl=document.createElement('span');dwLbl.style.cssText='font-size:11px;color:var(--muted);';
+    dwLbl.textContent='Your DW: '+deadwood(hands[0]);
+    north.appendChild(dwLbl);
+    /* Sort button */
+    var sortBtn=document.createElement('button');sortBtn.className='btn btn-outline';
+    sortBtn.style.cssText='font-size:10px;padding:3px 8px;';
+    sortBtn.textContent='Sort: '+(sortMode==='face'?'By Face':'By Order');
+    sortBtn.onclick=function(){sortMode=sortMode==='face'?'order':'face';selectedCards=new Set();render();};
+    north.appendChild(sortBtn);
+    wrap.appendChild(north);
+
+    /* ── MIDDLE ROW: West | Center | East ── */
+    var middle=box('display:flex;flex:1;overflow:hidden;min-height:0;');
+
+    /* ── WEST: Neneng (hands[1]) ── */
+    var west=box('display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 6px;background:rgba(239,68,68,.04);border-right:1px solid var(--border);flex-shrink:0;width:80px;overflow:hidden;');
+    var nenActive=turn===1;
+    west.appendChild(lbl('Neneng'+(nenActive?' ●':''),nenActive?'var(--accent)':'var(--muted)',9));
+    /* vertical face-down hand */
+    var nenHandCol=vCards(hands[1],true,32,46,2);
+    west.appendChild(nenHandCol);
+    /* exposed melds — vertical stacks */
+    if(allExposedMelds[1].length){
+      var nenExpLbl=document.createElement('div');nenExpLbl.style.cssText='font-size:8px;color:var(--green);font-weight:600;margin-top:4px;';
+      nenExpLbl.textContent='Melds';west.appendChild(nenExpLbl);
+      allExposedMelds[1].forEach(function(meld){
+        var ms=vCards(meld,false,28,40,1);ms.style.marginTop='2px';
+        west.appendChild(ms);
+      });
+    }
+    middle.appendChild(west);
+
+    /* ── CENTER ── */
+    var center=box('flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;min-width:0;');
+
+    /* Stock + Discard row */
+    var pilesRow=box('display:flex;gap:16px;align-items:flex-start;justify-content:center;');
+
+    /* Stock pile */
+    var sWrap=box('display:flex;flex-direction:column;align-items:center;gap:4px;');
+    var sLbl2=lbl('Stock ('+stock.length+')','var(--muted)',9);
+    var sEl=_cardEl(null,56,80,true);
+    if(turn===0&&!gover&&!pendingDraw&&!drawn){sEl.style.cursor='pointer';sEl.style.outline='2px solid var(--accent)';sEl.onclick=playerDraw;}
+    else{sEl.style.opacity='0.5';}
+    sWrap.appendChild(sLbl2);sWrap.appendChild(sEl);pilesRow.appendChild(sWrap);
+
+    /* Discard pile */
+    var dWrap2=box('display:flex;flex-direction:column;align-items:center;gap:4px;');
+    var dLbl2Span=document.createElement('div');dLbl2Span.style.cssText='font-size:9px;font-weight:700;color:var(--accent);cursor:pointer;text-decoration:underline;text-align:center;';
+    dLbl2Span.textContent='Discard ('+discardHistory.length+')';
+    dLbl2Span.onclick=function(){showDiscardPile=!showDiscardPile;render();};
+    var dEl2=discard.length?_cardEl(discard[discard.length-1],56,80):_cardEl(null,56,80,true);
+    if(chowOk){dEl2.style.cursor='pointer';dEl2.style.outline='3px solid var(--accent)';dEl2.onclick=playerChow;}
+    else if(turn===0&&!drawn&&!gover){dEl2.style.opacity='0.45';}
+    dWrap2.appendChild(dLbl2Span);dWrap2.appendChild(dEl2);
+    if(chowOk){var cHint=document.createElement('div');cHint.style.cssText='font-size:9px;color:var(--accent);font-weight:700;';cHint.textContent='✓ Chow';dWrap2.appendChild(cHint);}
+    pilesRow.appendChild(dWrap2);
+    center.appendChild(pilesRow);
+
+    /* Discard history popup */
+    if(showDiscardPile&&discardHistory.length){
+      var dpBox=box('background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;max-width:340px;max-height:200px;overflow-y:auto;');
+      var dpTitle=document.createElement('div');dpTitle.style.cssText='font-size:9px;color:var(--muted);margin-bottom:5px;cursor:pointer;font-weight:600;';
+      dpTitle.textContent='History ('+discardHistory.length+') — tap to close';dpTitle.onclick=function(){showDiscardPile=false;render();};
+      dpBox.appendChild(dpTitle);
+      var dpGrid=box('display:flex;gap:2px;flex-wrap:wrap;');
+      discardHistory.forEach(function(c){dpGrid.appendChild(_cardEl(c,26,36));});
+      dpBox.appendChild(dpGrid);center.appendChild(dpBox);
+    }
+
+    /* AI draw challenge */
+    if(pendingDraw&&pendingDraw.caller!==0){
+      var cb=box('background:rgba(253,203,110,.12);border:1px solid rgba(253,203,110,.3);border-radius:10px;padding:12px 16px;text-align:center;max-width:320px;');
+      var prot=isBurnProtected(0);
+      cb.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">'+tNames[pendingDraw.caller]+' calls DRAW (DW: '+pendingDraw.dw+')</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Your DW: '+deadwood(hands[0])+(prot?' ✅ Protected':'⚠️ No protection');
+      var br=box('display:flex;gap:8px;justify-content:center;');
+      var fb=document.createElement('button');fb.className='btn btn-primary';fb.style.fontSize='11px';fb.textContent='⚔️ Fight'+(prot?'':' (Burns!)');fb.onclick=function(){resolveFight(false);};
+      var fl=document.createElement('button');fl.className='btn btn-outline';fl.style.fontSize='11px';fl.textContent='🏳️ Fold';fl.onclick=function(){resolveFight(true);};
+      br.appendChild(fb);br.appendChild(fl);cb.appendChild(br);center.appendChild(cb);
+    }
+
+    /* Game over reveal */
+    if(gover){
+      var revRow=box('display:flex;gap:12px;justify-content:center;flex-wrap:wrap;');
+      [1,2].forEach(function(i){
+        var rb=box('text-align:center;');
+        rb.appendChild(lbl(tNames[i]+' DW:'+deadwood(hands[i]),'var(--muted)',9));
+        var rr=box('display:flex;gap:2px;justify-content:center;flex-wrap:wrap;');
+        hands[i].forEach(function(c){rr.appendChild(_cardEl(c,28,40));});
+        rb.appendChild(rr);revRow.appendChild(rb);
+      });
+      center.appendChild(revRow);
+      var nb=document.createElement('button');nb.className='btn btn-primary';nb.style.cssText='margin-top:10px;font-size:12px;';nb.textContent='New Game';nb.onclick=deal;center.appendChild(nb);
+    }
+
+    middle.appendChild(center);
+
+    /* ── EAST: Dodong (hands[2]) ── */
+    var east=box('display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px 6px;background:rgba(34,197,94,.04);border-left:1px solid var(--border);flex-shrink:0;width:80px;overflow:hidden;');
+    var dodActive=turn===2;
+    east.appendChild(lbl('Dodong'+(dodActive?' ●':''),dodActive?'var(--green)':'var(--muted)',9));
+    var dodHandCol=vCards(hands[2],true,32,46,2);
+    east.appendChild(dodHandCol);
+    if(allExposedMelds[2].length){
+      var dodExpLbl=document.createElement('div');dodExpLbl.style.cssText='font-size:8px;color:var(--green);font-weight:600;margin-top:4px;';
+      dodExpLbl.textContent='Melds';east.appendChild(dodExpLbl);
+      allExposedMelds[2].forEach(function(meld){
+        var ms=vCards(meld,false,28,40,1);ms.style.marginTop='2px';
+        east.appendChild(ms);
+      });
+    }
+    middle.appendChild(east);
+    wrap.appendChild(middle);
+
+    /* ── SOUTH: Player area ── */
+    var south=box('display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 12px;background:rgba(124,58,237,.04);border-top:1px solid var(--border);flex-shrink:0;');
+
+    /* Status hint */
+    var statusHint=document.createElement('div');statusHint.style.cssText='font-size:10px;color:var(--muted);text-align:center;min-height:14px;';
+    if(selArr.length>0){
+      statusHint.textContent=selArr.length===1
+        ?('1 raised — '+(drawn?'Discard, Meld, or Sapaw':'Draw first')+(selSapaw?' · Sapaw ready':''))
+        :(selArr.length+' raised — '+(selIsMeld?'✅ Valid meld!':'not a valid meld'));
+      statusHint.style.color=selIsMeld?'var(--green)':selSapaw?'var(--accent)':'var(--muted)';
+    } else if(gover){
+      statusHint.textContent='';
+    } else if(drawn){
+      statusHint.textContent='Tap a card to raise it → Discard, Meld, or Sapaw';
+    } else if(turn===0){
+      statusHint.textContent=chowOk?'Draw from stock or Chow the top discard':'Draw from stock';
+    } else {
+      statusHint.textContent=tNames[turn]+' is thinking…';
+    }
+    south.appendChild(statusHint);
+
+    /* Player exposed melds row */
+    if(allExposedMelds[0].length){
+      var expWrap=box('display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:4px 8px;background:rgba(37,211,102,.07);border:1px solid rgba(37,211,102,.2);border-radius:8px;width:100%;');
+      var expT=document.createElement('div');expT.style.cssText='width:100%;font-size:9px;color:var(--green);font-weight:600;';
+      expT.textContent='✅ Your Exposed Melds'+(playerGotSapawed?' · Sapawed':'');expWrap.appendChild(expT);
+      allExposedMelds[0].forEach(function(meld){
+        var mr=box('display:flex;gap:2px;');
+        meld.forEach(function(c){mr.appendChild(_cardEl(c,34,50));});
+        expWrap.appendChild(mr);
+      });
+      south.appendChild(expWrap);
+    }
+
+    /* Player hand — horizontal */
+    var hRow=box('display:flex;gap:3px;flex-wrap:wrap;justify-content:center;');
     sortHand(hands[0]).forEach(function(c){
       var isSel=selectedCards.has(c);
-      var isMelded=melded.has(c);
-      var ce=_cardEl(c,44,64);
-      ce.style.cssText+=';transition:transform .1s,box-shadow .1s;overflow:hidden';
-      if(isSel){ce.style.transform='translateY(-12px)';ce.style.boxShadow='0 6px 16px rgba(18,140,126,.5)';}
-      if(isMelded&&!isSel){ce.style.boxShadow='0 0 0 2px var(--green)';}
+      var isMelded2=melded.has(c);
+      var ce=_cardEl(c,44,66);
+      ce.style.transition='transform .1s,box-shadow .1s';
+      if(isSel){ce.style.transform='translateY(-12px)';ce.style.boxShadow='0 6px 18px rgba(124,58,237,.5)';}
+      if(isMelded2&&!isSel){ce.style.boxShadow='0 0 0 2px var(--green)';}
       if(turn===0&&!gover&&!pendingDraw){
         ce.style.cursor='pointer';
         (function(card){ce.onclick=function(){playerToggleCard(card);};})(c);
       }
       hRow.appendChild(ce);
     });
-    wrap.appendChild(hRow);
+    south.appendChild(hRow);
 
-    /* Action panel for selected cards — shows whenever cards are raised */
+    /* Action buttons for selected cards */
     if(selArr.length>0&&turn===0&&!gover&&!pendingDraw){
-      var actBox=document.createElement('div');
-      actBox.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;padding:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)';
-      /* Meld button — available pre and post draw */
+      var actBox=box('display:flex;gap:5px;justify-content:center;flex-wrap:wrap;padding:6px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);width:100%;');
       if(selArr.length>=3&&selIsMeld){
-        var meldBtn=document.createElement('button');meldBtn.className='btn btn-primary';meldBtn.style.cssText='font-size:10px;padding:5px 12px';
-        if(!drawn){meldBtn.disabled=true;meldBtn.title='Draw first before exposing a meld';}
+        var meldBtn=document.createElement('button');meldBtn.className='btn btn-primary';meldBtn.style.fontSize='10px';
+        if(!drawn){meldBtn.disabled=true;meldBtn.title='Draw first';}
         meldBtn.textContent='Expose Meld ('+selArr.length+')';meldBtn.onclick=playerConfirmMeld;actBox.appendChild(meldBtn);
       }
-      /* Sapaw button */
       if(selArr.length===1&&selSapaw){
-        var sapBtn=document.createElement('button');sapBtn.className='btn btn-outline';sapBtn.style.cssText='font-size:10px;padding:5px 12px';
+        var sapBtn=document.createElement('button');sapBtn.className='btn btn-outline';sapBtn.style.fontSize='10px';
         if(!drawn){sapBtn.disabled=true;sapBtn.title='Draw first';}
-        sapBtn.textContent='Sapaw → '+(selSapaw.owner===0?'your':AI[selSapaw.owner-1]+'\'s')+' meld';
+        sapBtn.textContent='Sapaw → '+(selSapaw.owner===0?'your':tNames[selSapaw.owner]+'\'s')+' meld';
         sapBtn.onclick=(function(t){return function(){playerConfirmSapaw(t);};})(selSapaw);actBox.appendChild(sapBtn);
       }
-      /* Discard button — only post draw */
       if(selArr.length===1&&drawn){
-        var discBtn=document.createElement('button');discBtn.className='btn btn-outline';discBtn.style.cssText='font-size:10px;padding:5px 12px';
+        var discBtn=document.createElement('button');discBtn.className='btn btn-outline';discBtn.style.fontSize='10px';
         discBtn.textContent='Discard '+selArr[0].v+selArr[0].s;discBtn.onclick=playerConfirmDiscard;actBox.appendChild(discBtn);
       }
-      /* Clear */
-      var clrBtn=document.createElement('button');clrBtn.className='btn btn-outline';clrBtn.style.cssText='font-size:10px;padding:5px 12px';
+      var clrBtn=document.createElement('button');clrBtn.className='btn btn-outline';clrBtn.style.fontSize='10px';
       clrBtn.textContent='✕ Clear';clrBtn.onclick=function(){selectedCards=new Set();render();};actBox.appendChild(clrBtn);
-      wrap.appendChild(actBox);
+      south.appendChild(actBox);
     }
 
-    /* Action buttons — sort always visible, call draw when drawn */
-    if(!gover&&!pendingDraw){
-      var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:5px;justify-content:center;flex-wrap:wrap;margin-bottom:4px';
-      /* Sort — always available */
-      var sortBtn=document.createElement('button');sortBtn.className='btn btn-outline';sortBtn.style.cssText='font-size:10px;padding:3px 8px';
-      sortBtn.textContent='Sort: '+(sortMode==='face'?'By Face ▼':'By Order ▼');
-      sortBtn.onclick=function(){sortMode=sortMode==='face'?'order':'face';selectedCards=new Set();render();};
-      btnRow.appendChild(sortBtn);
-      /* Call Draw — valid at START of turn before drawing */
-      if(!drawn&&turn===0){
-        var canCall=!playerGotSapawed&&!didSapawThisTurn;
-        var callBtn=document.createElement('button');callBtn.className='btn btn-outline';callBtn.style.cssText='font-size:10px;padding:3px 8px';
-        callBtn.textContent='Call Draw';
-        var whyCant=didSapawThisTurn?'Did a Sapaw this turn':playerGotSapawed?'Your meld was sapawed':'';
-        if(!canCall){callBtn.disabled=true;callBtn.title=whyCant;}
-        callBtn.onclick=playerCallDraw;btnRow.appendChild(callBtn);
-      }
-      wrap.appendChild(btnRow);
+    /* Call Draw button */
+    if(!gover&&!pendingDraw&&!drawn&&turn===0){
+      var callBtn=document.createElement('button');callBtn.className='btn btn-outline';callBtn.style.cssText='font-size:10px;padding:3px 10px;';
+      var canCall=!playerGotSapawed&&!didSapawThisTurn;
+      callBtn.textContent='Call Draw';callBtn.disabled=!canCall;
+      if(!canCall)callBtn.title=didSapawThisTurn?'Did a Sapaw this turn':playerGotSapawed?'Your meld was sapawed':'';
+      callBtn.onclick=playerCallDraw;south.appendChild(callBtn);
     }
-    if(turn!==0&&!gover&&!pendingDraw){
-      var wait=document.createElement('div');wait.style.cssText='font-size:11px;color:var(--muted);text-align:center;margin-top:4px';
-      wait.textContent=AI[turn-1]+' is thinking…';wrap.appendChild(wait);
-    }
-    if(gover){
-      var showRow=document.createElement('div');showRow.style.cssText='display:flex;gap:8px;justify-content:center;margin:8px 0;flex-wrap:wrap';
-      [1,2].forEach(function(i){
-        var box=document.createElement('div');box.style.cssText='text-align:center';
-        var lbl2=document.createElement('div');lbl2.style.cssText='font-size:10px;color:var(--muted);margin-bottom:3px';lbl2.textContent=AI[i-1]+' DW:'+deadwood(hands[i]);
-        var row2=document.createElement('div');row2.style.cssText='display:flex;gap:2px;justify-content:center;flex-wrap:wrap';
-        hands[i].forEach(function(c){row2.appendChild(_cardEl(c,28,40));});
-        box.appendChild(lbl2);box.appendChild(row2);showRow.appendChild(box);
-      });
-      wrap.appendChild(showRow);
-      var nb=document.createElement('button');nb.className='btn btn-primary';nb.style.marginTop='8px';nb.textContent='New Game';nb.onclick=deal;wrap.appendChild(nb);
-    }
+
+    wrap.appendChild(south);
     C.innerHTML='';C.appendChild(wrap);
   }
 
@@ -2595,6 +2642,192 @@ function gamePoker(C){
   newGame();
 }
 
+/* ═══════════════════════════════════════════════════
+   CONTEXTO — Find the secret word by semantic similarity
+   Every word has a rank based on AI semantic similarity to the target.
+   Rank 1 = the answer. Guess words, use the ranks as clues.
+   Uses Anthropic API to score guesses.
+═══════════════════════════════════════════════════ */
+function gameContexto(C){
+  /* Word pool — secret word is chosen randomly from this list */
+  var WORD_POOL=[
+    'apple','beach','bridge','camera','castle','coffee','cotton','danger','desert','doctor',
+    'dragon','engine','fabric','family','finger','forest','garden','guitar','hammer','harbor',
+    'island','jacket','jungle','kitchen','ladder','lantern','market','mirror','monkey','mountain',
+    'museum','needle','orange','palace','pencil','pepper','pillow','planet','prison','rabbit',
+    'rocket','saddle','salmon','silver','spider','spring','station','storm','summer','sunset',
+    'temple','tennis','ticket','timber','toilet','tomato','tunnel','turtle','valley','village',
+    'violin','wallet','window','winter','wisdom','school','office','planet','bottle','butter',
+    'candle','canvas','carpet','carrot','ceiling','cement','cheese','cherry','chicken','circle',
+    'copper','corner','cotton','crayon','crown','curtain','cushion','dagger','dagger','diamond',
+    'dinner','dollar','donkey','drawer','driver','eagle','earth','eclipse','fabric','falcon',
+    'feather','fence','ferry','fibre','figure','filter','finger','flame','flavor','flower',
+    'folder','fossil','fountain','frame','frozen','future','galaxy','garage','glacier','glitter',
+    'glove','goddess','gravel','gravity','green','ground','harvest','helmet','highway','history',
+    'hollow','honey','horizon','horse','hunter','hurdle','iceberg','impact','infant','insect',
+    'jungle','keeper','kettle','kingdom','knight','lantern','lemon','letter','library','lighthouse',
+    'linen','locket','magnet','marble','meadow','medal','melody','mentor','meteor','midnight',
+    'mineral','mist','model','mortar','motion','mural','muscle','mystery','nectar','network',
+    'noble','noodle','normal','notion','number','object','ocean','officer','onion','oracle',
+    'origin','oxygen','oyster','painter','palace','panda','paper','parent','parrot','pasture',
+    'pattern','pebble','pelican','pepper','phantom','photo','pilgrim','pillar','piston','pixel',
+    'plague','planner','plastic','plateau','player','pocket','poison','pollen','porter','powder',
+    'powder','prince','profit','protein','puddle','puppet','python','quartz','queen','quest',
+    'radar','rainbow','ranger','rapids','raven','reader','realm','ribbon','riddle','ritual',
+    'river','rubber','runner','sample','sand','savage','scale','scene','screen','season',
+    'sector','shadow','shelter','shield','signal','silver','singer','sketch','skull','slate',
+    'sleeve','slider','slope','smoke','soldier','source','sparrow','spirit','sponge','square',
+    'stable','steam','steel','stitch','stone','stream','street','string','stripe','student',
+    'studio','subject','symbol','system','talent','tanker','target','terrace','theory','thread',
+    'throne','thunder','timber','timer','title','tower','trade','trail','treasure','treaty',
+    'trophy','tropic','turret','tycoon','umbrella','unique','valley','vampire','velvet','vendor',
+    'venom','vessel','victor','virtue','vision','visitor','volcano','voyage','warrior','weapon',
+    'weather','weaver','weight','whale','whisper','wicker','wizard','wonder','worker','wreath'
+  ];
+
+  var secret=WORD_POOL[Math.floor(Math.random()*WORD_POOL.length)];
+  var guesses=[]; /* [{word, rank, exact}] sorted by rank ascending */
+  var won=false;
+  var loading=false;
+  var inputEl,listEl,statusEl,guessCountEl;
+
+  /* Score a guess via Claude API */
+  async function scoreGuess(word){
+    if(loading)return;
+    word=word.trim().toLowerCase().replace(/[^a-z]/g,'');
+    if(!word){toast('Enter a word!');return;}
+    if(guesses.find(function(g){return g.word===word;})){toast('Already guessed "'+word+'"!');return;}
+    loading=true;renderLoading();
+    try{
+      var resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-20250514',
+          max_tokens:100,
+          system:'You are a semantic similarity scorer for a word guessing game. The secret word is "'+secret+'". The player will guess a word. You must respond with ONLY a JSON object like: {"rank":NUMBER} where NUMBER is an integer from 1 to 1000 representing how semantically similar the guess is to the secret word. Rank 1 = the secret word itself (exact match). Rank 2-10 = extremely close synonyms or directly related words. Rank 11-50 = closely related concepts. Rank 51-200 = somewhat related. Rank 201-500 = loosely related. Rank 501-1000 = barely related. Be consistent. No other text.',
+          messages:[{role:'user',content:'Score this guess: "'+word+'"'}]
+        })
+      });
+      var data=await resp.json();
+      var txt=data.content&&data.content[0]&&data.content[0].text||'';
+      var parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+      var rank=parseInt(parsed.rank)||999;
+      var exact=(word===secret||rank===1);
+      if(exact)rank=1;
+      guesses.push({word:word,rank:rank,exact:exact});
+      guesses.sort(function(a,b){return a.rank-b.rank;});
+      if(exact){won=true;SND.win();setScore(guesses.length+' guesses');saveScore('contexto',guesses.length,false);}
+    }catch(e){toast('Error scoring guess — check connection.');}
+    loading=false;
+    renderTable();
+  }
+
+  function rankColor(rank){
+    if(rank===1)return'#ffd700';
+    if(rank<=10)return'var(--green)';
+    if(rank<=50)return'#86efac';
+    if(rank<=200)return'var(--amber)';
+    if(rank<=500)return'#fb923c';
+    return'var(--red)';
+  }
+  function rankBar(rank){
+    var pct=Math.max(0,Math.min(100,Math.round((1000-rank)/10)));
+    return '<div style="width:80px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px;">'
+      +'<div style="width:'+pct+'%;height:100%;background:'+rankColor(rank)+';border-radius:3px;transition:width .3s;"></div></div>';
+  }
+
+  function renderLoading(){
+    if(statusEl)statusEl.textContent='Scoring…';
+    if(inputEl)inputEl.disabled=true;
+  }
+
+  function renderTable(){
+    if(statusEl)statusEl.textContent='';
+    if(inputEl){inputEl.disabled=false;inputEl.value='';inputEl.focus();}
+    if(guessCountEl)guessCountEl.textContent='Guesses: '+guesses.length;
+
+    if(!listEl)return;
+    listEl.innerHTML='';
+
+    if(won){
+      var winDiv=document.createElement('div');
+      winDiv.style.cssText='text-align:center;padding:20px;';
+      winDiv.innerHTML='<div style="font-size:36px;margin-bottom:8px">🎉</div>'
+        +'<div style="font-size:18px;font-weight:700;color:#ffd700;margin-bottom:4px">The word was: <strong>'+secret.toUpperCase()+'</strong></div>'
+        +'<div style="font-size:13px;color:var(--muted);margin-bottom:16px">Found in '+guesses.length+' guess'+(guesses.length!==1?'es':'')+'!</div>';
+      var newBtn=document.createElement('button');newBtn.className='btn btn-primary';newBtn.textContent='New Game';
+      newBtn.onclick=function(){gameContexto(C);};
+      winDiv.appendChild(newBtn);listEl.appendChild(winDiv);
+    }
+
+    guesses.forEach(function(g,i){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.05);'+(i===0?'background:rgba(255,255,255,.04);':'');
+      var numSpan=document.createElement('span');numSpan.style.cssText='font-size:10px;color:var(--muted2);width:24px;text-align:right;flex-shrink:0;';
+      numSpan.textContent=(i+1)+'.';
+      var wordSpan=document.createElement('span');wordSpan.style.cssText='font-size:14px;font-weight:700;flex:1;color:'+(g.exact?'#ffd700':'var(--text)')+';';
+      wordSpan.textContent=g.word+(g.exact?' 🎯':'');
+      var rankSpan=document.createElement('span');rankSpan.style.cssText='font-size:12px;font-weight:700;color:'+rankColor(g.rank)+';flex-shrink:0;min-width:50px;text-align:right;';
+      rankSpan.textContent='#'+g.rank;
+      var barDiv=document.createElement('div');barDiv.innerHTML=rankBar(g.rank)+'</div>';
+      row.appendChild(numSpan);row.appendChild(wordSpan);row.appendChild(rankSpan);row.appendChild(barDiv);
+      listEl.appendChild(row);
+    });
+
+    if(!guesses.length){
+      var hint=document.createElement('div');hint.style.cssText='text-align:center;padding:40px 20px;color:var(--muted);font-size:13px;';
+      hint.innerHTML='<div style="font-size:32px;margin-bottom:10px">🧠</div>'
+        +'<div style="font-weight:700;margin-bottom:6px">Find the secret word!</div>'
+        +'<div style="font-size:11px;line-height:1.6">Every word in the dictionary is secretly ranked by<br>semantic similarity to the target. Rank #1 = the answer.<br>Use the numbers as clues to guide your guesses.</div>';
+      listEl.appendChild(hint);
+    }
+  }
+
+  /* Build full-screen layout */
+  C.style.cssText='display:flex;flex-direction:column;height:100%;background:var(--surface);padding:0;';
+
+  /* Top bar */
+  var topBar=document.createElement('div');
+  topBar.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(0,0,0,.15);';
+  guessCountEl=document.createElement('span');guessCountEl.style.cssText='font-size:12px;color:var(--muted);';guessCountEl.textContent='Guesses: 0';
+  statusEl=document.createElement('span');statusEl.style.cssText='font-size:11px;color:var(--accent2);font-style:italic;';
+  var hintLbl=document.createElement('span');hintLbl.style.cssText='font-size:11px;color:var(--muted2);margin-left:auto;';
+  hintLbl.textContent='#1 = the secret word · lower = closer';
+  topBar.appendChild(guessCountEl);topBar.appendChild(statusEl);topBar.appendChild(hintLbl);
+  C.appendChild(topBar);
+
+  /* Input row */
+  var inputRow=document.createElement('div');
+  inputRow.style.cssText='display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;';
+  inputEl=document.createElement('input');
+  inputEl.type='text';inputEl.placeholder='Type a word and press Enter…';
+  inputEl.style.cssText='flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-family:var(--font);outline:none;';
+  inputEl.setAttribute('autocomplete','off');inputEl.setAttribute('spellcheck','false');
+  inputEl.addEventListener('keydown',function(e){if(e.key==='Enter')scoreGuess(inputEl.value);});
+  var submitBtn=document.createElement('button');submitBtn.className='btn btn-primary';
+  submitBtn.style.cssText='padding:10px 20px;font-size:13px;';submitBtn.textContent='Guess';
+  submitBtn.onclick=function(){scoreGuess(inputEl.value);};
+  var skipBtn=document.createElement('button');skipBtn.className='btn btn-outline';
+  skipBtn.style.cssText='padding:10px 14px;font-size:11px;';skipBtn.textContent='💡 Reveal';
+  skipBtn.title='Give up and reveal the word';
+  skipBtn.onclick=function(){
+    if(!confirm('Reveal the secret word?'))return;
+    won=true;
+    guesses.unshift({word:secret,rank:1,exact:true});
+    SND.wrong();renderTable();
+  };
+  inputRow.appendChild(inputEl);inputRow.appendChild(submitBtn);inputRow.appendChild(skipBtn);
+  C.appendChild(inputRow);
+
+  /* Guess list — scrollable */
+  listEl=document.createElement('div');
+  listEl.style.cssText='flex:1;overflow-y:auto;';
+  C.appendChild(listEl);
+
+  inputEl.focus();
+  renderTable();
+}
 </script>
 </body>
 </html>
