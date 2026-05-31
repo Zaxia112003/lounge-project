@@ -58,12 +58,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 /* modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--surface);border:1px solid var(--border2);border-radius:20px;width:min(96vw,780px);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6);}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;width:min(98vw,1100px);height:min(96vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6);}
 .modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .modal-title{font-family:var(--fd);font-size:15px;font-weight:700;}
 .score-chip{font-size:11px;color:var(--muted);padding:2px 8px;background:var(--surface2);border-radius:10px;}
 .modal-close{margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;padding:2px 6px;}
-.modal-body{padding:16px;overflow-y:auto;flex:1;}
+.modal-body{padding:20px 28px;overflow-y:auto;flex:1;display:flex;flex-direction:column;align-items:center;}
 /* buttons */
 .btn{font-family:var(--font);font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;padding:7px 14px;transition:opacity .15s,background .15s;}
 .btn-primary{background:var(--accent);color:#fff;border:none;}
@@ -437,7 +437,6 @@ function saveScore(gameId,score,higher){
    LAUNCH
 ═══════════════════════════════════════════════════ */
 function launchGame(id,title){
-  if(id==='voidhorizons'){window.location.href='rpg.html';return;}
   var cost=CARD_GAME_IDS.indexOf(id)>-1?CREDIT_COST_CARD:CREDIT_COST_NORMAL;
   spendCredit(cost,function(){
     openModal(id,title);
@@ -467,7 +466,6 @@ function renderGrid(){
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
     {id:'pusoy',e:'🂢',n:'Pusoy Dos',d:'Big Two vs 3 AI · 3 credits',card:true},
     {id:'tongits',e:'🀄',n:'Tong Its',d:'Filipino card game vs 2 AI · 3 credits',card:true},
-    {id:'voidhorizons',e:'📖',n:'Void Horizons',d:'Your character · stats · equipment',rpg:true},
   ];
   var multi=[
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base · 1 credit'},
@@ -475,19 +473,6 @@ function renderGrid(){
   ];
   function makeTile(g,mp){
     var div=document.createElement('div');
-    if(g.rpg){
-      if(!cu||cu.role!=='manager') return null;
-      div.className='tile';
-      div.style.cssText='border-color:rgba(201,168,76,.35);background:linear-gradient(135deg,rgba(201,168,76,.06),transparent);';
-      div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
-        +'<div class="tile-name">'+g.n
-        +'<span class="badge" style="background:rgba(201,168,76,.15);color:#c9a84c;margin-left:4px;">RPG</span>'
-        +'<span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444;margin-left:4px;">DEV</span></div>'
-        +'<div class="tile-desc">'+g.d+'</div>'
-        +'<div style="font-size:10px;color:rgba(201,168,76,.6);margin-top:6px;letter-spacing:.5px;">Opens Void Horizons ↗</div>';
-      div.addEventListener('click',(function(id,title){return function(){launchGame(id,title);};})(g.id,g.e+' '+g.n));
-      return div;
-    }
     div.className='tile'+(mp?' multi':'')+(g.card?' card-tile':'');
     div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
       +'<div class="tile-name">'+g.n+'<span class="badge '+(mp?'multi-b':'solo-b')+'">'+(mp?'Multi':'Solo')+'</span></div>'
@@ -497,7 +482,7 @@ function renderGrid(){
   }
   var sg=G('solo-grid'),mg=G('multi-grid');
   sg.innerHTML='';mg.innerHTML='';
-  solo.forEach(function(g){var t=makeTile(g,false);if(t)sg.appendChild(t);});
+  solo.forEach(function(g){sg.appendChild(makeTile(g,false));});
   multi.forEach(function(g){mg.appendChild(makeTile(g,true));});
 }
 
