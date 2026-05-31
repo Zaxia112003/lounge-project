@@ -6560,6 +6560,13 @@ function ratingsSaveBands(){
     var val=parseFloat(inp.value)||0;
     ratingsState.bands[metric][r][pos]=val;
   });
+  /* Ensure min <= max on every band row (swap if user entered them reversed) */
+  Object.keys(ratingsState.bands).forEach(function(metric){
+    for(var r=1;r<=5;r++){
+      var b=ratingsState.bands[metric][r];
+      if(b&&b[0]>b[1]){var tmp=b[0];b[0]=b[1];b[1]=tmp;}
+    }
+  });
   ratingsCloseBands();
   renderRatingsTable();
 }
@@ -6876,6 +6883,13 @@ function escRatingsSaveBands(){
     var metric=inp.dataset.emetric,r=parseInt(inp.dataset.er),pos=parseInt(inp.dataset.epos);
     if(!escRatingsState.bands[metric])return; /* skip unknown keys */
     escRatingsState.bands[metric][r][pos]=parseFloat(inp.value)||0;
+  });
+  /* Ensure min <= max on every band row */
+  Object.keys(escRatingsState.bands).forEach(function(metric){
+    for(var r=1;r<=5;r++){
+      var b=escRatingsState.bands[metric][r];
+      if(b&&b[0]>b[1]){var tmp=b[0];b[0]=b[1];b[1]=tmp;}
+    }
   });
   escRatingsCloseBands();
   renderEscRatingsTable();
