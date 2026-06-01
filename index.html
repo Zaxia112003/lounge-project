@@ -1679,6 +1679,9 @@ function fsStartRealtimeListeners(){
     if(G('daily-tbl'))renderDailyTbl();
     if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
     if(G('mgr-kpi-card'))renderMgrKpiCard();
+    if(G('mgr-error-trend'))renderMgrErrorTrend();
+    if(G('my-day-stats-strip'))renderMyDayStatsStrip();
+    if(G('my-day-errors-card'))renderMyDayErrors();
   }));
 
   /* perfData */
@@ -1691,6 +1694,10 @@ function fsStartRealtimeListeners(){
     if(G('kpi-grid'))renderDashboard();
     if(G('team-tbl'))renderTeamOverview();
     if(G('mgr-kpi-card'))renderMgrKpiCard();
+    if(G('mgr-upload-trend'))renderMgrUploadTrend();
+    if(G('mgr-error-trend'))renderMgrErrorTrend();
+    if(G('my-day-trend-card'))renderMyDayTrend();
+    if(G('my-day-stats-strip'))renderMyDayStatsStrip();
   }));
 
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'avatars'),function(snap){
