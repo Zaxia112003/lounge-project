@@ -3902,7 +3902,15 @@ function renderMyDay(){
   }
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
-  if(cu&&!isManager){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();renderMyDayStatsStrip();renderMyDayTrend();renderMyDayErrors();},50);setTimeout(function(){showKobyMoodBubble();},1500);}
+  if(cu&&!isManager){
+    var _isEsc=cu.role==='escalation';
+    setTimeout(function(){
+      renderKCTile();kcUpdateBanner();renderMoodTile();
+      if(_isEsc){renderMyDayEscStatsStrip();renderMyDaySlaTrend();renderMyDayErrors();}
+      else{renderMyDayStatsStrip();renderMyDayTrend();renderMyDayErrors();}
+    },50);
+    setTimeout(function(){showKobyMoodBubble();},1500);
+  }
   startClock();
 }
 
@@ -4476,6 +4484,120 @@ function renderMyDayErrors(){
     h+='</div>';
   });
   h+='<button onclick="openNotifBell()" style="width:100%;font-size:10px;padding:4px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;margin-top:2px">View all</button>';
+  el.innerHTML=h;
+}
+
+/* ── ESCALATION My Day tiles ── */
+
+function renderMyDayEscStatsStrip(){
+  var el=G('my-day-stats-strip');if(!el||!cu)return;
+  var nick=cu.nickname;
+  var latest=getLatestSLA();
+  var slaPct=latest?latest.pct:null;
+  var slaColor=slaPct===null?'var(--muted)':(slaPct>=75?'var(--green)':'var(--red)');
+  var slaSub=slaPct===null?'No data yet':(slaPct>=75?'&#10003; On target':'&#9888; Below target');
+  /* Avg daily uploads */
+  var allUploads=Object.values(perfData[nick]||{});
+  var totalUpl=allUploads.reduce(function(a,d){return a+(d.uploadsTotal||0);},0);
+  var activeDays=Object.keys(perfData[nick]||{}).length||1;
+  var avgDailyUpl=totalUpl>0?(totalUpl/activeDays).toFixed(1):'—';
+  /* Pending escalations in queue */
+  var pendingEsc=(callouts||[]).filter(function(c){
+    return (c.type==='qesc'||c.type==='qesc_esc')&&c.escalationMember===nick&&c.status==='Pending';
+  }).length;
+  var pendColor=pendingEsc>0?'var(--amber)':'var(--text)';
+  var h='';
+  h+='<div class="sect-head" style="padding:0 0 8px">';
+  h+='<span class="sect-title">&#9889; Today&#39;s performance</span>';
+  h+='<span style="font-size:10px;color:var(--muted2)">Live</span>';
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#127919; Latest SLA</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:'+slaColor+'">'+(slaPct!==null?slaPct+'%':'—')+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">'+slaSub+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128228; Avg uploads</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+avgDailyUpl+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">per active day</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128276; Pending</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:'+pendColor+'">'+pendingEsc+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">escalations</div>';
+  h+='</div></div>';
+  el.innerHTML=h;
+}
+
+function renderMyDaySlaTrend(){
+  var el=G('my-day-trend-card');if(!el)return;
+  var today=getSydneyDate();
+  /* Build last 7 days from slaLog */
+  var dayLabels=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var days=[];
+  for(var i=6;i>=0;i--){
+    var d=new Date(today.getTime()-i*86400000);
+    var key=d.toISOString().slice(0,10);
+    var entry=(slaLog||[]).find(function(e){return e.date===key;});
+    days.push({label:i===0?'Today':dayLabels[d.getDay()].slice(0,1),pct:entry?entry.pct:null,isToday:i===0});
+  }
+  var defined=days.filter(function(d){return d.pct!==null;});
+  var avg=defined.length?Math.round(defined.reduce(function(s,d){return s+d.pct;},0)/defined.length):null;
+  var target=75;
+  /* SVG layout */
+  var W=220,H=90,PAD_L=6,PAD_R=6,PAD_TOP=18,PAD_BOT=24;
+  var chartW=W-PAD_L-PAD_R,chartH=H-PAD_TOP-PAD_BOT;
+  /* Scale: 0–100% */
+  var maxVal=100;
+  var barW=Math.floor((chartW-6*5)/7),gap=5;
+  var pts=[],svgParts='';
+  /* Target dashed line */
+  var targetY=PAD_TOP+chartH-Math.round((target/maxVal)*chartH);
+  svgParts+='<line x1="'+PAD_L+'" y1="'+targetY+'" x2="'+(W-PAD_R)+'" y2="'+targetY+'" stroke="var(--red)" stroke-width="0.7" stroke-dasharray="3,2" opacity="0.6"/>';
+  svgParts+='<text x="'+(W-PAD_R-2)+'" y="'+(targetY-2)+'" font-size="6" fill="var(--red)" text-anchor="end" opacity="0.8">'+target+'%</text>';
+  days.forEach(function(d,i){
+    var x=PAD_L+i*(barW+gap);
+    if(d.pct!==null){
+      var bh=Math.max(2,Math.round((d.pct/maxVal)*chartH));
+      var barY=PAD_TOP+chartH-bh;
+      var aboveTarget=d.pct>=target;
+      var fill=d.isToday?'#534AB7':'#AFA9EC';
+      var fillTop=d.isToday?'#7C6FD4':'#C8C4F0';
+      var opacity=d.isToday?'1':(aboveTarget?'0.7':'0.5');
+      svgParts+='<rect x="'+x+'" y="'+barY+'" width="'+barW+'" height="'+bh+'" rx="2" fill="'+fill+'" opacity="'+opacity+'"/>';
+      svgParts+='<rect x="'+x+'" y="'+barY+'" width="'+barW+'" height="2" rx="1" fill="'+fillTop+'" opacity="'+(d.isToday?'1':'0.8')+'"/>';
+      var labelY=barY-3;
+      var labelColor=d.isToday?'var(--text)':(aboveTarget?'var(--muted)':'var(--red)');
+      svgParts+='<text x="'+(x+barW/2)+'" y="'+labelY+'" text-anchor="middle" font-size="7" fill="'+labelColor+'" font-weight="'+(d.isToday?700:400)+'">'+d.pct+'%</text>';
+      pts.push([x+barW/2,barY]);
+    } else {
+      svgParts+='<rect x="'+x+'" y="'+(PAD_TOP+chartH-2)+'" width="'+barW+'" height="2" rx="1" fill="var(--border)" opacity="0.5"/>';
+      pts.push(null);
+    }
+    svgParts+='<text x="'+(x+barW/2)+'" y="'+(PAD_TOP+chartH+12)+'" text-anchor="middle" font-size="7.5" fill="'+(d.isToday?'var(--text)':'var(--muted2)')+'" font-weight="'+(d.isToday?700:400)+'">'+d.label+'</text>';
+  });
+  /* Trend line — only connect defined points */
+  var validPts=pts.filter(function(p){return p!==null;});
+  if(validPts.length>1){
+    svgParts+='<polyline points="'+validPts.map(function(p){return p[0]+','+p[1];}).join(' ')+'" fill="none" stroke="#EF9F27" stroke-width="2" stroke-linejoin="miter" stroke-linecap="square" opacity="1"/>';
+    validPts.forEach(function(p,i){
+      var isLast=i===validPts.length-1;
+      svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(isLast?3.5:2.5)+'" fill="#EF9F27"/>';
+      if(isLast){svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.5" fill="var(--surface)"/>';}
+    });
+  }
+  /* Baseline */
+  svgParts+='<line x1="'+PAD_L+'" y1="'+(PAD_TOP+chartH)+'" x2="'+(W-PAD_R)+'" y2="'+(PAD_TOP+chartH)+'" stroke="var(--border)" stroke-width="0.5"/>';
+  var h='';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h+='<span style="font-size:11px;font-weight:600;color:var(--text)">&#128202; SLA trend</span>';
+  h+='<span style="font-size:10px;color:'+(avg!==null?(avg>=target?'var(--green)':'var(--red)'):'var(--muted)')+';font-weight:600">'+(avg!==null?'avg '+avg+'%':'No data')+'</span></div>';
+  h+='<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" style="overflow:visible;display:block">'+svgParts+'</svg>';
+  h+='<div style="display:flex;gap:8px;margin-top:4px;align-items:center">';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:12px;height:2px;background:#EF9F27;vertical-align:middle"></span> trend</span>';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:14px;height:1px;border-top:1.5px dashed var(--red);vertical-align:middle"></span> '+target+'% target</span>';
+  h+='</div>';
   el.innerHTML=h;
 }
 
