@@ -3865,6 +3865,20 @@ function renderMyDay(){
     /* Manager: KPI quick view */
     +(isManager?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>':'')
 
+
+    /* NEW: Today's stats strip */
+    +(cu&&!isManager?'<div id="my-day-stats-strip" class="sect" style="padding:12px 14px 14px"></div>':'')
+
+
+    /* NEW: Trend + Error reviews side by side */
+    +(cu&&!isManager
+      ?'<div class="sect" style="padding:12px 14px 14px">'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+        +'<div id="my-day-trend-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:160px"></div>'
+        +'<div id="my-day-errors-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:160px"></div>'
+        +'</div></div>'
+      :'')
+
     /* Knowledge Check — compact horizontal strip (non-manager) */
     +(cu&&!isManager
       ?'<div class="sect" style="padding:0;margin-bottom:14px;overflow:visible">'
@@ -3875,6 +3889,7 @@ function renderMyDay(){
         +'<div id="kc-tile-body"></div>'
         +'</div>'
       :'')
+
   ;
 
 
@@ -3887,7 +3902,7 @@ function renderMyDay(){
   }
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
-  if(cu&&!isManager){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();},50);setTimeout(function(){showKobyMoodBubble();},1500);}
+  if(cu&&!isManager){setTimeout(function(){renderKCTile();kcUpdateBanner();renderMoodTile();renderMyDayStatsStrip();renderMyDayTrend();renderMyDayErrors();},50);setTimeout(function(){showKobyMoodBubble();},1500);}
   startClock();
 }
 
@@ -4305,6 +4320,163 @@ function moodLoadAggregate(cb){
 function renderMoodTile(){
   /* Mood tile is now handled by Koby bubble — see showKobyMoodBubble() */
   var el=G('mood-tile-body');if(el)el.innerHTML='';
+}
+
+/* ══════════════════════════════════════════════
+   MY DAY — NEW TILES (uploader only)
+══════════════════════════════════════════════ */
+
+function renderMyDayStatsStrip(){
+  var el=G('my-day-stats-strip');if(!el||!cu)return;
+  var nick=cu.nickname;
+  var todayKey=getSydneyDate().toISOString().slice(0,10);
+  var todayData=(perfData[nick]&&perfData[nick][todayKey])||{uploadsTotal:0};
+  var uploads=todayData.uploadsTotal||0;
+  var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&c.date===todayKey&&c.status!=='discarded';}).length;
+  var escalations=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&c.date===todayKey;}).length;
+  var dd=uploads>0?Math.round((errors+escalations)/uploads*10000)/10:null;
+  var ddColor=dd===null?'var(--muted)':(dd<=2?'var(--green)':dd<=5?'var(--amber)':'var(--red)');
+  var errColor=errors>0?'var(--red)':'var(--text)';
+  var h='';
+  h+='<div class="sect-head" style="padding:0 0 8px">';
+  h+='<span class="sect-title">&#9889; Today&#39;s performance</span>';
+  h+='<span style="font-size:10px;color:var(--muted2)">Live</span>';
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">📤 Uploads</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+uploads+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">⚠️ Errors today</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:'+errColor+'">'+errors+'</div>';
+  if(errors>0){h+='<div style="font-size:10px;color:var(--muted2)">pending review</div>';}
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">🔬 Defect density</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:'+ddColor+'">'+(dd!==null?dd:'—')+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">per 1&#8239;000</div>';
+  h+='</div></div>';
+  el.innerHTML=h;
+}
+
+function renderMyDayTrend(){
+  var el=G('my-day-trend-card');if(!el||!cu)return;
+  var nick=cu.nickname;
+  var today=getSydneyDate();
+  var dayLabels=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var days=[];
+  for(var i=6;i>=0;i--){
+    var d=new Date(today.getTime()-i*86400000);
+    var key=d.toISOString().slice(0,10);
+    var uploads=(perfData[nick]&&perfData[nick][key]&&perfData[nick][key].uploadsTotal)||0;
+    days.push({label:i===0?'Today':dayLabels[d.getDay()].slice(0,3),uploads:uploads,isToday:i===0});
+  }
+  var maxVal=Math.max.apply(null,days.map(function(d){return d.uploads;}));
+  if(maxVal===0){maxVal=1;}
+  var avg=Math.round(days.reduce(function(s,d){return s+d.uploads;},0)/7);
+
+  /* SVG layout */
+  var W=220, H=90;
+  var PAD_L=6, PAD_R=6, PAD_TOP=18, PAD_BOT=24;
+  var chartW=W-PAD_L-PAD_R;
+  var chartH=H-PAD_TOP-PAD_BOT;
+  var barW=Math.floor((chartW-6*5)/7); /* 7 bars, 6 gaps of 5px */
+  var gap=5;
+  var pts=[];
+  var svgParts='';
+
+  days.forEach(function(d,i){
+    var bh=Math.max(2,Math.round((d.uploads/maxVal)*chartH));
+    var x=PAD_L+i*(barW+gap);
+    var barY=PAD_TOP+chartH-bh;
+    var isToday=d.isToday;
+
+    /* Bar with gradient effect via two rects */
+    svgParts+='<rect x="'+x+'" y="'+barY+'" width="'+barW+'" height="'+bh+'" rx="2"'
+      +' fill="'+(isToday?'#534AB7':'#AFA9EC')+'" opacity="'+(isToday?'1':'0.7')+'"/>';
+    /* Highlight top edge for sharpness */
+    svgParts+='<rect x="'+x+'" y="'+barY+'" width="'+barW+'" height="2" rx="1"'
+      +' fill="'+(isToday?'#7C6FD4':'#C8C4F0')+'" opacity="'+(isToday?'1':'0.8')+'"/>';
+
+    /* Daily upload count above bar */
+    if(d.uploads>0){
+      svgParts+='<text x="'+(x+barW/2)+'" y="'+(barY-3)+'" text-anchor="middle" font-size="7"'
+        +' fill="'+(isToday?'var(--text)':'var(--muted)')+'" font-weight="'+(isToday?700:400)+'">'+d.uploads+'</text>';
+    }
+
+    /* Day label below */
+    svgParts+='<text x="'+(x+barW/2)+'" y="'+(PAD_TOP+chartH+12)+'" text-anchor="middle" font-size="7.5"'
+      +' fill="'+(isToday?'var(--text)':'var(--muted2)')+'" font-weight="'+(isToday?700:400)+'">'
+      +(isToday?'Now':d.label.slice(0,1))+'</text>';
+
+    pts.push([x+barW/2, barY]);
+  });
+
+  /* Trend line — sharp straight segments */
+  svgParts+='<polyline points="'+pts.map(function(p){return p[0]+','+p[1];}).join(' ')+'"'
+    +' fill="none" stroke="#EF9F27" stroke-width="2" stroke-linejoin="miter" stroke-linecap="square" opacity="1"/>';
+
+  /* Dots on trend line */
+  pts.forEach(function(p,i){
+    var r=i===6?3.5:2.5;
+    svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="#EF9F27"/>';
+    /* White center on last dot (today) */
+    if(i===6){svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.5" fill="var(--surface)"/>';}
+  });
+
+  /* Baseline */
+  svgParts+='<line x1="'+PAD_L+'" y1="'+(PAD_TOP+chartH)+'" x2="'+(W-PAD_R)+'" y2="'+(PAD_TOP+chartH)+'"'
+    +' stroke="var(--border)" stroke-width="0.5"/>';
+
+  var h='';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h+='<span style="font-size:11px;font-weight:600;color:var(--text)">📈 Upload trend</span>';
+  h+='<span style="font-size:10px;color:var(--green);font-weight:600">avg '+avg+'/day</span></div>';
+  h+='<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" style="overflow:visible;display:block">'+svgParts+'</svg>';
+  h+='<div style="display:flex;gap:8px;margin-top:4px;align-items:center">';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px">';
+  h+='<span style="display:inline-block;width:12px;height:2px;background:#EF9F27;vertical-align:middle"></span> trend</span>';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px">';
+  h+='<span style="display:inline-block;width:10px;height:8px;background:#534AB7;border-radius:1px;vertical-align:middle;opacity:.85"></span> today</span></div>';
+  el.innerHTML=h;
+}
+
+function renderMyDayErrors(){
+  var el=G('my-day-errors-card');if(!el||!cu)return;
+  var nick=cu.nickname;
+  var myReviews=(window._pendingReviews||[]).filter(function(r){return r.uploader===nick;});
+  var pending=myReviews.filter(function(r){return r.status==='pending_review';});
+  var total=myReviews.length;
+  var h='';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  h+='<span style="font-size:11px;font-weight:600;color:var(--text)">🔍 Error reviews</span>';
+  if(total>0){
+    var bc=pending.length>0?'var(--red)':'var(--muted)';
+    var bb=pending.length>0?'rgba(239,68,68,.12)':'var(--bg2)';
+    h+='<span style="font-size:10px;padding:2px 6px;border-radius:20px;background:'+bb+';color:'+bc+';font-weight:600">'+total+'</span>';
+  }
+  h+='</div>';
+  if(total===0){
+    h+='<div style="text-align:center;padding:20px 0;color:var(--muted2);font-size:11px">✅ No active reviews</div>';
+    el.innerHTML=h;return;
+  }
+  myReviews.slice(0,3).forEach(function(r){
+    var isPending=r.status==='pending_review';
+    var isAcked=r.status==='acknowledged';
+    var borderColor=isPending?'var(--red)':'var(--accent2)';
+    var statusLabel=isPending?'Pending':isAcked?'Acknowledged':'Resolved';
+    var statusColor=isPending?'var(--amber)':isAcked?'var(--accent2)':'var(--green)';
+    var raw=(r.note||r.description||'Error review')+'';
+    var title=raw.length>28?raw.slice(0,28)+'…':raw;
+    var dateStr=(r.date||'').slice(0,10);
+    h+='<div style="padding:6px 8px;background:var(--bg2);border-left:2.5px solid '+borderColor+';border-radius:0 4px 4px 0;margin-bottom:5px">';
+    h+='<div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+title+'</div>';
+    h+='<div style="font-size:10px;color:var(--muted2);margin-top:1px">'+dateStr+' &middot; <span style="color:'+statusColor+'">'+statusLabel+'</span></div>';
+    h+='</div>';
+  });
+  h+='<button onclick="openNotifBell()" style="width:100%;font-size:10px;padding:4px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;margin-top:2px">View all</button>';
+  el.innerHTML=h;
 }
 
 function showKobyMoodBubble(){
