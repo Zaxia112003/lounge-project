@@ -445,6 +445,19 @@ function saveScore(gameId,score,higher){
 function launchGame(id,title){
   var cost=CARD_GAME_IDS.indexOf(id)>-1?CREDIT_COST_CARD:CREDIT_COST_NORMAL;
   spendCredit(cost,function(){
+    /* Track play count */
+    if(db&&cu){
+      var playRef=db.collection('game_plays').doc(id);
+      playRef.get().then(function(snap){
+        var data=snap.exists?snap.data():{totalPlays:0,players:{}};
+        var nick=cu.nickname;
+        var newTotal=(data.totalPlays||0)+1;
+        var playerCount=(data.players&&data.players[nick]||0)+1;
+        var update={totalPlays:newTotal,lastPlayedAt:Date.now()};
+        update['players.'+nick]=playerCount;
+        playRef.set(update,{merge:true}).catch(function(){});
+      }).catch(function(){});
+    }
     openModal(id,title);
     setTimeout(function(){
       ensureAudio();
@@ -479,19 +492,46 @@ function renderGrid(){
     {id:'uno',e:'🃏',n:'UNO',d:'2–4 players · mix humans & AI · 1 credit'},
     {id:'tongits',e:'🀄',n:'Tong Its',d:'Multiplayer · 3 players · 3 credits',card:true},
   ];
+  var allGames=solo.concat(multi);
+  var playCounts={}; /* id → {total, mine} */
+
   function makeTile(g,mp){
     var div=document.createElement('div');
     div.className='tile'+(mp?' multi':'')+(g.card?' card-tile':'');
+    var pc=playCounts[g.id]||{total:0};
+    var playBadge=pc.total>0
+      ?'<div style="font-size:10px;color:var(--muted2);margin-top:5px">'+pc.total.toLocaleString()+' times played</div>'
+      :'';
     div.innerHTML='<div class="tile-icon">'+g.e+'</div>'
       +'<div class="tile-name">'+g.n+'<span class="badge '+(mp?'multi-b':'solo-b')+'">'+(mp?'Multi':'Solo')+'</span></div>'
-      +'<div class="tile-desc">'+g.d+'</div>';
+      +'<div class="tile-desc">'+g.d+'</div>'
+      +playBadge;
     div.addEventListener('click',(function(id,title){return function(){launchGame(id,title);};})(g.id,g.e+' '+g.n));
     return div;
   }
-  var sg=G('solo-grid'),mg=G('multi-grid');
-  sg.innerHTML='';mg.innerHTML='';
-  solo.forEach(function(g){sg.appendChild(makeTile(g,false));});
-  multi.forEach(function(g){mg.appendChild(makeTile(g,true));});
+
+  function buildTiles(){
+    var sg=G('solo-grid'),mg=G('multi-grid');
+    sg.innerHTML='';mg.innerHTML='';
+    solo.forEach(function(g){sg.appendChild(makeTile(g,false));});
+    multi.forEach(function(g){mg.appendChild(makeTile(g,true));});
+  }
+
+  /* Load play counts from Firestore then render */
+  buildTiles(); /* render immediately without counts */
+  if(db){
+    Promise.all(allGames.map(function(g){
+      return db.collection('game_plays').doc(g.id).get()
+        .then(function(snap){
+          if(snap.exists){
+            var d=snap.data();
+            playCounts[g.id]={total:d.totalPlays||0};
+          }
+        }).catch(function(){});
+    })).then(function(){
+      buildTiles(); /* re-render with counts */
+    });
+  }
 }
 
 function renderCardLock(){/* no-op — locked section removed */}
