@@ -3865,6 +3865,9 @@ function renderMyDay(){
     /* Manager: KPI quick view */
     +(isManager?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>':'')
 
+    /* Manager: 14-day team charts */
+    +(isManager?'<div class="sect" style="padding:12px 14px 14px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div id="mgr-upload-trend" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:160px"></div><div id="mgr-error-trend" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:160px"></div></div></div>':'')
+
 
     /* NEW: Today's stats strip */
     +(cu&&!isManager?'<div id="my-day-stats-strip" class="sect" style="padding:12px 14px 14px"></div>':'')
@@ -3898,7 +3901,7 @@ function renderMyDay(){
   if(mdAnnouncements.length>0&&_prevAnnCount===0){_playAnnouncementSound();}
   if(isManager){
     renderMgrKpiCard();
-    setTimeout(function(){renderMgrMoodOverview();},50);
+    setTimeout(function(){renderMgrMoodOverview();renderMgrUploadTrend();renderMgrErrorTrend();},50);
   }
   credRecalcFromUploads();
   setTimeout(updateCreditBadge,100);
@@ -4648,6 +4651,153 @@ function moodRespond(idx){
     var wrap=el.parentElement;
     if(wrap){wrap.style.transition='opacity .5s,max-height .5s';wrap.style.opacity='0';wrap.style.maxHeight='0';wrap.style.overflow='hidden';wrap.style.marginBottom='0';}
   },2500);
+}
+
+/* ══ MANAGER MY DAY — 14-day team charts ══ */
+
+function renderMgrUploadTrend(){
+  var el=G('mgr-upload-trend');if(!el)return;
+  var today=getSydneyDate();
+  var uploaders=TEAM.filter(function(t){return t.role&&(t.role==='uploader'||t.role==='escalation');});
+  /* Build last 14 days */
+  var days=[];
+  for(var i=13;i>=0;i--){
+    var d=new Date(today.getTime()-i*86400000);
+    var key=d.toISOString().slice(0,10);
+    var tot=uploaders.reduce(function(s,t){
+      return s+((perfData[t.nickname]&&perfData[t.nickname][key]&&perfData[t.nickname][key].uploadsTotal)||0);
+    },0);
+    days.push({key:key,tot:tot,isToday:i===0,dayNum:d.getDate()});
+  }
+  var maxVal=Math.max.apply(null,days.map(function(d){return d.tot;}));
+  if(maxVal===0)maxVal=1;
+  var avg=Math.round(days.reduce(function(s,d){return s+d.tot;},0)/14);
+  /* SVG */
+  var W=230,H=100,PL=22,PR=8,PT=18,PB=26;
+  var cW=W-PL-PR,cH=H-PT-PB;
+  var step=cW/13; /* 14 points, 13 gaps */
+  var pts=[];
+  var svgParts='';
+  /* Grid lines + Y labels */
+  var yTicks=[0,Math.round(maxVal*0.4),Math.round(maxVal*0.7),maxVal];
+  yTicks.forEach(function(v){
+    var y=PT+cH-Math.round((v/maxVal)*cH);
+    svgParts+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="var(--border)" stroke-width="0.4" opacity="0.5"/>';
+    svgParts+='<text x="'+(PL-2)+'" y="'+(y+2)+'" font-size="6" fill="var(--muted2)" text-anchor="end">'+( v>=1000?(v/1000).toFixed(1)+'k':v)+'</text>';
+  });
+  days.forEach(function(d,i){
+    var x=PL+Math.round(i*step);
+    var y=PT+cH-Math.max(1,Math.round((d.tot/maxVal)*cH));
+    pts.push([x,y,d]);
+  });
+  /* Area fill */
+  var areaPoints=pts.map(function(p){return p[0]+','+p[1];}).join(' ');
+  var areaClose=(W-PR)+','+(PT+cH)+' '+PL+','+(PT+cH);
+  svgParts+='<polygon points="'+areaPoints+' '+areaClose+'" fill="#534AB7" opacity="0.07"/>';
+  /* Line */
+  svgParts+='<polyline points="'+areaPoints+'" fill="none" stroke="#534AB7" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
+  /* Dots */
+  pts.forEach(function(p,i){
+    var isT=p[2].isToday;
+    svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(isT?3.5:1.8)+'" fill="#534AB7" opacity="'+(isT?1:0.5)+'"/>';
+    if(isT){
+      svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.5" fill="var(--surface)"/>';
+      svgParts+='<text x="'+p[0]+'" y="'+(p[1]-5)+'" font-size="7" fill="var(--text)" text-anchor="middle" font-weight="700">'+(p[2].tot>=1000?(p[2].tot/1000).toFixed(1)+'k':p[2].tot)+'</text>';
+    }
+  });
+  /* Baseline */
+  svgParts+='<line x1="'+PL+'" y1="'+(PT+cH)+'" x2="'+(W-PR)+'" y2="'+(PT+cH)+'" stroke="var(--border)" stroke-width="0.5"/>';
+  /* X labels: every other day */
+  pts.forEach(function(p,i){
+    if(i%2===0||p[2].isToday){
+      var lbl=p[2].isToday?'Now':String(p[2].dayNum);
+      svgParts+='<text x="'+p[0]+'" y="'+(PT+cH+10)+'" font-size="6" fill="'+(p[2].isToday?'var(--text)':'var(--muted2)')+'" text-anchor="middle" font-weight="'+(p[2].isToday?700:400)+'">'+lbl+'</text>';
+    }
+  });
+  var h='';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h+='<span style="font-size:11px;font-weight:600;color:var(--text)">&#128228; Team uploads</span>';
+  h+='<span style="font-size:10px;color:var(--green);font-weight:600">avg '+(avg>=1000?(avg/1000).toFixed(1)+'k':avg)+'/day</span></div>';
+  h+='<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" style="overflow:visible;display:block">'+svgParts+'</svg>';
+  h+='<div style="display:flex;gap:8px;margin-top:4px;align-items:center">';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px">';
+  h+='<span style="display:inline-block;width:14px;height:2px;background:#534AB7;border-radius:1px;vertical-align:middle"></span> total uploads/day</span></div>';
+  el.innerHTML=h;
+}
+
+function renderMgrErrorTrend(){
+  var el=G('mgr-error-trend');if(!el)return;
+  var today=getSydneyDate();
+  var days=[];
+  for(var i=13;i>=0;i--){
+    var d=new Date(today.getTime()-i*86400000);
+    var key=d.toISOString().slice(0,10);
+    var errs=(callouts||[]).filter(function(c){return c.type==='qscore'&&c.date===key&&c.status!=='discarded';}).length;
+    var escs=(callouts||[]).filter(function(c){return c.type==='qesc'&&c.date===key;}).length;
+    days.push({key:key,errs:errs,escs:escs,isToday:i===0,dayNum:d.getDate()});
+  }
+  var maxVal=Math.max.apply(null,days.map(function(d){return Math.max(d.errs,d.escs);}));
+  if(maxVal===0)maxVal=1;
+  var avgE=Math.round(days.reduce(function(s,d){return s+d.errs;},0)/14*10)/10;
+  /* SVG */
+  var W=230,H=100,PL=18,PR=8,PT=18,PB=26;
+  var cW=W-PL-PR,cH=H-PT-PB;
+  var step=cW/13;
+  var ePts=[],esPts=[];
+  var svgParts='';
+  /* Grid */
+  [0,Math.ceil(maxVal/2),maxVal].forEach(function(v){
+    var y=PT+cH-Math.round((v/maxVal)*cH);
+    svgParts+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="var(--border)" stroke-width="0.4" opacity="0.5"/>';
+    svgParts+='<text x="'+(PL-2)+'" y="'+(y+2)+'" font-size="6" fill="var(--muted2)" text-anchor="end">'+v+'</text>';
+  });
+  days.forEach(function(d,i){
+    var x=PL+Math.round(i*step);
+    var ey=PT+cH-Math.max(1,Math.round((d.errs/maxVal)*cH));
+    var sy=PT+cH-Math.max(1,Math.round((d.escs/maxVal)*cH));
+    ePts.push([x,ey,d]);esPts.push([x,sy,d]);
+  });
+  /* Error area + line */
+  var eStr=ePts.map(function(p){return p[0]+','+p[1];}).join(' ');
+  var eArea=eStr+' '+(W-PR)+','+(PT+cH)+' '+PL+','+(PT+cH);
+  svgParts+='<polygon points="'+eArea+'" fill="#EF4444" opacity="0.07"/>';
+  svgParts+='<polyline points="'+eStr+'" fill="none" stroke="#EF4444" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
+  /* Escalation area + line */
+  var esStr=esPts.map(function(p){return p[0]+','+p[1];}).join(' ');
+  var esArea=esStr+' '+(W-PR)+','+(PT+cH)+' '+PL+','+(PT+cH);
+  svgParts+='<polygon points="'+esArea+'" fill="#EF9F27" opacity="0.07"/>';
+  svgParts+='<polyline points="'+esStr+'" fill="none" stroke="#EF9F27" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>';
+  /* Dots */
+  ePts.forEach(function(p){
+    var isT=p[2].isToday;
+    svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(isT?3.5:1.8)+'" fill="#EF4444" opacity="'+(isT?1:0.45)+'"/>';
+    if(isT){svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.5" fill="var(--surface)"/>';svgParts+='<text x="'+p[0]+'" y="'+(p[1]-5)+'" font-size="7" fill="var(--red)" text-anchor="middle" font-weight="700">'+p[2].errs+'</text>';}
+  });
+  esPts.forEach(function(p){
+    var isT=p[2].isToday;
+    svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(isT?3.5:1.8)+'" fill="#EF9F27" opacity="'+(isT?1:0.45)+'"/>';
+    if(isT){svgParts+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="1.5" fill="var(--surface)"/>';svgParts+='<text x="'+p[0]+'" y="'+(p[1]-5)+'" font-size="7" fill="var(--amber)" text-anchor="middle" font-weight="700">'+p[2].escs+'</text>';}
+  });
+  /* Baseline */
+  svgParts+='<line x1="'+PL+'" y1="'+(PT+cH)+'" x2="'+(W-PR)+'" y2="'+(PT+cH)+'" stroke="var(--border)" stroke-width="0.5"/>';
+  /* X labels */
+  days.forEach(function(d,i){
+    if(i%2===0||d.isToday){
+      var x=PL+Math.round(i*step);
+      var lbl=d.isToday?'Now':String(d.dayNum);
+      svgParts+='<text x="'+x+'" y="'+(PT+cH+10)+'" font-size="6" fill="'+(d.isToday?'var(--text)':'var(--muted2)')+'" text-anchor="middle" font-weight="'+(d.isToday?700:400)+'">'+lbl+'</text>';
+    }
+  });
+  var h='';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+  h+='<span style="font-size:11px;font-weight:600;color:var(--text)">&#9888;&#65039; Errors & Escs</span>';
+  h+='<span style="font-size:10px;color:var(--red);font-weight:600">avg '+avgE+'/day</span></div>';
+  h+='<svg width="100%" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet" style="overflow:visible;display:block">'+svgParts+'</svg>';
+  h+='<div style="display:flex;gap:10px;margin-top:4px;align-items:center">';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:14px;height:2px;background:#EF4444;border-radius:1px;vertical-align:middle"></span> errors</span>';
+  h+='<span style="font-size:9px;color:var(--muted2);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:14px;height:2px;background:#EF9F27;border-radius:1px;vertical-align:middle"></span> escalations</span>';
+  h+='</div>';
+  el.innerHTML=h;
 }
 
 function renderMgrMoodOverview(){
