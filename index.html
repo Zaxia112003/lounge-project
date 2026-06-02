@@ -1582,8 +1582,7 @@ async function fsLoadAll(){
   });
   /* Merge TEAM_DIR from Firestore team */
   TEAM.forEach(function(m){
-    if(!TEAM_DIR[m.nickname]&&m.email)
-      TEAM_DIR[m.nickname]={email:m.email||'',fullName:m.fullName,birthday:m.birthday||'TBC',hireDate:m.hireDate||'TBC',role:m.role||'uploader'};
+    TEAM_DIR[m.nickname]={email:m.email||'',fullName:m.fullName,birthday:m.birthday||'TBC',hireDate:m.hireDate||'TBC',role:m.role||'uploader',shiftStart:m.shiftStart,shiftEnd:m.shiftEnd};
   });
   /* Rebuild SHIFTS from TEAM_DIR — role-based defaults */
   Object.keys(SHIFTS).forEach(function(k){delete SHIFTS[k];}); /* clear stale keys */
@@ -4152,7 +4151,8 @@ function renderMgrKpiCard(){
     var nick=t.nickname;
     var days=Object.keys(perfData[nick]||{}).filter(function(d){return inMonth(d);});
     var tot=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
-    var avg=days.length?tot/days.length:null;
+    var inShiftTot=days.reduce(function(s,d){var r=perfData[nick][d];return s+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+    var avg=days.length?inShiftTot/days.length:null;
     var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&inMonth(c.date);}).length;
     var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&inMonth(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
     var qScore=tot>0?((tot-errs-qEsc)/tot*100):null;
@@ -4379,18 +4379,33 @@ function renderMyDayStatsStrip(){
   h+='<span class="sect-title">&#9889; Today&#39;s performance</span>';
   h+='<span style="font-size:10px;color:var(--muted2)">Live</span>';
   h+='</div>';
-  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  var uplPerfDays=Object.keys(perfData[nick]||{});
+  var uplPerfInShift=uplPerfDays.reduce(function(s,d){var r=perfData[nick][d];return s+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+  var uplPerfAdu=uplPerfDays.length?Math.round(uplPerfInShift/uplPerfDays.length*10)/10:null;
+  var uplAhuH=uplPerfDays.reduce(function(s,d){return s+Object.keys(perfData[nick][d].uploadsByHourInShift||{}).length;},0);
+  var uplAhuVal=uplAhuH>=1?Math.round(uplPerfInShift/uplAhuH*10)/10:null;
+  h+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
-  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">📤 Uploads</div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128228; Uploads</div>';
   h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+uploads+'</div>';
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
-  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">⚠️ Errors today</div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128202; ADU</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+(uplPerfAdu!==null?uplPerfAdu.toFixed(1):'—')+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">avg/day</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#9203; AHU</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+(uplAhuVal!==null?uplAhuVal.toFixed(1):'—')+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">avg/hour</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#9888;&#65039; Errors today</div>';
   h+='<div style="font-size:22px;font-weight:700;color:'+errColor+'">'+errors+'</div>';
   if(errors>0){h+='<div style="font-size:10px;color:var(--muted2)">pending review</div>';}
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
-  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">🔬 Defect density</div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128300; Defect density</div>';
   h+='<div style="font-size:22px;font-weight:700;color:'+ddColor+'">'+(dd!==null?dd:'—')+'</div>';
   h+='<div style="font-size:10px;color:var(--muted2)">per 1&#8239;000</div>';
   h+='</div></div>';
@@ -4526,21 +4541,25 @@ function renderMyDayEscStatsStrip(){
   var slaColor=slaPct===null?'var(--muted)':(slaPct>=75?'var(--green)':'var(--red)');
   var slaSub=slaPct===null?'No data yet':(slaPct>=75?'&#10003; On target':'&#9888; Below target');
   /* Avg daily uploads */
-  var allUploads=Object.values(perfData[nick]||{});
-  var totalUpl=allUploads.reduce(function(a,d){return a+(d.uploadsTotal||0);},0);
-  var activeDays=Object.keys(perfData[nick]||{}).length||1;
-  var avgDailyUpl=totalUpl>0?(totalUpl/activeDays).toFixed(1):'—';
+  var escDaysAll=Object.keys(perfData[nick]||{});
+  var totalUpl=escDaysAll.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+  var inShiftUpl=escDaysAll.reduce(function(s,d){var r=perfData[nick][d];return s+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+  var activeDays=escDaysAll.length||1;
+  var avgDailyUpl=inShiftUpl>0?(inShiftUpl/activeDays).toFixed(1):'—';
   /* Pending escalations in queue */
   var pendingEsc=(callouts||[]).filter(function(c){
     return (c.type==='qesc'||c.type==='qesc_esc')&&c.escalationMember===nick&&c.status==='Pending';
   }).length;
   var pendColor=pendingEsc>0?'var(--amber)':'var(--text)';
+  var escAhuH=escDaysAll.reduce(function(s,d){return s+Object.keys(perfData[nick][d].uploadsByHourInShift||{}).length;},0);
+  var escAhuVal=escAhuH>=1?Math.round(inShiftUpl/escAhuH*10)/10:null;
+  var escAhuStr=escAhuVal!==null?escAhuVal.toFixed(1):'—';
   var h='';
   h+='<div class="sect-head" style="padding:0 0 8px">';
   h+='<span class="sect-title">&#9889; Today&#39;s performance</span>';
   h+='<span style="font-size:10px;color:var(--muted2)">Live</span>';
   h+='</div>';
-  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
   h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#127919; Latest SLA</div>';
   h+='<div style="font-size:22px;font-weight:700;color:'+slaColor+'">'+(slaPct!==null?slaPct+'%':'—')+'</div>';
@@ -4549,7 +4568,12 @@ function renderMyDayEscStatsStrip(){
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
   h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128228; Avg uploads</div>';
   h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+avgDailyUpl+'</div>';
-  h+='<div style="font-size:10px;color:var(--muted2)">per active day</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">avg/day</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#9203; AHU</div>';
+  h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+escAhuStr+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">avg/hour</div>';
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
   h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128276; Pending</div>';
@@ -7788,6 +7812,82 @@ function mgrHubInRange(dateStr){
   }catch(e){return false;}
 }
 
+
+function hubClosePopup(){var el=G('hub-breakdown-popup');if(el)el.remove();}
+function hubPopup(title,bodyHtml){
+  var ex=G('hub-breakdown-popup');if(ex)ex.remove();
+  var ov=document.createElement('div');
+  ov.id='hub-breakdown-popup';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px';
+  ov.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(96vw,560px);margin:0 auto">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">'+title+'</span>'
+    +'<button onclick="hubClosePopup()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
+    +'</div>'+bodyHtml+'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+}
+
+function hubShowAhuBreakdown(nick,name){
+  var days=Object.keys(perfData[nick]||{}).filter(mgrHubInRange).sort();
+  var html='';
+  days.forEach(function(d){
+    var byH=perfData[nick][d].uploadsByHourInShift||{};
+    var hrs=Object.keys(byH).map(Number).sort(function(a,b){return a-b;});
+    if(!hrs.length)return;
+    html+='<div style="margin-bottom:14px"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">'+fmtDate(d)+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+    hrs.forEach(function(h){html+='<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);color:var(--text)">'+h+':00 — <strong>'+byH[h]+'</strong></span>';});
+    html+='</div></div>';
+  });
+  if(!html)html='<p style="color:var(--muted);font-size:12px">No hourly data (Data A) recorded for this period.</p>';
+  hubPopup('&#9203; AHU Breakdown — '+name,html);
+}
+
+function hubShowDDBreakdown(nick,name){
+  var days=Object.keys(perfData[nick]||{}).filter(mgrHubInRange);
+  var errs=callouts.filter(function(c){
+    if(c.type!=='qscore')return false;
+    if(c.status==='discarded'||c.status==='pending_review')return false;
+    if(c.uploader!==nick&&c.uploader!==name)return false;
+    return mgrHubInRange((c.date||'').slice(0,10));
+  });
+  var escs=callouts.filter(function(c){
+    if(!(c.type==='qesc'||c.type==='qesc_esc'))return false;
+    if(c.status==='discarded')return false;
+    if(c.uploader!==nick&&c.uploader!==name&&c.escalationMember!==nick)return false;
+    return mgrHubInRange((c.date||'').slice(0,10));
+  });
+  var totUpl=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+  var dd=totUpl>0?((errs.length+escs.length)/totUpl*1000):null;
+  var html='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">'
+    +'<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--red)">'+errs.length+'</div><div style="font-size:10px;color:var(--muted)">errors</div></div>'
+    +'<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--amber)">'+escs.length+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
+    +'<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700">'+(dd!==null?dd.toFixed(1):'—')+'</div><div style="font-size:10px;color:var(--muted)">per 1000</div></div>'
+    +'</div>';
+  var combined=errs.map(function(c){return{date:c.date,type:'Error',desc:c.error||c.description||'—'};})
+    .concat(escs.map(function(c){return{date:c.date,type:'Escalation',desc:c.notes||c.error||'—'};}))
+    .sort(function(a,b){return a.date<b.date?1:-1;});
+  if(combined.length){
+    html+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'
+      +'<th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Date</th>'
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Type</th>'
+      +'<th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Notes</th></tr></thead><tbody>';
+    combined.forEach(function(row){
+      var bg=row.type==='Error'?'rgba(239,68,68,.15)':'rgba(245,158,11,.15)';
+      var col=row.type==='Error'?'var(--red)':'var(--amber)';
+      html+='<tr>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);white-space:nowrap;font-size:11px">'+row.date+'</td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);text-align:center"><span style="font-size:10px;padding:1px 6px;border-radius:10px;background:'+bg+';color:'+col+'">'+row.type+'</span></td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">'+row.desc+'</td>'
+        +'</tr>';
+    });
+    html+='</tbody></table>';
+  } else {
+    html+='<p style="color:var(--muted);font-size:12px">No errors or escalations in this period.</p>';
+  }
+  hubPopup('&#128300; Defect Breakdown — '+name,html);
+}
+
 function renderMgrHubPerformance(){
   renderMgrMoodCard();
   var el=G('mgr-hub-pane-performance');if(!el)return;
@@ -7867,9 +7967,13 @@ function renderMgrHubPerformance(){
       +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.totalUploads+'</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
-      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+uplAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></div>'
+      +(uplAhu!==null
+        ?'<div style="text-align:center;cursor:pointer" data-nick="'+r.nick+'" data-name="'+r.m.fullName+'" onclick="hubShowAhuBreakdown(this.dataset.nick,this.dataset.name)" title="Hourly breakdown"><div style="font-size:16px;font-weight:700;color:var(--accent);text-decoration:underline dotted">'+uplAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour &#8599;</div></div>'
+        :'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--muted)">—</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></div>')
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.qualEsc+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
-      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+ddColor+'">'+ddStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000</div></div>'
+      +(defectDensity!==null
+        ?'<div style="text-align:center;cursor:pointer" data-nick="'+r.nick+'" data-name="'+r.m.fullName+'" onclick="hubShowDDBreakdown(this.dataset.nick,this.dataset.name)" title="Error breakdown"><div style="font-size:16px;font-weight:700;color:'+ddColor+';text-decoration:underline dotted">'+ddStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000 &#8599;</div></div>'
+        :'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--muted)">—</div><div style="font-size:10px;color:var(--muted)">defect/1000</div></div>')
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+qColor+'">'+qStr+'</div><div style="font-size:10px;color:var(--muted)">quality score</div></div>'
       +'</div>';
   }).join('');
@@ -9162,9 +9266,11 @@ function threadReplyKeydown(e){
 /* ── MY TEAM ── */
 function renderMyTeam(){
   var el=G('lounge-pane-my-team');if(!el)return;
-  var groups={Manager:[],Escalation:[],Uploader:[]};
+  var groups={manager:[],escalation:[],uploader:[]};
   Object.keys(TEAM_DIR).forEach(function(nick){
-    var d=TEAM_DIR[nick];if(groups[d.role])groups[d.role].push(nick);
+    var d=TEAM_DIR[nick];
+    var r=(d.role||'').toLowerCase();
+    if(groups[r])groups[r].push(nick);
   });
   function makeCard(nick){
     var isMgr=cu&&cu.role==='manager';
@@ -9216,9 +9322,9 @@ function renderMyTeam(){
   el.innerHTML=moodSection+photosSection
     +addBtn
     +'<div class="team-org">'
-    +'<div><div class="team-org-label">&#128084; Manager</div><div class="team-org-row">'+groups.Manager.map(makeCard).join('')+'</div></div>'
-    +'<div><div class="team-org-label">&#9889; Escalation</div><div class="team-org-row">'+groups.Escalation.map(makeCard).join('')+'</div></div>'
-    +'<div><div class="team-org-label">&#128188; Uploaders</div><div class="team-org-row">'+groups.Uploader.map(makeCard).join('')+'</div></div>'
+    +'<div><div class="team-org-label">&#128084; Manager</div><div class="team-org-row">'+groups.manager.map(makeCard).join('')+'</div></div>'
+    +'<div><div class="team-org-label">&#9889; Escalation</div><div class="team-org-row">'+groups.escalation.map(makeCard).join('')+'</div></div>'
+    +'<div><div class="team-org-label">&#128188; Uploaders</div><div class="team-org-row">'+groups.uploader.map(makeCard).join('')+'</div></div>'
     +'</div>';
 
   /* Start wall slideshow */
@@ -9511,6 +9617,7 @@ function mwSLAConfirm(){
   pushNotif('📈','Escalation SLA logged: '+pct+'% for '+date+(drivers.length?' · '+drivers.length+' drivers':'')+'.');
   mwSLAReset();closeMgrWrite();
   if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();
+  if(G('mgr-kpi-card'))renderMgrKpiCard();
 }
 
 /* ── LOG AWARDS — DROPDOWN SELECTOR ── */
@@ -10358,10 +10465,13 @@ function renderEscalationHub(){
   },100);
   var sh=SHIFTS[cu.nickname];
   var shLabel=sh?'Shift: '+sh.start+':00–'+sh.end+':00 AEST':'';
-  var allUploads=Object.values(perfData[cu.nickname]||{});
-  var inShiftTotal=allUploads.reduce(function(a,d){return a+(d.uploadsTotal||0);},0);
-  var activeDays=Object.keys(perfData[cu.nickname]||{}).length||1;
+  var uplDaysAll=Object.keys(perfData[cu.nickname]||{});
+  var inShiftTotal=uplDaysAll.reduce(function(s,d){var r=perfData[cu.nickname][d];return s+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+  var activeDays=uplDaysAll.length||1;
   var avgDailyUpload=inShiftTotal>0?(inShiftTotal/activeDays).toFixed(1):'—';
+  var escAhuH=uplDaysAll.reduce(function(s,d){return s+Object.keys(perfData[cu.nickname][d].uploadsByHourInShift||{}).length;},0);
+  var escAhuVal=escAhuH>=1?Math.round(inShiftTotal/escAhuH*10)/10:null;
+  var escAhuStr=escAhuVal!==null?escAhuVal.toFixed(1):'—';
   var latest=getLatestSLA();
   var slaPct=latest?latest.pct:null;
   var slaBadgeCls=slaPct===null?'warn':slaPct>=75?'good':'bad';
@@ -10421,8 +10531,14 @@ function renderEscalationHub(){
     +'<div class="kpi-sub" id="esc-rate-sub">uploads per active day</div>'
     +'<div class="kpi-sub" style="margin-top:4px">Total: '+inShiftTotal+' uploads · '+activeDays+' days</div>'
     +'<div class="prog-wrap"><div class="prog-bar" id="esc-rate-bar" style="width:'+Math.min((inShiftTotal/20)*100,100)+'%"></div></div>'
-    +'</div></div>'
-
+    +'<div class="prog-wrap"><div class="prog-bar" id="esc-rate-bar" style="width:'+Math.min((inShiftTotal/20)*100,100)+'%"></div></div>'
+    +'</div>'
+    +'<div class="kpi-card">'
+    +'<div class="kpi-label">&#9203; Avg Hourly Upload</div>'
+    +'<div class="kpi-value" id="esc-ahu-val">'+escAhuStr+'</div>'
+    +'<div class="kpi-sub">'+(escAhuVal!==null?'In-shift uploads ÷ active hours':'Paste Data A to see AHU')+'</div>'
+    +'</div>'
+    +'</div>'
     +'<div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:0">'
     /* LEFT — top drivers */
     +(latestDrivers.length
@@ -10702,6 +10818,14 @@ function renderEscPerfFiltered(){
   if(rateVal)rateVal.textContent=avgDaily;
   if(rateSub)rateSub.textContent='uploads per active day';
   if(rateBar)rateBar.style.width=Math.min((filteredUploads/20)*100,100)+'%';
+  /* Update AHU */
+  var escAhuEl=G('esc-ahu-val');
+  if(escAhuEl){
+    var ahuH=filteredDays.reduce(function(s,d){return s+Object.keys((perfData[cu.nickname][d]||{}).uploadsByHourInShift||{}).length;},0);
+    var ahuInS=filteredDays.reduce(function(s,d){var r=perfData[cu.nickname][d]||{};return s+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+    var ahuV=ahuH>=1?Math.round(ahuInS/ahuH*10)/10:null;
+    escAhuEl.textContent=ahuV!==null?ahuV.toFixed(1):'—';
+  }
 
   /* Update SLA KPI card from filtered data */
   var slaKpiVal=G('esc-sla-kpi-val');
@@ -10855,7 +10979,13 @@ function renderDashboard(){
   const ddB=dd===null?`<span class="kpi-badge kb-amber">No Data</span>`:dd<=5?`<span class="kpi-badge kb-green">✓ On Target</span>`:dd<=15?`<span class="kpi-badge kb-amber">⚠ Watch</span>`:`<span class="kpi-badge kb-red">⚠ High</span>`;
   const ddColor=dd===null?'var(--text)':dd<=5?'var(--green)':dd<=15?'var(--amber)':'var(--red)';
   const kpi=G('kpi-grid');
-  if(kpi)kpi.innerHTML=`
+  if(kpi){
+    const uplDaysInRange=Object.keys(perfData[nick]||{}).filter(d=>inRange(d,range));
+    const ahuInShift=uplDaysInRange.reduce((s,d)=>{const r=perfData[nick][d];return s+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+    const ahuActiveH=uplDaysInRange.reduce((s,d)=>s+Object.keys(perfData[nick][d].uploadsByHourInShift||{}).length,0);
+    const ahuVal=ahuActiveH>=1?Math.round(ahuInShift/ahuActiveH*10)/10:null;
+    const ahuStr=ahuVal!==null?ahuVal.toFixed(1):'—';
+    kpi.innerHTML=`
     <div class="kpi-card">
       <div class="kpi-label">Total Uploads</div>
       <div class="kpi-value">${s.uploadsTotal}</div>
@@ -10866,6 +10996,11 @@ function renderDashboard(){
       <div class="kpi-value">${s.adu.toFixed(1)}</div>
       <span class="kpi-badge kb-blue">${s.weightedDays} weighted days</span>
       <div class="kpi-sub">In-shift ÷ weighted working days</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">⏱️ Avg Hourly Upload</div>
+      <div class="kpi-value">${ahuStr}</div>
+      <div class="kpi-sub">${ahuVal!==null?'In-shift uploads ÷ active hours':'Paste Data A to see AHU'}</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Quality Escalations</div>
@@ -10881,6 +11016,7 @@ function renderDashboard(){
       <div class="kpi-sub">Target: 3.0–5.0 per 1,000 uploads</div>
       <div class="prog-wrap"><div class="prog-bar" style="width:${Math.min((dd||0)/20*100,100)}%;background:${ddColor}"></div></div>
     </div>`;
+  }
   renderDailyTbl(nick,range);
   /* Re-init custom range calendar after render (DOM re-clones) */
   setTimeout(function(){
@@ -10899,19 +11035,49 @@ function renderDashboard(){
 }
 
 function renderDailyTbl(nick,range){
-  const el=G('daily-tbl');if(!el)return;
-  const data=perfData[nick]||{};
-  const dates=Object.keys(data).filter(d=>inRange(d,range)).sort().reverse();
+  var el=G('daily-tbl');if(!el)return;
+  var data=perfData[nick]||{};
+  var dates=Object.keys(data).filter(function(d){return inRange(d,range);}).sort().reverse();
   if(!dates.length){el.innerHTML='<div class="empty"><div class="empty-ico">&#128241;</div><div class="empty-txt">No upload data for this period.</div></div>';return;}
-  const wtMap={full:'x1.0',half:'x0.5',nonupload:'x0.4',absent:'x0',al:'AL',sl:'SL',rdo:'RDO',other:'Leave'};
-  const rows=dates.map(d=>{
-    const dd=data[d];const attRec=(attendance[nick]||{})[d];
-    const status=attRec?attRec.status:'full';const wt=wtMap[status]||'x1.0';
-    const offTag='';
-    const note=attRec&&attRec.notes?' — '+attRec.notes:'';
-    var errCount=callouts.filter(function(co){return co.uploader===nick&&co.type==='qscore'&&co.date===d&&co.status!=='pending_review'&&co.status!=='discarded';}).length;return '<tr><td>'+fmtDate(d)+'</td><td>'+(dd.uploadsTotal||0)+'</td><td>'+(errCount>0?'<span class="kpi-badge kb-red" style="font-size:9px">'+errCount+'</span>':'<span style="font-size:11px;color:var(--muted)">—</span>')+'</td></tr>';
-  }).join('');
-  el.innerHTML='<table><thead><tr><th>Date (AEST)</th><th>Total Uploads</th><th>Errors Logged</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  var html='<table><thead><tr><th>Date (AEST)</th><th>Total Uploads</th><th>Errors Logged</th></tr></thead><tbody>';
+  dates.forEach(function(d){
+    var dd=data[d];
+    var errCount=callouts.filter(function(co){return co.uploader===nick&&co.type==='qscore'&&co.date===d&&co.status!=='pending_review'&&co.status!=='discarded';}).length;
+    var errBadge=errCount>0?'<span class="kpi-badge kb-red" style="font-size:9px">'+errCount+'</span>':'<span style="font-size:11px;color:var(--muted)">—</span>';
+    var byH=dd.uploadsByHour||{};
+    var byHS=dd.uploadsByHourInShift||{};
+    var hours=Object.keys(byH).map(Number).sort(function(a,b){return a-b;});
+    var hasHours=hours.length>0;
+    var chevBtn=hasHours?'<span id="dtchev-'+d+'" data-d="'+d+'" style="font-size:10px;color:var(--muted);cursor:pointer;padding:1px 5px;border-radius:4px;background:var(--bg3);border:1px solid var(--border);margin-left:6px" onclick="toggleDailyHours(event,this.dataset.d)">&#8964;</span>':'';
+    html+='<tr'+(hasHours?' data-d="'+d+'" style="cursor:pointer" onclick="toggleDailyHours(event,this.dataset.d)"':'')+' >';
+    html+='<td style="white-space:nowrap">'+fmtDate(d)+chevBtn+'</td>';
+    html+='<td style="text-align:center">'+(dd.uploadsTotal||0)+'</td>';
+    html+='<td style="text-align:center">'+errBadge+'</td>';
+    html+='</tr>';
+    if(hasHours){
+      html+='<tr id="dtrow-'+d+'" style="display:none;background:var(--bg3)"><td colspan="3" style="padding:6px 12px 10px">';
+      html+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Hourly uploads</div>';
+      html+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      hours.forEach(function(h){
+        var tot=byH[h]||0;
+        var inS=byHS[h]||0;
+        var offS=tot-inS;
+        var bg=offS>0?'var(--bg2)':'var(--bg2)';
+        html+='<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:'+bg+';border:1px solid var(--border);color:var(--text)" title="'+(inS>0?inS+' in-shift':''+(offS>0?', ':'')+offS+' off-shift')+'">'+h+':00 <strong>'+tot+'</strong>'+(offS>0?'<span style="color:var(--amber);font-size:10px"> ('+offS+'&#9650;)</span>':'')+'</span>';
+      });
+      html+='</div></td></tr>';
+    }
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+
+function toggleDailyHours(e,d){
+  if(e)e.stopPropagation();
+  var row=G('dtrow-'+d);if(!row)return;
+  var open=row.style.display!=='none';
+  row.style.display=open?'none':'';
+  var chev=G('dtchev-'+d);if(chev)chev.innerHTML=open?'&#8964;':'&#8963;';
 }
 
 function renderTeamOverview(){
@@ -11619,27 +11785,9 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="dl-body">
       <div class="dl-tabs">
         <button class="dl-tab active" data-tab="error" onclick="switchDailyLogTab('error',this)">&#9997;&#65039; Log Error</button>
-        <button class="dl-tab" data-tab="esc-detail" onclick="switchDailyLogTab('esc-detail',this);escDetailReset()">&#128202; Log Daily Detail</button>
+
       </div>
       <div class="dl-pane">
-        <!-- Log Daily Detail (escalation) -->
-        <div class="dl-section" id="dl-sec-esc-detail">
-          <div class="s-section-title">Log Daily Detail</div>
-          <div class="s-row-desc" style="margin-bottom:14px;line-height:1.6">Paste the daily upload report. The system will parse your row automatically.</div>
-          <div id="esc-detail-paste-wrap">
-            <textarea class="form-input" id="esc-detail-paste" rows="6" placeholder="Paste report data here...&#10;&#10;Example:&#10;astrid.cortes@domain.com.au&#9;50&#9;April 1, 2026, 9:14 a.m.&#9;April 1, 2026, 5:41 p.m." style="font-size:11px;font-family:monospace;resize:vertical"></textarea>
-            <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="escDetailParse()">&#128202; Parse Data</button>
-          </div>
-          <div id="esc-detail-status" style="font-size:12px;color:var(--muted);margin-top:10px;min-height:18px"></div>
-          <div id="esc-detail-preview" style="display:none;margin-top:12px">
-            <div style="font-family:var(--font-d);font-size:12px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Parsed — confirm before saving</div>
-            <div id="esc-detail-table" style="margin-bottom:14px"></div>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-outline btn-sm" style="flex:1" onclick="escDetailReset()">&#8592; Clear</button>
-              <button class="btn btn-primary btn-sm" style="flex:1" onclick="escDetailConfirm()">&#10003; Confirm &amp; Save</button>
-            </div>
-          </div>
-        </div>
         <!-- Log Error -->
         <div class="dl-section" id="dl-sec-error">
           <div class="s-section-title">Log Error</div>
