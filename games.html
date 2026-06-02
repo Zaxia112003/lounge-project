@@ -414,13 +414,7 @@ var THEMES=[
     ['E4',1],['_',.5],['G4',.5],['Ab4',1],['G4',.5],['_',.5],['F4',1],['E4',.5],['D4',.5],['C4',2],['_',.5]],
    bass:[['C3',4],['A3',4],['F3',4],['G3',4],['C3',4],['F3',4],['G3',4],['C3',4]],
    type:'sine',bassType:'triangle'},
-  /* Theme 1 — jazzy swing */
-  {mel:[['E4',1.5],['D4',.5],['C4',1],['_',1],['A3',1],['C4',.5],['D4',.5],['E4',1.5],['_',.5],
-    ['G4',1],['F4',.5],['E4',.5],['D4',1],['C4',1],['_',1],
-    ['A3',1.5],['C4',.5],['E4',1],['_',1],['G4',1.5],['E4',.5],['C4',2],['_',1]],
-   bass:[['A3',4],['D3',4],['F3',4],['E3',4],['A3',4],['D3',4],['G3',4],['A3',4]],
-   type:'square',bassType:'sine'},
-  /* Theme 2 — chill waltz */
+  /* Theme 1 — chill waltz */
   {mel:[['G4',2],['E4',1],['C4',3],['D4',2],['F4',1],['A4',3],
     ['G4',2],['E4',1],['D4',2],['C4',1],['_',3],
     ['E4',2],['G4',1],['Ab4',2],['G4',1],['F4',2],['E4',1],['D4',3],['C4',3]],
@@ -2744,6 +2738,7 @@ function gameTongIts(C){
   var roomUnsub=null;     /* onSnapshot unsubscribe */
   var stateUnsub=null;
   var handUnsub=null;
+  var tongitsRoomData={}; /* cached room data for seat lookups */
 
   /* Shared game state (mirrored from Firestore) */
   var GS={};             /* full game state doc */
@@ -3058,9 +3053,13 @@ function gameTongIts(C){
       });
 
       /* Write shared game state */
+      /* Find first occupied seat to start turn */
+      var firstTurn=0;
+      for(var si=0;si<3;si++){if(seats[si]){firstTurn=si;break;}}
       var initState={
         phase:'playing',
-        turn:0,
+        turn:firstTurn,
+        _seats:roomData.seats,
         stock:encHand(deck),
         discard:[encCard(dealerDiscard)],
         discardHistory:[encCard(dealerDiscard)],
@@ -3090,6 +3089,7 @@ function gameTongIts(C){
   ════════════════════════════════════════ */
   function subscribeGame(roomData){
     /* My seat */
+    tongitsRoomData=roomData;
     var seats=normSeats(roomData.seats);
     mySeat=seats.findIndex(function(s){return s&&s.nick===myNick;});
     if(mySeat<0)mySeat=0; /* fallback */
@@ -3176,8 +3176,10 @@ function gameTongIts(C){
     var discHistArr=decHand(GS.discardHistory||[]);
     discHistArr.push(card);
     var newHand=myHand.filter(function(c){return encCard(c)!==encCard(card);});
-    /* Advance turn */
-    var nextTurn=(GS.turn+1)%3;
+    /* Advance turn — skip empty seats (supports 2-player mode) */
+    var occSeats=normSeats(GS._seats||tongitsRoomData.seats||[]);
+    var nextTurn=GS.turn;
+    for(var si=1;si<=3;si++){var cand=(GS.turn+si)%3;if(occSeats[cand]){nextTurn=cand;break;}}
     var updates={
       discard:encHand(discArr),
       discardHistory:encHand(discHistArr),
@@ -3405,7 +3407,13 @@ function gameTongIts(C){
 
             /* Consider calling draw */
             var dw=deadwood(aiHand);
-            var nextTurn=(seat+1)%3;
+            /* Find next occupied seat (skip empty seats in 2-player mode) */
+            var nextTurn=seat;
+            var seats2=normSeats(rdata.seats||[]);
+            for(var si=1;si<=3;si++){
+              var cand=(seat+si)%3;
+              if(seats2[cand]){nextTurn=cand;break;}
+            }
             var updates={stock:encHand(stockArr),discard:encHand(discArr),discardHistory:encHand(newDiscHist),allExposedMelds:encMelds(aeMelds),drawn:false,drawnByChow:false,drawnByStock:false,didSapawThisTurn:false,updatedAt:Date.now()};
             if(dw<=5&&(aeMelds[seat]||[]).length>0&&Math.random()<0.6){
               updates.pendingDraw={caller:seat,dw:dw};
@@ -3742,6 +3750,11 @@ function gameTongIts(C){
     var handSizes=((Array.isArray(gs.handSizes)?gs.handSizes:[12,12,12].map(function(i,idx){return(gs.handSizes&&gs.handSizes[idx])||12;})));
     handSizes[mySeat]=myHand.length;
     if(isHost){stateRef().update({handSizes:handSizes}).catch(function(){});}
+
+    /* Trigger AI if it's their turn and host is running */
+    if(isHost&&!gover&&!pendingDraw&&turn!==mySeat&&seatIsAI(turn)){
+      setTimeout(function(){doAITurns(turn,allMelds);},700);
+    }
   }
 
   /* ════════════════════════════════════════
