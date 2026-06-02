@@ -271,6 +271,47 @@ var SND={
   draw:   function(){sfx(350,.06,.05,'triangle');},
 };
 
+/* ── BACKGROUND MUSIC LOOP (3 rotating themes) ── */
+var _bgmTimer=null,_bgmTrack=0,_bgmPlaying=false;
+var _bgmTracks=[
+  /* Track 0 — upbeat chiptune */
+  function(){
+    var n=[[523,.12],[659,.12],[784,.12],[1047,.12],[784,.12],[659,.12],[523,.12],[440,.12]];
+    n.forEach(function(p,i){sfx(p[0],p[1],.04,'square',i*0.14);});
+  },
+  /* Track 1 — jazzy arpeggio */
+  function(){
+    var n=[[392,.1],[494,.1],[587,.1],[740,.1],[587,.1],[494,.1],[392,.1],[330,.1]];
+    n.forEach(function(p,i){sfx(p[0],p[1],.035,'triangle',i*0.13);});
+    var bass=[[196,.2],[220,.2],[196,.2],[185,.2]];
+    bass.forEach(function(p,i){sfx(p[0],p[1],.025,'sine',i*0.26);});
+  },
+  /* Track 2 — chill lo-fi feel */
+  function(){
+    var n=[[349,.15],[440,.15],[523,.15],[440,.15],[349,.15],[294,.15],[262,.15],[294,.15]];
+    n.forEach(function(p,i){sfx(p[0],p[1],.03,'sine',i*0.18);});
+    var c=[[131,.3],[147,.3],[131,.3],[123,.3]];
+    c.forEach(function(p,i){sfx(p[0],p[1],.02,'triangle',i*0.36);});
+  }
+];
+function bgmPlay(){
+  if(!_bgmPlaying)return;
+  ensureAudio();
+  _bgmTracks[_bgmTrack]();
+  _bgmTrack=(_bgmTrack+1)%_bgmTracks.length;
+  var dur=_bgmTrack===0?1900:_bgmTrack===1?1900:2600;
+  _bgmTimer=setTimeout(bgmPlay,dur);
+}
+function bgmStart(){
+  if(_bgmPlaying)return;
+  _bgmPlaying=true;_bgmTrack=0;
+  bgmPlay();
+}
+function bgmStop(){
+  _bgmPlaying=false;
+  if(_bgmTimer){clearTimeout(_bgmTimer);_bgmTimer=null;}
+}
+
 /* ═══════════════════════════════════════════════════
    CREDITS
 ═══════════════════════════════════════════════════ */
@@ -366,11 +407,29 @@ function loadAllCredits(){
 /* ═══════════════════════════════════════════════════
    MUSIC
 ═══════════════════════════════════════════════════ */
-var MEL=[['C4',1],['_',.5],['E4',.5],['G4',1],['_',1],['A3',.5],['C4',.5],['E4',1],['_',1],['D4',.5],
-  ['F4',1],['_',.5],['E4',.5],['D4',1],['_',1],['C4',2],['_',1],['G3',.5],
-  ['E4',1],['_',.5],['G4',.5],['Ab4',1],['G4',.5],['_',.5],['F4',1],['E4',.5],['D4',.5],['C4',2],['_',.5]];
-var BASS=[['C3',4],['A3',4],['F3',4],['G3',4],['C3',4],['F3',4],['G3',4],['C3',4]];
+var THEMES=[
+  /* Theme 0 — original bouncy chiptune */
+  {mel:[['C4',1],['_',.5],['E4',.5],['G4',1],['_',1],['A3',.5],['C4',.5],['E4',1],['_',1],['D4',.5],
+    ['F4',1],['_',.5],['E4',.5],['D4',1],['_',1],['C4',2],['_',1],['G3',.5],
+    ['E4',1],['_',.5],['G4',.5],['Ab4',1],['G4',.5],['_',.5],['F4',1],['E4',.5],['D4',.5],['C4',2],['_',.5]],
+   bass:[['C3',4],['A3',4],['F3',4],['G3',4],['C3',4],['F3',4],['G3',4],['C3',4]],
+   type:'sine',bassType:'triangle'},
+  /* Theme 1 — jazzy swing */
+  {mel:[['E4',1.5],['D4',.5],['C4',1],['_',1],['A3',1],['C4',.5],['D4',.5],['E4',1.5],['_',.5],
+    ['G4',1],['F4',.5],['E4',.5],['D4',1],['C4',1],['_',1],
+    ['A3',1.5],['C4',.5],['E4',1],['_',1],['G4',1.5],['E4',.5],['C4',2],['_',1]],
+   bass:[['A3',4],['D3',4],['F3',4],['E3',4],['A3',4],['D3',4],['G3',4],['A3',4]],
+   type:'square',bassType:'sine'},
+  /* Theme 2 — chill waltz */
+  {mel:[['G4',2],['E4',1],['C4',3],['D4',2],['F4',1],['A4',3],
+    ['G4',2],['E4',1],['D4',2],['C4',1],['_',3],
+    ['E4',2],['G4',1],['Ab4',2],['G4',1],['F4',2],['E4',1],['D4',3],['C4',3]],
+   bass:[['C3',3],['G3',3],['A3',3],['F3',3],['C3',3],['G3',3],['F3',3],['C3',3]],
+   type:'triangle',bassType:'sine'}
+];
+var MEL=THEMES[0].mel,BASS=THEMES[0].bass;/* kept for legacy references */
 var NF={C3:131,D3:147,E3:165,F3:175,G3:196,A3:220,B3:247,C4:262,D4:294,E4:330,F4:349,G4:392,Ab4:415,A4:440,B4:494,C5:523,_:0};
+var _musicThemeIdx=0;
 function pNote(f,t,d,vol,type){
   if(!f||!audioCtx)return;
   var o=audioCtx.createOscillator(),g=audioCtx.createGain();
@@ -381,10 +440,14 @@ function pNote(f,t,d,vol,type){
 }
 function schedMusic(){
   if(!musicOn||!audioCtx)return;
+  var theme=THEMES[_musicThemeIdx];
+  var mel=theme.mel,bass=theme.bass,mType=theme.type||'sine',bType=theme.bassType||'triangle';
   var now=audioCtx.currentTime,beat=.44,t=now+.1;
-  MEL.forEach(function(n){var f=NF[n[0]],d=n[1]*beat;if(f)pNote(f,t,d*.85,musicVol*.4,'sine');t+=d;});
-  var bt=now+.1;BASS.forEach(function(n){var f=NF[n[0]],d=n[1]*beat;if(f)pNote(f,bt,d*.9,musicVol*.18,'triangle');bt+=d;});
-  var loop=MEL.reduce(function(s,n){return s+n[1]*beat;},0);
+  mel.forEach(function(n){var f=NF[n[0]],d=n[1]*beat;if(f)pNote(f,t,d*.85,musicVol*.4,mType);t+=d;});
+  var bt=now+.1;bass.forEach(function(n){var f=NF[n[0]],d=n[1]*beat;if(f)pNote(f,bt,d*.9,musicVol*.18,bType);bt+=d;});
+  var loop=mel.reduce(function(s,n){return s+n[1]*beat;},0);
+  /* Advance to next theme on next loop */
+  _musicThemeIdx=(_musicThemeIdx+1)%THEMES.length;
   musicTimer=setTimeout(schedMusic,(loop-.15)*1000);
 }
 function musicUI(on){
@@ -392,7 +455,7 @@ function musicUI(on){
   var ic=G('snd-icon');if(ic)ic.textContent=on?'🔊':'🔈';
   var btn=G('music-toggle-btn');if(btn)btn.textContent=on?'⏸ Pause':'▶ Play';
 }
-function startMusic(){ensureAudio();musicOn=true;musicUI(true);schedMusic();}
+function startMusic(){ensureAudio();musicOn=true;_musicThemeIdx=0;musicUI(true);schedMusic();}
 function stopMusic(){musicOn=false;clearTimeout(musicTimer);musicTimer=null;musicNodes.forEach(function(n){try{n.stop();}catch(e){}});musicNodes=[];musicUI(false);}
 function toggleMusic(){musicOn?stopMusic():startMusic();}
 function setVol(v){musicVol=parseFloat(v);var l=G('vol-label');if(l)l.textContent=Math.round(v*100)+'%';}
@@ -3121,8 +3184,8 @@ function gameTongIts(C){
       drawn:false,drawnByChow:false,drawnByStock:false,didSapawThisTurn:false,
       turn:nextTurn
     };
-    /* Check tongits */
-    if(newHand.length===0){
+    /* Check tongits — empty hand OR DW=0 (all remaining cards are in melds) */
+    if(newHand.length===0||(newHand.length>0&&deadwood(newHand)===0)){
       updates.gover=true;
       updates.gameResult=buildResult(mySeat,'tongits',allMelds,newHand);
     }
@@ -3417,7 +3480,7 @@ function gameTongIts(C){
     var gameResult=gs.gameResult||null;
 
     var isMyTurn=turn===mySeat&&!gover&&!pendingDraw;
-    var chowOk=isMyTurn&&!drawn&&discTop&&canChow(discTop,myHand);
+    var chowOk=isMyTurn&&!drawn&&!gs.drawnByStock&&discTop&&canChow(discTop,myHand);
 
     /* Selected cards */
     if(!C._sel)C._sel=[];
@@ -3542,7 +3605,7 @@ function gameTongIts(C){
     if(pendingDraw&&pendingDraw.caller!==mySeat){
       var cb=box('background:rgba(253,203,110,.12);border:1px solid rgba(253,203,110,.3);border-radius:10px;padding:12px 16px;text-align:center;max-width:320px;');
       var prot=isBurnProtectedHand(myHand,(allMelds[mySeat]||[]).map(function(m){return m.map(decCard);}));
-      cb.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">'+seatName(pendingDraw.caller)+' calls DRAW (DW: '+pendingDraw.dw+')</div>'
+      cb.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">'+seatName(pendingDraw.caller)+' calls DRAW!</div>'
         +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Your DW: '+deadwood(myHand)+(prot?' ✅ Protected':'⚠️ No protection')+'</div>';
       var br=box('display:flex;gap:8px;justify-content:center;');
       var fb=document.createElement('button');fb.className='btn btn-primary';fb.style.fontSize='11px';fb.textContent='⚔️ Fight'+(prot?'':' (Burns!)');fb.onclick=doFight;
