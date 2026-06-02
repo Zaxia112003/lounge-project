@@ -4395,9 +4395,9 @@ function renderMyDayStatsStrip(){
   h+='<div style="font-size:10px;color:var(--muted2)">avg/day</div>';
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
-  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#9203; AHU</div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">PI</div>';
   h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+(uplAhuVal!==null?uplAhuVal.toFixed(1):'—')+'</div>';
-  h+='<div style="font-size:10px;color:var(--muted2)">avg/hour</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">avg/hour (PI)</div>';
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
   h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#9888;&#65039; Errors today</div>';
@@ -4571,9 +4571,9 @@ function renderMyDayEscStatsStrip(){
   h+='<div style="font-size:10px;color:var(--muted2)">avg/day</div>';
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
-  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#9203; AHU</div>';
+  h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">PI</div>';
   h+='<div style="font-size:22px;font-weight:700;color:var(--text)">'+escAhuStr+'</div>';
-  h+='<div style="font-size:10px;color:var(--muted2)">avg/hour</div>';
+  h+='<div style="font-size:10px;color:var(--muted2)">avg/hour (PI)</div>';
   h+='</div>';
   h+='<div style="background:var(--bg2);border-radius:8px;padding:10px 12px">';
   h+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">&#128276; Pending</div>';
@@ -6700,7 +6700,7 @@ function ratingsGetKPIs(nick){
   var totalOffShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
   var dayCount=days.length||1;
   var avgDaily=Math.round((totalInShift/dayCount)*10)/10;
-  /* AHU = total in-shift uploads / total active in-shift hours across all days */
+  /* PI (Productivity Index) = total in-shift uploads / total active in-shift hours across all days */
   var totalActiveShiftHours=days.reduce(function(s,d){
     var byH=perfData[nick][d].uploadsByHourInShift||{};
     return s+Object.keys(byH).length;
@@ -6975,7 +6975,7 @@ function renderRatingsTable(){
     +'<span style="margin-left:auto">Perf Score = ('+perfFormula+')</span>'
     +'</div>';
   if(metrics.some(function(m){return m.key==='ahu';})){
-    html+='<div style="margin-top:6px;font-size:10px;color:var(--muted2)">* AHU falls back to ADU when hourly data is unavailable for that period.</div>';
+    html+='<div style="margin-top:6px;font-size:10px;color:var(--muted2)">* PI falls back to ADU when hourly data is unavailable for that period.</div>';
   }
 
   wrap.innerHTML=html;
@@ -7013,7 +7013,7 @@ function ratingsOnWeight(){ratingsMetricChanged();}
 
 var RT_UPL_METRICS=[
   {key:'uploads',label:'ADU (avg daily uploads)'},
-  {key:'ahu',label:'AHU (avg hourly uploads)'},
+  {key:'ahu',label:'Productivity Index (PI)'},
   {key:'quality',label:'Quality Score'},
   {key:'defect',label:'Defect Density'},
   {key:'escalation',label:'Quality Escalations'}
@@ -7068,7 +7068,7 @@ function ratingsSaveAndToast(){
 /* ── BANDS MODAL ── */
 var UPL_METRIC_DEFS=[
   {key:'uploads',label:'ADU (avg daily uploads)',hint:'Avg in-shift uploads per day',bandKey:'uploads'},
-  {key:'ahu',label:'AHU (avg hourly uploads)',hint:'Avg in-shift uploads per active hour',bandKey:'ahu'},
+  {key:'ahu',label:'Productivity Index (PI)',hint:'Avg in-shift uploads per active hour (PI)',bandKey:'ahu'},
   {key:'quality',label:'Quality Score',hint:'(Total - Errors - Escs) / Total × 100',bandKey:'quality'},
   {key:'defect',label:'Defect Density',hint:'(Errors + Escs) / Total × 1000 — lower is better',bandKey:'defect'},
   {key:'escalation',label:'Quality Escalations',hint:'Count of quality escalations — lower is better',bandKey:'escalation'}
@@ -7273,14 +7273,14 @@ var METRIC_BAND_KEY_ESC={sla:'sla',avgDaily:'avgDaily',ahu:'ahu',escQuality:'avg
 var ESC_METRICS=[
   {key:'sla',label:'Escalation SLA %'},
   {key:'avgDaily',label:'ADU (avg daily uploads)'},
-  {key:'ahu',label:'AHU (avg hourly uploads)'},
+  {key:'ahu',label:'Productivity Index (PI)'},
   {key:'escQuality',label:'Quality Escalations'}
 ];
 
 
 /* ── Metric display helpers ── */
 var METRIC_LABEL={
-  uploads:'ADU',ahu:'AHU',quality:'Quality Score',
+  uploads:'ADU',ahu:'PI',quality:'Quality Score',
   defect:'Defect Density',escalation:'Quality Escs',
   sla:'Esc. SLA %',avgDaily:'ADU',escQuality:'Quality Escs'
 };
@@ -7497,7 +7497,7 @@ function renderEscRatingsTable(){
     html+='<div style="margin-top:8px;font-size:10px;color:var(--muted2)">&#9432; Escalation SLA % is a team-wide metric logged by the manager. It applies equally across all escalation members for the selected period.</div>';
   }
   if(metrics.some(function(m){return m.key==='ahu';})){
-    html+='<div style="margin-top:4px;font-size:10px;color:var(--muted2)">* AHU falls back to ADU when hourly data is unavailable for that period.</div>';
+    html+='<div style="margin-top:4px;font-size:10px;color:var(--muted2)">* PI falls back to ADU when hourly data is unavailable for that period.</div>';
   }
 
   wrap.innerHTML=html;
@@ -7565,7 +7565,7 @@ function escRatingsSaveAndToast(){
 var ESC_METRIC_DEFS=[
   {key:'sla',label:'Escalation SLA %',hint:'Team-wide SLA % — applies equally to all escalation members',bandKey:'sla'},
   {key:'avgDaily',label:'ADU (avg daily uploads)',hint:'Avg in-shift uploads per day',bandKey:'avgDaily'},
-  {key:'ahu',label:'AHU (avg hourly uploads)',hint:'Avg in-shift uploads per active hour',bandKey:'ahu'},
+  {key:'ahu',label:'Productivity Index (PI)',hint:'Avg in-shift uploads per active hour (PI)',bandKey:'ahu'},
   {key:'escQuality',label:'Quality Escalations',hint:'Count of quality escalations — lower is better',bandKey:'avgDaily'}
 ];
 
@@ -7840,7 +7840,7 @@ function hubShowAhuBreakdown(nick,name){
     html+='</div></div>';
   });
   if(!html)html='<p style="color:var(--muted);font-size:12px">No hourly data (Data A) recorded for this period.</p>';
-  hubPopup('&#9203; AHU Breakdown — '+name,html);
+  hubPopup('&#128300; PI Breakdown — '+name,html);
 }
 
 function hubShowDDBreakdown(nick,name){
@@ -7968,8 +7968,8 @@ function renderMgrHubPerformance(){
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.totalUploads+'</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
       +(uplAhu!==null
-        ?'<div style="text-align:center;cursor:pointer" data-nick="'+r.nick+'" data-name="'+r.m.fullName+'" onclick="hubShowAhuBreakdown(this.dataset.nick,this.dataset.name)" title="Hourly breakdown"><div style="font-size:16px;font-weight:700;color:var(--accent);text-decoration:underline dotted">'+uplAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour &#8599;</div></div>'
-        :'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--muted)">—</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></div>')
+        ?'<div style="text-align:center;cursor:pointer" data-nick="'+r.nick+'" data-name="'+r.m.fullName+'" onclick="hubShowAhuBreakdown(this.dataset.nick,this.dataset.name)" title="PI breakdown"><div style="font-size:16px;font-weight:700;color:var(--accent);text-decoration:underline dotted">'+uplAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour (PI) &#8599;</div></div>'
+        :'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--muted)">—</div><div style="font-size:10px;color:var(--muted)">avg/hour (PI)</div></div>')
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.qualEsc+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
       +(defectDensity!==null
         ?'<div style="text-align:center;cursor:pointer" data-nick="'+r.nick+'" data-name="'+r.m.fullName+'" onclick="hubShowDDBreakdown(this.dataset.nick,this.dataset.name)" title="Error breakdown"><div style="font-size:16px;font-weight:700;color:'+ddColor+';text-decoration:underline dotted">'+ddStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000 &#8599;</div></div>'
@@ -8005,7 +8005,7 @@ function renderMgrHubPerformance(){
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase">Member</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">ADU</div>'
-    +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">AHU</div>'
+    +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">PI</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Defect Density</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Score</div>'
@@ -8031,7 +8031,7 @@ function renderMgrHubPerformance(){
         return Math.round(tot/ahuArr.length*10)/10;
       })():null;
       var gtAhuStr=gtAhu!==null?gtAhu.toFixed(1):'—';
-      return '<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></div>';
+      return '<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour (PI)</div></div>';
     })()
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></div>'
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+gtDDColor+'">'+gtDDStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000 (team)</div></div>'
@@ -8089,7 +8089,7 @@ function renderMgrHubPerformance(){
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgDailyStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></td>'
-      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+escAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+escAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour (PI)</div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -8108,7 +8108,7 @@ function renderMgrHubPerformance(){
     +'<td style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscAvg+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></td>'
-    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></td>'
+    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour (PI)</div></td>'
     +'<td style="text-align:center;padding:10px 12px">'+sharedSlaBadge+'</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></td>'
     +'</tr>';
@@ -8160,7 +8160,7 @@ function renderMgrHubPerformance(){
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:left">Member</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">ADU</th>'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">AHU</th>'
+    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">PI</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Escalation SLA</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</th>'
     +'</tr></thead>'
@@ -9879,7 +9879,7 @@ function mwDetailParse(){
       +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">Total</th>'
       +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">In-shift</th>'
       +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">Off-shift</th>'
-      +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">AHU</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">PI</th>'
       +'<th style="padding:5px 8px;text-align:left;color:var(--muted)">Active hours</th>'
       +'</tr></thead><tbody>';
     rows.forEach(function(r){
@@ -10534,9 +10534,9 @@ function renderEscalationHub(){
     +'<div class="prog-wrap"><div class="prog-bar" id="esc-rate-bar" style="width:'+Math.min((inShiftTotal/20)*100,100)+'%"></div></div>'
     +'</div>'
     +'<div class="kpi-card">'
-    +'<div class="kpi-label">&#9203; Avg Hourly Upload</div>'
+    +'<div class="kpi-label">&#128202; Productivity Index (PI)</div>'
     +'<div class="kpi-value" id="esc-ahu-val">'+escAhuStr+'</div>'
-    +'<div class="kpi-sub">'+(escAhuVal!==null?'In-shift uploads ÷ active hours':'Paste Data A to see AHU')+'</div>'
+    +'<div class="kpi-sub">'+(escAhuVal!==null?'In-shift uploads ÷ active hours':'Paste Data A to see PI')+'</div>'
     +'</div>'
     +'</div>'
     +'<div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:0">'
@@ -10818,7 +10818,7 @@ function renderEscPerfFiltered(){
   if(rateVal)rateVal.textContent=avgDaily;
   if(rateSub)rateSub.textContent='uploads per active day';
   if(rateBar)rateBar.style.width=Math.min((filteredUploads/20)*100,100)+'%';
-  /* Update AHU */
+  /* Update PI */
   var escAhuEl=G('esc-ahu-val');
   if(escAhuEl){
     var ahuH=filteredDays.reduce(function(s,d){return s+Object.keys((perfData[cu.nickname][d]||{}).uploadsByHourInShift||{}).length;},0);
@@ -10998,9 +10998,9 @@ function renderDashboard(){
       <div class="kpi-sub">In-shift ÷ weighted working days</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">⏱️ Avg Hourly Upload</div>
+      <div class="kpi-label">&#128202; Productivity Index (PI)</div>
       <div class="kpi-value">${ahuStr}</div>
-      <div class="kpi-sub">${ahuVal!==null?'In-shift uploads ÷ active hours':'Paste Data A to see AHU'}</div>
+      <div class="kpi-sub">${ahuVal!==null?'In-shift uploads ÷ active hours':'Paste Data A to see PI'}</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Quality Escalations</div>
