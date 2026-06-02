@@ -1842,6 +1842,9 @@ function fsSaveTeamMember(m){
   if(!fsDb())return;
   var dir=TEAM_DIR[m.nickname]||{};
   var payload={nickname:m.nickname,fullName:m.fullName,role:m.role,email:dir.email||'',birthday:dir.birthday||'TBC',hireDate:dir.hireDate||'TBC'};
+  /* Include shift schedule if defined */
+  if(m.shiftStart!==undefined&&m.shiftStart!==null)payload.shiftStart=m.shiftStart;
+  if(m.shiftEnd!==undefined&&m.shiftEnd!==null)payload.shiftEnd=m.shiftEnd;
   window._fsSetDoc(window._fsDoc(fsDb(),'team',m.nickname),payload,{merge:true});
 }
 
@@ -4196,7 +4199,23 @@ function renderMgrKpiCard(){
     +'</div>'
     +'<div style="display:flex;gap:10px;padding:0 14px 16px;flex-wrap:wrap">'
     +kpiTile('📤', totalUploads.toLocaleString(), 'Total Uploads', 'var(--text)')
-    +kpiTile('📊', gtUplAvg!==null?gtUplAvg.toFixed(1):'—', 'Avg Daily (ADU)', 'var(--text)')
+    +kpiTile('📊', gtUplAvg!==null?gtUplAvg.toFixed(1):'—', 'ADU', 'var(--text)')
+    +(function(){
+      var ahuNicks=uploaders.filter(function(t){
+        var d2=Object.keys(perfData[t.nickname]||{}).filter(function(d){return inMonth(d);});
+        return d2.some(function(d){return Object.keys(perfData[t.nickname][d].uploadsByHourInShift||{}).length>0;});
+      });
+      var gtAhu=ahuNicks.length?(function(){
+        var sum=ahuNicks.reduce(function(s,t){
+          var d2=Object.keys(perfData[t.nickname]||{}).filter(function(d){return inMonth(d);});
+          var sUpl=d2.reduce(function(ss,d){var r=perfData[t.nickname][d];return ss+(r.uploadsInShift!=null?r.uploadsInShift:r.uploadsTotal||0);},0);
+          var aH=d2.reduce(function(ss,d){return ss+Object.keys(perfData[t.nickname][d].uploadsByHourInShift||{}).length;},0);
+          return s+(aH>0?sUpl/aH:0);
+        },0);
+        return Math.round(sum/ahuNicks.length*10)/10;
+      })():null;
+      return kpiTile('⏱️', gtAhu!==null?gtAhu.toFixed(1):'—', 'AHU', 'var(--text)');
+    })()
     +kpiTile('🔬', gtDD!==null?gtDD.toFixed(1):'—', 'Defect Density', ddColor)
     +kpiTile('✅', gtUplQ!==null?gtUplQ.toFixed(1)+'%':'—', 'Quality %', qColor)
     +kpiTile('🎯', avgSLA!==null?avgSLA.toFixed(1)+'%':'—', 'Esc. SLA %', slaColor)
@@ -6589,12 +6608,19 @@ var ratingsState={
   year:null,
   month:null,     /* 1-12 or null = whole quarter */
   memberFilter:null,
-  /* Weightages — performance (must sum to 100) */
+  /* Configurable performance metrics [{key,weight}] */
+  metrics:[
+    {key:'uploads', weight:50},
+    {key:'quality', weight:30},
+    {key:'escalation', weight:20}
+  ],
+  /* Legacy flat weights kept for backward compat */
   wUploads:50, wQuality:30, wEscalation:20,
   /* Competency weightages (each scored 1-5, averaged with equal weight) */
   /* Performance band ranges — [min,max] inclusive for each rating 1-5 */
   bands:{
     uploads: {5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]},
+    ahu:     {5:[18,9999],4:[15,17],3:[12,14],2:[8,11],1:[0,7]},
     quality: {5:[100,9999],4:[99,99],3:[98,98],2:[93,97],1:[0,92]},
     escalation:{5:[0,0],4:[1,1],3:[2,3],2:[4,5],1:[6,9999]},
     /* Defect density: lower = better. Key = score directly (1=worst/highest DD, 5=best/lowest DD) */
@@ -6642,13 +6668,27 @@ function ratingsInRange(dateStr){
 function ratingsGetKPIs(nick){
   var days=Object.keys(perfData[nick]||{}).filter(ratingsInRange);
   var totalUpl=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
+  /* ADU uses in-shift uploads; fall back to uploadsTotal if inShift not yet recorded */
+  var totalInShift=days.reduce(function(s,d){
+    var rec=perfData[nick][d];
+    return s+(rec.uploadsInShift!=null?rec.uploadsInShift:rec.uploadsTotal||0);
+  },0);
+  var totalOffShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
   var dayCount=days.length||1;
-  var avgDaily=Math.round((totalUpl/dayCount)*10)/10;
+  var avgDaily=Math.round((totalInShift/dayCount)*10)/10;
+  /* AHU = total in-shift uploads / total active in-shift hours across all days */
+  var totalActiveShiftHours=days.reduce(function(s,d){
+    var byH=perfData[nick][d].uploadsByHourInShift||{};
+    return s+Object.keys(byH).length;
+  },0);
+  var avgHourly=totalActiveShiftHours>=1?Math.round((totalInShift/totalActiveShiftHours)*10)/10:null;
   var errs=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&ratingsInRange(c.date)&&c.status!=='pending_review'&&c.status!=='discarded';}).length;
   var qEsc=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&ratingsInRange(c.date);}).length;
   var qScore=totalUpl>0?Math.round(((totalUpl-errs-qEsc)/totalUpl)*1000)/10:null;
   var defectDensity=totalUpl>0?Math.round(((errs+qEsc)/totalUpl)*10000)/10:null;
-  return{avgDaily:avgDaily,qScore:qScore,qEsc:qEsc,totalUpl:totalUpl,dayCount:dayCount,defectDensity:defectDensity};
+  return{avgDaily:avgDaily,avgHourly:avgHourly,qScore:qScore,qEsc:qEsc,
+    totalUpl:totalUpl,totalInShift:totalInShift,totalOffShift:totalOffShift,
+    dayCount:dayCount,defectDensity:defectDensity};
 }
 
 function ratingsBandScore(metric,val){
@@ -6662,16 +6702,34 @@ function ratingsBandScore(metric,val){
   return 1;
 }
 
+/* Map metric key → KPI value */
+var METRIC_KPI_MAP_UPL={
+  uploads:function(kpi){return kpi.avgDaily;},
+  ahu:function(kpi){return kpi.avgHourly!==null?kpi.avgHourly:kpi.avgDaily;},
+  quality:function(kpi){return kpi.qScore;},
+  defect:function(kpi){return kpi.defectDensity;},
+  escalation:function(kpi){return kpi.qEsc;}
+};
+/* Band key to use per metric */
+var METRIC_BAND_KEY_UPL={uploads:'uploads',ahu:'ahu',quality:'quality',defect:'defect',escalation:'escalation'};
+
 function ratingsCalcPerformance(nick){
   var kpi=ratingsGetKPIs(nick);
-  var su=ratingsBandScore('uploads',kpi.avgDaily);
-  /* Defect density bands are defined so rating key = score directly (lower DD = higher key) */
-  var sq=ratingsBandScore('defect',kpi.defectDensity);
-  var se=ratingsBandScore('escalation',kpi.qEsc);
-  if(su===null&&sq===null&&se===null)return null;
-  su=su||1;sq=sq||1;se=se||1;
-  var w=ratingsState;
-  return Math.round(((su*(w.wUploads/100))+(sq*(w.wQuality/100))+(se*(w.wEscalation/100)))*100)/100;
+  var metrics=ratingsState.metrics;
+  if(!metrics||!metrics.length)return null;
+  var totalWeight=metrics.reduce(function(s,m){return s+m.weight;},0);
+  if(totalWeight<=0)return null;
+  var score=0,hasAny=false;
+  metrics.forEach(function(m){
+    var valFn=METRIC_KPI_MAP_UPL[m.key];
+    var bandKey=METRIC_BAND_KEY_UPL[m.key]||m.key;
+    if(!valFn)return;
+    var val=valFn(kpi);
+    var s=ratingsBandScore(bandKey,val);
+    if(s!==null){hasAny=true;score+=s*(m.weight/totalWeight);}
+    else{score+=1*(m.weight/totalWeight);}
+  });
+  return hasAny?Math.round(score*100)/100:null;
 }
 
 function ratingsCalcCompetency(nick){
@@ -6702,6 +6760,7 @@ function ratingsSave(){
   try{
     var payload={
       quarter:ratingsState.quarter,year:ratingsState.year,
+      metrics:ratingsState.metrics,
       wUploads:ratingsState.wUploads,wQuality:ratingsState.wQuality,wEscalation:ratingsState.wEscalation,
       bands:ratingsState.bands,competency:ratingsState.competency,
       savedAt:new Date().toISOString(),savedBy:cu?cu.nickname:''
@@ -6731,6 +6790,7 @@ async function ratingsLoad(quarter,year){
           ratingsState.bands.defect={1:[21,9999],2:[11,20],3:[6,10],4:[3,5],5:[0,2]};
         }
       }
+      if(d.metrics&&d.metrics.length>=2)ratingsState.metrics=d.metrics;
       if(d.competency)ratingsState.competency=d.competency;
     }
   }catch(e){}
@@ -6781,36 +6841,22 @@ function renderRatingsTab(){
     +'<span style="font-size:11px;color:var(--muted);font-weight:600">Member</span>'
     +'<select id="rt-member" onchange="ratingsOnMemberChange(this.value)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+memberOpts+'</select>'
     +'</div>'
-    +'<button onclick="ratingsOpenBands()" style="margin-left:auto;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#9881; Target Bands</button>'
+    +'<button onclick="ratingsOpenConfig()" style="margin-left:auto;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#9881; Metrics &amp; Bands</button>'
     +'<button onclick="ratingsSaveAndToast()" style="font-size:11px;padding:5px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">&#128190; Save Ratings</button>'
     +'</div>'
     +'</div>'
-    /* ── weightage row ── */
-    +'<div class="sect" style="padding:12px 16px;margin-bottom:16px">'
-    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-    +'<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Performance Weightage (must = 100%)</span>'
-    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Avg Uploads</span>'
-    +'<input id="rt-w-upl" type="number" min="0" max="100" value="'+ratingsState.wUploads+'" oninput="ratingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
-    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Quality Score</span>'
-    +'<input id="rt-w-qua" type="number" min="0" max="100" value="'+ratingsState.wQuality+'" oninput="ratingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
-    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Quality Esc</span>'
-    +'<input id="rt-w-esc" type="number" min="0" max="100" value="'+ratingsState.wEscalation+'" oninput="ratingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
-    +'<span id="rt-w-total" style="font-size:11px;font-weight:700;color:var(--green);margin-left:6px">= 100%</span>'
-    +'</div>'
-    +'</div>'
-    /* ── table ── */
     +'<div id="ratings-table-wrap" style="overflow-x:auto"></div>'
-    /* ── bands modal ── */
-    +'<div id="rt-bands-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">'
-    +'<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(94vw,560px);max-height:80vh;overflow-y:auto">'
+    /* unified metrics & bands config modal */
+    +'<div id="rt-config-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 0">'
+    +'<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(96vw,620px);margin:auto">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">&#9881; Target Bands</span>'
-    +'<button onclick="ratingsCloseBands()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
+    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">&#9881; Metrics &amp; Bands</span>'
+    +'<button onclick="ratingsCloseConfig()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
     +'</div>'
-    +'<div id="rt-bands-body"></div>'
+    +'<div id="rt-config-body"></div>'
     +'<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">'
-    +'<button onclick="ratingsCloseBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Close</button>'
-    +'<button onclick="ratingsSaveBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Save Bands</button>'
+    +'<button onclick="ratingsCloseConfig()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Cancel</button>'
+    +'<button onclick="ratingsSaveConfig()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">&#128190; Save Metrics &amp; Bands</button>'
     +'</div></div></div>'
     +'</div>' /* close rt-pane-uploaders */
     /* ── escalation pane (hidden initially) ── */
@@ -6851,79 +6897,65 @@ function renderRatingsTable(){
     document.head.appendChild(s);
   }
 
+  var metrics=ratingsState.metrics||[{key:'uploads',weight:50},{key:'quality',weight:30},{key:'escalation',weight:20}];
+  var perfColCount=metrics.length+2; /* metric cols + Perf Score + Perf Rating */
+  var kpi0=ratingsGetKPIs(members[0]?members[0].nickname:'');
+  /* Build header */
+  var perfFormula=metrics.map(function(m){return (METRIC_LABEL[m.key]||m.key)+'×'+m.weight+'%';}).join(' + ');
   var html='<table class="rt-tbl">'
-    +'<thead>'
-    +'<tr>'
+    +'<thead><tr>'
     +'<th rowspan="2" style="text-align:left;min-width:140px">Member</th>'
-    +'<th colspan="5" class="th-perf">Performance (60%)</th>'
+    +'<th colspan="'+perfColCount+'" class="th-perf">Performance (60%)</th>'
     +'<th colspan="4" class="th-comp">Competencies (40%)</th>'
     +'<th rowspan="2" class="th-final" style="min-width:100px">Final<br>Rating</th>'
-    +'</tr>'
-    +'<tr>'
-    /* performance sub-headers */
-    +'<th class="th-perf">Avg Daily<br>Uploads<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
-    +'<th class="th-perf">Defect<br>Density<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
-    +'<th class="th-perf">Quality<br>Escalation<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
-    +'<th class="th-perf">Perf<br>Score</th>'
-    +'<th class="th-perf">Perf<br>Rating</th>'
-    /* competency sub-headers */
-    +'<th class="th-comp">Core<br>Skills</th>'
-    +'<th class="th-comp">Working<br>w/ Others</th>'
-    +'<th class="th-comp">Delivering<br>Results</th>'
-    +'<th class="th-comp">Comp<br>Score</th>'
-    +'</tr>'
-    +'</thead>'
-    +'<tbody>';
+    +'</tr><tr>'
+    +metrics.map(function(m){return '<th class="th-perf">'+(METRIC_LABEL[m.key]||m.key)+'<br>'+m.weight+'%<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>';}).join('')
+    +'<th class="th-perf">Perf<br>Score</th><th class="th-perf">Perf<br>Rating</th>'
+    +'<th class="th-comp">Core<br>Skills</th><th class="th-comp">Working<br>w/ Others</th>'
+    +'<th class="th-comp">Delivering<br>Results</th><th class="th-comp">Comp<br>Score</th>'
+    +'</tr></thead><tbody>';
 
   members.forEach(function(m){
     var nick=m.nickname;
     var kpi=ratingsGetKPIs(nick);
-    var su=ratingsBandScore('uploads',kpi.avgDaily);
-    var sq=ratingsBandScore('defect',kpi.defectDensity);
-    var se=ratingsBandScore('escalation',kpi.qEsc);
     var perfScore=ratingsCalcPerformance(nick);
     var perfRating=ratingsLabel(perfScore);
     var comp=ratingsState.competency[nick]||{c1:'',c2:'',c3:''};
     var compScore=ratingsCalcCompetency(nick);
     var finalScore=ratingsCalcFinal(nick);
     var finalRating=ratingsLabel(finalScore);
-
     html+='<tr>'
-      /* name */
       +'<td class="td-name"><div style="display:flex;align-items:center;gap:8px">'
       +avEl(nick,28)
       +'<div><div style="font-size:12px;font-weight:600">'+m.fullName+'</div>'
       +'<div style="font-size:10px;color:var(--muted)">'+m.role+'</div></div></div></td>'
-      /* KPI values */
-      +'<td>'+((kpi.avgDaily||kpi.totalUpl)?kpi.avgDaily:'—')+'</td>'
-      +'<td>'+(kpi.defectDensity!==null?kpi.defectDensity.toFixed(1):'—')+'</td>'
-      +'<td>'+kpi.qEsc+'</td>'
-      /* perf score & rating */
+      +metrics.map(function(metric){
+        var valFn=METRIC_VAL_UPL[metric.key];
+        var val=valFn?valFn(kpi):'—';
+        return '<td>'+val+'</td>';
+      }).join('')
       +'<td><span class="rt-score">'+(perfScore!==null?perfScore.toFixed(2):'—')+'</span></td>'
       +'<td><span class="r-pill '+perfRating.cls+'">'+perfRating.label+'</span></td>'
-      /* competency dropdowns */
-      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c1\',this.value)">'
-      +ratingsCompOpts(comp.c1)+'</select></td>'
-      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c2\',this.value)">'
-      +ratingsCompOpts(comp.c2)+'</select></td>'
-      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c3\',this.value)">'
-      +ratingsCompOpts(comp.c3)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c1\',this.value)">'+ratingsCompOpts(comp.c1)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c2\',this.value)">'+ratingsCompOpts(comp.c2)+'</select></td>'
+      +'<td><select class="rt-comp-sel" onchange="ratingsSetComp(\''+nick+'\',\'c3\',this.value)">'+ratingsCompOpts(comp.c3)+'</select></td>'
       +'<td><span class="rt-score">'+(compScore!==null?compScore.toFixed(2):'—')+'</span></td>'
-      /* final */
       +'<td><div><span class="rt-score">'+(finalScore!==null?finalScore.toFixed(2):'—')+'</span>'
       +'<div style="margin-top:3px"><span class="r-pill '+finalRating.cls+'">'+finalRating.label+'</span></div></div></td>'
       +'</tr>';
   });
 
   html+='</tbody></table>';
-
-  /* Legend */
   html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--muted)">'
     +'<span>Formula: <strong>Final = (Perf Score × 60%) + (Comp Score × 40%)</strong></span>'
-    +'<span style="margin-left:auto">Perf Score = (Uploads×'+ratingsState.wUploads+'% + Quality×'+ratingsState.wQuality+'% + Esc×'+ratingsState.wEscalation+'%)</span>'
+    +'<span style="margin-left:auto">Perf Score = ('+perfFormula+')</span>'
     +'</div>';
+  if(metrics.some(function(m){return m.key==='ahu';})){
+    html+='<div style="margin-top:6px;font-size:10px;color:var(--muted2)">* AHU falls back to ADU when hourly data is unavailable for that period.</div>';
+  }
 
   wrap.innerHTML=html;
+
 }
 
 function ratingsCompOpts(val){
@@ -6938,17 +6970,51 @@ function ratingsSetComp(nick,key,val){
   renderRatingsTable();
 }
 
-function ratingsOnWeight(){
-  var wu=parseFloat(G('rt-w-upl').value)||0;
-  var wq=parseFloat(G('rt-w-qua').value)||0;
-  var we=parseFloat(G('rt-w-esc').value)||0;
-  var total=wu+wq+we;
+function ratingsMetricChanged(){
+  var rows=document.querySelectorAll('#rt-metrics-rows .rt-metric-row');
+  var metrics=[];
+  rows.forEach(function(row){
+    var key=row.querySelector('.rt-metric-key').value;
+    var w=parseFloat(row.querySelector('.rt-metric-w').value)||0;
+    metrics.push({key:key,weight:w});
+  });
+  var total=metrics.reduce(function(s,m){return s+m.weight;},0);
   var tEl=G('rt-w-total');
-  if(tEl){tEl.textContent='= '+total+'%';tEl.style.color=total===100?'var(--green)':'#ef4444';}
-  if(total===100){
-    ratingsState.wUploads=wu;ratingsState.wQuality=wq;ratingsState.wEscalation=we;
-    renderRatingsTable();
-  }
+  if(tEl){tEl.textContent='= '+total+'%';tEl.style.color=total===100?'var(--green)':'var(--red)';}
+  ratingsState.metrics=metrics;
+  if(total===100)renderRatingsTable();
+}
+
+function ratingsOnWeight(){ratingsMetricChanged();}
+
+var RT_UPL_METRICS=[
+  {key:'uploads',label:'ADU (avg daily uploads)'},
+  {key:'ahu',label:'AHU (avg hourly uploads)'},
+  {key:'quality',label:'Quality Score'},
+  {key:'defect',label:'Defect Density'},
+  {key:'escalation',label:'Quality Escalations'}
+];
+
+function ratingsAddMetricRow(){
+  var container=G('rt-metrics-rows');if(!container)return;
+  var used=Array.from(container.querySelectorAll('.rt-metric-key')).map(function(s){return s.value;});
+  var next=RT_UPL_METRICS.find(function(m){return used.indexOf(m.key)<0;})||RT_UPL_METRICS[0];
+  var opts=RT_UPL_METRICS.map(function(o){return '<option value="'+o.key+'"'+(o.key===next.key?' selected':'')+'>'+o.label+'</option>';}).join('');
+  var row=document.createElement('div');
+  row.className='rt-metric-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 36px;gap:6px;align-items:center;margin-bottom:6px';
+  row.innerHTML='<select class="rt-metric-key" onchange="ratingsMetricChanged()" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+opts+'</select>'
+    +'<div style="display:flex;align-items:center;gap:3px"><input type="number" class="rt-metric-w" min="0" max="100" value="0" oninput="ratingsMetricChanged()" style="width:48px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<button onclick="ratingsRemoveMetricRow(this)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">&#215;</button>';
+  container.appendChild(row);
+  ratingsMetricChanged();
+}
+
+function ratingsRemoveMetricRow(btn){
+  var container=G('rt-metrics-rows');if(!container)return;
+  if(container.querySelectorAll('.rt-metric-row').length<=2)return;
+  btn.closest('.rt-metric-row').remove();
+  ratingsMetricChanged();
 }
 
 function ratingsOnQuarterChange(val){
@@ -6976,60 +7042,131 @@ function ratingsSaveAndToast(){
 }
 
 /* ── BANDS MODAL ── */
-function ratingsOpenBands(){
-  var overlay=G('rt-bands-overlay');if(!overlay)return;
-  overlay.style.display='flex';
-  var body=G('rt-bands-body');if(!body)return;
-  var metrics=[
-    {key:'uploads',label:'Avg Daily Uploads',hint:'Number of uploads per day'},
-    {key:'defect',label:'Defect Density',hint:'(Errors + Escalations) / Total × 1000 — Rating 5 = lowest DD (best), Rating 1 = highest DD (worst)'},
-    {key:'escalation',label:'Quality Escalation',hint:'Count of quality escalations (lower = better)'}
-  ];
-  var html='';
-  metrics.forEach(function(m){
-    html+='<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;margin-bottom:4px">'+m.label+'</div>'
-      +'<div style="font-size:10px;color:var(--muted);margin-bottom:8px">'+m.hint+'</div>'
+var UPL_METRIC_DEFS=[
+  {key:'uploads',label:'ADU (avg daily uploads)',hint:'Avg in-shift uploads per day',bandKey:'uploads'},
+  {key:'ahu',label:'AHU (avg hourly uploads)',hint:'Avg in-shift uploads per active hour',bandKey:'ahu'},
+  {key:'quality',label:'Quality Score',hint:'(Total - Errors - Escs) / Total × 100',bandKey:'quality'},
+  {key:'defect',label:'Defect Density',hint:'(Errors + Escs) / Total × 1000 — lower is better',bandKey:'defect'},
+  {key:'escalation',label:'Quality Escalations',hint:'Count of quality escalations — lower is better',bandKey:'escalation'}
+];
+
+function ratingsOpenConfig(){
+  var o=G('rt-config-overlay');if(!o)return;
+  o.style.display='flex';
+  ratingsRenderConfig();
+}
+
+function ratingsRenderConfig(){
+  var body=G('rt-config-body');if(!body)return;
+  var metrics=ratingsState.metrics||[];
+  var totalW=metrics.reduce(function(s,m){return s+m.weight;},0);
+  var wColor=totalW===100?'var(--green)':'var(--red)';
+  var metricRows=metrics.map(function(m){
+    var opts=UPL_METRIC_DEFS.map(function(d){return '<option value="'+d.key+'"'+(d.key===m.key?' selected':'')+'>'+d.label+'</option>';}).join('');
+    return '<div class="rtc-row" style="display:grid;grid-template-columns:1fr 90px 36px;gap:6px;align-items:center;margin-bottom:6px">'
+      +'<select class="rtc-key" onchange="ratingsUpdateBandsSection()" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+opts+'</select>'
+      +'<div style="display:flex;align-items:center;gap:3px"><input type="number" class="rtc-w" min="0" max="100" value="'+m.weight+'" oninput="ratingsRenderConfigTotal()" style="width:48px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+      +'<button onclick="ratingsRemoveConfigRow(this)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px">&#215;</button>'
+      +'</div>';
+  }).join('');
+  body.innerHTML=
+    '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Performance Metrics</div>'
+    +'<div id="rtc-rows">'+metricRows+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
+    +'<button onclick="ratingsAddConfigRow()" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">+ Add metric</button>'
+    +'<span id="rtc-total" style="font-size:11px;font-weight:700;color:'+wColor+'">Total: '+totalW+'%</span>'
+    +'<span style="font-size:10px;color:var(--muted2);margin-left:4px">Min 2. Must = 100%.</span>'
+    +'</div>'
+    +'<div id="rtc-bands-section"></div>';
+  ratingsUpdateBandsSection();
+}
+
+function ratingsUpdateBandsSection(){
+  var bsEl=G('rtc-bands-section');if(!bsEl)return;
+  var selects=document.querySelectorAll('#rtc-rows .rtc-key');
+  var keys=[];selects.forEach(function(s){keys.push(s.value);});
+  var usedBandKeys=[...new Set(keys.map(function(k){var d=UPL_METRIC_DEFS.find(function(x){return x.key===k;});return d?d.bandKey:null;}).filter(Boolean))];
+  var bandLabels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
+  var bandsHtml=usedBandKeys.map(function(bk){
+    var keysUsingBand=keys.filter(function(k){var d=UPL_METRIC_DEFS.find(function(x){return x.key===k;});return d&&d.bandKey===bk;});
+    var labelSuffix=keysUsingBand.length>1?' (shared)':'';
+    var def=UPL_METRIC_DEFS.find(function(d){return d.bandKey===bk;})||{label:bk,hint:''};
+    def={label:def.label+labelSuffix,hint:def.hint};
+    var bandDef=ratingsState.bands[bk]||{};
+    var trows='';
+    for(var r=5;r>=1;r--){
+      var b=bandDef[r]||[0,9999];
+      trows+='<tr>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text);font-size:11px">'+bandLabels[r]+'</td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-bkey="'+bk+'" data-r="'+r+'" data-pos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-bkey="'+bk+'" data-r="'+r+'" data-pos="1" value="'+(b[1]>=9000?9999:b[1])+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
+        +'</tr>';
+    }
+    return '<div style="margin-bottom:18px">'
+      +'<div style="font-size:12px;font-weight:700;margin-bottom:3px">'+def.label+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:6px">'+def.hint+'</div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
       +'<tr><th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Rating</th>'
       +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Min</th>'
-      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>';
-    var labels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
-    var bandDef=ratingsState.bands[m.key];
-    if(!bandDef){html+='</table></div>';return;} /* skip unknown key */
-    for(var r=5;r>=1;r--){
-      var b=bandDef[r];
-      var maxDisplay=b[1]>=9000?'∞':b[1];
-      html+='<tr>'
-        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text)">'+labels[r]+'</td>'
-        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-metric="'+m.key+'" data-r="'+r+'" data-pos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
-        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-metric="'+m.key+'" data-r="'+r+'" data-pos="1" value="'+(b[1]>=9000?9999:b[1])+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center" placeholder="9999=∞"></td>'
-        +'</tr>';
-    }
-    html+='</table></div>';
-  });
-  body.innerHTML=html;
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>'
+      +trows+'</table></div>';
+  }).join('');
+  bsEl.innerHTML=bandsHtml
+    ?'<div style="border-top:1px solid var(--border);padding-top:16px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Target Bands</div>'+bandsHtml+'</div>'
+    :'';
 }
 
-function ratingsSaveBands(){
-  G('rt-bands-body').querySelectorAll('input[data-metric]').forEach(function(inp){
-    var metric=inp.dataset.metric,r=parseInt(inp.dataset.r),pos=parseInt(inp.dataset.pos);
-    var val=parseFloat(inp.value)||0;
-    ratingsState.bands[metric][r][pos]=val;
-  });
-  /* Ensure min <= max on every band row (swap if user entered them reversed) */
-  Object.keys(ratingsState.bands).forEach(function(metric){
-    for(var r=1;r<=5;r++){
-      var b=ratingsState.bands[metric][r];
-      if(b&&b[0]>b[1]){var tmp=b[0];b[0]=b[1];b[1]=tmp;}
-    }
-  });
-  ratingsCloseBands();
-  renderRatingsTable();
+function ratingsRenderConfigTotal(){
+  var rows=document.querySelectorAll('#rtc-rows .rtc-w');
+  var total=0;rows.forEach(function(el){total+=parseFloat(el.value)||0;});
+  var el=G('rtc-total');if(el){el.textContent='Total: '+total+'%';el.style.color=total===100?'var(--green)':'var(--red)';}
 }
 
-function ratingsCloseBands(){
-  var o=G('rt-bands-overlay');if(o)o.style.display='none';
+function ratingsAddConfigRow(){
+  var container=G('rtc-rows');if(!container)return;
+  var used=Array.from(container.querySelectorAll('.rtc-key')).map(function(s){return s.value;});
+  var next=UPL_METRIC_DEFS.find(function(d){return used.indexOf(d.key)<0;})||UPL_METRIC_DEFS[0];
+  var opts=UPL_METRIC_DEFS.map(function(d){return '<option value="'+d.key+'"'+(d.key===next.key?' selected':'')+'>'+d.label+'</option>';}).join('');
+  var row=document.createElement('div');row.className='rtc-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 36px;gap:6px;align-items:center;margin-bottom:6px';
+  row.innerHTML='<select class="rtc-key" onchange="ratingsUpdateBandsSection()" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+opts+'</select>'
+    +'<div style="display:flex;align-items:center;gap:3px"><input type="number" class="rtc-w" min="0" max="100" value="0" oninput="ratingsRenderConfigTotal()" style="width:48px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<button onclick="ratingsRemoveConfigRow(this)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px">&#215;</button>';
+  container.appendChild(row);ratingsUpdateBandsSection();ratingsRenderConfigTotal();
 }
+
+function ratingsRemoveConfigRow(btn){
+  var container=G('rtc-rows');if(!container)return;
+  if(container.querySelectorAll('.rtc-row').length<=2)return;
+  btn.closest('.rtc-row').remove();ratingsUpdateBandsSection();ratingsRenderConfigTotal();
+}
+
+function ratingsSaveConfig(){
+  var rows=document.querySelectorAll('#rtc-rows .rtc-row');
+  var metrics=[];
+  rows.forEach(function(row){
+    metrics.push({key:row.querySelector('.rtc-key').value,weight:parseFloat(row.querySelector('.rtc-w').value)||0});
+  });
+  var total=metrics.reduce(function(s,m){return s+m.weight;},0);
+  if(total!==100){alert('Weights must total 100%. Currently: '+total+'%');return;}
+  if(metrics.length<2){alert('Minimum 2 metrics required.');return;}
+  ratingsState.metrics=metrics;
+  document.querySelectorAll('#rtc-bands-section input[data-bkey]').forEach(function(inp){
+    var bk=inp.dataset.bkey,r=parseInt(inp.dataset.r),pos=parseInt(inp.dataset.pos);
+    if(!ratingsState.bands[bk])ratingsState.bands[bk]={};
+    if(!ratingsState.bands[bk][r])ratingsState.bands[bk][r]=[0,9999];
+    ratingsState.bands[bk][r][pos]=parseFloat(inp.value)||0;
+  });
+  Object.keys(ratingsState.bands).forEach(function(bk){
+    for(var r=1;r<=5;r++){var b=ratingsState.bands[bk][r];if(b&&b[0]>b[1]){var t=b[0];b[0]=b[1];b[1]=t;}}
+  });
+  ratingsCloseConfig();renderRatingsTable();
+}
+
+function ratingsCloseConfig(){var o=G('rt-config-overlay');if(o)o.style.display='none';}
+function ratingsOpenBands(){ratingsOpenConfig();}
+function ratingsSaveBands(){ratingsSaveConfig();}
+function ratingsCloseBands(){ratingsCloseConfig();}
 
 /* ── RATINGS SUB-TABS ── */
 var ratingsSubTabActive='uploaders';
@@ -7047,10 +7184,15 @@ function ratingsSubTab(tab,btn){
    ══════════════════════════════════════════════════ */
 var escRatingsState={
   quarter:null, year:null, month:null, memberFilter:null,
+  metrics:[
+    {key:'sla', weight:60},
+    {key:'escQuality', weight:40}
+  ],
   wSLA:60, wQEsc:40,
   bands:{
-    sla:    {5:[95,9999],4:[90,94],3:[80,89],2:[70,79],1:[0,69]},
-    avgDaily:{5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]}
+    sla:     {5:[95,9999],4:[90,94],3:[80,89],2:[70,79],1:[0,69]},
+    avgDaily:{5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]},
+    ahu:     {5:[18,9999],4:[15,17],3:[12,14],2:[8,11],1:[0,7]}
   },
   competency:{},
 };
@@ -7097,14 +7239,58 @@ function escRatingsBandScore(metric,val){
   return 1;
 }
 
+var METRIC_KPI_MAP_ESC={
+  sla:function(kpi){return kpi.avgSLA;},
+  avgDaily:function(kpi){return kpi.avgDaily;},
+  ahu:function(kpi){return kpi.avgHourly!==null?kpi.avgHourly:kpi.avgDaily;},
+  escQuality:function(kpi){return kpi.qualEsc;}
+};
+var METRIC_BAND_KEY_ESC={sla:'sla',avgDaily:'avgDaily',ahu:'ahu',escQuality:'avgDaily'};
+var ESC_METRICS=[
+  {key:'sla',label:'Escalation SLA %'},
+  {key:'avgDaily',label:'ADU (avg daily uploads)'},
+  {key:'ahu',label:'AHU (avg hourly uploads)'},
+  {key:'escQuality',label:'Quality Escalations'}
+];
+
+
+/* ── Metric display helpers ── */
+var METRIC_LABEL={
+  uploads:'ADU',ahu:'AHU',quality:'Quality Score',
+  defect:'Defect Density',escalation:'Quality Escs',
+  sla:'Esc. SLA %',avgDaily:'ADU',escQuality:'Quality Escs'
+};
+var METRIC_VAL_UPL={
+  uploads:function(k){return k.avgDaily!==null?k.avgDaily.toFixed(1):'—';},
+  ahu:function(k){return k.avgHourly!==null?k.avgHourly.toFixed(1):(k.avgDaily!==null?k.avgDaily.toFixed(1)+'*':'—');},
+  quality:function(k){return k.qScore!==null?k.qScore.toFixed(1)+'%':'—';},
+  defect:function(k){return k.defectDensity!==null?k.defectDensity.toFixed(1):'—';},
+  escalation:function(k){return k.qEsc;}
+};
+var METRIC_VAL_ESC={
+  sla:function(k){return k.avgSLA!==null?k.avgSLA+'%':'—';},
+  avgDaily:function(k){return k.avgDaily!==null?k.avgDaily.toFixed(1):'—';},
+  ahu:function(k){return k.avgHourly!==null?k.avgHourly.toFixed(1):(k.avgDaily!==null?k.avgDaily.toFixed(1)+'*':'—');},
+  escQuality:function(k){return k.qualEsc!==undefined?k.qualEsc:'—';}
+};
+
 function escRatingsCalcPerformance(nick){
   var kpi=escRatingsGetKPIs(nick);
-  var ss=escRatingsBandScore('sla',kpi.avgSLA);
-  var sq=escRatingsBandScore('avgDaily',kpi.avgDaily);
-  if(ss===null&&sq===null)return null;
-  ss=ss||1;sq=sq||1;
-  var w=escRatingsState;
-  return Math.round(((ss*(w.wSLA/100))+(sq*(w.wQEsc/100)))*100)/100;
+  var metrics=escRatingsState.metrics;
+  if(!metrics||!metrics.length)return null;
+  var totalWeight=metrics.reduce(function(s,m){return s+m.weight;},0);
+  if(totalWeight<=0)return null;
+  var score=0,hasAny=false;
+  metrics.forEach(function(m){
+    var valFn=METRIC_KPI_MAP_ESC[m.key];
+    var bandKey=METRIC_BAND_KEY_ESC[m.key]||m.key;
+    if(!valFn)return;
+    var val=valFn(kpi);
+    var s=escRatingsBandScore(bandKey,val);
+    if(s!==null){hasAny=true;score+=s*(m.weight/totalWeight);}
+    else{score+=1*(m.weight/totalWeight);}
+  });
+  return hasAny?Math.round(score*100)/100:null;
 }
 
 function escRatingsCalcCompetency(nick){
@@ -7133,6 +7319,7 @@ function escRatingsSave(){
     var key='esc_'+escRatingsState.quarter+'_'+escRatingsState.year;
     window._fsSetDoc(window._fsDoc(fsDb(),'ratings',key),{
       quarter:escRatingsState.quarter,year:escRatingsState.year,
+      metrics:escRatingsState.metrics,
       wSLA:escRatingsState.wSLA,wQEsc:escRatingsState.wQEsc,
       bands:escRatingsState.bands,competency:escRatingsState.competency,
       savedAt:new Date().toISOString(),savedBy:cu?cu.nickname:''
@@ -7160,6 +7347,7 @@ async function escRatingsLoad(quarter,year){
           escRatingsState.bands.avgDaily={5:[100,9999],4:[96,99],3:[90,95],2:[83,89],1:[0,82]};
         }
       }
+      if(d.metrics&&d.metrics.length>=2)escRatingsState.metrics=d.metrics;
       if(d.competency)escRatingsState.competency=d.competency;
     }
   }catch(e){}
@@ -7168,10 +7356,19 @@ async function escRatingsLoad(quarter,year){
 
 function renderEscRatingsPane(){
   var pane=G('rt-pane-escalation');if(!pane)return;
-  /* Sync quarter/year from main ratingsState */
-  escRatingsState.quarter=ratingsState.quarter;
-  escRatingsState.year=ratingsState.year;
-  escRatingsState.month=ratingsState.month;
+  /* Sync quarter/year from main ratingsState if not set */
+  if(!escRatingsState.quarter){escRatingsState.quarter=ratingsState.quarter;escRatingsState.year=ratingsState.year;escRatingsState.month=ratingsState.month;}
+
+  var qs=ratingsGetQuarters();
+  var qOpts=qs.map(function(q){
+    return '<option value="'+q.q+'_'+q.year+'"'+(q.q===escRatingsState.quarter&&q.year===escRatingsState.year?' selected':'')+'>'+q.label+'</option>';
+  }).join('');
+  var qNum=parseInt((escRatingsState.quarter||'Q1').replace('Q',''));
+  var yr=escRatingsState.year||getSydneyDate().getFullYear();
+  var mStart=(qNum-1)*3;
+  var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var mOpts='<option value="">Whole quarter</option>';
+  for(var mi=1;mi<=3;mi++){var mIdx=mStart+(mi-1);mOpts+='<option value="'+mi+'"'+(escRatingsState.month===mi?' selected':'')+'>'+MONTHS[mIdx]+' '+yr+'</option>';}
 
   var escMembers=TEAM.filter(function(m){return m.role==='escalation';});
   var memberOpts='<option value="">All members</option>'+escMembers.map(function(m){
@@ -7179,42 +7376,31 @@ function renderEscRatingsPane(){
   }).join('');
 
   pane.innerHTML=
-    /* toolbar */
     '<div class="sect" style="padding:14px 16px;margin-bottom:16px">'
     +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted);font-weight:600">Quarter</span>'
+    +'<select id="ert-quarter" onchange="escRatingsOnQuarterChange(this.value)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+qOpts+'</select></div>'
+    +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted);font-weight:600">Month</span>'
+    +'<select id="ert-month" onchange="escRatingsOnMonthChange(this.value)" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+mOpts+'</select></div>'
     +'<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted);font-weight:600">Member</span>'
-    +'<select id="ert-member" onchange="escRatingsState.memberFilter=this.value||null;renderEscRatingsTable()" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+memberOpts+'</select>'
-    +'</div>'
-    +'<div style="margin-left:auto;display:flex;gap:8px;align-items:center">'
-    +'<span style="font-size:10px;color:var(--muted2)">Quarter: '+escRatingsState.quarter+' '+escRatingsState.year+(escRatingsState.month?' · Month '+escRatingsState.month:'')+'</span>'
-    +'<button onclick="escRatingsOpenBands()" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#9881; Target Bands</button>'
+    +'<select id="ert-member" onchange="escRatingsState.memberFilter=this.value||null;renderEscRatingsTable()" style="font-size:12px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+memberOpts+'</select></div>'
+    +'<button onclick="escRatingsOpenConfig()" style="margin-left:auto;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">&#9881; Metrics &amp; Bands</button>'
     +'<button onclick="escRatingsSaveAndToast()" style="font-size:11px;padding:5px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">&#128190; Save Ratings</button>'
-    +'</div></div></div>'
-    /* weightage */
-    +'<div class="sect" style="padding:12px 16px;margin-bottom:16px">'
-    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-    +'<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Performance Weightage (must = 100%)</span>'
-    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Escalation SLA %</span>'
-    +'<input id="ert-w-sla" type="number" min="0" max="100" value="'+escRatingsState.wSLA+'" oninput="escRatingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
-    +'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--muted)">Avg Daily Uploads</span>'
-    +'<input id="ert-w-qesc" type="number" min="0" max="100" value="'+escRatingsState.wQEsc+'" oninput="escRatingsOnWeight()" style="width:56px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
-    +'<span id="ert-w-total" style="font-size:11px;font-weight:700;color:var(--green);margin-left:6px">= 100%</span>'
     +'</div></div>'
     /* table */
     +'<div id="esc-ratings-table-wrap" style="overflow-x:auto"></div>'
-    /* bands modal */
-    +'<div id="ert-bands-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:center;justify-content:center">'
-    +'<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(94vw,480px);max-height:80vh;overflow-y:auto">'
+    /* unified metrics & bands config modal — escalation */
+    +'<div id="ert-config-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 0">'
+    +'<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:24px;width:min(96vw,620px);margin:auto">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">&#9881; Escalation Target Bands</span>'
-    +'<button onclick="escRatingsCloseBands()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
+    +'<span style="font-size:14px;font-weight:700;font-family:var(--font-d)">&#9881; Metrics &amp; Bands</span>'
+    +'<button onclick="escRatingsCloseConfig()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">&#10005;</button>'
     +'</div>'
-    +'<div id="ert-bands-body"></div>'
+    +'<div id="ert-config-body"></div>'
     +'<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">'
-    +'<button onclick="escRatingsCloseBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Close</button>'
-    +'<button onclick="escRatingsSaveBands()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Save Bands</button>'
+    +'<button onclick="escRatingsCloseConfig()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">Cancel</button>'
+    +'<button onclick="escRatingsSaveConfig()" style="font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">&#128190; Save Metrics &amp; Bands</button>'
     +'</div></div></div>'
-    ;
 
   escRatingsLoad(escRatingsState.quarter,escRatingsState.year);
 }
@@ -7224,25 +7410,27 @@ function renderEscRatingsTable(){
   var members=TEAM.filter(function(m){return m.role==='escalation';});
   if(escRatingsState.memberFilter)members=members.filter(function(m){return m.nickname===escRatingsState.memberFilter;});
 
+  var metrics=escRatingsState.metrics||[{key:'sla',weight:60},{key:'avgDaily',weight:40}];
+  var perfColCount=metrics.length+2;
+  var perfFormula=metrics.map(function(m){return (METRIC_LABEL[m.key]||m.key)+'×'+m.weight+'%';}).join(' + ');
   var html='<table class="rt-tbl">'
     +'<thead><tr>'
     +'<th rowspan="2" style="text-align:left;min-width:140px">Member</th>'
-    +'<th colspan="4" class="th-perf">Performance (60%)</th>'
+    +'<th colspan="'+perfColCount+'" class="th-perf">Performance (60%)</th>'
     +'<th colspan="4" class="th-comp">Competencies (40%)</th>'
     +'<th rowspan="2" class="th-final" style="min-width:100px">Final<br>Rating</th>'
     +'</tr><tr>'
-    +'<th class="th-perf">Escalation SLA %<br><span style="font-weight:400;color:#5a8a3a">team avg · auto</span></th>'
-    +'<th class="th-perf">Avg Daily<br>Uploads<br><span style="font-weight:400;color:#5a8a3a">auto</span></th>'
-    +'<th class="th-perf">Perf<br>Score</th>'
-    +'<th class="th-perf">Perf<br>Rating</th>'
-    +'<th class="th-comp">Core<br>Skills</th>'
-    +'<th class="th-comp">Working<br>w/ Others</th>'
-    +'<th class="th-comp">Delivering<br>Results</th>'
-    +'<th class="th-comp">Comp<br>Score</th>'
+    +metrics.map(function(m){
+      var sub=m.key==='sla'?'team avg · auto':'auto';
+      return '<th class="th-perf">'+(METRIC_LABEL[m.key]||m.key)+'<br>'+m.weight+'%<br><span style="font-weight:400;color:#5a8a3a">'+sub+'</span></th>';
+    }).join('')
+    +'<th class="th-perf">Perf<br>Score</th><th class="th-perf">Perf<br>Rating</th>'
+    +'<th class="th-comp">Core<br>Skills</th><th class="th-comp">Working<br>w/ Others</th>'
+    +'<th class="th-comp">Delivering<br>Results</th><th class="th-comp">Comp<br>Score</th>'
     +'</tr></thead><tbody>';
 
   if(!members.length){
-    html+='<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No escalation team members found.</td></tr>';
+    html+='<tr><td colspan="'+(perfColCount+6)+'" style="padding:24px;text-align:center;color:var(--muted);font-size:12px">No escalation team members found.</td></tr>';
   }
 
   members.forEach(function(m){
@@ -7254,24 +7442,23 @@ function renderEscRatingsTable(){
     var compScore=escRatingsCalcCompetency(nick);
     var finalScore=escRatingsCalcFinal(nick);
     var finalRating=ratingsLabel(finalScore);
-
     html+='<tr>'
       +'<td class="td-name"><div style="display:flex;align-items:center;gap:8px">'
       +avEl(nick,28)
       +'<div><div style="font-size:12px;font-weight:600">'+m.fullName+'</div>'
       +'<div style="font-size:10px;color:var(--muted)">escalation</div></div></div></td>'
-      /* KPIs */
-      +'<td>'+(kpi.avgSLA!==null?kpi.avgSLA+'%':'—')+'<div style="font-size:9px;color:var(--muted2)">team avg</div></td>'
-      +'<td>'+(kpi.avgDaily!==null?kpi.avgDaily.toFixed(1):'—')+'</td>'
-      /* perf */
+      +metrics.map(function(metric){
+        var valFn=METRIC_VAL_ESC[metric.key];
+        var val=valFn?valFn(kpi):'—';
+        var sub=metric.key==='sla'?'<div style="font-size:9px;color:var(--muted2)">team avg</div>':'';
+        return '<td>'+val+sub+'</td>';
+      }).join('')
       +'<td><span class="rt-score">'+(perfScore!==null?perfScore.toFixed(2):'—')+'</span></td>'
       +'<td><span class="r-pill '+perfRating.cls+'">'+perfRating.label+'</span></td>'
-      /* competency */
       +'<td><select class="rt-comp-sel" onchange="escRatingsSetComp(\''+nick+'\',\'c1\',this.value)">'+ratingsCompOpts(comp.c1)+'</select></td>'
       +'<td><select class="rt-comp-sel" onchange="escRatingsSetComp(\''+nick+'\',\'c2\',this.value)">'+ratingsCompOpts(comp.c2)+'</select></td>'
       +'<td><select class="rt-comp-sel" onchange="escRatingsSetComp(\''+nick+'\',\'c3\',this.value)">'+ratingsCompOpts(comp.c3)+'</select></td>'
       +'<td><span class="rt-score">'+(compScore!==null?compScore.toFixed(2):'—')+'</span></td>'
-      /* final */
       +'<td><div><span class="rt-score">'+(finalScore!==null?finalScore.toFixed(2):'—')+'</span>'
       +'<div style="margin-top:3px"><span class="r-pill '+finalRating.cls+'">'+finalRating.label+'</span></div></div></td>'
       +'</tr>';
@@ -7280,20 +7467,69 @@ function renderEscRatingsTable(){
   html+='</tbody></table>';
   html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--muted)">'
     +'<span>Formula: <strong>Final = (Perf Score × 60%) + (Comp Score × 40%)</strong></span>'
-    +'<span style="margin-left:auto">Perf Score = (SLA×'+escRatingsState.wSLA+'% + Avg Daily Uploads×'+escRatingsState.wQEsc+'%)</span>'
-    +'</div>'
-    +'<div style="margin-top:8px;font-size:10px;color:var(--muted2)">&#9432; Escalation SLA % is a team-wide metric logged by the manager. It applies equally across all escalation members for the selected period.</div>';
+    +'<span style="margin-left:auto">Perf Score = ('+perfFormula+')</span>'
+    +'</div>';
+  if(metrics.some(function(m){return m.key==='sla';})){
+    html+='<div style="margin-top:8px;font-size:10px;color:var(--muted2)">&#9432; Escalation SLA % is a team-wide metric logged by the manager. It applies equally across all escalation members for the selected period.</div>';
+  }
+  if(metrics.some(function(m){return m.key==='ahu';})){
+    html+='<div style="margin-top:4px;font-size:10px;color:var(--muted2)">* AHU falls back to ADU when hourly data is unavailable for that period.</div>';
+  }
 
   wrap.innerHTML=html;
+
 }
 
-function escRatingsOnWeight(){
-  var ws=parseFloat(G('ert-w-sla').value)||0;
-  var wq=parseFloat(G('ert-w-qesc').value)||0;
-  var total=ws+wq;
+function escRatingsMetricChanged(){
+  var rows=document.querySelectorAll('#ert-metrics-rows .ert-metric-row');
+  var metrics=[];
+  rows.forEach(function(row){
+    var key=row.querySelector('.ert-metric-key').value;
+    var w=parseFloat(row.querySelector('.ert-metric-w').value)||0;
+    metrics.push({key:key,weight:w});
+  });
+  var total=metrics.reduce(function(s,m){return s+m.weight;},0);
   var tEl=G('ert-w-total');
-  if(tEl){tEl.textContent='= '+total+'%';tEl.style.color=total===100?'var(--green)':'#ef4444';}
-  if(total===100){escRatingsState.wSLA=ws;escRatingsState.wQEsc=wq;renderEscRatingsTable();}
+  if(tEl){tEl.textContent='= '+total+'%';tEl.style.color=total===100?'var(--green)':'var(--red)';}
+  escRatingsState.metrics=metrics;
+  if(total===100)renderEscRatingsTable();
+}
+
+function escRatingsOnWeight(){escRatingsMetricChanged();}
+
+function escRatingsAddMetricRow(){
+  var container=G('ert-metrics-rows');if(!container)return;
+  var used=Array.from(container.querySelectorAll('.ert-metric-key')).map(function(s){return s.value;});
+  var next=ESC_METRICS.find(function(m){return used.indexOf(m.key)<0;})||ESC_METRICS[0];
+  var opts=ESC_METRICS.map(function(o){return '<option value="'+o.key+'"'+(o.key===next.key?' selected':'')+'>'+o.label+'</option>';}).join('');
+  var row=document.createElement('div');
+  row.className='ert-metric-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 36px;gap:6px;align-items:center;margin-bottom:6px';
+  row.innerHTML='<select class="ert-metric-key" onchange="escRatingsMetricChanged()" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+opts+'</select>'
+    +'<div style="display:flex;align-items:center;gap:3px"><input type="number" class="ert-metric-w" min="0" max="100" value="0" oninput="escRatingsMetricChanged()" style="width:48px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<button onclick="escRatingsRemoveMetricRow(this)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">&#215;</button>';
+  container.appendChild(row);
+  escRatingsMetricChanged();
+}
+
+function escRatingsRemoveMetricRow(btn){
+  var container=G('ert-metrics-rows');if(!container)return;
+  if(container.querySelectorAll('.ert-metric-row').length<=2)return;
+  btn.closest('.ert-metric-row').remove();
+  escRatingsMetricChanged();
+}
+
+function escRatingsOnQuarterChange(val){
+  var parts=val.split('_');
+  escRatingsState.quarter=parts[0];escRatingsState.year=parseInt(parts[1]);
+  escRatingsState.month=null;escRatingsState.competency={};
+  var pane=G('rt-pane-escalation');
+  if(pane&&pane.style.display!=='none')renderEscRatingsPane();
+}
+
+function escRatingsOnMonthChange(val){
+  escRatingsState.month=val?parseInt(val):null;
+  renderEscRatingsTable();
 }
 
 function escRatingsSaveAndToast(){
@@ -7302,58 +7538,127 @@ function escRatingsSaveAndToast(){
   if(btn){var orig=btn.textContent;btn.textContent='✓ Saved!';btn.style.background='var(--green)';setTimeout(function(){btn.textContent=orig;btn.style.background='';},1800);}
 }
 
-function escRatingsOpenBands(){
-  var overlay=G('ert-bands-overlay');if(!overlay)return;
-  overlay.style.display='flex';
-  var body=G('ert-bands-body');if(!body)return;
-  var metrics=[
-    {key:'sla',label:'Escalation SLA %',hint:'Average team SLA % for the period (logged by manager)'},
-    {key:'avgDaily',label:'Avg Daily Uploads',hint:'Average uploads per active day in rating period — individual per member'},
-  ];
-  var html='';
-  var labels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
-  metrics.forEach(function(m){
-    html+='<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;margin-bottom:4px">'+m.label+'</div>'
-      +'<div style="font-size:10px;color:var(--muted);margin-bottom:8px">'+m.hint+'</div>'
+var ESC_METRIC_DEFS=[
+  {key:'sla',label:'Escalation SLA %',hint:'Team-wide SLA % — applies equally to all escalation members',bandKey:'sla'},
+  {key:'avgDaily',label:'ADU (avg daily uploads)',hint:'Avg in-shift uploads per day',bandKey:'avgDaily'},
+  {key:'ahu',label:'AHU (avg hourly uploads)',hint:'Avg in-shift uploads per active hour',bandKey:'ahu'},
+  {key:'escQuality',label:'Quality Escalations',hint:'Count of quality escalations — lower is better',bandKey:'avgDaily'}
+];
+
+function escRatingsOpenConfig(){
+  var o=G('ert-config-overlay');if(!o)return;
+  o.style.display='flex';
+  escRatingsRenderConfig();
+}
+
+function escRatingsRenderConfig(){
+  var body=G('ert-config-body');if(!body)return;
+  var metrics=escRatingsState.metrics||[];
+  var totalW=metrics.reduce(function(s,m){return s+m.weight;},0);
+  var wColor=totalW===100?'var(--green)':'var(--red)';
+  var metricRows=metrics.map(function(m){
+    var opts=ESC_METRIC_DEFS.map(function(d){return '<option value="'+d.key+'"'+(d.key===m.key?' selected':'')+'>'+d.label+'</option>';}).join('');
+    return '<div class="ertc-row" style="display:grid;grid-template-columns:1fr 90px 36px;gap:6px;align-items:center;margin-bottom:6px">'
+      +'<select class="ertc-key" onchange="escRatingsUpdateBandsSection()" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+opts+'</select>'
+      +'<div style="display:flex;align-items:center;gap:3px"><input type="number" class="ertc-w" min="0" max="100" value="'+m.weight+'" oninput="escRatingsRenderConfigTotal()" style="width:48px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+      +'<button onclick="escRatingsRemoveConfigRow(this)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px">&#215;</button>'
+      +'</div>';
+  }).join('');
+  body.innerHTML=
+    '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Performance Metrics</div>'
+    +'<div id="ertc-rows">'+metricRows+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
+    +'<button onclick="escRatingsAddConfigRow()" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer">+ Add metric</button>'
+    +'<span id="ertc-total" style="font-size:11px;font-weight:700;color:'+wColor+'">Total: '+totalW+'%</span>'
+    +'<span style="font-size:10px;color:var(--muted2);margin-left:4px">Min 2. Must = 100%.</span>'
+    +'</div>'
+    +'<div id="ertc-bands-section"></div>';
+  escRatingsUpdateBandsSection();
+}
+
+function escRatingsUpdateBandsSection(){
+  var bsEl=G('ertc-bands-section');if(!bsEl)return;
+  var selects=document.querySelectorAll('#ertc-rows .ertc-key');
+  var keys=[];selects.forEach(function(s){keys.push(s.value);});
+  var usedBandKeys=[...new Set(keys.map(function(k){var d=ESC_METRIC_DEFS.find(function(x){return x.key===k;});return d?d.bandKey:null;}).filter(Boolean))];
+  var bandLabels={5:'5 — Redefined',4:'4 — Exceeded',3:'3 — Met',2:'2 — Partial',1:'1 — Did not meet'};
+  var bandsHtml=usedBandKeys.map(function(bk){
+    var def=ESC_METRIC_DEFS.find(function(d){return d.bandKey===bk;})||{label:bk,hint:''};
+    var bandDef=escRatingsState.bands[bk]||{};
+    var trows='';
+    for(var r=5;r>=1;r--){
+      var b=bandDef[r]||[0,9999];
+      trows+='<tr>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text);font-size:11px">'+bandLabels[r]+'</td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-ebkey="'+bk+'" data-r="'+r+'" data-pos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
+        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-ebkey="'+bk+'" data-r="'+r+'" data-pos="1" value="'+(b[1]>=9000?9999:b[1])+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
+        +'</tr>';
+    }
+    return '<div style="margin-bottom:18px">'
+      +'<div style="font-size:12px;font-weight:700;margin-bottom:3px">'+def.label+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);margin-bottom:6px">'+def.hint+'</div>'
       +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
       +'<tr><th style="text-align:left;padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Rating</th>'
       +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Min</th>'
-      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>';
-    var bandDef=escRatingsState.bands[m.key];
-    if(!bandDef){html+='</table></div>';return;}
-    for(var r=5;r>=1;r--){
-      var b=bandDef[r];
-      html+='<tr>'
-        +'<td style="padding:4px 8px;border:1px solid var(--border);color:var(--text)">'+labels[r]+'</td>'
-        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-emetric="'+m.key+'" data-er="'+r+'" data-epos="0" value="'+b[0]+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"></td>'
-        +'<td style="padding:4px 8px;border:1px solid var(--border)"><input type="number" data-emetric="'+m.key+'" data-er="'+r+'" data-epos="1" value="'+(b[1]>=9000?9999:b[1])+'" style="width:70px;font-size:11px;padding:3px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center" placeholder="9999=∞"></td>'
-        +'</tr>';
-    }
-    html+='</table></div>';
-  });
-  body.innerHTML=html;
+      +'<th style="padding:4px 8px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)">Max</th></tr>'
+      +trows+'</table></div>';
+  }).join('');
+  bsEl.innerHTML=bandsHtml
+    ?'<div style="border-top:1px solid var(--border);padding-top:16px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Target Bands</div>'+bandsHtml+'</div>'
+    :'';
 }
 
-function escRatingsSaveBands(){
-  G('ert-bands-body').querySelectorAll('input[data-emetric]').forEach(function(inp){
-    var metric=inp.dataset.emetric,r=parseInt(inp.dataset.er),pos=parseInt(inp.dataset.epos);
-    if(!escRatingsState.bands[metric])return; /* skip unknown keys */
-    escRatingsState.bands[metric][r][pos]=parseFloat(inp.value)||0;
-  });
-  /* Ensure min <= max on every band row */
-  Object.keys(escRatingsState.bands).forEach(function(metric){
-    for(var r=1;r<=5;r++){
-      var b=escRatingsState.bands[metric][r];
-      if(b&&b[0]>b[1]){var tmp=b[0];b[0]=b[1];b[1]=tmp;}
-    }
-  });
-  escRatingsCloseBands();
-  renderEscRatingsTable();
+function escRatingsRenderConfigTotal(){
+  var rows=document.querySelectorAll('#ertc-rows .ertc-w');
+  var total=0;rows.forEach(function(el){total+=parseFloat(el.value)||0;});
+  var el=G('ertc-total');if(el){el.textContent='Total: '+total+'%';el.style.color=total===100?'var(--green)':'var(--red)';}
 }
 
-function escRatingsCloseBands(){
-  var o=G('ert-bands-overlay');if(o)o.style.display='none';
+function escRatingsAddConfigRow(){
+  var container=G('ertc-rows');if(!container)return;
+  var used=Array.from(container.querySelectorAll('.ertc-key')).map(function(s){return s.value;});
+  var next=ESC_METRIC_DEFS.find(function(d){return used.indexOf(d.key)<0;})||ESC_METRIC_DEFS[0];
+  var opts=ESC_METRIC_DEFS.map(function(d){return '<option value="'+d.key+'"'+(d.key===next.key?' selected':'')+'>'+d.label+'</option>';}).join('');
+  var row=document.createElement('div');row.className='ertc-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 36px;gap:6px;align-items:center;margin-bottom:6px';
+  row.innerHTML='<select class="ertc-key" onchange="escRatingsUpdateBandsSection()" style="font-size:11px;padding:4px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">'+opts+'</select>'
+    +'<div style="display:flex;align-items:center;gap:3px"><input type="number" class="ertc-w" min="0" max="100" value="0" oninput="escRatingsRenderConfigTotal()" style="width:48px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);text-align:center"><span style="font-size:11px;color:var(--muted)">%</span></div>'
+    +'<button onclick="escRatingsRemoveConfigRow(this)" style="width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px">&#215;</button>';
+  container.appendChild(row);escRatingsUpdateBandsSection();escRatingsRenderConfigTotal();
 }
+
+function escRatingsRemoveConfigRow(btn){
+  var container=G('ertc-rows');if(!container)return;
+  if(container.querySelectorAll('.ertc-row').length<=2)return;
+  btn.closest('.ertc-row').remove();escRatingsUpdateBandsSection();escRatingsRenderConfigTotal();
+}
+
+function escRatingsSaveConfig(){
+  var rows=document.querySelectorAll('#ertc-rows .ertc-row');
+  var metrics=[];
+  rows.forEach(function(row){
+    metrics.push({key:row.querySelector('.ertc-key').value,weight:parseFloat(row.querySelector('.ertc-w').value)||0});
+  });
+  var total=metrics.reduce(function(s,m){return s+m.weight;},0);
+  if(total!==100){alert('Weights must total 100%. Currently: '+total+'%');return;}
+  if(metrics.length<2){alert('Minimum 2 metrics required.');return;}
+  escRatingsState.metrics=metrics;
+  document.querySelectorAll('#ertc-bands-section input[data-ebkey]').forEach(function(inp){
+    var bk=inp.dataset.ebkey,r=parseInt(inp.dataset.r),pos=parseInt(inp.dataset.pos);
+    if(!escRatingsState.bands[bk])escRatingsState.bands[bk]={};
+    if(!escRatingsState.bands[bk][r])escRatingsState.bands[bk][r]=[0,9999];
+    escRatingsState.bands[bk][r][pos]=parseFloat(inp.value)||0;
+  });
+  Object.keys(escRatingsState.bands).forEach(function(bk){
+    for(var r=1;r<=5;r++){var b=escRatingsState.bands[bk][r];if(b&&b[0]>b[1]){var t=b[0];b[0]=b[1];b[1]=t;}}
+  });
+  escRatingsCloseConfig();renderEscRatingsTable();
+}
+
+function escRatingsCloseConfig(){var o=G('ert-config-overlay');if(o)o.style.display='none';}
+function escRatingsOpenBands(){escRatingsOpenConfig();}
+function escRatingsSaveBands(){escRatingsSaveConfig();}
+function escRatingsCloseBands(){escRatingsCloseConfig();}
 
 
 var mgrHubCustomRange={from:'',to:''};
@@ -7517,7 +7822,10 @@ function renderMgrHubPerformance(){
     var totalUploads=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
     var inShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsInShift||0);},0);
     var offShift=days.reduce(function(s,d){return s+(perfData[nick][d].uploadsOffShift||0);},0);
-    var avgDaily=days.length?(totalUploads/days.length):null;
+    /* ADU: use inShift if available, fall back to total for old records without shift data */
+    var hasShiftData=days.some(function(d){return perfData[nick][d].uploadsInShift!=null;});
+    var aduBase=hasShiftData?inShift:totalUploads;
+    var avgDaily=days.length?(aduBase/days.length):null;
     var qualEsc=callouts.filter(function(c){
       if(!(c.type==='qesc'||c.type==='qesc_esc'))return false;
       if(c.status==='discarded')return false;
@@ -7550,10 +7858,16 @@ function renderMgrHubPerformance(){
     var ddColor=defectDensity===null?'var(--muted)':defectDensity<=5?'var(--green)':defectDensity<=15?'var(--amber)':'var(--red)';
     var qStr=r.qScore!==null?(r.qScore>=99.5?r.qScore.toFixed(2)+'%':r.qScore.toFixed(1)+'%'):'—';
     var qColor=r.qScore!==null?(r.qScore>=95?'var(--green)':r.qScore>=80?'var(--amber)':'var(--red)'):'var(--muted)';
-    return '<div style="display:grid;grid-template-columns:140px repeat(5,1fr);align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px">'
+    var uplDays2=Object.keys(perfData[r.nick]||{}).filter(mgrHubInRange);
+    var uplShiftTotal=uplDays2.reduce(function(s,d){var rec=perfData[r.nick][d];return s+(rec.uploadsInShift!=null?rec.uploadsInShift:rec.uploadsTotal||0);},0);
+    var uplActiveH=uplDays2.reduce(function(s,d){return s+Object.keys(perfData[r.nick][d].uploadsByHourInShift||{}).length;},0);
+    var uplAhu=uplActiveH>=1?Math.round((uplShiftTotal/uplActiveH)*10)/10:null;
+    var uplAhuStr=uplAhu!==null?uplAhu.toFixed(1):'\u2014';
+    return '<div style="display:grid;grid-template-columns:140px repeat(6,1fr);align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px">'
       +'<div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.totalUploads+'</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
+      +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+uplAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.qualEsc+'</div><div style="font-size:10px;color:var(--muted)">escalations</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+ddColor+'">'+ddStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000</div></div>'
       +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+qColor+'">'+qStr+'</div><div style="font-size:10px;color:var(--muted)">quality score</div></div>'
@@ -7583,19 +7897,38 @@ function renderMgrHubPerformance(){
 
   var uplSection='<div class="sect" style="margin-bottom:20px">'
     +'<div class="sect-head"><span class="sect-title">&#128188; Uploaders</span></div>'
-    +'<div style="display:grid;grid-template-columns:140px repeat(5,1fr);gap:8px;padding:8px 12px;border-bottom:1px solid var(--border2)">'
+    +'<div style="display:grid;grid-template-columns:140px repeat(6,1fr);gap:8px;padding:8px 12px;border-bottom:1px solid var(--border2)">'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase">Member</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</div>'
-    +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Avg Daily</div>'
+    +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">ADU</div>'
+    +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">AHU</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Defect Density</div>'
     +'<div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Score</div>'
     +'</div>'
     +uplRows
-    +'<div style="display:grid;grid-template-columns:140px repeat(5,1fr);align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);font-size:12px;border-top:2px solid var(--border2)">'
+    +'<div style="display:grid;grid-template-columns:140px repeat(6,1fr);align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);font-size:12px;border-top:2px solid var(--border2)">'
     +'<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</div>'
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></div>'
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplAvg+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></div>'
+    +(function(){
+      var ahuArr=uplData.filter(function(r){
+        var d2=Object.keys(perfData[r.nick]||{}).filter(mgrHubInRange);
+        var aH=d2.reduce(function(s,d){return s+Object.keys(perfData[r.nick][d].uploadsByHourInShift||{}).length;},0);
+        return aH>=1;
+      });
+      var gtAhu=ahuArr.length?(function(){
+        var tot=ahuArr.reduce(function(s,r){
+          var d2=Object.keys(perfData[r.nick]||{}).filter(mgrHubInRange);
+          var sUpl=d2.reduce(function(ss,d){var rec=perfData[r.nick][d];return ss+(rec.uploadsInShift!=null?rec.uploadsInShift:rec.uploadsTotal||0);},0);
+          var aH=d2.reduce(function(ss,d){return ss+Object.keys(perfData[r.nick][d].uploadsByHourInShift||{}).length;},0);
+          return s+(aH>=1?sUpl/aH:0);
+        },0);
+        return Math.round(tot/ahuArr.length*10)/10;
+      })():null;
+      var gtAhuStr=gtAhu!==null?gtAhu.toFixed(1):'—';
+      return '<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></div>';
+    })()
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtUplEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></div>'
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+gtDDColor+'">'+gtDDStr+'</div><div style="font-size:10px;color:var(--muted)">defect/1000 (team)</div></div>'
     +'<div style="text-align:center"><div style="font-size:16px;font-weight:700;color:'+gtUplQColor+'">'+gtUplQ+'</div><div style="font-size:10px;color:var(--muted)">avg quality score</div></div>'
@@ -7614,7 +7947,11 @@ function renderMgrHubPerformance(){
     var uplDays=Object.keys(perfData[nick]||{}).filter(function(d){return mgrHubInRange(d);});
     var uplTotal=uplDays.reduce(function(s,d){return s+(perfData[nick][d].uploadsTotal||0);},0);
     var dayCount=uplDays.length||1;
-    var avgDaily=uplTotal>0?(uplTotal/dayCount):null;
+    var hasShiftDataEsc=uplDays.some(function(d){return perfData[nick][d].uploadsInShift!=null;});
+    var escInShift=uplDays.reduce(function(s,d){var rec=perfData[nick][d];return s+(rec.uploadsInShift!=null?rec.uploadsInShift:rec.uploadsTotal||0);},0);
+    var avgDaily=uplDays.length?(hasShiftDataEsc?escInShift:uplTotal)/uplDays.length:null;
+    var escActiveH=uplDays.reduce(function(s,d){return s+Object.keys(perfData[nick][d].uploadsByHourInShift||{}).length;},0);
+    var escAhu=escActiveH>=1?Math.round((escInShift/escActiveH)*10)/10:null;
     var memberSecs=(allTimerSessions||[]).filter(function(s){return s.nick===nick&&mgrHubInRange(s.date);}).reduce(function(a,s){return a+s.seconds;},0);
     var memberHrs=memberSecs/3600;
     var qualEsc=callouts.filter(function(c){
@@ -7623,7 +7960,7 @@ function renderMgrHubPerformance(){
       if(!mgrHubInRange(c.date))return false;
       return c.uploader===nick||c.escalationMember===nick||c.uploader===m.fullName||c.escalationMember===m.fullName;
     }).length;
-    return {m:m,nick:nick,uplTotal:uplTotal,avgDaily:avgDaily,dayCount:dayCount,memberHrs:memberHrs,qualEsc:qualEsc};
+    return {m:m,nick:nick,uplTotal:uplTotal,avgDaily:avgDaily,dayCount:dayCount,memberHrs:memberHrs,qualEsc:qualEsc,escAhu:escAhu};
   });
 
   /* Build SLA badge BEFORE escRows so it's defined when rows render */
@@ -7635,6 +7972,7 @@ function renderMgrHubPerformance(){
 
   var escRows=escData.map(function(r,i){
     var avgDailyStr=r.avgDaily!==null?r.avgDaily.toFixed(1):'—';
+    var escAhuStr=r.escAhu!==null?r.escAhu.toFixed(1):'—';
     var qualBadge=r.qualEsc===0
       ?'<span class="esc-metric-badge good">0</span>'
       :r.qualEsc<=3
@@ -7647,6 +7985,7 @@ function renderMgrHubPerformance(){
       +'<td style="padding:10px 12px;font-size:12px"><div style="display:flex;align-items:center;gap:8px">'+avEl(r.nick,28)+'<span style="font-weight:600;color:var(--text)">'+r.m.fullName+'</span></div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+r.uplTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
       +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+avgDailyStr+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></td>'
+      +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+escAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></td>'
       +slaCell
       +'<td style="text-align:center;padding:10px 12px">'+qualBadge+'</td>'
       +'</tr>';
@@ -7658,14 +7997,17 @@ function renderMgrHubPerformance(){
   var gtEscAvg=gtEscAvgArr.length?(gtEscAvgArr.reduce(function(s,r){return s+r.avgDaily;},0)/gtEscAvgArr.length).toFixed(1):'—';
   var gtEscEsc=escData.reduce(function(s,r){return s+r.qualEsc;},0);
 
+  var gtEscAhuArr=escData.filter(function(r){return r.escAhu!==null;});
+  var gtEscAhu=gtEscAhuArr.length?Math.round(gtEscAhuArr.reduce(function(s,r){return s+r.escAhu;},0)/gtEscAhuArr.length*10)/10:null;
+  var gtEscAhuStr=gtEscAhu!==null?gtEscAhu.toFixed(1):'—';
   var escGrandTotal='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">'
     +'<td style="padding:10px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Grand Total</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscTotal+'</div><div style="font-size:10px;color:var(--muted)">total uploads</div></td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscAvg+'</div><div style="font-size:10px;color:var(--muted)">avg/day</div></td>'
+    +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscAhuStr+'</div><div style="font-size:10px;color:var(--muted)">avg/hour</div></td>'
     +'<td style="text-align:center;padding:10px 12px">'+sharedSlaBadge+'</td>'
     +'<td style="text-align:center;padding:10px 12px"><div style="font-size:16px;font-weight:700;color:var(--text)">'+gtEscEsc+'</div><div style="font-size:10px;color:var(--muted)">total escalations</div></td>'
     +'</tr>';
-
   /* Aggregate drivers across ALL SLA entries in range */
   var driverMap={};
   slaInRange.forEach(function(e){
@@ -7713,7 +8055,8 @@ function renderMgrHubPerformance(){
     +'<thead><tr style="border-bottom:1px solid var(--border2)">'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:left">Member</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Total Uploads</th>'
-    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Avg Daily</th>'
+    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">ADU</th>'
+    +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">AHU</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Escalation SLA</th>'
     +'<th style="padding:8px 12px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;text-align:center">Quality Esc.</th>'
     +'</tr></thead>'
@@ -9074,8 +9417,49 @@ function openMemberProfile(nick){
   var fmtShift=function(h){var hr=Math.floor(h),min=h%1===0.5?'30':'00';return hr+':'+min;};
   G('member-profile-shift').textContent=sh?fmtShift(sh.start)+' – '+fmtShift(sh.end)+' AEST':'No fixed schedule';
   var isManager=cu&&cu.role==='manager';
+  /* Show/hide edit button for managers (not for their own card) */
+  var editBtn=G('member-profile-shift-edit-btn');
+  if(editBtn)editBtn.style.display=(isManager&&nick!==cu.nickname)?'':'none';
+  /* Store current nick on the edit section for save function */
+  var editDiv=G('member-profile-shift-edit');
+  if(editDiv){editDiv.dataset.nick=nick;editDiv.style.display='none';}
+  if(G('member-profile-shift-err'))G('member-profile-shift-err').textContent='';
+  /* Pre-fill inputs with current shift */
+  if(G('member-profile-shift-start'))G('member-profile-shift-start').value=sh?sh.start:'';
+  if(G('member-profile-shift-end'))G('member-profile-shift-end').value=sh?sh.end:'';
   renderAwardHistoryList(nick, history, isManager);
   G('modal-member-profile').classList.add('open');
+}
+
+function memberProfileToggleShiftEdit(){
+  var div=G('member-profile-shift-edit');
+  if(!div)return;
+  var open=div.style.display!=='none';
+  div.style.display=open?'none':'';
+  if(G('member-profile-shift-err'))G('member-profile-shift-err').textContent='';
+}
+
+function memberProfileSaveShift(){
+  var div=G('member-profile-shift-edit');if(!div)return;
+  var nick=div.dataset.nick;if(!nick)return;
+  var startVal=G('member-profile-shift-start').value;
+  var endVal=G('member-profile-shift-end').value;
+  var start=parseFloat(startVal);
+  var end=parseFloat(endVal);
+  var err=G('member-profile-shift-err');
+  if(isNaN(start)||isNaN(end)){if(err)err.textContent='Enter both start and end times.';return;}
+  if(start>=end){if(err)err.textContent='Start must be before end.';return;}
+  if(start<0||end>24){if(err)err.textContent='Hours must be between 0 and 24.';return;}
+  /* Save to SHIFTS and Firestore */
+  SHIFTS[nick]={start:start,end:end};
+  var d=TEAM_DIR[nick];if(d){d.shiftStart=start;d.shiftEnd=end;}
+  fsSaveTeamMember(Object.assign({},TEAM_DIR[nick]||{},{nickname:nick,shiftStart:start,shiftEnd:end}));
+  /* Update display */
+  var fmtShift=function(h){var hr=Math.floor(h),min=h%1===0.5?'30':'00';return hr+':'+min;};
+  G('member-profile-shift').textContent=fmtShift(start)+' – '+fmtShift(end)+' AEST';
+  div.style.display='none';
+  if(err)err.textContent='';
+  pushNotif('🕐','Shift updated for '+nick+': '+fmtShift(start)+'–'+fmtShift(end),'shift');
 }
 
 /* ── ESCALATION PORTAL ── */
@@ -9314,59 +9698,103 @@ function mwDetailParse(){
   var raw=G('mw-detail-paste').value.trim();
   if(!raw){G('mw-detail-status').textContent='Please paste data first.';return;}
   var uploaderNicks=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return m.nickname;});
-  var mapped=[];
-  var lines=raw.split('\n').filter(function(l){return l.trim();});
-  lines.forEach(function(line){
+  /* DATA A FORMAT: Address | Email | Begin | End | Duration (tab-separated, one row per session) */
+  var byKey={};
+  var unmatched=new Set();
+  var totalRows=0,matchedRows=0;
+  function resolveNick(email){
+    email=email.trim().toLowerCase();
+    var n=EMAIL_MAP[email];if(n)return n;
+    var uPart=email.split('@')[0];var best=null,bScore=0;
+    Object.keys(EMAIL_MAP).forEach(function(k){
+      var kU=k.split('@')[0];var sc=0,ml=Math.min(uPart.length,kU.length);
+      for(var i=0;i<ml;i++){if(uPart[i]===kU[i])sc++;}
+      sc=sc/Math.max(uPart.length,kU.length);
+      if(sc>0.8&&sc>bScore){bScore=sc;best=EMAIL_MAP[k];}
+    });
+    return best;
+  }
+  raw.split('\n').forEach(function(line){
+    if(!line.trim())return;
     var parts=line.split('\t');
-    if(parts.length<2)return;
-    var email=parts[0].trim().toLowerCase();
-    var total=parseInt(parts[1].trim())||0;
-    var earliestRaw=parts[2]?parts[2].trim():'';
-    var latestRaw=parts[3]?parts[3].trim():'';
-    var nick=EMAIL_MAP[email];
-    if(!nick){
-      var userPart=email.split('@')[0];
-      var bestMatch=null,bestScore=0;
-      Object.keys(EMAIL_MAP).forEach(function(k){
-        var kUser=k.split('@')[0];
-        var score=0,minLen=Math.min(userPart.length,kUser.length);
-        for(var ci=0;ci<minLen;ci++){if(userPart[ci]===kUser[ci])score++;}
-        score=score/Math.max(userPart.length,kUser.length);
-        if(score>0.8&&score>bestScore){bestScore=score;bestMatch=EMAIL_MAP[k];}
-      });
-      nick=bestMatch;
+    if(parts.length<3)return;
+    var col1=parts[0].trim().toLowerCase();
+    if(col1==='address'||col1==='uploader'||col1==='user')return;
+    var email=parts[1].trim().toLowerCase();
+    var beginStr=parts[2].trim();
+    if(!email||!beginStr)return;
+    totalRows++;
+    var tsMatch=beginStr.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
+    if(!tsMatch)return;
+    var dateStr=tsMatch[1];
+    var hour=parseInt(tsMatch[2]);
+    var nick=resolveNick(email);
+    if(!nick||uploaderNicks.indexOf(nick)<0){unmatched.add(email);return;}
+    matchedRows++;
+    var key=nick+'::'+dateStr;
+    if(!byKey[key]){
+      var sh=SHIFTS[nick]||{start:9,end:18};
+      byKey[key]={nick:nick,date:dateStr,sh:sh,
+        fullName:(TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick}).fullName,
+        total:0,inShift:0,offShift:0,byHour:{},byHourInShift:{}};
     }
-    if(!nick||uploaderNicks.indexOf(nick)<0)return;
-    /* Extract date from timestamp e.g. "April 1, 2026, 10:02 a.m." */
-    var dateStr=null;
-    var dateMatch=earliestRaw.match(/([A-Za-z]+)\s+(\d+),\s+(\d{4})/);
-    if(dateMatch){
-      var monthMap={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
-      var mo=monthMap[dateMatch[1]]||'01';
-      dateStr=dateMatch[3]+'-'+mo+'-'+dateMatch[2].padStart(2,'0');
-    }
-    var sh=SHIFTS[nick]||{start:9,end:18};
-    var earliest=dlParseTime(earliestRaw),latest=dlParseTime(latestRaw);
-    var inShift=total,offShift=0;
-    if(earliest!==null&&latest!==null&&total>0){
-      var wS=Math.max(earliest,sh.start),wE=Math.min(latest,sh.end),tw=latest-earliest||1,iw=Math.max(0,wE-wS);
-      inShift=Math.round(total*(iw/tw));offShift=total-inShift;
-    }
-    mapped.push({nick:nick,fullName:(TEAM.find(function(m){return m.nickname===nick;})||{fullName:nick}).fullName,total:total,inShift:inShift,offShift:offShift,earliest:earliestRaw,latest:latestRaw,date:dateStr});
+    var rec=byKey[key];
+    rec.total++;
+    rec.byHour[hour]=(rec.byHour[hour]||0)+1;
+    if(hour>=rec.sh.start&&hour<rec.sh.end){
+      rec.inShift++;
+      rec.byHourInShift[hour]=(rec.byHourInShift[hour]||0)+1;
+    } else {rec.offShift++;}
   });
-  if(!mapped.length){G('mw-detail-status').textContent='No matching uploaders found. Check the pasted data.';return;}
+  var mapped=Object.values(byKey);
+  mapped.forEach(function(r){
+    var activeH=Object.keys(r.byHourInShift).length;
+    r.ahu=activeH>=1?Math.round((r.inShift/activeH)*10)/10:null;
+  });
+  if(!mapped.length){G('mw-detail-status').textContent='No matching uploaders found ('+totalRows+' rows scanned).';return;}
   mwDetailExtracted=mapped;
-  G('mw-detail-status').textContent='';
-  G('mw-detail-paste-wrap').style.display='none';
-  var dates=[...new Set(mapped.map(function(r){return r.date||'Unknown date';}))];
-  var tableHTML='';
+  var dates=[...new Set(mapped.map(function(r){return r.date;}))].sort();
+  var allH=mapped.reduce(function(a,r){Object.keys(r.byHour).forEach(function(h){a.push(parseInt(h));});return a;},[]);
+  var minH=allH.length?Math.min.apply(null,allH):0,maxH=allH.length?Math.max.apply(null,allH):0;
+  var summaryHTML='<div style="display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--bg2);border-radius:8px;margin-bottom:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">'
+    +'<span>\u2705 <strong style="color:var(--text)">'+matchedRows+' rows</strong> \u00b7 <strong style="color:var(--text)">'+mapped.length+' uploader-day records</strong></span>'
+    +'<span>\uD83D\uDCC5 '+dates.join(', ')+'</span>'
+    +'<span>\uD83D\uDD50 Range: '+String(minH).padStart(2,'0')+':00\u2013'+String(maxH).padStart(2,'0')+':59</span>'
+    +(unmatched.size?'<span style="color:var(--amber)">\u26A0\uFE0F '+unmatched.size+' unmatched</span>':'')
+    +'</div>';
+  var tableHTML=summaryHTML;
   dates.forEach(function(d){
-    var rows=mapped.filter(function(r){return (r.date||'Unknown date')===d;});
-    tableHTML+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:8px 0 4px">'+d+'</div>';
-    tableHTML+='<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px"><thead><tr style="border-bottom:1px solid var(--border2)"><th style="padding:5px 8px;text-align:left;color:var(--muted)">Uploader</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Total</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">In-Shift</th><th style="padding:5px 8px;text-align:center;color:var(--muted)">Off-Shift</th></tr></thead><tbody>';
-    rows.forEach(function(r){tableHTML+='<tr><td style="padding:6px 8px;color:var(--text);font-weight:600">'+r.fullName+'</td><td style="padding:6px 8px;text-align:center">'+r.total+'</td><td style="padding:6px 8px;text-align:center;color:var(--green)">'+r.inShift+'</td><td style="padding:6px 8px;text-align:center;color:var(--amber)">'+r.offShift+'</td></tr>';});
+    var rows=mapped.filter(function(r){return r.date===d;}).sort(function(a,b){return b.total-a.total;});
+    tableHTML+='<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:8px 0 4px">'+d+'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px">'
+      +'<thead><tr style="border-bottom:1px solid var(--border2)">'
+      +'<th style="padding:5px 8px;text-align:left;color:var(--muted)">Uploader</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">Total</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">In-shift</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">Off-shift</th>'
+      +'<th style="padding:5px 8px;text-align:center;color:var(--muted)">AHU</th>'
+      +'<th style="padding:5px 8px;text-align:left;color:var(--muted)">Active hours</th>'
+      +'</tr></thead><tbody>';
+    rows.forEach(function(r){
+      var sh=r.sh;
+      var badges=Object.keys(r.byHour).map(Number).sort(function(a,b){return a-b;}).map(function(h){
+        var inS=h>=sh.start&&h<sh.end;
+        return '<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:'+(inS?'rgba(34,197,94,.1)':'rgba(234,179,8,.1)')
+          +';color:'+(inS?'var(--green)':'var(--amber)')+'">'+String(h).padStart(2,'0')+(inS?'':'\u2191')+'</span>';
+      }).join(' ');
+      tableHTML+='<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:6px 8px;color:var(--text);font-weight:600">'+r.fullName+'</td>'
+        +'<td style="padding:6px 8px;text-align:center">'+r.total+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:var(--green);font-weight:700">'+r.inShift+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;color:'+(r.offShift>0?'var(--amber)':'var(--muted2)')+'">'+r.offShift+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;font-weight:700;color:var(--text)">'+(r.ahu!==null?r.ahu:'\u2014')+'</td>'
+        +'<td style="padding:6px 8px;line-height:1.8">'+badges+'</td>'
+        +'</tr>';
+    });
     tableHTML+='</tbody></table>';
   });
+  G('mw-detail-status').textContent='';
+  G('mw-detail-paste-wrap').style.display='none';
   G('mw-detail-table').innerHTML=tableHTML;
   G('mw-detail-preview').style.display='';
 }
@@ -9377,7 +9805,17 @@ function mwDetailConfirm(){
     var dateKey=r.date||today;
     if(!perfData[r.nick])perfData[r.nick]={};
     var ex=perfData[r.nick][dateKey]||{};
-    perfData[r.nick][dateKey]={uploadsTotal:r.total,uploadsInShift:r.inShift,uploadsOffShift:r.offShift,ahtTotal:ex.ahtTotal||0,ahtCount:ex.ahtCount||0,ahtSecs:ex.ahtSecs||0};
+    perfData[r.nick][dateKey]={
+      uploadsTotal:r.total,
+      uploadsInShift:r.inShift,
+      uploadsOffShift:r.offShift,
+      uploadsByHour:r.byHour||{},
+      uploadsByHourInShift:r.byHourInShift||{},
+      ahuDay:r.ahu||null,
+      ahtTotal:ex.ahtTotal||0,
+      ahtCount:ex.ahtCount||0,
+      ahtSecs:ex.ahtSecs||0
+    };
     fsSavePerfData(r.nick);
   });
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
@@ -11315,9 +11753,28 @@ document.addEventListener('DOMContentLoaded',function(){
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Hire Date</span>
         <span id="member-profile-hire" style="font-size:12px;color:var(--text)"></span>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Shift</span>
-        <span id="member-profile-shift" style="font-size:12px;color:var(--text)"></span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="member-profile-shift" style="font-size:12px;color:var(--text)"></span>
+          <button id="member-profile-shift-edit-btn" onclick="memberProfileToggleShiftEdit()" style="display:none;font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">Edit</button>
+        </div>
+      </div>
+      <!-- Shift edit row — manager only, hidden by default -->
+      <div id="member-profile-shift-edit" style="display:none;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="flex:1">
+            <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px">START (24h)</label>
+            <input id="member-profile-shift-start" type="number" min="0" max="23" step="0.5" placeholder="e.g. 9" class="form-input" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <div style="flex:1">
+            <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:4px">END (24h)</label>
+            <input id="member-profile-shift-end" type="number" min="0" max="23" step="0.5" placeholder="e.g. 18" class="form-input" style="font-size:12px;padding:6px 8px"/>
+          </div>
+          <button onclick="memberProfileSaveShift()" style="font-size:12px;padding:6px 12px;border-radius:8px;background:var(--accent);color:#fff;border:none;cursor:pointer;margin-top:14px;white-space:nowrap">Save</button>
+          <button onclick="memberProfileToggleShiftEdit()" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;margin-top:14px">✕</button>
+        </div>
+        <div id="member-profile-shift-err" style="font-size:11px;color:var(--red);margin-top:4px"></div>
       </div>
     </div>
     <div class="modal-footer">
