@@ -338,6 +338,14 @@ function spendCredit(cost,cb){
 }
 
 function awardCredit(nick,amount){
+  /* Apply daily game credit cap (only for the current user, not performance credits) */
+  var isGameAward=arguments[2]==='game'; /* pass 'game' as 3rd arg for game winnings */
+  var effectiveAmount=amount;
+  if(isGameAward&&cu&&nick===cu.nickname.toLowerCase()&&!gcIsManager()){
+    effectiveAmount=gcCapAward(amount);
+    if(effectiveAmount>0)gcAddDayCredits(effectiveAmount);
+    if(effectiveAmount<=0)return; /* cap hit */
+  }
   var key=nick.toLowerCase();
   db.collection('player_credits').doc(key).get().then(function(snap){
     var c=snap.exists?(snap.data().credits||0):0;
@@ -488,11 +496,308 @@ function toggleSndPanel(){
 /* ═══════════════════════════════════════════════════
    MODAL
 ═══════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   GAME CORNER SAFEGUARDS
+   · 10-min session timer (5-min warning, auto-close)
+   · Shift-hours lockout for members (strict, no exceptions)
+   · Weekend lockout for members
+   · 50-credit/day cap from games
+   · 2-min cooldown between games
+   · Manager exempt from all restrictions
+══════════════════════════════════════════════════════ */
+var GC={
+  SESSION_LIMIT:10*60,   /* 10 min base */
+  WARN_AT:5*60,          /* show warning + extend when 5 min left */
+  EXTEND_SECS:3*60,      /* each extension adds 3 min */
+  EXTEND_COST:5,         /* credits per extension */
+  MAX_EXTENSIONS:2,      /* max 2 extensions → 16 min total */
+  DAILY_GAME_CAP:25,     /* max credits from games per day */
+  GAME_COOLDOWN:120,     /* 2 min between games in seconds */
+  SESSION_COOLDOWN:60*60,/* 1hr before next session if still in shift */
+  _timer:null, _elapsed:0, _warned:false, _extensions:0,
+  _lastGameEnd:0, _sessionEndTime:0
+};
+
+function gcIsManager(){
+  return cu&&cu.role&&cu.role.toLowerCase()==='manager';
+}
+
+function gcGetSydneyDay(){
+  /* Returns 0=Sun,1=Mon...6=Sat in Sydney time */
+  return new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'})).getDay();
+}
+
+function gcIsWeekend(){
+  var d=gcGetSydneyDay();
+  return d===0||d===6;
+}
+
+function gcIsInShift(){
+  if(!cu)return false;
+  var nick=cu.nickname;
+  /* Read shift from SHIFTS global (loaded from Firestore team doc) */
+  var sh=window.SHIFTS&&window.SHIFTS[nick];
+  if(!sh)return true; /* no shift defined — allow by default */
+  var now=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+  var h=now.getHours(),m=now.getMinutes();
+  var tot=h*60+m;
+  return tot>=sh.start*60&&tot<sh.end*60;
+}
+
+function gcCheckAccess(){
+  if(gcIsManager())return{ok:true};
+  if(gcIsWeekend())return{ok:false,reason:'Game Corner is closed on weekends.',sub:'Come back on a weekday during your shift.',icon:'ti-calendar-off'};
+  if(!gcIsInShift())return{ok:false,reason:'Game Corner is only available during your shift.',sub:'Check your shift schedule and try again when you\'re on the clock.',icon:'ti-clock-off'};
+  if(!gcSessionCooldownOk()){
+    var endTime=parseInt(sessionStorage.getItem('gc_session_end')||'0');
+    var remMs=GC.SESSION_COOLDOWN*1000-(Date.now()-endTime);
+    var remMins=Math.ceil(remMs/60000);
+    return{ok:false,reason:'Session cooldown active.',sub:'Next session opens in ~'+remMins+' minute'+(remMins!==1?'s':'')+'. Back to work! \uD83D\uDCAA',icon:'ti-refresh'};
+  }
+  return{ok:true};
+}
+
+function gcGetTodayKey(){
+  var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+  return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+}
+
+function gcGetDayCredits(){
+  /* Track daily game credits earned in sessionStorage (resets per calendar day) */
+  var key='gc_daycred_'+(cu?cu.nickname:'x')+'_'+gcGetTodayKey();
+  return parseInt(sessionStorage.getItem(key)||'0');
+}
+
+function gcAddDayCredits(n){
+  var key='gc_daycred_'+(cu?cu.nickname:'x')+'_'+gcGetTodayKey();
+  var cur=gcGetDayCredits();
+  sessionStorage.setItem(key,cur+n);
+}
+
+function gcCapAward(raw){
+  /* Returns how many credits can actually be awarded given daily cap */
+  if(gcIsManager())return raw;
+  var spent=gcGetDayCredits();
+  var remaining=Math.max(0,GC.DAILY_GAME_CAP-spent);
+  return Math.min(raw,remaining);
+}
+
+function gcStartSession(){
+  if(gcIsManager())return;
+  GC._elapsed=parseInt(sessionStorage.getItem('gc_session_elapsed')||'0');
+  GC._extensions=parseInt(sessionStorage.getItem('gc_session_ext')||'0');
+  GC._warned=false;
+  clearInterval(GC._timer);
+  GC._timer=setInterval(function(){
+    GC._elapsed++;
+    sessionStorage.setItem('gc_session_elapsed',GC._elapsed);
+    var limit=GC.SESSION_LIMIT+GC._extensions*GC.EXTEND_SECS;
+    var remaining=limit-GC._elapsed;
+    /* Only show timer bar when under 5 min */
+    if(remaining<=GC.WARN_AT){
+      gcUpdateTimerUI(remaining);
+      if(!GC._warned){
+        GC._warned=true;
+        gcShowExtendPrompt(remaining);
+      }
+    }
+    if(remaining<=0){
+      gcEndSession();
+    }
+  },1000);
+}
+
+function gcStopSession(){
+  clearInterval(GC._timer);GC._timer=null;
+}
+
+function gcResetSession(){
+  sessionStorage.removeItem('gc_session_elapsed');
+  sessionStorage.removeItem('gc_session_ext');
+  GC._elapsed=0;GC._warned=false;GC._extensions=0;
+}
+
+function gcUpdateTimerUI(remaining){
+  var el=G('gc-timer-bar');
+  if(!el)return;
+  var mins=Math.floor(remaining/60),secs=remaining%60;
+  var label=el.querySelector('#gc-timer-label');
+  if(label)label.textContent=mins+':'+(secs<10?'0':'')+secs+' left';
+  var limit=GC.SESSION_LIMIT+GC._extensions*GC.EXTEND_SECS;
+  var bar=el.querySelector('#gc-timer-fill');
+  if(bar){
+    var pct=Math.max(0,remaining/GC.WARN_AT*100); /* fill relative to warning window */
+    bar.style.width=Math.min(100,pct)+'%';
+    bar.style.background=remaining<=60?'var(--color-background-danger)':'var(--color-background-warning)';
+  }
+  el.style.display='flex';
+}
+
+function gcShowExtendPrompt(remaining){
+  /* Remove any existing prompt */
+  var old=G('gc-extend-prompt');if(old)old.remove();
+  var grid=G('game-grid');if(!grid)return;
+  var canExtend=GC._extensions<GC.MAX_EXTENSIONS;
+  var prompt=document.createElement('div');
+  prompt.id='gc-extend-prompt';
+  prompt.style.cssText='padding:12px 14px;background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);margin-bottom:8px;display:flex;align-items:center;gap:12px;';
+  var extsLeft=GC.MAX_EXTENSIONS-GC._extensions;
+  prompt.innerHTML='<i class="ti ti-clock" style="font-size:18px;color:var(--color-text-warning);flex-shrink:0" aria-hidden="true"></i>'
+    +'<div style="flex:1;min-width:0;">'
+    +'<div style="font-size:13px;font-weight:500;color:var(--color-text-warning);">Session ending soon</div>'
+    +'<div style="font-size:12px;color:var(--color-text-warning);opacity:.8;">'+(canExtend?extsLeft+' extension'+(extsLeft!==1?'s':'')+' left · 5 credits each':'No more extensions available')+'</div>'
+    +'</div>';
+  if(canExtend){
+    var extBtn=document.createElement('button');
+    extBtn.style.cssText='flex-shrink:0;padding:7px 14px;background:var(--color-background-primary);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);font-size:12px;font-weight:500;color:var(--color-text-warning);cursor:pointer;white-space:nowrap;';
+    extBtn.textContent='+3 min · 5 cr';
+    extBtn.onclick=function(){gcExtendSession();};
+    prompt.appendChild(extBtn);
+  }
+  /* Insert after timer bar or at top of grid */
+  var timerBar=G('gc-timer-bar');
+  if(timerBar&&timerBar.nextSibling){grid.insertBefore(prompt,timerBar.nextSibling);}
+  else{grid.insertBefore(prompt,grid.firstChild);}
+}
+
+function gcExtendSession(){
+  if(GC._extensions>=GC.MAX_EXTENSIONS){toast('Maximum extensions reached');return;}
+  spendCredit(GC.EXTEND_COST,function(){
+    GC._extensions++;
+    sessionStorage.setItem('gc_session_ext',GC._extensions);
+    GC._warned=false; /* reset so next warn fires again at next 5-min threshold */
+    /* Remove prompt */
+    var p=G('gc-extend-prompt');if(p)p.remove();
+    /* Hide timer bar again — will reappear at next 5-min threshold */
+    var bar=G('gc-timer-bar');if(bar)bar.style.display='none';
+    toast('⏱️ +3 minutes added! ('+(GC.MAX_EXTENSIONS-GC._extensions)+' extension'+(GC.MAX_EXTENSIONS-GC._extensions!==1?'s':'')+' remaining)');
+  });
+}
+
+function gcEndSession(){
+  gcStopSession();
+  /* Record when session ended for 1hr cooldown */
+  var endTime=Date.now();
+  sessionStorage.setItem('gc_session_end',endTime);
+  GC._sessionEndTime=endTime;
+  gcResetSession();
+  if(G('game-modal')&&G('game-modal').classList.contains('open'))closeModal();
+  var grid=G('game-grid');
+  if(grid){
+    grid.innerHTML='<div style="text-align:center;padding:48px 20px;">'
+      +'<div style="width:56px;height:56px;border-radius:50%;background:var(--color-background-danger);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">'
+      +'<i class="ti ti-hourglass-empty" style="font-size:26px;color:var(--color-text-danger)" aria-hidden="true"></i></div>'
+      +'<div style="font-size:16px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px;">Session time is up</div>'
+      +'<div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:16px;line-height:1.5;">Your session has ended. A new session opens<br>1 hour from now — if you are still on shift.</div>'
+      +'<div style="font-size:12px;padding:8px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);display:inline-block;color:var(--color-text-tertiary);">Refreshes at '+gcNextSessionTime()+'</div>'
+      +'</div>';
+  }
+}
+
+function gcNextSessionTime(){
+  var t=new Date(Date.now()+GC.SESSION_COOLDOWN*1000);
+  var h=t.getHours(),m=t.getMinutes();
+  return h+':'+(m<10?'0':'')+m;
+}
+
+function gcSessionCooldownOk(){
+  if(gcIsManager())return true;
+  var endTime=parseInt(sessionStorage.getItem('gc_session_end')||'0');
+  if(!endTime)return true;
+  return Date.now()-endTime>=GC.SESSION_COOLDOWN*1000;
+}
+
+function gcCooldownOk(){
+  if(gcIsManager())return true;
+  var now=Date.now();
+  return now-GC._lastGameEnd>=GC.GAME_COOLDOWN*1000;
+}
+
+function gcCooldownRemaining(){
+  var rem=Math.ceil((GC.GAME_COOLDOWN*1000-(Date.now()-GC._lastGameEnd))/1000);
+  return Math.max(0,rem);
+}
+
+/* Inject timer bar into game grid header */
+function gcInjectTimerBar(){
+  if(gcIsManager())return;
+  var grid=G('game-grid');
+  if(!grid||G('gc-timer-bar'))return;
+  var bar=document.createElement('div');
+  bar.id='gc-timer-bar';
+  bar.style.cssText='display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--color-background-warning);border-radius:var(--border-radius-md);margin-bottom:8px;border:0.5px solid var(--color-border-warning);';
+  bar.innerHTML='<i class="ti ti-clock" style="font-size:16px;color:var(--color-text-secondary)" aria-hidden="true"></i>'
+    +'<div style="flex:1;height:6px;background:var(--color-border-tertiary);border-radius:3px;overflow:hidden;">'
+    +'<div id="gc-timer-fill" style="height:100%;border-radius:3px;background:var(--color-background-success);width:100%;transition:width 1s linear,background .3s;"></div>'
+    +'</div>'
+    +'<span id="gc-timer-label" style="font-size:12px;color:var(--color-text-secondary);min-width:50px;text-align:right;">10:00</span>';
+  grid.insertBefore(bar,grid.firstChild);
+}
+
+/* ── KC Credit Award — once per week ── */
+function gcAwardKCCredits(score,total){
+  if(!cu||!db)return;
+  var pct=Math.round(score/total*100);
+  var passThreshold=80; /* KC_PASS_PCT */
+  if(pct<passThreshold)return; /* didn't pass, no award */
+  /* Check if already awarded this week */
+  var weekKey=gcGetWeekKey();
+  var storeKey='kc_credit_'+cu.nickname+'_'+weekKey;
+  if(sessionStorage.getItem(storeKey))return; /* already awarded this session */
+  /* Check Firestore for this week's award */
+  db.collection('gc_awards').doc(cu.nickname+'_kc_'+weekKey).get().then(function(snap){
+    if(snap.exists)return; /* already awarded this week */
+    var award=pct===100?10:5;
+    awardCredit(cu.nickname.toLowerCase(),award); /* performance credit — no cap */
+    db.collection('gc_awards').doc(cu.nickname+'_kc_'+weekKey).set({nick:cu.nickname,type:'kc',pct:pct,award:award,week:weekKey,awardedAt:Date.now()});
+    sessionStorage.setItem(storeKey,'1');
+    var msg=pct===100?'🏆 Perfect score! +'+award+' credits awarded':'🎓 KC passed! +'+award+' credits awarded';
+    setTimeout(function(){toast(msg);},500);
+  }).catch(function(){});
+}
+
+function gcGetWeekKey(){
+  var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+  var jan1=new Date(d.getFullYear(),0,1);
+  var week=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+  return d.getFullYear()+'-W'+week;
+}
+
+/* ── Performance Credit Award — called by portal after daily data entry ── */
+/* Called from the portal's Data B / EOD submission flow */
+function gcAwardPerformanceCredits(nick,date,metrics){
+  /* metrics = {uploadsInShift, aduTarget, aduActual, piTarget, piActual, defectDensity} */
+  if(!db||!nick)return;
+  var docKey=nick.toLowerCase()+'_perf_'+date;
+  db.collection('gc_awards').doc(docKey).get().then(function(snap){
+    if(snap.exists)return; /* already awarded for this date */
+    var awards=[];
+    /* ADU target */
+    if(metrics.aduActual!=null&&metrics.aduTarget!=null&&metrics.aduActual>=metrics.aduTarget)
+      awards.push({reason:'ADU target hit',credits:5});
+    /* PI target */
+    if(metrics.piActual!=null&&metrics.piTarget!=null&&metrics.piActual>=metrics.piTarget)
+      awards.push({reason:'PI target hit',credits:5});
+    /* Defect density = 0 */
+    if(metrics.defectDensity!=null&&metrics.defectDensity===0)
+      awards.push({reason:'Zero defect density',credits:3});
+    var total=awards.reduce(function(s,a){return s+a.credits;},0);
+    if(total>0){
+      awardCredit(nick.toLowerCase(),total); /* performance — no daily cap */
+      db.collection('gc_awards').doc(docKey).set({nick:nick,type:'performance',date:date,awards:awards,total:total,awardedAt:Date.now()});
+      /* Push notification if member is online */
+      pushNotif('🎮',nick+' earned '+total+' performance credits for '+date+' ('+awards.map(function(a){return a.reason;}).join(', ')+')','credit');
+    }
+  }).catch(function(){});
+}
+
+/* Expose globally for portal to call */
+window.gcAwardPerformanceCredits=gcAwardPerformanceCredits;
+
 function openModal(id,title){
   currentGame=id;G('modal-title').textContent=title;
   G('cur-score').textContent='';G('best-score').textContent='';
   G('modal-body').innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Loading…</div>';
-  /* KB Quiz uses a compact modal; all other games fill the full modal */
   var modal=G('game-modal').querySelector('.modal');
   if(id==='kbquiz'){modal.classList.add('modal-sm');}
   else{modal.classList.remove('modal-sm');}
@@ -501,6 +806,7 @@ function openModal(id,title){
 function closeModal(){
   G('game-modal').classList.remove('open');G('modal-body').innerHTML='';currentGame=null;
   ['_msIv','_sgIv','_unoIv'].forEach(function(k){if(window[k]){clearInterval(window[k]);window[k]=null;}});
+  GC._lastGameEnd=Date.now();
   setTimeout(function(){if(!musicOn)startMusic();},300);
 }
 function setScore(s){var el=G('cur-score');if(el)el.textContent='Score: '+s;}
@@ -521,6 +827,24 @@ function saveScore(gameId,score,higher){
    LAUNCH
 ═══════════════════════════════════════════════════ */
 function launchGame(id,title){
+  /* ── Access checks ── */
+  var access=gcCheckAccess();
+  if(!access.ok){
+    toast('🔒 '+access.reason);
+    return;
+  }
+  /* ── Cooldown ── */
+  if(!gcCooldownOk()){
+    var rem=gcCooldownRemaining();
+    var mins=Math.floor(rem/60),secs=rem%60;
+    toast('⏳ Cooldown: '+mins+'m '+secs+'s before your next game.');
+    return;
+  }
+  /* ── Daily game cap check ── */
+  if(!gcIsManager()&&gcGetDayCredits()>=GC.DAILY_GAME_CAP){
+    toast('🎮 Daily game credit cap ('+GC.DAILY_GAME_CAP+') reached — keep up the great work and earn more through performance!');
+    /* Still allow playing, just no more credits */
+  }
   var cost=GAME_COSTS[id]||CREDIT_COST_NORMAL;
   spendCredit(cost,function(){
     /* Track play count */
@@ -559,6 +883,25 @@ function launchGame(id,title){
    GRID
 ═══════════════════════════════════════════════════ */
 function renderGrid(){
+  var grid=G('game-grid');if(!grid)return;
+
+  /* ── Access gate ── */
+  var access=gcCheckAccess();
+  if(!access.ok){
+    var iconClass=access.icon||'ti-lock';
+    grid.innerHTML='<div style="text-align:center;padding:48px 20px;">'
+      +'<div style="width:56px;height:56px;border-radius:50%;background:var(--color-background-secondary);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">'
+      +'<i class="ti '+iconClass+'" style="font-size:26px;color:var(--color-text-secondary)" aria-hidden="true"></i></div>'
+      +'<div style="font-size:16px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px;">'+access.reason+'</div>'
+      +'<div style="font-size:13px;color:var(--color-text-secondary);line-height:1.5;">'+access.sub+'</div>'
+      +'</div>';
+    return;
+  }
+
+  /* ── Start session timer ── */
+  gcStartSession();
+  gcInjectTimerBar();
+
   var solo=[
     {id:'minesweeper',e:'💣',n:'Minesweeper',d:'Clear the board · 1 credit'},
     {id:'wordguess',e:'📝',n:'Word Guess',d:'Guess the 5-letter word · 1 credit'},
@@ -1742,6 +2085,8 @@ function gameKBQuiz(C){
   function render(){
     if(idx>=pool.length){
       setScore(score+'/'+pool.length);saveScore('kbquiz',score,true);
+      /* ── KC Credit Award (immediate, once per week) ── */
+      gcAwardKCCredits(score,pool.length);
       var wrap=document.createElement('div');wrap.style.cssText='text-align:center;padding:20px';
       wrap.innerHTML='<div style="font-size:36px;margin-bottom:12px">'+(score>=8?'🎉':'📚')+'</div><div style="font-size:20px;font-weight:700;margin-bottom:8px">'+score+'/'+pool.length+'</div><div style="font-size:13px;color:var(--muted);margin-bottom:20px">'+(score>=8?'Excellent!':score>=6?'Good effort!':'Keep studying!')+'</div>';
       var nb=document.createElement('button');nb.className='btn btn-primary';nb.textContent='Play Again';nb.onclick=function(){gameKBQuiz(C);};wrap.appendChild(nb);

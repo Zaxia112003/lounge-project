@@ -1782,6 +1782,30 @@ function fsSavePerfData(nick){
   if(!fsDb())return;
   if(_testModeGuard())return; /* test mode: no real data writes */
   fsWriteDoc('perfData',Object.assign({_fsId:nick},perfData[nick]||{}));
+  /* ── Award performance credits for today ── */
+  try{
+    var today=todayStr(); /* portal's todayStr() returns YYYY-MM-DD in Sydney time */
+    var dayData=perfData[nick]&&perfData[nick][today];
+    if(dayData){
+      /* ADU target: use SHIFTS to get total shift hours → target = (shiftHours * 1.0 baseline) */
+      /* For simplicity use a fixed target of 80 ADU per day — can be made configurable */
+      var aduTarget=80,piTarget=15; /* pi = productivity index target per hour */
+      var sh=window.SHIFTS&&window.SHIFTS[nick];
+      if(sh&&sh.end>sh.start)piTarget=parseFloat((((sh.end-sh.start)||9)*1.8).toFixed(1));
+      var inShiftUpl=dayData.uploadsInShift!=null?dayData.uploadsInShift:(dayData.uploadsTotal||0);
+      var activeH=Object.keys(dayData.uploadsByHourInShift||{}).length||1;
+      var piActual=+(inShiftUpl/activeH).toFixed(1);
+      var dd=dayData.uploadsTotal>0?+((((perfData[nick]||{})[today]||{}).defectCount||0)/dayData.uploadsTotal*1000).toFixed(1):null;
+      /* Call games file function if available */
+      if(window.gcAwardPerformanceCredits){
+        window.gcAwardPerformanceCredits(nick,today,{
+          aduActual:inShiftUpl,aduTarget:aduTarget,
+          piActual:piActual,piTarget:piTarget,
+          defectDensity:dd
+        });
+      }
+    }
+  }catch(e){/* silent — don't break data save */}
 }
 
 async function fsSaveCallout(c){
