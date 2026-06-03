@@ -321,7 +321,7 @@ function updateCreditUI(){
 }
 var CREDIT_COST_NORMAL=1;
 var CREDIT_COST_CARD=3;
-var CARD_GAME_IDS=['tongits','millionaire','dealornodeal'];
+var CARD_GAME_IDS=['tongits'];
 
 function spendCredit(cost,cb){
   if(!cu){toast('Not signed in — open the Portal first.');return;}
@@ -565,8 +565,8 @@ function renderGrid(){
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
   ];
   var multi=[
-    {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions · lifelines · win up to 500 credits · 3 credits'},
-    {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'20 briefcases · banker offers · press your luck · 3 credits'},
+    {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions · lifelines · win big · 1 credit'},
+    {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'20 briefcases · banker offers · press your luck · 1 credit'},
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base · 1 credit'},
     {id:'chess',e:'♟️',n:'Chess',d:'vs AI or vs Player · Normal or Timed · 1 credit'},
     {id:'uno',e:'🃏',n:'UNO',d:'2–4 players · mix humans & AI · 1 credit'},
@@ -3081,9 +3081,11 @@ function gameTongIts(C){
       });
 
       /* Write shared game state */
-      /* Find first occupied seat to start turn */
+      /* Winner of last round goes first; fallback to first occupied seat */
       var firstTurn=0;
-      for(var si=0;si<3;si++){if(seats[si]){firstTurn=si;break;}}
+      var lw=roomData.lastWinner;
+      if(typeof lw==='number'&&lw>=0&&lw<=2&&seats[lw]){firstTurn=lw;}
+      else{for(var si=0;si<3;si++){if(seats[si]){firstTurn=si;break;}}}
       var initState={
         phase:'playing',
         turn:firstTurn,
@@ -3353,7 +3355,7 @@ function gameTongIts(C){
     /* Update room pot and streaks */
     var newPot=(result.potWon>0)?0:(GS.pot||0); /* pot stays unless claimed */
     var newStreaks=result.consecutiveWins;
-    roomRef().update({pot:newPot,consecutiveWins:newStreaks}).catch(function(){});
+    roomRef().update({pot:newPot,consecutiveWins:newStreaks,lastWinner:result.winner}).catch(function(){});
     /* Award player seat credits */
     var winnerSeat=result.winner;
     /* For now award credits to the player who is in the winner seat */
@@ -3609,7 +3611,7 @@ function gameTongIts(C){
     var pilesRow=box('display:flex;gap:16px;align-items:flex-start;justify-content:center;');
     var sWrap=box('display:flex;flex-direction:column;align-items:center;gap:4px;');
     sWrap.appendChild(lbl('Stock ('+(gs.stock||[]).length+')','var(--muted)',9));
-    var sEl=_cardEl(null,56,80,true);
+    var sEl=_cardEl(null,70,100,true);
     if(isMyTurn&&!drawn){sEl.style.cursor='pointer';sEl.style.outline='2px solid var(--accent)';sEl.onclick=doDrawFromStock;}
     else sEl.style.opacity='0.5';
     sWrap.appendChild(sEl);pilesRow.appendChild(sWrap);
@@ -3618,7 +3620,7 @@ function gameTongIts(C){
     var dTopLbl=document.createElement('div');dTopLbl.style.cssText='font-size:9px;font-weight:700;color:var(--accent);cursor:pointer;text-decoration:underline;text-align:center;';
     dTopLbl.textContent='Discard ('+(gs.discardHistory||[]).length+')';
     dTopLbl.onclick=function(){C._showDiscard=!C._showDiscard;renderGame(roomData);};
-    var dEl=discTop?_cardEl(discTop,56,80):_cardEl(null,56,80,true);
+    var dEl=discTop?_cardEl(discTop,70,100):_cardEl(null,70,100,true);
     if(chowOk){dEl.style.cursor='pointer';dEl.style.outline='3px solid var(--accent)';dEl.onclick=doChow;}
     else if(isMyTurn&&!drawn)dEl.style.opacity='0.45';
     dWrap.appendChild(dTopLbl);dWrap.appendChild(dEl);
@@ -3633,7 +3635,7 @@ function gameTongIts(C){
       dpT.textContent='Discard history — tap to close';dpT.onclick=function(){C._showDiscard=false;renderGame(roomData);};
       dpBox.appendChild(dpT);
       var dpGrid=box('display:flex;gap:2px;flex-wrap:wrap;');
-      decHand(gs.discardHistory||[]).forEach(function(c){dpGrid.appendChild(_cardEl(c,26,36));});
+      decHand(gs.discardHistory||[]).forEach(function(c){dpGrid.appendChild(_cardEl(c,32,46));});
       dpBox.appendChild(dpGrid);center.appendChild(dpBox);
     }
 
@@ -3703,29 +3705,56 @@ function gameTongIts(C){
       eT.textContent='✅ Your Exposed Melds';eWrap.appendChild(eT);
       (allMelds[mySeat]||[]).forEach(function(meld){
         var mr=box('display:flex;gap:4px;');
-        meld.map(decCard).forEach(function(c){mr.appendChild(_cardEl(c,38,54));});
+        meld.map(decCard).forEach(function(c){mr.appendChild(_cardEl(c,50,70));});
         eWrap.appendChild(mr);
       });
       south.appendChild(eWrap);
     }
 
     /* Hand */
-    var hRow=box('display:flex;gap:3px;flex-wrap:wrap;justify-content:center;');
-    sortHand(myHand).forEach(function(c){
+    if(!C._groups)C._groups={};
+    var GROUP_COLORS=['','rgba(239,68,68,.55)','rgba(59,130,246,.55)','rgba(234,179,8,.55)'];
+    var GROUP_LABELS=['','🔴','🔵','🟡'];
+    /* Group hint */
+    var groupHint=box('font-size:10px;color:var(--muted);text-align:center;margin-bottom:2px;');
+    groupHint.textContent='Tip: Right-click a card to mark it for a meld group (🔴🔵🟡)';
+    south.appendChild(groupHint);
+    /* Sort hand but keep grouped cards together */
+    var sorted=sortHand(myHand);
+    var grouped=sorted.slice().sort(function(a,b){
+      var ga=C._groups[encCard(a)]||0, gb=C._groups[encCard(b)]||0;
+      return ga-gb;
+    });
+    var hRow=box('display:flex;gap:5px;flex-wrap:wrap;justify-content:center;');
+    grouped.forEach(function(c){
       var isSel=sel.some(function(s){return encCard(s)===encCard(c);});
       var isMld=melded.has(encCard(c));
-      var ce=_cardEl(c,44,66);
-      ce.style.transition='transform .1s,box-shadow .1s';
-      if(isSel){ce.style.transform='translateY(-12px)';ce.style.boxShadow='0 6px 18px rgba(124,58,237,.5)';}
-      if(isMld&&!isSel)ce.style.boxShadow='0 0 0 2px var(--green)';
-      if(isMyTurn&&!gover&&!pendingDraw){
-        ce.style.cursor='pointer';
-        (function(card){ce.onclick=function(){
-          var idx=sel.findIndex(function(s){return encCard(s)===encCard(card);});
-          if(idx>-1)sel.splice(idx,1);else sel.push(card);
-          renderGame(roomData);
-        };})(c);
+      var grp=C._groups[encCard(c)]||0;
+      var ce=_cardEl(c,58,86);
+      ce.style.transition='transform .1s,box-shadow .1s,outline .1s';
+      if(isSel){ce.style.transform='translateY(-14px)';ce.style.boxShadow='0 6px 18px rgba(124,58,237,.5)';}
+      else if(grp>0){
+        ce.style.outline='3px solid '+GROUP_COLORS[grp];
+        ce.style.transform='translateY(-6px)';
       }
+      if(isMld&&!isSel&&!grp)ce.style.boxShadow='0 0 0 2px var(--green)';
+      /* Left-click = select; Right-click = cycle group */
+      ce.style.cursor='pointer';
+      (function(card){
+        ce.onclick=function(e){
+          if(isMyTurn&&!gover&&!pendingDraw){
+            var idx=sel.findIndex(function(s){return encCard(s)===encCard(card);});
+            if(idx>-1)sel.splice(idx,1);else sel.push(card);
+            renderGame(roomData);
+          }
+        };
+        ce.oncontextmenu=function(e){
+          e.preventDefault();
+          var cur=C._groups[encCard(card)]||0;
+          C._groups[encCard(card)]=(cur+1)%GROUP_COLORS.length;
+          renderGame(roomData);
+        };
+      })(c);
       hRow.appendChild(ce);
     });
     south.appendChild(hRow);
@@ -4477,8 +4506,8 @@ function gameMillionaire(C){
       +'<div style="font-size:12px;color:rgba(200,200,230,.5);margin-bottom:20px">You reached Q'+(qIdx)+' of 15</div>';
     var pb=document.createElement('button');
     pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
-    pb.textContent='Play again (3 credits)';
-    pb.onclick=function(){spendCredit(3,function(){questions=[];usedIdx={1:[],2:[],3:[]};for(var i=0;i<5;i++){var q=pickQ(1);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(2);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(3);if(q)questions.push(q);}qIdx=0;lifelines={fifty:true,audience:true,friend:true,swap:true};gameOver=false;eliminated=[];safeFloor=0;render();});};
+    pb.textContent='Play again (1 credit)';
+    pb.onclick=function(){spendCredit(1,function(){questions=[];usedIdx={1:[],2:[],3:[]};for(var i=0;i<5;i++){var q=pickQ(1);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(2);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(3);if(q)questions.push(q);}qIdx=0;lifelines={fifty:true,audience:true,friend:true,swap:true};gameOver=false;eliminated=[];safeFloor=0;render();});};
     wrap.appendChild(pb);
     C.appendChild(wrap);
   }
@@ -4685,8 +4714,8 @@ function gameDealOrNoDeal(C){
       +'<div style="font-size:14px;color:rgba(200,200,230,.6);margin-bottom:20px">Added to your balance!</div>';
     var pb=document.createElement('button');
     pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
-    pb.textContent='Play again (3 credits)';
-    pb.onclick=function(){spendCredit(3,function(){gameDealOrNoDeal(C);});};
+    pb.textContent='Play again (1 credit)';
+    pb.onclick=function(){spendCredit(1,function(){gameDealOrNoDeal(C);});};
     wrap.appendChild(pb);
     C.appendChild(wrap);
   }
@@ -4701,8 +4730,8 @@ function gameDealOrNoDeal(C){
       +'<div style="font-size:11px;color:rgba(200,200,230,.4);margin-bottom:12px">Case value: '+origPrize+' cr × 0.3</div>';
     var pb=document.createElement('button');
     pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
-    pb.textContent='Play again (3 credits)';
-    pb.onclick=function(){spendCredit(3,function(){gameDealOrNoDeal(C);});};
+    pb.textContent='Play again (1 credit)';
+    pb.onclick=function(){spendCredit(1,function(){gameDealOrNoDeal(C);});};
     wrap.appendChild(pb);
     C.appendChild(wrap);
   }
