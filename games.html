@@ -100,19 +100,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 <body>
 
 <div class="header">
-  <div class="header-logo">🎮 Game Corner</div>
+  <div class="header-logo" id="header-logo">🎮 Game Corner</div>
   <div class="credit-pill" id="credit-pill">🎮 — credits</div>
   <div style="display:flex;align-items:center;gap:8px;margin-left:auto;position:relative">
-    <button class="snd-btn" id="snd-btn" onclick="toggleSndPanel()"><span id="snd-icon">🔈</span> <span class="eq"><span class="eq-b off"></span><span class="eq-b off"></span><span class="eq-b off"></span><span class="eq-b off"></span><span class="eq-b off"></span></span></button>
-    <div class="snd-panel" id="snd-panel">
-      <label>Volume — <span id="vol-label">22%</span></label>
-      <input type="range" min="0" max="1" step="0.01" value="0.22" oninput="setVol(this.value)">
-      <button id="music-toggle-btn" class="btn btn-outline" style="width:100%;margin-top:10px;font-size:11px" onclick="toggleMusic()">▶ Play</button>
-    </div>
     <!-- Notification bell -->
     <button id="notif-btn" style="display:none;position:relative;background:none;border:none;cursor:pointer;font-size:18px;padding:4px;line-height:1;" onclick="toggleNotifPanel()" aria-label="Notifications">🔔<span id="notif-badge" style="display:none;position:absolute;top:0;right:0;width:8px;height:8px;border-radius:50%;background:var(--red);"></span></button>
-    <!-- Manager credit panel toggle -->
-    <button id="mgr-credits-btn" style="display:none;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer" onclick="toggleMgrPanel()">👑 Credits</button>
+    <!-- Manager settings button (replaces logo area, visible to manager only) -->
+    <button id="mgr-credits-btn" style="display:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;" onclick="toggleMgrPanel()" title="Manager Settings" aria-label="Manager Settings">⚙️</button>
     <div class="user-chip" id="user-chip" style="display:none">
       <div class="av" id="user-av"></div>
       <div class="user-nick" id="user-nick"></div>
@@ -121,14 +115,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 </div>
 
 <!-- Manager credit management panel -->
-<div id="mgr-panel-wrap" style="display:none;position:fixed;top:58px;right:0;width:280px;height:calc(100vh - 58px);background:var(--surface);border-left:1px solid var(--border);z-index:200;overflow-y:auto;padding:16px;box-shadow:-4px 0 20px rgba(0,0,0,.3);">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-    <div style="font-size:14px;font-weight:700;color:var(--text)">👑 Credit Manager</div>
-    <button onclick="toggleMgrPanel()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
-  </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.5;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-    Each game costs <strong style="color:var(--text)">3 credits</strong>. Use + / − to adjust member balances.
-  </div>
+<div id="mgr-panel-wrap" style="display:none;position:fixed;top:58px;right:0;width:360px;height:calc(100vh - 58px);background:var(--surface);border-left:1px solid var(--border);z-index:200;overflow-y:auto;padding:16px;box-shadow:-4px 0 20px rgba(0,0,0,.3);">
   <div id="mgr-pane"></div>
 </div>
 
@@ -415,10 +402,12 @@ function renderMgrPanel(){
     +'<button class="mgr-tab mgr-tab-on" id="mt-credits" onclick="mgrSwitchTab(\'credits\')">💰 Credits</button>'
     +'<button class="mgr-tab" id="mt-shifts" onclick="mgrSwitchTab(\'shifts\')">🕐 Shifts</button>'
     +'<button class="mgr-tab" id="mt-requests" onclick="mgrSwitchTab(\'requests\')">🎖 Requests</button>'
+    +'<button class="mgr-tab" id="mt-team" onclick="mgrSwitchTab(\'team\')">👥 Team</button>'
     +'</div>'
     +'<div id="mgr-tab-credits"></div>'
     +'<div id="mgr-tab-shifts" style="display:none"></div>'
     +'<div id="mgr-tab-requests" style="display:none"></div>';
+    +'<div id="mgr-tab-team" style="display:none"></div>'
 
   /* Inject tab CSS once */
   if(!G('mgr-tab-style')){
@@ -435,7 +424,7 @@ function renderMgrPanel(){
 }
 
 function mgrSwitchTab(tab){
-  ['credits','shifts','requests'].forEach(function(t){
+  ['credits','shifts','requests','team'].forEach(function(t){
     var pane=G('mgr-tab-'+t);if(pane)pane.style.display=t===tab?'':'none';
     var btn=G('mt-'+t);if(btn)btn.className='mgr-tab'+(t===tab?' mgr-tab-on':'');
   });
@@ -602,6 +591,89 @@ function mgrRenderRequests(){
       pane.appendChild(div);
     });
   }).catch(function(){pane.innerHTML='<div style="font-size:11px;color:var(--muted)">Could not load requests. Firestore index may be needed.</div>';});
+}
+
+
+/* ── TEAM TAB ── */
+function mgrRenderTeam(){
+  var pane=G('mgr-tab-team');if(!pane)return;
+  /* Load team from gc_team_setup or fall back to _allCredits keys */
+  db.collection('gc_settings').doc('team').get().then(function(snap){
+    var teamData=snap.exists?(snap.data().members||[]):[];
+    /* Merge with credit keys so everyone is listed */
+    var nicks=Object.keys(_allCredits);
+    nicks.forEach(function(n){
+      if(!teamData.find(function(m){return m.nick===n;}))
+        teamData.push({nick:n,fullName:'',role:'uploader'});
+    });
+    teamData.sort(function(a,b){return a.nick.localeCompare(b.nick);});
+    pane.innerHTML='';
+    var info=document.createElement('div');
+    info.style.cssText='font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;';
+    info.textContent='Set each member display name and role. Roles control Game Corner access. Managers bypass all restrictions.';
+    pane.appendChild(info);
+    teamData.forEach(function(member){
+      var div=document.createElement('div');
+      div.style.cssText='padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;';
+      div.innerHTML='<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">'+member.nick+'</div>'
+        +'<div style="display:flex;flex-direction:column;gap:6px;">'
+        +'<input type="text" id="team-name-'+member.nick+'" value="'+(member.fullName||'')+'" placeholder="Full name" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;width:100%;">'
+        +'<select id="team-role-'+member.nick+'" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;width:100%;">'
+        +'<option value="uploader"'+(member.role==='uploader'?' selected':'')+'>Uploader</option>'
+        +'<option value="escalation"'+(member.role==='escalation'?' selected':'')+'>Escalation</option>'
+        +'<option value="manager"'+(member.role==='manager'?' selected':'')+'>Manager</option>'
+        +'</select>'
+        +'<button onclick="mgrSaveTeamMember(\''+member.nick+'\')" style="font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;">Save</button>'
+        +'</div>';
+      pane.appendChild(div);
+    });
+    var addDiv=document.createElement('div');
+    addDiv.style.cssText='padding:10px;background:var(--surface2);border-radius:8px;border:1px dashed var(--border);margin-bottom:8px;';
+    addDiv.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Add new member</div>'
+      +'<div style="display:flex;gap:6px;">'
+      +'<input type="text" id="new-member-nick" placeholder="Nickname (lowercase)" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;">'
+      +'<button onclick="mgrAddTeamMember()" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;white-space:nowrap;">Add</button>'
+      +'</div>';
+    pane.appendChild(addDiv);
+  }).catch(function(){
+    pane.innerHTML='<div style="font-size:11px;color:var(--muted)">Could not load team data.</div>';
+  });
+}
+
+function mgrSaveTeamMember(nick){
+  var nameEl=G('team-name-'+nick),roleEl=G('team-role-'+nick);
+  if(!nameEl||!roleEl)return;
+  var fullName=nameEl.value.trim(),role=roleEl.value;
+  db.collection('gc_settings').doc('team').get().then(function(snap){
+    var members=snap.exists?(snap.data().members||[]):[];
+    var idx=members.findIndex(function(m){return m.nick===nick;});
+    if(idx>-1)members[idx]={nick:nick,fullName:fullName,role:role};
+    else members.push({nick:nick,fullName:fullName,role:role});
+    db.collection('gc_settings').doc('team').set({members:members}).then(function(){
+      toast('Saved: '+nick+' ('+role+')');
+      if(cu&&nick===cu.nickname.toLowerCase()){
+        localStorage.setItem('lounge_role',role);
+        cu.role=role;
+      }
+    });
+  }).catch(function(e){toast('Error: '+e.message);});
+}
+
+function mgrAddTeamMember(){
+  var el=G('new-member-nick');
+  if(!el||!el.value.trim())return;
+  var nick=el.value.trim().toLowerCase();
+  db.collection('gc_settings').doc('team').get().then(function(snap){
+    var members=snap.exists?(snap.data().members||[]):[];
+    if(members.find(function(m){return m.nick===nick;})){toast(nick+' already exists');return;}
+    members.push({nick:nick,fullName:'',role:'uploader'});
+    db.collection('gc_settings').doc('team').set({members:members}).then(function(){
+      /* Initialise credits to 0 */
+      db.collection('player_credits').doc(nick).set({credits:0},{merge:true});
+      el.value='';toast('Added: '+nick);
+      mgrRenderTeam();
+    });
+  }).catch(function(e){toast('Error: '+e.message);});
 }
 
 function gcMgrApproveFromPanel(reqId){
@@ -1087,7 +1159,7 @@ function closeModal(){
   G('game-modal').classList.remove('open');G('modal-body').innerHTML='';currentGame=null;
   ['_msIv','_sgIv','_unoIv'].forEach(function(k){if(window[k]){clearInterval(window[k]);window[k]=null;}});
   GC._lastGameEnd=Date.now();
-  setTimeout(function(){if(!musicOn)startMusic();},300);
+  /* BGM disabled — startMusic() preserved but not called on close */
 }
 function setScore(s){var el=G('cur-score');if(el)el.textContent='Score: '+s;}
 function setBest(nick,score){var el=G('best-score');if(el)el.textContent='Best: '+nick+' · '+score;}
@@ -1312,7 +1384,14 @@ function applyTheme(nick){
 function toggleMgrPanel(){
   var wrap=G('mgr-panel-wrap');
   if(!wrap)return;
-  wrap.style.display=wrap.style.display==='none'?'block':'none';
+  var opening=wrap.style.display==='none'||!wrap.style.display;
+  wrap.style.display=opening?'block':'none';
+  if(opening){
+    renderMgrPanel();
+    loadAllCredits();
+    mgrLoadShifts();
+    mgrRenderTeam();
+  }
 }
 
 function init(){
@@ -1330,14 +1409,17 @@ function init(){
   /* Show manager credit panel button */
   if(cu.role==='manager'){
     var mgrBtn=G('mgr-credits-btn');
-    if(mgrBtn)mgrBtn.style.display='';
+    if(mgrBtn){mgrBtn.style.display='flex';}
+    /* Manager gets gear icon, members get plain logo */
+    var logo=G('header-logo');
+    if(logo)logo.style.display='none'; /* hide logo for manager — gear icon replaces it */
     loadAllCredits();
   }
   db.collection('player_credits').doc(nick.toLowerCase()).onSnapshot(function(snap){
     credits=snap.exists?(snap.data().credits||0):0;creditsLoaded=true;updateCreditUI();
   });
   renderGrid();
-  function fg(){ensureAudio();startMusic();document.removeEventListener('click',fg);document.removeEventListener('keydown',fg);}
+  function fg(){ensureAudio();/* BGM disabled — code preserved */document.removeEventListener('click',fg);document.removeEventListener('keydown',fg);}
   document.addEventListener('click',fg);document.addEventListener('keydown',fg);
 }
 
