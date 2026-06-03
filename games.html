@@ -372,8 +372,7 @@ function gcAwardGameCredit(nick,amount){
   if(gcIsManager()){awardCredit(nick,amount);return;}
   var effective=gcCapAward(amount);
   if(effective<=0){
-    if(cu&&nick.toLowerCase()===cu.nickname.toLowerCase())
-      toast('🎮 Daily game credit cap ('+GC.DAILY_GAME_CAP+') reached — performance credits still available!');
+    /* Cap hit — play continues but no credit awarded. Silent. */
     return;
   }
   gcAddDayCredits(effective);
@@ -541,7 +540,7 @@ function mgrSaveShift(nick){
   if(!startEl||!endEl)return;
   var start=startEl.value,end=endEl.value;
   if(!start||!end){toast('Please set both start and end times');return;}
-  _gcShifts[nick]={start:start,end:end};
+  _gcShifts[nick.toLowerCase()]={start:start,end:end};
   db.collection('gc_settings').doc('shifts').set(_gcShifts,{merge:false}).then(function(){
     toast('Shift saved for '+nick+': '+start+' – '+end);
     mgrRenderCredits();
@@ -565,10 +564,13 @@ function mgrSaveAllShifts(){
 function mgrRenderRequests(){
   var pane=G('mgr-tab-requests');if(!pane)return;
   pane.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Loading requests…</div>';
-  db.collection('gc_badge_requests').where('status','==','pending').orderBy('createdAt','desc').get().then(function(snap){
+  db.collection('gc_badge_requests').where('status','==','pending').get().then(function(snap){
     if(snap.empty){pane.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0;">No pending badge requests 🎉</div>';return;}
     pane.innerHTML='';
-    snap.forEach(function(doc){
+    /* Sort client-side by createdAt desc (avoids composite index requirement) */
+    var docs=[];snap.forEach(function(d){docs.push(d);});
+    docs.sort(function(a,b){return(b.data().createdAt||0)-(a.data().createdAt||0);});
+    docs.forEach(function(doc){
       var req=doc.data();
       var item=SHOP_ITEMS.find(function(i){return i.id===req.itemId;})||{name:req.itemId,icon:'🎖'};
       var extra='';
@@ -598,14 +600,23 @@ function mgrRenderRequests(){
 function mgrRenderTeam(){
   var pane=G('mgr-tab-team');if(!pane)return;
   /* Load team from gc_team_setup or fall back to _allCredits keys */
+  /* Always build from _allCredits keys (loaded on panel open) merged with any saved team data */
   db.collection('gc_settings').doc('team').get().then(function(snap){
-    var teamData=snap.exists?(snap.data().members||[]):[];
-    /* Merge with credit keys so everyone is listed */
+    var saved=snap.exists?(snap.data().members||[]):[];
+    /* Start from allCredits so every member appears even if team doc is empty */
     var nicks=Object.keys(_allCredits);
-    nicks.forEach(function(n){
-      if(!teamData.find(function(m){return m.nick===n;}))
-        teamData.push({nick:n,fullName:'',role:'uploader'});
+    if(!nicks.length){
+      /* Credits not loaded yet — try loading them first */
+      loadAllCredits();
+      pane.innerHTML='<div style="font-size:11px;color:var(--muted)">Loading members… if this persists, click Credits tab first then return here.</div>';
+      return;
+    }
+    var teamData=nicks.map(function(n){
+      var saved_entry=saved.find(function(m){return m.nick===n;})||{};
+      return{nick:n,fullName:saved_entry.fullName||'',role:saved_entry.role||'uploader'};
     });
+    /* Also add any in saved but not in credits */
+    saved.forEach(function(m){if(!teamData.find(function(t){return t.nick===m.nick;}))teamData.push(m);});
     teamData.sort(function(a,b){return a.nick.localeCompare(b.nick);});
     pane.innerHTML='';
     var info=document.createElement('div');
@@ -814,11 +825,11 @@ function toggleSndPanel(){
    · Manager exempt from all restrictions
 ══════════════════════════════════════════════════════ */
 var GC={
-  SESSION_LIMIT:10*60,   /* 10 min base */
+  SESSION_LIMIT:15*60,   /* 15 min base */
   WARN_AT:5*60,          /* show warning + extend when 5 min left */
-  EXTEND_SECS:3*60,      /* each extension adds 3 min */
-  EXTEND_COST:5,         /* credits per extension */
-  MAX_EXTENSIONS:2,      /* max 2 extensions → 16 min total */
+  EXTEND_SECS:5*60,      /* each extension adds 5 min */
+  EXTEND_COST:10,        /* credits per extension */
+  MAX_EXTENSIONS:999,    /* unlimited extensions */
   DAILY_GAME_CAP:25,     /* max credits from games per day */
   GAME_COOLDOWN:10,      /* 10 seconds between games */
   SESSION_COOLDOWN:60*60,/* 1hr before next session if still in shift */
@@ -842,20 +853,31 @@ function gcIsWeekend(){
 
 /* Shift data loaded from gc_settings/shifts Firestore doc */
 var _gcShiftsLoaded=false;
+/* ── Load shifts from Firestore BEFORE rendering the grid ── */
 function gcLoadShiftsFromFirestore(){
   if(!db||_gcShiftsLoaded)return;
   _gcShiftsLoaded=true;
+  var firstLoad=true;
   db.collection('gc_settings').doc('shifts').onSnapshot(function(snap){
     if(snap.exists)_gcShifts=snap.data()||{};
+    if(firstLoad){
+      firstLoad=false;
+      /* Re-render grid now that shifts are known */
+      renderGrid();
+    }
+  },function(){
+    /* Firestore error — render anyway so page isn't blank */
+    if(firstLoad){firstLoad=false;renderGrid();}
   });
 }
 
 function gcIsInShift(){
   if(!cu)return false;
   if(cu.role&&cu.role.toLowerCase()==='manager')return true;
-  var nick=cu.nickname;
+  /* Normalize to lowercase — Firestore keys are stored lowercase */
+  var nick=cu.nickname.toLowerCase();
   /* Try Firestore-backed _gcShifts first, then localStorage fallback */
-  var sh=_gcShifts&&_gcShifts[nick];
+  var sh=_gcShifts&&(_gcShifts[nick]||_gcShifts[cu.nickname]);
   if(!sh){
     try{
       var lsShifts=JSON.parse(localStorage.getItem('rta_SHIFTS')||'{}');
@@ -878,15 +900,24 @@ function gcIsInShift(){
   return tot>=toMins(sh.start)&&tot<toMins(sh.end);
 }
 
+function gcIsOutsideShift(){
+  return gcIsWeekend()||!gcIsInShift();
+}
+
+function gcEffectiveCap(){
+  /* 5 credits outside shift/weekend, 25 during shift */
+  return gcIsOutsideShift()?5:GC.DAILY_GAME_CAP;
+}
+
 function gcCheckAccess(){
   if(gcIsManager())return{ok:true};
-  if(gcIsWeekend())return{ok:false,reason:'Game Corner is closed on weekends.',sub:'Come back on a weekday during your shift.',icon:'ti-calendar-off'};
-  if(!gcIsInShift())return{ok:false,reason:'Game Corner is only available during your shift.',sub:'Check your shift schedule and try again when you\'re on the clock.',icon:'ti-clock-off'};
+  /* No shift lockout — credit cap handles abuse prevention instead */
+  /* Session cooldown still applies */
   if(!gcSessionCooldownOk()){
     var endTime=parseInt(localStorage.getItem('gc_session_end_'+(cu?cu.nickname:'x'))||'0');
     var remMs=GC.SESSION_COOLDOWN*1000-(Date.now()-endTime);
     var remMins=Math.ceil(remMs/60000);
-    return{ok:false,reason:'Session cooldown active.',sub:'Next session opens in ~'+remMins+' minute'+(remMins!==1?'s':'')+'. Back to work! \uD83D\uDCAA',icon:'ti-refresh'};
+    return{ok:false,reason:'Session cooldown active.',sub:'Next session opens in ~'+remMins+' minute'+(remMins!==1?'s':'')+'. Back to work! 💪',icon:'ti-refresh'};
   }
   return{ok:true};
 }
@@ -909,10 +940,11 @@ function gcAddDayCredits(n){
 }
 
 function gcCapAward(raw){
-  /* Returns how many credits can actually be awarded given daily cap */
+  /* Cap depends on shift status: 25 during shift, 5 outside shift/weekend */
   if(gcIsManager())return raw;
+  var cap=gcEffectiveCap();
   var spent=gcGetDayCredits();
-  var remaining=Math.max(0,GC.DAILY_GAME_CAP-spent);
+  var remaining=Math.max(0,cap-spent);
   return Math.min(raw,remaining);
 }
 
@@ -975,16 +1007,16 @@ function gcShowExtendPrompt(remaining){
   var prompt=document.createElement('div');
   prompt.id='gc-extend-prompt';
   prompt.style.cssText='padding:12px 14px;background:var(--color-background-danger);border:1.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);margin-bottom:8px;display:flex;align-items:center;gap:12px;';
-  var extsLeft=GC.MAX_EXTENSIONS-GC._extensions;
+  var extsLeft=GC.MAX_EXTENSIONS-GC._extensions; /* unlimited — not shown */
   prompt.innerHTML='<i class="ti ti-alarm" style="font-size:22px;color:var(--color-text-danger);flex-shrink:0" aria-hidden="true"></i>'
     +'<div style="flex:1;min-width:0;">'
     +'<div style="font-size:13px;font-weight:500;color:var(--color-text-danger);">Session ending soon</div>'
-    +'<div style="font-size:12px;color:var(--color-text-danger);opacity:.85;">'+(canExtend?extsLeft+' extension'+(extsLeft!==1?'s':'')+' left · 5 credits each':'No more extensions available')+'</div>'
+    +'<div style="font-size:12px;color:var(--color-text-danger);opacity:.85;">'+(canExtend?'Extend session · 10 credits each':'No more extensions available')+'</div>'
     +'</div>';
   if(canExtend){
     var extBtn=document.createElement('button');
     extBtn.style.cssText='flex-shrink:0;padding:8px 16px;background:var(--color-background-primary);border:1.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);font-size:13px;font-weight:500;color:var(--color-text-danger);cursor:pointer;white-space:nowrap;';
-    extBtn.textContent='+3 min · 5 cr';
+    extBtn.textContent='+5 min · 10 cr';
     extBtn.onclick=function(){gcExtendSession();};
     prompt.appendChild(extBtn);
   }
@@ -1004,7 +1036,7 @@ function gcExtendSession(){
     var p=G('gc-extend-prompt');if(p)p.remove();
     /* Hide timer bar again — will reappear at next 5-min threshold */
     var bar=G('gc-timer-bar');if(bar)bar.style.display='none';
-    toast('⏱️ +3 minutes added! ('+(GC.MAX_EXTENSIONS-GC._extensions)+' extension'+(GC.MAX_EXTENSIONS-GC._extensions!==1?'s':'')+' remaining)');
+    toast('⏱️ +5 minutes added!');
   });
 }
 
@@ -1174,11 +1206,8 @@ function launchGame(id,title){
     toast('⏳ Cooldown: '+mins+'m '+secs+'s before your next game.');
     return;
   }
-  /* ── Daily game cap check ── */
-  if(!gcIsManager()&&gcGetDayCredits()>=GC.DAILY_GAME_CAP){
-    toast('🎮 Daily game credit cap ('+GC.DAILY_GAME_CAP+') reached — keep up the great work and earn more through performance!');
-    /* Still allow playing, just no more credits */
-  }
+  /* ── Daily game cap: members can still play, just earn no more credits ── */
+  /* No toast or block here — gcAwardGameCredit handles the cap silently */
   var cost=GAME_COSTS[id]||CREDIT_COST_NORMAL;
   spendCredit(cost,function(){
     /* Track play count */
@@ -1398,7 +1427,13 @@ function init(){
   db.collection('player_credits').doc(nick.toLowerCase()).onSnapshot(function(snap){
     credits=snap.exists?(snap.data().credits||0):0;creditsLoaded=true;updateCreditUI();
   });
-  renderGrid();
+  /* Load shifts first — renderGrid is called inside gcLoadShiftsFromFirestore once shifts arrive.
+     If shifts load in < ~300ms (cached) it's seamless; worst case a brief blank then the grid. */
+  gcLoadShiftsFromFirestore();
+  /* Fallback: if Firestore takes > 3s, render anyway so page isn't permanently blank */
+  setTimeout(function(){
+    if(!_gcShiftsLoaded||G('gc-pane-games').children.length===0)renderGrid();
+  },3000);
   function fg(){ensureAudio();/* BGM disabled — code preserved */document.removeEventListener('click',fg);document.removeEventListener('keydown',fg);}
   document.addEventListener('click',fg);document.addEventListener('keydown',fg);
 }
@@ -6982,6 +7017,6 @@ function mgrSetCredit(nick){
 var _origInit=window.init;
 window.init=function(){
   if(_origInit)_origInit.apply(this,arguments);
-  setTimeout(function(){if(cu&&db){gcLoadNotifications();gcLoadShiftsFromFirestore();}},1200);
+  setTimeout(function(){if(cu&&db){gcLoadNotifications();}},1200);
 };
 </script>
