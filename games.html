@@ -321,7 +321,7 @@ function updateCreditUI(){
 }
 var CREDIT_COST_NORMAL=1;
 var CREDIT_COST_CARD=3;
-var CARD_GAME_IDS=['pusoy','tongits'];
+var CARD_GAME_IDS=['tongits','millionaire','dealornodeal'];
 
 function spendCredit(cost,cb){
   if(!cu){toast('Not signed in — open the Portal first.');return;}
@@ -549,7 +549,8 @@ function launchGame(id,title){
       else if(id==='uno')gameUNO(body);
       else if(id==='pusoy')gamePusoyDos(body);
       else if(id==='tongits')gameTongIts(body);
-      else if(id==='contexto')gameContexto(body);
+      else if(id==='millionaire')gameMillionaire(body);
+      else if(id==='dealornodeal')gameDealOrNoDeal(body);
     },60);
   });
 }
@@ -562,10 +563,10 @@ function renderGrid(){
     {id:'minesweeper',e:'💣',n:'Minesweeper',d:'Clear the board · 1 credit'},
     {id:'wordguess',e:'📝',n:'Word Guess',d:'Guess the 5-letter word · 1 credit'},
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
-    {id:'contexto',e:'🧠',n:'Contexto',d:'Find the secret word by semantic similarity · 1 credit'},
-    {id:'pusoy',e:'🂢',n:'Pusoy Dos',d:'Big Two vs 3 AI · 3 credits',card:true},
   ];
   var multi=[
+    {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions · lifelines · win up to 500 credits · 3 credits'},
+    {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'20 briefcases · banker offers · press your luck · 3 credits'},
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base · 1 credit'},
     {id:'chess',e:'♟️',n:'Chess',d:'vs AI or vs Player · Normal or Timed · 1 credit'},
     {id:'uno',e:'🃏',n:'UNO',d:'2–4 players · mix humans & AI · 1 credit'},
@@ -2775,7 +2776,12 @@ function gameTongIts(C){
   function mkDeck(){
     var d=[];
     SUIT_ORDER.forEach(function(s){VALS.forEach(function(v){d.push({s:s,v:v});});});
-    return d.sort(function(){return Math.random()-.5;});
+    /* Fisher-Yates — unbiased shuffle */
+    for(var i=d.length-1;i>0;i--){
+      var j=Math.floor(Math.random()*(i+1));
+      var tmp=d[i];d[i]=d[j];d[j]=tmp;
+    }
+    return d;
   }
 
   function encCard(c){return c.v+'|'+c.s;}
@@ -3448,14 +3454,14 @@ function gameTongIts(C){
               handRef(seat).update({cards:encHand(aiHand),updatedAt:Date.now()})
             ]).then(function(){
               if(!updates.pendingDraw&&nextTurn!==mySeat){
-                setTimeout(function(){doAITurns(nextTurn,aeMelds);},700);
+                setTimeout(function(){doAITurns(nextTurn,aeMelds);},2200);
               }
             });
           });
         });
       });
     }
-    setTimeout(function(){runAI(startTurn);},700);
+    setTimeout(function(){runAI(startTurn);},1800);
   }
 
   function buildResultFromGS(winner,winType,allMelds,winnerHand,gs){
@@ -3775,7 +3781,7 @@ function gameTongIts(C){
 
     /* Trigger AI if it's their turn and host is running */
     if(isHost&&!gover&&!pendingDraw&&turn!==mySeat&&seatIsAI(turn)){
-      setTimeout(function(){doAITurns(turn,allMelds);},700);
+      setTimeout(function(){doAITurns(turn,allMelds);},1800);
     }
   }
 
@@ -4111,138 +4117,596 @@ function gamePoker(C){
   newGame();
 }
 
-/* ═══════════════════════════════════════════════════
-   CONTEXTO — Find the secret word by semantic similarity
-   Fully offline — semantic neighbor lists are pre-built.
-   Every secret word has 300 ranked neighbors (index 0 = closest).
-   Rank of a guess = its index+1. If not in list → 999.
-═══════════════════════════════════════════════════ */
-function gameContexto(C){
-  var BANK={"ocean":["sea","water","wave","beach","coast","shore","marine","tide","reef","bay","gulf","island","current","deep","surf","salt","nautical","aquatic","coral","fish","whale","shark","dolphin","harbor","port","vessel","boat","ship","sail","horizon","brine","abyss","depth","trench","kelp","seaweed","lagoon","estuary","delta","fjord","atoll","sandbar","seafloor","plankton","maritime","sailor","captain","anchor","lighthouse","buoy","driftwood","seagull","crab","lobster","oyster","clam","mussel","urchin","starfish","jellyfish","squid","octopus","seal","walrus","otter","river","lake","pond","stream","pool","waterfall","rain","flood","dam","reservoir","canal","glacier","iceberg","tropics","equator","compass","navigation","voyage","expedition","peninsula","strait","channel","wind","storm","hurricane","tsunami","erosion","sediment","sand","pebble","cliff","dune","ebb","flow","pressure","salinity","ecology","ecosystem","biodiversity","pollution","fishing","trawl","spawn","migrate","habitat","predator","prey","food","chain","sunlight","photosynthesis","algae","bacteria","zooplankton","krill","sardine","tuna","salmon","cod","herring","mackerel","bass","flounder","halibut","swordfish","manta","ray","barracuda","catfish","trout","perch","carp","pike","clownfish","grouper","snapper","intertidal","subtidal","benthic","pelagic","abyssal","continental","shelf","slope","ridge","seamount","limestone","basalt","igneous","sedimentary","fossil","mineral","crystal","pearl","shell","skeleton","scale","fin","gill","life","growth","reproduction","evolution","adaptation","natural","selection","mutation","gene","biology","oceanography","hydrography","cartography","geography","meteorology","climatology","atmospheric","physics","chemistry","earth","science","geology","geophysics","biogeography","taxonomy","systematics","cladistics","phylogeny","genomics","bioinformatics","computational","modeling","simulation","prediction","forecasting","monitoring","observation","measurement","data","analysis","statistics","probability","uncertainty","risk","resilience","conservation","restoration","rewilding","corridor","connectivity","fragmentation","extinction","endangered","threatened","vulnerable","endemic","native","invasive","exotic","introduced","feral","domesticated","wild","captive","zoo","sanctuary","reserve","park","wilderness","protected","management","stewardship","sustainability","future","generations","legacy","planet","globe","world","climate","environment","atmosphere","biosphere","hydrosphere","lithosphere","cryosphere","pedosphere","anthroposphere","technosphere","noosphere","consciousness","civilization","humanity","society","culture","tradition","heritage","memory","history","hope","dream","aspiration","purpose","meaning","beauty","truth","goodness","wisdom","virtue","integrity","love","joy","peace"],"mountain":["hill","peak","summit","ridge","valley","cliff","slope","terrain","elevation","altitude","highland","rock","boulder","glacier","snow","ice","alpine","crest","pass","col","saddle","plateau","mesa","butte","bluff","escarpment","canyon","ravine","gorge","chasm","crevasse","cave","cavern","stalactite","limestone","granite","basalt","quartz","mica","schist","marble","slate","sandstone","obsidian","pumice","lava","magma","volcano","eruption","caldera","crater","geothermal","tectonic","plate","fault","seismic","earthquake","tremor","landslide","avalanche","mudslide","talus","scree","moraine","till","outwash","cirque","horn","tarn","fjord","snowpack","treeline","timberline","subalpine","arctic","tundra","heath","moor","heather","moss","lichen","fern","spruce","fir","pine","cedar","hemlock","larch","meadow","wildflower","sedge","grass","stream","brook","cascade","waterfall","torrent","rapid","spring","aquifer","watershed","drainage","basin","runoff","erosion","deposition","alluvium","terrace","meander","tributary","headwater","highpoint","prominence","topographic","contour","relief","height","grade","aspect","exposure","windward","leeward","temperature","precipitation","humidity","storm","cloud","fog","mist","frost","thaw","flood","drought","fire","burn","succession","pioneer","climax","community","ecosystem","biodiversity","species","population","habitat","food","web","carbon","nitrogen","water","cycle","nutrient","mineral","soil","organic","decomposition","fungi","bacteria","invertebrate","insect","worm","amphibian","reptile","bird","mammal","predator","prey","herbivore","carnivore","omnivore","scavenger","trophic","biomass","productivity","diversity","richness","endemic","native","invasive","extinction","endangered","conservation","restoration","park","wilderness","hiking","climbing","trekking","skiing","snowboarding","mountaineering","expedition","exploration","adventure","discovery","journey","view","vista","panorama","scenery","landscape","photography","solitude","silence","peace","beauty","freedom","challenge","perseverance","achievement","triumph","inspiration","awe","wonder","reverence","gratitude","nature","outdoors","recreation","tourism","culture","tradition","heritage","legend","myth","sacred","spiritual","monastery","pilgrimage","shrine","temple","earth","planet","globe","world","geographic","cartographic","geologic","geomorphic","hydrologic","ecologic","biologic","atmospheric","climatic","environmental","stewardship","sustainability","future","generations","legacy","contribution","service","love","compassion","wisdom","joy","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation"],"fire":["flame","burn","heat","smoke","ash","ember","spark","blaze","inferno","torch","candle","light","glow","flicker","ignite","combustion","fuel","oxygen","carbon","chemical","reaction","energy","temperature","hot","warm","steam","vapor","plasma","thermodynamics","infrared","radiation","spectrum","wavelength","atom","molecule","bond","electron","proton","ionic","covalent","kinetic","thermal","electrical","nuclear","mechanical","work","power","efficiency","entropy","conduction","convection","insulation","conductor","semiconductor","circuit","current","voltage","resistance","generator","motor","engine","turbine","piston","cylinder","explosion","detonation","deflagration","arson","accident","lightning","campfire","bonfire","fireplace","stove","furnace","boiler","kiln","smelter","forge","foundry","reactor","fission","fusion","laser","photon","beam","coherent","optics","lens","mirror","prism","crystal","symmetry","lattice","quantum","mechanics","uncertainty","principle","relativity","spacetime","dimension","electromagnetic","ultraviolet","visible","radio","microwave","absorption","emission","spectroscopy","doppler","redshift","expansion","cosmic","galaxy","star","planet","sun","solar","hydrogen","helium","stellar","evolution","supernova","black","hole","neutron","white","dwarf","main","sequence","protostar","nebula","dust","cloud","interstellar","medium","spiral","elliptical","cluster","filament","void","dark","matter","cosmological","constant","big","bang","inflation","background","baryon","lepton","quark","gluon","boson","fermion","standard","model","particle","physics","field","theory","gauge","spontaneous","breaking","higgs","mechanism","mass","force","gravity","electromagnetism","weak","strong","interaction","unification","supersymmetry","string","extra","dimensions","singularity","event","horizon","hawking","information","paradox","arrow","time","causality","determinism","chaos","complexity","emergence","self","organization","network","system","feedback","loop","nonlinear","dynamics","bifurcation","phase","transition","critical","point","universality","scaling","fractal","turbulence","fluid","viscosity","conservation","momentum","angular","topology","manifold","fiber","bundle","curvature","riemann","tensor","einstein","equations","general","special","lorentz","transformation","inertial","frame","reference","equivalence","geodesic","ricci","scalar","friedmann","equation","hubble","acceleration","vacuum","fluctuation","virtual","casimir","effect","complementarity","wave","duality","entanglement","superposition","coherence","decoherence","measurement","copenhagen","many","worlds","interpretation","pilot","hidden","variable","bell","inequality","nonlocality","epr"],"forest":["tree","wood","timber","bark","leaf","branch","root","trunk","canopy","undergrowth","shrub","fern","moss","lichen","fungi","mushroom","soil","earth","humus","compost","decay","decompose","nutrient","mineral","water","sunlight","photosynthesis","chlorophyll","oxygen","carbon","atmosphere","climate","weather","rain","humidity","temperature","season","spring","summer","autumn","winter","deciduous","evergreen","coniferous","broadleaf","mixed","tropical","temperate","boreal","taiga","rainforest","cloud","fog","mist","dew","frost","snow","ice","wind","fire","drought","flood","erosion","watershed","stream","river","wetland","swamp","bog","meadow","clearing","glade","path","trail","hike","walk","explore","nature","wildlife","habitat","ecosystem","biodiversity","species","population","community","ecology","food","web","chain","predator","prey","herbivore","carnivore","omnivore","bird","mammal","reptile","amphibian","insect","invertebrate","deer","elk","moose","bear","wolf","fox","rabbit","squirrel","chipmunk","raccoon","skunk","opossum","beaver","otter","mink","weasel","badger","porcupine","bat","owl","hawk","eagle","falcon","raven","crow","woodpecker","nuthatch","thrush","warbler","vireo","tanager","finch","sparrow","junco","wren","chickadee","kingfisher","heron","egret","crane","duck","goose","swan","grouse","turkey","pheasant","quail","pigeon","dove","cuckoo","hummingbird","osprey","cormorant","pelican","reed","cattail","bulrush","sedge","rush","grass","wildflower","herb","vine","climber","epiphyte","parasite","mycorrhiza","symbiosis","mutualism","commensalism","parasitism","competition","predation","herbivory","pollination","seed","dispersal","germination","growth","succession","pioneer","climax","disturbance","recovery","resilience","adaptation","evolution","speciation","extinction","conservation","protection","management","restoration","rewilding","corridor","connectivity","fragmentation","isolation","edge","interior","core","buffer","reserve","park","sanctuary","wilderness","recreation","tourism","logging","mining","agriculture","development","urbanization","deforestation","degradation","pollution","invasive","disease","pest","sequestration","storage","cycle","productivity","biomass","diversity","richness","evenness","abundance","endemic","native","landscape","geography","topography","terrain","hydrology","geology","environment","planet","globe","world","service","natural","capital","green","infrastructure","based","solution","sustainable","certify","responsible","stewardship","governance","accountability","transparency","equity","justice","participation","democracy","rights","indigenous","peoples","land","traditional","knowledge","culture","heritage","identity","belonging","connection","relationship","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness"],"music":["sound","rhythm","melody","harmony","beat","tempo","pitch","note","tone","chord","scale","key","major","minor","interval","octave","frequency","vibration","wave","acoustic","resonance","timbre","texture","dynamics","forte","piano","crescendo","rest","pause","measure","bar","meter","syncopation","swing","groove","funk","soul","jazz","blues","rock","pop","classical","baroque","folk","country","reggae","ska","punk","metal","electronic","hip","hop","rap","dance","house","techno","ambient","improvisation","composition","arrangement","orchestration","ensemble","orchestra","band","quartet","trio","solo","voice","singer","vocalist","instrument","guitar","violin","cello","bass","drums","percussion","trumpet","trombone","horn","flute","oboe","clarinet","saxophone","harp","organ","synthesizer","recording","studio","microphone","amplifier","equalizer","compressor","reverb","mixing","mastering","production","artist","musician","composer","conductor","performer","audience","listener","fan","critic","album","single","track","song","lyric","verse","chorus","bridge","hook","intro","riff","pattern","loop","sample","remix","cover","copyright","royalty","label","streaming","concert","live","performance","venue","stage","tour","festival","merchandise","culture","scene","genre","subgenre","movement","era","style","influence","creativity","expression","emotion","feeling","mood","atmosphere","energy","power","beauty","aesthetics","form","structure","theme","motif","phrase","symphony","concerto","sonata","suite","prelude","fugue","opera","cantata","hymn","chant","modal","tonal","atonal","minimalist","world","fusion","collaboration","duet","mashup","tribute","interpretation","score","notation","staff","clef","treble","sharp","flat","accidental","fermata","staccato","legato","vibrato","arpeggio","trill","ornament","improvise","compose","perform","conduct","rehearse","practice","master","skill","theory","ear","training","sight","transposition","modulation","leading","counterpoint","exposition","development","recapitulation","coda","cadence","tension","release","expectation","surprise","contrast","unity","continuity","momentum","pacing","climax","narrative","drama","storytelling","purpose","meaning","virtue","excellence","integrity","love","joy","peace"],"space":["star","planet","moon","sun","galaxy","universe","cosmos","nebula","comet","asteroid","meteor","orbit","gravity","black","hole","supernova","quasar","pulsar","neutron","white","dwarf","red","giant","stellar","evolution","nuclear","fusion","hydrogen","helium","carbon","oxygen","iron","elements","atomic","proton","electron","nucleus","orbital","quantum","mechanics","relativity","spacetime","dimension","electromagnetic","radiation","photon","infrared","ultraviolet","visible","radio","microwave","wavelength","frequency","spectrum","absorption","emission","spectroscopy","doppler","redshift","expansion","big","bang","cosmic","inflation","dark","matter","energy","cosmological","constant","hubble","satellite","probe","rover","lander","mission","launch","rocket","propulsion","thrust","escape","velocity","trajectory","maneuver","rendezvous","docking","station","international","astronaut","cosmonaut","eva","spacewalk","suit","life","support","food","microgravity","weightlessness","adaptation","bone","density","isolation","communication","delay","navigation","gps","ground","control","telemetry","data","antenna","solar","panel","battery","power","thermal","camera","spectrometer","magnetometer","seismometer","sample","laboratory","results","discovery","publication","nasa","esa","roscosmos","jaxa","spacex","blue","commercial","crew","cargo","tourism","colonization","settlement","mars","mining","terraforming","artificial","interstellar","warp","drive","science","fiction","future","technology","innovation","exploration","knowledge","understanding","humanity","civilization","existence","meaning","purpose","light","speed","vacuum","particle","field","symmetry","loop","string","singularity","event","horizon","hawking","entropy","information","arrow","causality","chaos","complexity","emergence","self","organization","network","feedback","nonlinear","dynamics","bifurcation","fractal","turbulence","cosmology","baryon","lepton","quark","boson","fermion","standard","model","physics","collider","accelerator","detector","experiment","observation","telescope","observatory","kepler","tess","gaia","james","webb","chandra","spitzer","exoplanet","transit","radial","direct","imaging","atmosphere","biosignature","intelligence","seti","drake","equation","fermi","paradox","great","silence","zoo","hypothesis","planetarium","map","constellation","zodiac","ecliptic","equinox","solstice","precession","nutation","libration","tide","gravitational","wave","ligo","virgo","merger","ringdown","chirp","amplitude","strain","sensitivity","interferometer","michelson","laser","beam","splitter","mirror","suspension","seismic","noise","shot","heisenberg","uncertainty","complementarity","duality","entanglement","superposition","coherence","decoherence","measurement","love","joy","peace","beauty","truth","goodness","wisdom","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom"],"food":["eat","taste","flavor","ingredient","recipe","cook","chef","kitchen","meal","dish","cuisine","restaurant","diet","nutrition","protein","carbohydrate","fat","vitamin","mineral","calorie","energy","metabolism","digestion","absorption","appetite","hunger","satiety","bread","rice","pasta","potato","vegetable","fruit","meat","fish","poultry","dairy","egg","cheese","butter","oil","sugar","salt","spice","herb","sauce","soup","salad","sandwich","pizza","burger","sushi","taco","curry","stew","grill","roast","bake","steam","boil","fry","simmer","saute","braise","poach","marinate","season","garnish","plate","serve","portion","delicious","savory","sweet","sour","bitter","umami","spicy","bland","rich","light","fresh","frozen","processed","organic","local","seasonal","sustainable","farm","garden","harvest","crop","grain","legume","bean","lentil","pea","chickpea","soybean","tofu","tempeh","mushroom","algae","fermentation","probiotic","prebiotic","gut","microbiome","health","disease","prevention","allergy","intolerance","sensitivity","celiac","lactose","gluten","vegan","vegetarian","flexitarian","omnivore","carnivore","pescatarian","paleo","keto","mediterranean","dash","plant","whole","junk","fast","convenience","snack","beverage","drink","water","juice","tea","coffee","alcohol","wine","beer","cocktail","smoothie","shake","yogurt","kefir","kombucha","vinegar","pickle","preserve","can","jar","bottle","package","label","serving","daily","value","macronutrient","micronutrient","antioxidant","phytonutrient","fiber","omega","fatty","acid","amino","essential","bioavailability","stomach","intestine","microbiota","immunity","inflammation","chronic","diabetes","obesity","cardiovascular","mental","mood","cognition","memory","performance","athlete","sport","training","recovery","hydration","electrolyte","supplement","creatine","caffeine","weight","maintenance","body","composition","muscle","bone","strength","endurance","periodization","frequency","quantity","quality","variety","moderation","enjoyment","social","cultural","economic","environmental","ethical","sustainability","security","access","justice","equity","poverty","malnutrition","globalization","agriculture","technology","innovation","tradition","preservation","heritage","identity","community","sharing","hospitality","ritual","ceremony","celebration","gratitude","mindfulness","pleasure","nourishment","sustenance","survival","thriving","smell","texture","temperature","color","presentation","plating","course","menu","degustation","pairing","cheesemaking","brewing","distilling","culture","craft","skill","mastery","artisan","specialty","terroir","provenance","seasonality","freshness","ripeness","maturity","development","complexity","depth","richness","balance","harmony","mouthfeel","finish","aftertaste","lingering","association","emotion","comfort","home","family","love","joy","peace","beauty","goodness","wisdom","virtue","integrity","wholeness","presence","awareness","consciousness"],"book":["read","page","chapter","author","story","novel","fiction","nonfiction","library","publish","write","word","sentence","paragraph","narrative","plot","character","setting","theme","genre","poetry","essay","biography","history","science","philosophy","education","knowledge","learning","language","grammar","syntax","vocabulary","literature","classic","contemporary","bestseller","review","critic","award","prize","cover","spine","binding","paper","ink","font","typography","layout","design","illustration","photograph","index","glossary","bibliography","footnote","citation","reference","source","research","scholarship","academic","textbook","manual","guide","dictionary","encyclopedia","atlas","almanac","journal","magazine","newspaper","article","editorial","column","feature","interview","report","analysis","opinion","commentary","argument","rhetoric","persuasion","evidence","fact","claim","thesis","hypothesis","theory","model","framework","concept","idea","thought","logic","reason","critical","thinking","creativity","imagination","inspiration","insight","wisdom","perspective","worldview","culture","society","identity","self","community","belonging","meaning","purpose","value","belief","morality","ethics","justice","freedom","equality","democracy","power","resistance","revolution","transformation","change","progress","tradition","heritage","memory","nostalgia","future","hope","dream","aspiration","ambition","success","failure","resilience","courage","compassion","empathy","understanding","connection","relationship","love","friendship","family","solitude","silence","reflection","contemplation","meditation","mindfulness","presence","awareness","consciousness","experience","emotion","feeling","sensation","perception","fantasy","reality","truth","beauty","aesthetics","art","music","dance","theater","film","photography","painting","sculpture","architecture","craft","skill","practice","mastery","discipline","dedication","persistence","patience","humility","curiosity","wonder","discovery","exploration","adventure","journey","growth","development","mentoring","coaching","guiding","inspiring","motivating","encouraging","supporting","nurturing","celebrating","sharing","giving","receiving","gratitude","appreciation","recognition","validation","affirmation","inclusion","diversity","equity","liberation","empowerment","agency","voice","expression","innovation","impact","legacy","contribution","fulfillment","happiness","wellbeing","flourishing","thriving","joy","peace","wholeness","integration","balance","harmony","flow","grace","serenity","contentment","acceptance","trust","faith","kindness","generosity","service","commitment","responsibility","accountability","virtue","excellence","integrity","authenticity","awakening"],"time":["clock","hour","minute","second","past","present","future","moment","instant","duration","period","era","age","epoch","history","memory","nostalgia","anticipation","planning","schedule","calendar","date","deadline","punctual","late","early","delay","rush","slow","fast","speed","pace","rhythm","cycle","pattern","repeat","change","progress","evolution","development","growth","decay","entropy","thermodynamics","arrow","direction","causality","sequence","order","chronology","timeline","narrative","story","beginning","middle","end","birth","death","life","existence","consciousness","awareness","perception","experience","sensation","meditation","mindfulness","presence","flow","focus","concentration","attention","distraction","procrastination","urgency","priority","efficiency","productivity","management","goal","objective","milestone","achievement","success","failure","learning","adaptation","resilience","patience","persistence","dedication","discipline","practice","mastery","skill","habit","routine","ritual","tradition","culture","society","civilization","archaeology","paleontology","geology","cosmology","universe","stellar","planetary","biological","speciation","extinction","emergence","complexity","intelligence","technology","innovation","acceleration","singularity","prediction","forecasting","uncertainty","probability","risk","scenario","strategy","preparation","readiness","flexibility","adaptability","robustness","feedback","loop","nonlinear","dynamics","chaos","organization","network","interdependence","holism","reductionism","paradigm","worldview","philosophy","metaphysics","ontology","epistemology","logic","reason","rationality","creativity","imagination","intuition","emotion","wisdom","compassion","love","joy","beauty","truth","goodness","virtue","excellence","integrity","authenticity","wholeness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","service","watch","hourglass","sundial","chronometer","timer","stopwatch","alarm","chime","tick","tock","digital","analog","quartz","atomic","precision","accuracy","synchronization","greenwich","timezone","daylight","saving","leap","year","century","millennium","decade","month","week","day","dawn","morning","noon","afternoon","evening","dusk","night","midnight","solstice","equinox","season","spring","summer","autumn","winter","tropical","sidereal","synodic","lunar","solar","gregorian","julian","hebrew","islamic","chinese","hindu","geological","psychological","subjective","relative","absolute","linear","circular","cyclical","recursive","fractal","self","similar","scale","invariant","dimensional","analysis","unit","measurement","physics","relativity","special","general","dilation","length","contraction","simultaneity","twin","paradox","lightcone","spacelike","timelike","null","geodesic","interval","proper","coordinate","minkowski","spacetime","metric","tensor","curvature","schwarzschild","kerr","solution","black","hole","event","horizon","hawking","radiation","information","thermodynamic","cosmological","quantum","gravity","string","theory","multiverse","many","worlds","branching","decoherence","copenhagen","observer","effect"],"money":["currency","cash","coin","bill","dollar","euro","pound","yen","franc","peso","wealth","rich","poor","income","salary","wage","profit","loss","investment","savings","debt","loan","credit","interest","rate","bank","finance","economy","market","trade","commerce","business","entrepreneur","startup","capital","venture","stock","bond","share","dividend","portfolio","fund","mutual","hedge","pension","retirement","tax","revenue","budget","fiscal","monetary","policy","inflation","deflation","recession","depression","growth","gdp","unemployment","poverty","inequality","distribution","redistribution","welfare","social","security","insurance","healthcare","education","housing","basic","needs","motivation","drive","ambition","success","failure","risk","reward","uncertainty","opportunity","competition","cooperation","trust","reputation","brand","value","price","cost","supply","demand","equilibrium","scarcity","abundance","efficiency","productivity","innovation","technology","disruption","transformation","globalization","agreement","tariff","barrier","regulation","deregulation","liberalization","privatization","capitalism","socialism","communism","mixed","state","austerity","stimulus","quantitative","easing","central","deficit","surplus","yield","spread","rating","default","bankruptcy","restructuring","bailout","moral","hazard","systemic","contagion","crisis","bubble","crash","recovery","supervision","oversight","accountability","transparency","governance","corruption","fraud","laundering","evasion","avoidance","offshore","haven","compliance","enforcement","sanction","penalty","deterrence","prevention","detection","investigation","prosecution","justice","restitution","compensation","crime","law","ethics","integrity","honesty","fairness","loyalty","satisfaction","service","quality","excellence","strategy","execution","leadership","culture","talent","team","collaboration","diversity","inclusion","equity","belonging","psychological","safety","wellbeing","engagement","performance","effectiveness","impact","legacy","purpose","meaning","fulfillment","joy","love","compassion","wisdom","virtue","authenticity","wholeness","presence","awareness","consciousness","learning","becoming","thriving","flourishing","dedication","discipline","practice","patience","persistence","resilience","courage","humility","curiosity","wonder","discovery","exploration","adventure","development","being","existing","living"],"dream":["sleep","night","rest","subconscious","unconscious","mind","vision","imagination","fantasy","surreal","bizarre","vivid","memory","emotion","symbol","archetype","jung","freud","psychology","neuroscience","brain","rem","stage","cycle","lucid","control","awareness","clarity","nightmare","fear","anxiety","joy","wonder","creative","inspiration","idea","insight","revelation","prophecy","premonition","intuition","hope","aspiration","goal","ambition","desire","wish","longing","yearning","nostalgia","past","future","possibility","potential","opportunity","challenge","obstacle","journey","quest","hero","myth","story","narrative","metaphor","allegory","parable","wisdom","truth","beauty","meaning","purpose","fulfillment","transcendence","spiritual","sacred","mystical","divine","presence","consciousness","awakening","enlightenment","liberation","freedom","love","peace","unity","oneness","wholeness","integration","balance","harmony","flow","grace","serenity","contentment","bliss","ecstasy","rapture","awe","reverence","gratitude","appreciation","recognition","understanding","compassion","empathy","connection","belonging","community","kindness","generosity","service","dedication","commitment","sacrifice","courage","resilience","perseverance","patience","trust","faith","creativity","expression","art","music","poetry","dance","theater","storytelling","play","exploration","adventure","discovery","learning","growth","transformation","evolution","change","progress","actualization","self","realization","meditation","contemplation","reflection","inquiry","investigation","virtue","excellence","integrity","authenticity","practice","discipline","mastery","sky","star","moon","constellation","milky","way","galaxy","universe","cosmos","infinite","eternal","boundless","mystery","magical","enchanted","extraordinary","miraculous","transcendent","ineffable","indescribable","beyond","words","language","thought","being","existence","life","goodness","significance","legacy","contribution","care","relationship","social","support","network","family","friend","colleague","mentor","teacher","student","learner","curious","wondering","discovering","exploring","growing","transforming","becoming","thriving","flourishing"],"city":["urban","town","village","suburb","metropolitan","downtown","neighborhood","district","borough","municipality","government","mayor","council","planning","zoning","development","infrastructure","road","highway","bridge","tunnel","transit","subway","bus","rail","airport","port","utility","water","electricity","gas","internet","communication","building","skyscraper","tower","apartment","house","office","commercial","industrial","residential","density","sprawl","congestion","traffic","parking","pedestrian","bicycle","sidewalk","park","plaza","square","market","mall","community","gathering","culture","arts","museum","theater","library","school","university","hospital","clinic","police","fire","emergency","service","public","safety","health","education","welfare","social","poverty","homelessness","inequality","gentrification","displacement","affordability","housing","cost","living","wage","income","economy","employment","unemployment","business","startup","innovation","technology","industry","finance","trade","commerce","tourism","entertainment","recreation","nightlife","restaurant","cafe","bar","shop","retail","street","energy","vibrancy","diversity","multicultural","immigrant","belonging","identity","place","attachment","home","pride","activism","advocacy","politics","voting","participation","democracy","governance","accountability","transparency","corruption","crime","security","surveillance","policing","reform","justice","equity","inclusion","accessibility","universal","disability","aging","population","demographic","change","resilience","adaptation","climate","heat","island","flooding","drought","air","quality","pollution","noise","green","space","forest","biodiversity","ecosystem","sustainable","smart","data","sensor","network","connectivity","platform","citizen","engagement","collaboration","future","vision","architecture","landscape","interaction","serendipity","creativity","collision","idea","exchange","knowledge","spillover","agglomeration","productivity","competition","cooperation","cluster","hub","global","cosmopolitan","sophisticated","vibrant","creative","innovative","competitive","livable","just","beautiful","inspiring","meaningful","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","care","empathy","understanding","connection","relationship","support","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","thriving","flourishing"],"animal":["creature","beast","wildlife","species","habitat","ecosystem","biodiversity","evolution","adaptation","natural","selection","mutation","gene","dna","chromosome","cell","organism","biology","zoology","ethology","ecology","taxonomy","classification","kingdom","phylum","class","order","family","genus","subspecies","population","community","food","web","chain","predator","prey","herbivore","carnivore","omnivore","scavenger","decomposer","producer","consumer","trophic","level","energy","flow","nutrient","cycle","carbon","nitrogen","water","oxygen","photosynthesis","respiration","metabolism","homeostasis","reproduction","sexual","asexual","mating","courtship","territory","dominance","hierarchy","social","group","herd","pack","pride","flock","school","colony","swarm","communication","vocalization","body","language","pheromone","signal","behavior","instinct","learning","memory","intelligence","cognition","problem","solving","tool","use","culture","play","emotion","pain","suffering","consciousness","sentience","welfare","rights","ethics","conservation","protection","endangered","threatened","vulnerable","extinct","invasive","native","endemic","migration","hibernation","dormancy","estivation","molting","metamorphosis","lifecycle","birth","growth","maturation","death","decomposition","camouflage","mimicry","warning","coloration","defense","offense","parasitism","mutualism","commensalism","competition","cooperation","altruism","kin","inclusive","fitness","reciprocal","game","theory","evolutionary","stable","strategy","arms","race","coevolution","phylogeny","cladistics","molecular","systematics","biogeography","continental","drift","vicariance","dispersal","founder","effect","bottleneck","genetic","speciation","allopatric","sympatric","adaptive","radiation","convergent","parallel","vestigial","structure","homology","analogy","fossil","record","paleontology","geochronology","radiometric","dating","geological","time","scale","era","period","epoch","mass","extinction","asteroid","impact","volcanic","eruption","climate","change","sea","glaciation","crisis","recovery","diversification","balance","nature","service","landscape","corridor","connectivity","fragmentation","isolation","edge","interior","core","buffer","reserve","park","sanctuary","wilderness","restoration","rewilding","sustainable","management","dynamics","carrying","capacity","keystone","umbrella","flagship","indicator","surrogate","hotspot","endemism","rarity","vulnerability","threat","hunting","poaching","trafficking","loss","degradation","pollution","overexploitation","monitoring","research","education","awareness","advocacy","policy","law","enforcement","international","convention","treaty","agreement","framework","implementation","improvement","excellence","mastery","dedication","commitment","responsibility","sustainability","future","generations","legacy","contribution","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awakening","liberation","freedom"],"color":["red","blue","green","yellow","orange","purple","pink","brown","black","white","gray","cyan","magenta","teal","violet","indigo","scarlet","crimson","burgundy","maroon","navy","royal","sky","aqua","turquoise","mint","lime","olive","chartreuse","amber","gold","bronze","copper","silver","platinum","cream","ivory","beige","tan","khaki","chocolate","coffee","mahogany","chestnut","rust","coral","salmon","peach","rose","fuchsia","lavender","lilac","mauve","periwinkle","cerulean","cobalt","sapphire","azure","ultramarine","viridian","emerald","jade","forest","sage","moss","seafoam","spectrum","rainbow","hue","saturation","brightness","value","chroma","lightness","darkness","shade","tint","tone","contrast","complement","analogous","triadic","tetradic","monochromatic","achromatic","chromatic","primary","secondary","tertiary","warm","cool","neutral","vibrant","muted","pastel","neon","fluorescent","metallic","glossy","matte","transparent","opaque","translucent","iridescent","opalescent","pearlescent","luminescent","phosphorescent","bioluminescent","wavelength","frequency","electromagnetic","radiation","visible","infrared","ultraviolet","photon","light","optics","refraction","reflection","absorption","transmission","dispersion","scattering","diffraction","interference","polarization","perception","vision","eye","retina","cone","rod","photoreceptor","opsin","pigment","melanin","carotene","chlorophyll","chromophore","dye","paint","ink","mixing","subtractive","additive","rgb","cmyk","hsl","hsv","lab","space","gamut","profile","calibration","monitor","printer","camera","photography","film","digital","image","processing","editing","graphic","design","art","painting","drawing","illustration","fashion","interior","landscape","product","branding","marketing","psychology","emotion","culture","symbolism","meaning","association","preference","bias","difference","universal","individual","cultural","historical","linguistic","hypothesis","language","thought","cognition","memory","learning","conditioning","synesthesia","tetrachromacy","blindness","deficiency","deuteranopia","protanopia","tritanopia","achromatopsia","ishihara","test","diagnosis","treatment","accommodation","accessibility","ratio","readability","legibility","visibility","safety","signal","warning","danger","caution","information","guidance","wayfinding","identity","logo","palette","scheme","system","consistency","hierarchy","emphasis","balance","harmony","rhythm","repetition","variation","unity","gestalt","principle","figure","ground","proximity","similarity","continuity","closure","symmetry","simplicity","order","complexity","chaos","beauty","aesthetics","creativity","expression","communication","purpose","significance","legacy","contribution","service","love","compassion","wisdom","joy","peace","truth","goodness","virtue","excellence","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom"],"health":["body","mind","wellness","fitness","exercise","nutrition","diet","sleep","stress","mental","physical","emotional","spiritual","holistic","preventive","medicine","doctor","nurse","hospital","clinic","pharmacy","drug","therapy","treatment","diagnosis","symptom","disease","illness","condition","chronic","acute","infection","inflammation","immune","system","vaccine","antibody","virus","bacteria","fungi","parasite","microbiome","gut","heart","lung","brain","liver","kidney","muscle","bone","joint","skin","blood","cell","tissue","organ","cardiovascular","respiratory","digestive","nervous","endocrine","reproductive","musculoskeletal","integumentary","lymphatic","urinary","autonomic","central","peripheral","somatic","sensory","motor","cognitive","behavioral","genetic","epigenetic","developmental","aging","lifespan","longevity","vitality","energy","resilience","recovery","adaptation","homeostasis","balance","harmony","flow","serenity","contentment","wellbeing","flourishing","thriving","excellence","mastery","dedication","discipline","practice","patience","persistence","courage","humility","curiosity","wonder","discovery","exploration","growth","learning","transformation","becoming","presence","awareness","consciousness","awakening","liberation","freedom","joy","love","peace","beauty","truth","goodness","wisdom","virtue","integrity","authenticity","wholeness","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","autoimmune","allergy","sensitivity","intolerance","disorder","syndrome","pathology","etiology","prognosis","epidemiology","prevalence","incidence","risk","factor","protective","determinant","environmental","lifestyle","modifiable","nonmodifiable","prevention","screening","detection","early","intervention","management","rehabilitation","quality","life","disability","functional","capacity","independence","autonomy","dignity","respect","rights","equity","access","justice","inclusion","diversity","evidence","based","clinical","guideline","standard","protocol","safety","efficacy","effectiveness","efficiency","monitoring","evaluation","adaptive","improvement","compassion"],"house":["home","building","structure","architecture","design","room","bedroom","bathroom","kitchen","living","dining","hall","corridor","staircase","basement","attic","garage","garden","yard","porch","deck","balcony","roof","wall","floor","ceiling","window","door","furniture","chair","table","sofa","bed","desk","shelf","storage","closet","wardrobe","drawer","cabinet","appliance","refrigerator","stove","oven","microwave","dishwasher","washer","dryer","air","conditioning","heating","ventilation","plumbing","electrical","wiring","insulation","foundation","frame","material","wood","brick","stone","concrete","steel","glass","tile","carpet","hardwood","laminate","vinyl","paint","wallpaper","curtain","blind","lighting","fixture","thermostat","alarm","security","smart","automation","energy","efficiency","sustainability","solar","panel","rainwater","collection","composting","landscape","native","plant","community","neighborhood","street","district","urban","planning","zoning","code","permit","inspection","regulation","safety","structural","integrity","maintenance","renovation","remodeling","preservation","restoration","heritage","historic","victorian","colonial","craftsman","modern","contemporary","mediterranean","tudor","spanish","french","greek","gothic","baroque","renaissance","neoclassical","sustainable","passive","net","zero","leed","breeam","certification","standard","benchmark","performance","value","price","market","appraisal","tax","insurance","mortgage","loan","interest","equity","investment","return","rental","income","property","management","tenant","landlord","lease","agreement","contract","negotiation","real","estate","agent","broker","transaction","closing","escrow","title","deed","survey","financing","improvement","addition","repair","upgrade","modernization","transformation","becoming","thriving","flourishing","excellence","mastery","wisdom","compassion","love","joy","peace","beauty","truth","goodness","virtue","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","belonging","social","support","network","family","friend","colleague","mentor","coach","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","being","existing"],"love":["heart","emotion","feeling","affection","care","compassion","empathy","kindness","warmth","tenderness","devotion","attachment","bond","connection","relationship","romance","passion","desire","attraction","intimacy","trust","commitment","loyalty","fidelity","respect","admiration","appreciation","gratitude","support","encouragement","sacrifice","service","giving","receiving","sharing","vulnerability","openness","honesty","authenticity","acceptance","forgiveness","healing","growth","transformation","becoming","belonging","home","family","friend","partner","spouse","child","parent","sibling","community","humanity","universal","unconditional","transcendent","divine","sacred","spiritual","mystical","eternal","infinite","boundless","limitless","pure","perfect","beautiful","joyful","peaceful","harmonious","balanced","whole","integrated","complete","fulfilled","meaningful","purposeful","alive","vital","vibrant","flourishing","thriving","excellent","masterful","wise","compassionate","loving","truthful","good","virtuous","authentic","present","aware","conscious","awake","liberated","free","dedicated","disciplined","patient","persistent","courageous","humble","curious","wondering","discovering","exploring","growing","learning","transforming","being","existing","living","joy","peace","beauty","truth","goodness","wisdom","virtue","excellence","integrity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","generosity","significant","fulfillment","meaning","purpose","significance","legacy","contribution"],"garden":["plant","flower","tree","grass","soil","earth","seed","grow","water","sun","root","leaf","branch","bloom","harvest","vegetable","herb","fruit","compost","fertilizer","mulch","pest","insect","bird","butterfly","bee","pollination","ecosystem","biodiversity","nature","outdoor","fresh","air","green","space","design","landscape","formal","informal","cottage","kitchen","meditation","therapy","community","urban","rooftop","vertical","container","raised","bed","greenhouse","cold","frame","propagation","cutting","division","layering","grafting","pruning","training","espalier","topiary","bonsai","japanese","english","french","mediterranean","tropical","desert","succulent","cacti","native","wildflower","meadow","lawn","border","path","patio","terrace","pergola","arbor","trellis","fence","gate","wall","pond","fountain","stream","bog","rain","tool","spade","fork","hoe","rake","trowel","watering","hose","sprinkler","irrigation","drip","mowing","edging","weeding","planting","transplanting","deadheading","staking","netting","protecting","frost","wind","drought","shade","alkaline","acid","neutral","sandy","clay","loam","silt","organic","matter","humus","worm","microorganism","fungi","bacteria","mycorrhiza","nitrogen","phosphorus","potassium","calcium","magnesium","mineral","deficiency","toxicity","integrated","management","companion","crop","rotation","cover","succession","perennial","annual","biennial","deciduous","evergreen","hardy","tender","resistant","hardiness","zone","climate","microclimate","aspect","exposure","shelter","windbreak","hedge","screen","privacy","wildlife","habitat","feeding","nesting","bathing","migrating","attracting","conserving","restoring","naturalistic","ecological","sustainable","regenerative","permaculture","food","forest","agroforestry","biodynamic","horticulture","pomology","viticulture","silviculture","arboriculture","floriculture","market","allotment","supported","agriculture","farm","share","local","seasonal","zero","waste","circular","economy","system","sovereignty","security","access","equity","justice","belonging","connection","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","relationship","social","support","network","family","friend","colleague","mentor","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"storm":["thunder","lightning","rain","wind","cloud","dark","electricity","power","force","nature","danger","warning","shelter","safety","flood","damage","destruction","aftermath","recovery","resilience","adaptation","climate","change","extreme","weather","event","hurricane","typhoon","cyclone","tornado","supercell","cumulonimbus","updraft","downdraft","rotation","vortex","eye","wall","spiral","band","intensity","category","scale","track","forecast","prediction","model","advisory","evacuation","emergency","management","response","preparation","readiness","community","mitigation","infrastructure","building","code","standard","barrier","sea","green","based","solution","wetland","mangrove","forest","soil","restoration","carbon","sequestration","action","policy","agreement","paris","kyoto","protocol","ipcc","assessment","report","scenario","pathway","loss","finance","technology","transfer","capacity","equity","justice","vulnerable","developing","country","small","island","arctic","coastal","mountain","dryland","agriculture","food","security","water","biodiversity","health","poverty","displacement","migration","conflict","cooperation","solidarity","shared","responsibility","common","differentiated","capability","leadership","ambition","implementation","monitoring","reporting","verification","compliance","enforcement","accountability","transparency","integrity","honesty","fairness","trust","collaboration","partnership","public","interest","collective","social","movement","advocacy","activism","legislation","regulation","learning","improvement","excellence","mastery","wisdom","compassion","love","joy","peace","beauty","truth","goodness","virtue","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","belonging","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","transforming","becoming","being","existing","living","thriving","flourishing"],"art":["create","paint","draw","sculpture","photograph","film","dance","theater","poetry","writing","design","craft","skill","technique","medium","material","canvas","brush","pencil","charcoal","ink","watercolor","oil","acrylic","pastel","color","line","shape","form","texture","pattern","composition","balance","harmony","rhythm","contrast","unity","variety","emphasis","proportion","movement","space","light","shadow","perspective","depth","dimension","representation","abstraction","expression","emotion","idea","concept","meaning","symbol","metaphor","narrative","story","culture","history","society","identity","self","community","world","beauty","truth","goodness","wisdom","virtue","excellence","integrity","authenticity","wholeness","museum","gallery","exhibition","collection","curator","critic","review","award","prize","market","auction","dealer","collector","patron","grant","residency","fellowship","commission","public","installation","mural","street","graffiti","digital","new","media","interactive","immersive","virtual","reality","augmented","mixed","generative","algorithmic","artificial","intelligence","machine","learning","collaboration","workshop","studio","atelier","school","academy","university","tradition","innovation","experiment","risk","failure","success","mastery","dedication","discipline","practice","patience","persistence","courage","humility","curiosity","wonder","discovery","exploration","adventure","growth","transformation","becoming","presence","awareness","consciousness","awakening","liberation","freedom","joy","love","peace","fulfillment","purpose","significance","legacy","contribution","service","empathy","understanding","connection","relationship","belonging","social","heritage","memory","nostalgia","future","hope","dream","aspiration","imagination","creativity","communication","language","other","humanity","being","existence","life","care","support","network","family","friend","colleague","mentor","teacher","student","learner","curious","exploring","discovering","growing","transforming","thriving","flourishing"],"school":["learn","teach","student","teacher","classroom","lesson","homework","test","exam","grade","knowledge","education","university","college","curriculum","subject","math","science","history","language","arts","music","sport","extracurricular","activity","club","team","competition","award","achievement","graduation","degree","diploma","certificate","qualification","skill","competency","literacy","numeracy","digital","critical","thinking","creativity","collaboration","communication","problem","solving","research","project","presentation","discussion","debate","essay","report","reading","writing","speaking","listening","understanding","application","analysis","synthesis","evaluation","metacognition","reflection","growth","mindset","motivation","engagement","interest","passion","curiosity","wonder","exploration","discovery","adventure","experimentation","failure","resilience","persistence","dedication","discipline","practice","mastery","excellence","recognition","validation","belonging","inclusion","diversity","equity","accessibility","support","special","need","gifted","talented","learner","immigrant","generation","socioeconomic","background","race","ethnicity","gender","sexuality","disability","mental","health","wellbeing","social","emotional","character","development","values","ethics","citizenship","community","service","leadership","responsibility","accountability","integrity","honesty","fairness","respect","kindness","compassion","empathy","connection","relationship","friendship","safety","trust","transformation","becoming","thriving","flourishing","wisdom","love","joy","peace","beauty","truth","goodness","virtue","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","care","network","family","friend","colleague","mentor","coach","guide","curious","wondering","discovering","exploring","growing","learning","transforming","being","existing","living"],"technology":["computer","software","hardware","internet","network","data","algorithm","code","programming","language","database","server","cloud","mobile","app","platform","startup","innovation","disruption","digital","transformation","artificial","intelligence","machine","learning","deep","neural","natural","processing","vision","robotics","automation","blockchain","cryptocurrency","virtual","reality","augmented","mixed","extended","things","sensor","actuator","edge","computing","quantum","cybersecurity","privacy","protection","regulation","compliance","ethics","bias","fairness","transparency","explainability","accountability","governance","responsibility","sustainability","green","energy","efficiency","circular","economy","waste","recycling","repair","reuse","reduce","social","impact","divide","access","equity","inclusion","literacy","skill","education","workforce","future","work","gig","freelance","remote","hybrid","job","displacement","reskilling","upskilling","lifelong","human","interaction","user","experience","design","accessibility","universal","inclusive","participatory","open","source","commons","sharing","collaboration","community","ecosystem","effect","marketplace","aggregator","intermediary","value","chain","business","model","revenue","stream","monetization","freemium","subscription","advertising","product","service","outcome","measurement","evaluation","analytics","insight","decision","support","augmentation","partnership","symbiosis","coevolution","adaptation","improvement","excellence","mastery","wisdom","compassion","love","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","care","empathy","understanding","connection","relationship","belonging","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","transforming","becoming","being","existing","living","thriving","flourishing"],"travel":["journey","trip","voyage","adventure","explore","destination","route","map","passport","visa","customs","immigration","airport","airline","flight","hotel","hostel","accommodation","tour","guide","itinerary","schedule","budget","currency","exchange","culture","language","tradition","custom","cuisine","landmark","attraction","museum","monument","nature","park","beach","mountain","city","village","rural","urban","backpacking","camping","glamping","cruise","road","rail","bicycle","motorcycle","walking","hiking","trekking","climbing","diving","snorkeling","surfing","skiing","sailing","kayaking","photography","journaling","blogging","social","media","influencer","content","creator","community","inspiration","aspiration","bucket","list","experience","memory","nostalgia","growth","learning","transformation","perspective","worldview","empathy","understanding","connection","humanity","diversity","diplomacy","peace","cooperation","friendship","love","compassion","wisdom","joy","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","relationship","belonging","support","network","family","friend","colleague","exploration","discovery","wonder","awe","reverence","gratitude","appreciation","mentor","coach","teacher","student","learner","curious","wondering","discovering","exploring","growing","transforming","becoming","being","existing","living","thriving","flourishing"],"winter":["cold","snow","ice","frost","freeze","dark","short","night","long","hibernation","bare","tree","evergreen","pine","holly","mistletoe","fireplace","fire","warm","blanket","coat","scarf","hat","glove","boot","tea","coffee","cocoa","soup","stew","holiday","christmas","hanukkah","kwanzaa","solstice","equinox","season","change","transition","rest","renewal","preparation","seed","dormancy","waiting","patience","stillness","quiet","silence","peace","reflection","contemplation","meditation","introspection","inner","depth","mystery","darkness","light","contrast","hope","spring","anticipation","resilience","endurance","survival","adaptation","evolution","natural","rhythm","cycle","flow","breath","presence","awareness","consciousness","awakening","liberation","freedom","joy","love","beauty","truth","goodness","wisdom","virtue","excellence","integrity","authenticity","wholeness","blizzard","snowstorm","whiteout","sleet","freezing","rain","black","wind","chill","hypothermia","frostbite","shovel","plow","salt","grit","traction","skid","slide","treacherous","dangerous","hazardous","careful","cautious","prepared","ready","resilient","adapted","comfortable","cozy","snug","inviting","welcoming","hospitable","generous","kind","compassionate","loving","joyful","peaceful","beautiful","truthful","good","wise","virtuous","excellent","dedicated","disciplined","patient","persistent","courageous","humble","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","thriving","flourishing","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","teacher","student","learner","being","existing","living"],"coffee":["drink","brew","bean","roast","grind","espresso","latte","cappuccino","americano","mocha","macchiato","pour","over","french","press","cold","drip","filter","aeropress","chemex","siphon","moka","pot","instant","caffeine","stimulant","energy","alertness","focus","concentration","productivity","morning","ritual","routine","breakfast","cafe","barista","artisan","specialty","third","wave","single","origin","fair","trade","organic","sustainable","ethiopia","colombia","brazil","guatemala","yemen","kenya","jamaica","blue","mountain","sumatra","java","arabica","robusta","liberica","processing","washing","natural","honey","fermentation","terroir","altitude","rainfall","soil","shade","grown","harvest","cherry","pulp","parchment","green","export","import","commodity","price","market","certification","direct","relationship","transparency","traceability","quality","cupping","tasting","scoring","sca","competition","championship","brewing","extraction","yield","ratio","temperature","time","size","consistency","distribution","bloom","saturation","agitation","turbulence","channeling","pressure","flow","rate","profile","pre","infusion","tamping","portafilter","basket","group","head","steam","milk","froth","texture","microfoam","art","rosetta","heart","tulip","pitcher","thermometer","scale","timer","kettle","gooseneck","precision","repeatability","recipe","protocol","standard","benchmark","judge","sensory","evaluation","descriptors","flavor","wheel","aroma","taste","mouthfeel","acidity","sweetness","bitterness","body","finish","aftertaste","balance","complexity","clarity","cleanliness","defect","fault","light","medium","dark","nordic","italian","american","australian","blend","decaf","half","caf","gesha","geisha","pacamara","maragogype","yellow","red","pink","bourbon","sidra","rume","heirloom","landrace","hybrid","breeding","selection","resistance","tradeoff","sustainability","climate","change","adaptation","resilience","community","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","belonging","social","support","network","family","friend","colleague","mentor","teacher","student","learner"],"river":["water","flow","stream","current","bank","shore","bed","channel","meander","bend","curve","oxbow","lake","delta","estuary","mouth","source","headwater","spring","tributary","confluence","watershed","basin","catchment","drainage","runoff","erosion","sediment","deposition","alluvium","floodplain","wetland","marsh","swamp","flood","drought","dam","reservoir","irrigation","navigation","transport","fish","salmon","trout","bass","catfish","eel","carp","pike","perch","aquatic","plant","reed","cattail","watercress","algae","invertebrate","crayfish","mussel","clam","snail","dragonfly","mayfly","frog","toad","salamander","newt","turtle","snake","heron","egret","crane","kingfisher","osprey","eagle","duck","goose","swan","otter","beaver","muskrat","mink","raccoon","drinking","supply","treatment","purification","quality","pollution","contamination","sewage","agricultural","industrial","mining","restoration","remediation","conservation","protection","management","stewardship","riparian","buffer","zone","corridor","connectivity","fragmentation","passage","migration","spawning","breeding","habitat","refuge","biodiversity","ecosystem","service","control","recreation","fishing","swimming","boating","kayaking","rafting","cultural","historical","spiritual","sacred","mythology","folklore","legend","tradition","ceremony","ritual","festival","art","literature","music","poetry","painting","monitoring","data","collection","analysis","modeling","prediction","early","warning","system","emergency","response","recovery","resilience","adaptation","climate","change","sea","level","rise","saltwater","intrusion","freshwater","scarcity","security","conflict","cooperation","international","law","treaty","agreement","shared","resource","governance","accountability","transparency","equity","justice","access","right","commons","public","trust","responsibility","sustainability","future","generations","legacy","contribution","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","care","empathy","understanding","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"night":["dark","sky","star","moon","sleep","dream","rest","quiet","silence","peace","mystery","shadow","light","lamp","candle","glow","darkness","twilight","dusk","dawn","sunrise","sunset","midnight","late","early","owl","bat","firefly","cricket","frog","nocturnal","predator","prey","hunter","vision","adapted","rod","cone","photoreceptor","pupil","iris","eye","sight","smell","hearing","touch","sense","navigate","echolocation","sonar","radar","infrared","thermal","bioluminescence","phosphorescence","fluorescence","luminescence","reflection","refraction","scattering","absorption","transmission","wavelength","frequency","spectrum","electromagnetic","radiation","photon","quantum","particle","wave","duality","uncertainty","relativity","spacetime","gravity","force","field","energy","matter","cosmic","universe","galaxy","nebula","planet","comet","asteroid","meteor","shooting","wish","hope","aspiration","imagination","fantasy","wonder","awe","reverence","gratitude","appreciation","beauty","truth","goodness","wisdom","virtue","excellence","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","joy","love","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"bridge":["span","cross","connect","link","structure","engineering","architecture","steel","concrete","cable","suspension","arch","beam","truss","cantilever","bascule","drawbridge","pontoon","rope","pedestrian","road","rail","water","over","under","viaduct","aqueduct","overpass","underpass","tunnel","river","valley","gorge","canyon","chasm","gap","divide","connection","transition","transformation","change","crossing","journey","passage","threshold","gateway","portal","entrance","exit","beginning","end","middle","way","path","route","direction","navigation","wayfinding","signage","map","guide","exploration","discovery","adventure","travel","commute","transport","mobility","access","equity","inclusion","community","belonging","integration","wholeness","balance","harmony","flow","grace","beauty","truth","goodness","wisdom","virtue","integrity","authenticity","presence","awareness","consciousness","awakening","liberation","freedom","joy","love","peace","excellence","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","relationship","social","support","network","family","friend","colleague","mentor","coach","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing","metaphor","symbol","reconciliation","diplomacy","cooperation","collaboration","partnership","solidarity","shared","responsibility","common","good","public","interest","collective","action","movement","advocacy","activism","policy","legislation","governance","accountability","transparency","honesty","fairness","trust","commitment","sustainability","future","generations"],"dance":["move","body","rhythm","music","beat","flow","grace","expression","art","performance","stage","audience","choreography","technique","style","ballet","jazz","modern","contemporary","hip","hop","salsa","tango","waltz","foxtrot","swing","breakdance","tap","flamenco","kathak","bharatanatyam","traditional","folk","social","partner","solo","group","improvisation","composition","rehearsal","practice","training","teacher","student","school","company","festival","competition","audition","casting","role","character","costume","lighting","set","collaboration","creative","process","inspiration","imagination","emotion","story","narrative","meaning","culture","identity","community","celebration","ritual","ceremony","healing","therapy","joy","connection","belonging","transcendence","spiritual","sacred","secular","universal","particular","individual","collective","local","global","ancient","timeless","powerful","subtle","complex","simple","beautiful","meaningful","profound","serious","playful","passionate","visceral","intuitive","structured","free","composed","improvised","trained","untrained","professional","amateur","recreational","therapeutic","educational","competitive","political","subversive","revolutionary","conservative","innovative","experimental","avant","garde","postmodern","new","media","digital","virtual","augmented","mixed","reality","motion","capture","artificial","intelligence","human","machine","technology","fusion","crossover","interdisciplinary","mastery","excellence","dedication","discipline","patience","persistence","courage","humility","curiosity","wonder","discovery","exploration","adventure","growth","learning","transformation","becoming","presence","awareness","consciousness","awakening","liberation","freedom","love","peace","beauty","truth","goodness","wisdom","virtue","integrity","authenticity","wholeness","fulfillment","purpose","significance","legacy","contribution","service","care","empathy","understanding","relationship","support","network","family","friend","colleague","mentor","coach","guide","learner"],"bread":["wheat","flour","grain","yeast","fermentation","sourdough","gluten","rise","bake","oven","crust","crumb","soft","chewy","crispy","artisan","sandwich","toast","butter","jam","slice","loaf","roll","bun","bagel","pita","naan","flatbread","focaccia","ciabatta","baguette","rye","whole","multigrain","seed","nut","olive","herb","cheese","sweet","savory","breakfast","lunch","dinner","snack","culture","tradition","history","staple","sustenance","nourishment","community","sharing","hospitality","ritual","ceremony","celebration","communion","solidarity","comfort","home","warmth","love","compassion","generosity","kindness","giving","receiving","gratitude","appreciation","abundance","simplicity","beauty","truth","goodness","wisdom","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","joy","peace","kneading","proofing","scoring","steam","injection","formation","maillard","reaction","browning","caramelization","flavor","development","complexity","depth","richness","texture","structure","alveoli","bubble","network","extensibility","elasticity","strength","hydration","ratio","baker","percentage","autolyse","bulk","fold","stretch","shaping","tension","lame","blade","ear","bloom","spring","baking","stone","dutch","cast","iron","tender","dense","light","airy","moist","dry","stale","fresh","industrial","commercial","starter","levain","mother","wild","cultivated","bacteria","lactic","acid","acetic","tang","process","technique","skill","practice","mastery","dedication","discipline","patience","persistence","courage","humility","curiosity","wonder","discovery","exploration","growth","learning","transformation","becoming","excellence","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","belonging","social","support","family","friend","colleague","mentor","teacher","student","learner"],"king":["ruler","monarch","sovereign","power","authority","throne","crown","scepter","palace","court","noble","lord","knight","vassal","subject","kingdom","empire","dynasty","succession","heir","prince","princess","queen","regent","duke","earl","baron","history","medieval","ancient","feudal","constitutional","absolute","divine","right","legitimacy","conquest","war","peace","diplomacy","treaty","alliance","marriage","politics","governance","law","justice","order","stability","prosperity","culture","patronage","art","architecture","religion","ceremony","ritual","symbol","myth","legend","hero","villain","tyrant","benefactor","just","wise","foolish","strong","weak","beloved","feared","respected","honored","celebrated","mourned","remembered","forgotten","legacy","contribution","service","love","compassion","wisdom","joy","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","care","empathy","understanding","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing","chess","card","game","checkers","strategy","tactics","planning","execution","decision","making","resource","allocation","priority","optimization","winning","losing","growth","resilience","adaptation","flexibility","agility","creativity","innovation","disruption","transformation","mastery","dedication","discipline","practice","patience","persistence","courage","humility","curiosity","wonder","discovery","exploration","adventure"],"shadow":["dark","light","contrast","silhouette","form","shape","outline","edge","boundary","penumbra","umbra","eclipse","projection","cast","angle","direction","sun","moon","lamp","candle","artificial","natural","morning","evening","midday","optical","illusion","perception","vision","eye","brain","interpret","recognize","understand","meaning","symbol","metaphor","archetype","jung","collective","unconscious","hidden","repressed","denied","rejected","unwanted","unacknowledged","aspect","self","personality","character","trait","behavior","pattern","habit","belief","assumption","bias","blind","spot","defense","mechanism","transference","countertransference","therapy","healing","integration","wholeness","balance","harmony","masculine","feminine","conscious","ego","persona","anima","animus","myth","story","narrative","culture","tradition","ritual","ceremony","art","music","dream","meditation","contemplation","reflection","inquiry","investigation","exploration","discovery","insight","understanding","wisdom","compassion","love","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","purpose","significance","legacy","contribution","service","care","empathy","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"gold":["metal","precious","valuable","yellow","shiny","wealth","money","currency","standard","reserve","bank","investment","commodity","mine","ore","nugget","dust","panning","extraction","refining","smelting","alloy","karat","purity","jewelry","ring","necklace","bracelet","earring","crown","trophy","medal","olympic","award","prize","achievement","excellence","mastery","best","highest","top","first","champion","winner","success","glory","honor","respect","admiration","symbol","status","power","luxury","art","decoration","illumination","manuscript","icon","religious","sacred","temple","church","palace","treasury","ancient","civilization","egypt","rome","aztec","inca","maya","byzantine","venetian","spanish","colonial","discovery","americas","conquest","trade","route","silk","spice","rush","california","klondike","australia","south","africa","boom","bust","economy","speculative","bubble","crash","recovery","market","price","volatility","inflation","hedge","safe","haven","portfolio","diversification","asset","class","return","risk","correlation","liquidity","storage","physical","etf","futures","options","derivative","paper","digital","cryptocurrency","bitcoin","stablecoin","monetary","policy","interest","rate","dollar","fiat","bretton","woods","nixon","shock","floating","exchange","globalization","financialization","inequality","redistribution","taxation","regulation","oversight","accountability","transparency","governance","ethics","integrity","honesty","fairness","justice","equity","inclusion","diversity","belonging","community","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","social","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"wind":["air","blow","breeze","gust","storm","current","flow","pressure","temperature","weather","climate","season","change","direction","speed","force","power","energy","renewable","turbine","generator","electricity","offshore","onshore","farm","blade","rotor","nacelle","tower","foundation","grid","transmission","distribution","storage","battery","hydrogen","electrolysis","fuel","cell","green","clean","sustainable","carbon","zero","emission","decarbonization","transition","system","transformation","policy","market","investment","finance","technology","innovation","cost","reduction","deployment","scale","global","capacity","megawatt","gigawatt","terawatt","kilowatt","hour","generation","consumption","demand","supply","flexibility","intermittency","variability","integration","balancing","ancillary","service","frequency","regulation","voltage","control","stability","reliability","resilience","security","independence","sovereignty","trade","import","export","diversity","mix","portfolio","optimization","dispatch","scheduling","forecasting","prediction","model","data","analytics","machine","learning","artificial","intelligence","digital","twin","monitoring","performance","maintenance","inspection","repair","upgrade","decommission","recycling","circular","economy","life","cycle","assessment","environmental","impact","land","use","visual","noise","wildlife","bird","bat","migration","radar","aviation","communication","stakeholder","engagement","community","benefit","sharing","local","ownership","cooperative","trust","social","license","operate","acceptance","planning","permission","standard","guideline","best","practice","code","conduct","ethics","integrity","accountability","transparency","governance","responsibility","sustainability","future","generations","legacy","contribution","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","care","empathy","understanding","connection","relationship","belonging","support","network","family","friend","colleague","mentor","coach","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","transforming","becoming","being","existing","living","thriving","flourishing"],"island":["ocean","sea","water","shore","beach","coast","cliff","reef","coral","sand","rock","wave","tide","lagoon","atoll","archipelago","remote","isolated","paradise","tropical","mediterranean","arctic","volcanic","continental","barrier","tidal","river","lake","endemic","native","invasive","exotic","unique","biodiversity","ecosystem","conservation","protection","tourism","resort","hotel","cruise","ship","boat","sail","dive","snorkel","surf","fish","explore","discover","adventure","escape","retreat","sanctuary","peace","quiet","solitude","beauty","nature","sunset","sunrise","star","moon","night","day","season","weather","wind","rain","storm","hurricane","cyclone","typhoon","tsunami","earthquake","eruption","lava","ash","geothermal","hot","spring","flora","fauna","bird","reptile","amphibian","mammal","insect","plant","tree","palm","mangrove","rainforest","savanna","scrub","dune","wetland","cave","tube","caldera","crater","peak","summit","highland","plateau","valley","arch","stack","blowhole","pool","rocky","sandy","seagrass","kelp","forest","open","pelagic","dolphin","whale","shark","ray","turtle","seabird","seal","lion","walrus","polar","bear","penguin","albatross","frigate","booby","tropicbird","shearwater","petrel","skua","tern","gull","cormorant","pelican","heron","egret","kingfisher","osprey","eagle","hawk","falcon","parrot","pigeon","dove","finch","warbler","thrush","starling","culture","tradition","history","archaeology","heritage","indigenous","people","colonization","decolonization","self","determination","sovereignty","independence","autonomy","governance","democracy","community","belonging","identity","place","attachment","home","land","connection","relationship","stewardship","responsibility","sustainability","future","generations","legacy","contribution","service","love","compassion","wisdom","joy","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance"],"strength":["power","force","muscle","physical","fitness","exercise","training","lift","push","pull","resistance","weight","body","athlete","sport","competition","performance","endurance","speed","agility","flexibility","balance","coordination","skill","technique","practice","dedication","discipline","patience","persistence","resilience","courage","mental","toughness","willpower","determination","motivation","goal","achievement","success","growth","mastery","excellence","virtue","integrity","authenticity","wholeness","character","grit","perseverance","steadfastness","fortitude","stamina","vigor","vitality","energy","capacity","ability","potential","actualize","develop","improve","progress","advance","overcome","challenge","obstacle","adversity","difficulty","hardship","struggle","trial","test","prove","demonstrate","show","express","communicate","inspire","motivate","encourage","support","help","lead","guide","mentor","coach","teach","model","example","role","hero","legend","champion","winner","recognition","award","honor","respect","admiration","love","compassion","wisdom","joy","peace","beauty","truth","goodness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","community","belonging","social","network","family","friend","colleague","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"rain":["water","drop","cloud","storm","thunder","lightning","wet","flood","puddle","umbrella","coat","boot","gray","sky","petrichor","smell","fresh","clean","cold","warm","tropical","monsoon","drizzle","downpour","shower","sprinkle","mist","fog","dew","precipitation","humidity","evaporation","condensation","formation","cumulonimbus","nimbostratus","altostratus","cumulus","convection","front","occluded","stationary","low","pressure","system","cyclone","depression","trough","convergence","uplift","orographic","convective","frontal","cyclonic","cooling","saturation","point","relative","vapor","adiabatic","lapse","rate","stability","instability","cape","shear","wind","vertical","motion","updraft","downdraft","microbursts","gust","squall","line","mesoscale","organized","multicell","supercell","tornado","hail","funnel","wall","bwer","rfd","rear","flank","forward","sounding","diagram","parcel","theory","moist","static","energy","equivalent","potential","temperature","bulb","thermometer","psychrometer","hygrometer","radiosonde","balloon","upper","level","observation","reanalysis","climate","model","global","circulation","hadley","ferrel","polar","cell","itcz","subtropical","ridge","jet","stream","blocking","pattern","teleconnection","enso","nao","pdo","amo","mjo","oscillation","solar","cycle","volcanic","forcing","aerosol","greenhouse","gas","radiative","feedback","sensitivity","tipping","threshold","abrupt","change","nonlinear","complexity","uncertainty","risk","scenario","projection","pathway","mitigation","adaptation","resilience","sustainability","future","generations","legacy","contribution","service","love","compassion","wisdom","joy","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","excellence","fulfillment","meaning","purpose","significance","care","empathy","understanding","connection","relationship","community","belonging","social","support","network","family","friend","colleague","mentor","teacher","student","learner","curious","wondering","discovering","exploring","growing","learning","transforming","becoming","being","existing","living","thriving","flourishing"],"sport":["game","competition","team","player","athlete","coach","training","practice","fitness","skill","technique","strategy","tactics","strength","speed","endurance","flexibility","agility","coordination","balance","power","reaction","mental","toughness","resilience","determination","dedication","discipline","sacrifice","goal","achievement","victory","defeat","score","point","record","championship","trophy","medal","gold","silver","bronze","olympic","world","cup","league","tournament","season","playoff","final","referee","rule","fair","play","sportsmanship","respect","inclusion","diversity","accessibility","community","fan","supporter","spectator","crowd","stadium","arena","field","court","track","pool","gym","equipment","uniform","jersey","shoe","nutrition","recovery","injury","prevention","rehabilitation","medicine","science","technology","analytics","data","performance","measurement","evaluation","coaching","mentoring","leadership","dynamics","communication","trust","collaboration","cohesion","culture","identity","belonging","pride","passion","joy","love","commitment","perseverance","excellence","mastery","growth","learning","transformation","becoming","thriving","flourishing","wisdom","compassion","peace","beauty","truth","goodness","virtue","integrity","authenticity","wholeness","presence","awareness","consciousness","awakening","liberation","freedom","fulfillment","meaning","purpose","significance","legacy","contribution","service","care","empathy","understanding","connection","relationship","social","support","network","family","friend","teammate","mentor","guide","teacher","student","learner","curious","wondering","discovering","exploring","growing","transforming","being","existing","living"]};
-
-  var secrets=Object.keys(BANK);
-  var secret=secrets[Math.floor(Math.random()*secrets.length)];
-  var neighbors=BANK[secret]; /* index 0 = closest, ascending */
-
-  var guesses=[]; /* [{word,rank,exact}] sorted rank asc */
-  var won=false;
-  var inputEl,listEl,statusEl,guessCountEl;
-
-  function getRank(word){
-    var w=word.toLowerCase().trim();
-    if(w===secret)return 1;
-    var idx=neighbors.indexOf(w);
-    return idx===-1?999:idx+2; /* +2: index 0 is rank 2 (rank 1 = secret itself) */
-  }
-
-  function submitGuess(word){
-    word=word.toLowerCase().trim().replace(/[^a-z]/g,'');
-    if(!word){toast('Type a word!');return;}
-    if(guesses.find(function(g){return g.word===word;})){toast('"'+word+'" already guessed!');return;}
-    var rank=getRank(word);
-    var exact=(rank===1);
-    guesses.push({word:word,rank:rank,exact:exact});
-    guesses.sort(function(a,b){return a.rank-b.rank;});
-    if(exact){won=true;SND.win();setScore(guesses.length+' guess'+(guesses.length!==1?'es':''));saveScore('contexto',guesses.length,false);}
-    else SND.click();
-    if(guessCountEl)guessCountEl.textContent='Guesses: '+guesses.length;
-    renderList();
-    if(inputEl){inputEl.value='';inputEl.focus();}
-  }
-
-  function rankColor(r){
-    if(r===1)return'#ffd700';
-    if(r<=10)return'var(--green)';
-    if(r<=50)return'#86efac';
-    if(r<=150)return'var(--amber)';
-    if(r<=300)return'#fb923c';
-    return'var(--red)';
-  }
-
-  function rankBar(r){
-    var pct=Math.max(2,Math.round((300-Math.min(r,300))/3));
-    return'<div style="width:72px;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px"><div style="width:'+pct+'%;height:100%;background:'+rankColor(r)+';border-radius:3px"></div></div>';
-  }
-
-  function renderList(){
-    if(!listEl)return;
-    listEl.innerHTML='';
-    if(won){
-      var wd=document.createElement('div');
-      wd.style.cssText='text-align:center;padding:24px 20px';
-      wd.innerHTML='<div style="font-size:40px;margin-bottom:10px">🎉</div>'
-        +'<div style="font-size:20px;font-weight:800;color:#ffd700;margin-bottom:6px">'+secret.toUpperCase()+'</div>'
-        +'<div style="font-size:13px;color:var(--muted);margin-bottom:18px">Found in '+guesses.length+' guess'+(guesses.length!==1?'es':'')+'!</div>';
-      var nb=document.createElement('button');nb.className='btn btn-primary';nb.textContent='New Game';
-      nb.onclick=function(){gameContexto(C);};wd.appendChild(nb);listEl.appendChild(wd);
-    }
-    guesses.forEach(function(g,i){
-      var row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.05);'+(i===0?'background:rgba(255,255,255,.04)':'');
-      var num=document.createElement('span');num.style.cssText='font-size:10px;color:var(--muted2);width:24px;text-align:right;flex-shrink:0';
-      num.textContent=(i+1)+'.';
-      var wrd=document.createElement('span');wrd.style.cssText='font-size:14px;font-weight:700;flex:1;color:'+(g.exact?'#ffd700':'var(--text)');
-      wrd.textContent=g.word+(g.exact?' 🎯':'');
-      var rnk=document.createElement('span');rnk.style.cssText='font-size:12px;font-weight:700;color:'+rankColor(g.rank)+';flex-shrink:0;min-width:52px;text-align:right';
-      rnk.textContent=g.rank===999?'?':'#'+g.rank;
-      var bar=document.createElement('div');bar.innerHTML=rankBar(g.rank);
-      row.appendChild(num);row.appendChild(wrd);row.appendChild(rnk);row.appendChild(bar);
-      listEl.appendChild(row);
-    });
-    if(!guesses.length){
-      var hint=document.createElement('div');hint.style.cssText='text-align:center;padding:44px 24px;color:var(--muted)';
-      hint.innerHTML='<div style="font-size:36px;margin-bottom:12px">🧠</div>'
-        +'<div style="font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text)">Find the secret word!</div>'
-        +'<div style="font-size:12px;line-height:1.7">Every word is ranked by semantic closeness to the target.<br>#1 = the answer · lower number = closer · #999 = not in database</div>';
-      listEl.appendChild(hint);
-    }
-  }
-
-  /* Build UI */
-  /* Clear any previous game content before building UI */
-  C.innerHTML='';
-  C.style.cssText='display:flex;flex-direction:column;height:100%;background:var(--surface);padding:0';
-
-  var topBar=document.createElement('div');
-  topBar.style.cssText='display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(0,0,0,.15)';
-  guessCountEl=document.createElement('span');guessCountEl.style.cssText='font-size:12px;color:var(--muted)';guessCountEl.textContent='Guesses: 0';
-  statusEl=document.createElement('span');statusEl.style.cssText='font-size:11px;color:var(--accent2);font-style:italic';
-  var hintLbl=document.createElement('span');hintLbl.style.cssText='font-size:11px;color:var(--muted2);margin-left:auto';
-  hintLbl.textContent='#1 = secret · lower = closer · #999 = unknown';
-  topBar.appendChild(guessCountEl);topBar.appendChild(statusEl);topBar.appendChild(hintLbl);
-  C.appendChild(topBar);
-
-  var inputRow=document.createElement('div');
-  inputRow.style.cssText='display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0';
-  inputEl=document.createElement('input');
-  inputEl.type='text';inputEl.placeholder='Type a word and press Enter…';
-  inputEl.style.cssText='flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:14px;font-family:var(--font);outline:none';
-  inputEl.setAttribute('autocomplete','off');inputEl.setAttribute('spellcheck','false');
-  inputEl.addEventListener('keydown',function(e){if(e.key==='Enter')submitGuess(inputEl.value);});
-  var submitBtn=document.createElement('button');submitBtn.className='btn btn-primary';
-  submitBtn.style.cssText='padding:10px 20px;font-size:13px';submitBtn.textContent='Guess';
-  submitBtn.onclick=function(){submitGuess(inputEl.value);};
-  var skipBtn=document.createElement('button');skipBtn.className='btn btn-outline';
-  skipBtn.style.cssText='padding:10px 14px;font-size:11px';skipBtn.textContent='💡 Give Up';
-  skipBtn.title='Reveal the secret word';
-  skipBtn.onclick=function(){
-    if(!confirm('Reveal the secret word?'))return;
-    won=true;
-    if(!guesses.find(function(g){return g.exact;}))
-      guesses.unshift({word:secret,rank:1,exact:true});
-    SND.wrong();
-    if(guessCountEl)guessCountEl.textContent='Guesses: '+guesses.length;
-    renderList();
-  };
-  inputRow.appendChild(inputEl);inputRow.appendChild(submitBtn);inputRow.appendChild(skipBtn);
-  C.appendChild(inputRow);
-
-  listEl=document.createElement('div');listEl.style.cssText='flex:1;overflow-y:auto';
-  C.appendChild(listEl);
-
-  inputEl.focus();
-  renderList();
-}
 
 </script>
 </body>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   WHO WANTS TO BE A MILLIONAIRE
+   15 questions · 3 tiers · 4 lifelines · Koby (Claude API)
+═══════════════════════════════════════════════════ */
+var TRIVIA_QUESTIONS=[
+  /* ── EASY (tier 1, Q1-Q5) ── */
+  {t:1,q:"What is the capital of France?",o:["Rome","Paris","Madrid","Berlin"],a:1,exp:"Paris has been the capital of France since 987 AD."},
+  {t:1,q:"How many sides does a hexagon have?",o:["Five","Six","Seven","Eight"],a:1,exp:"Hex means six — a hexagon has six sides."},
+  {t:1,q:"Which planet is known as the Red Planet?",o:["Venus","Jupiter","Mars","Saturn"],a:2,exp:"Mars gets its reddish color from iron oxide (rust) on its surface."},
+  {t:1,q:"What is H2O more commonly known as?",o:["Salt","Water","Oxygen","Hydrogen"],a:1,exp:"H2O is the chemical formula for water — two hydrogen atoms and one oxygen."},
+  {t:1,q:"How many days are in a leap year?",o:["364","365","366","367"],a:2,exp:"A leap year has 366 days — February gets an extra day every 4 years."},
+  {t:1,q:"Which ocean is the largest on Earth?",o:["Atlantic","Indian","Arctic","Pacific"],a:3,exp:"The Pacific Ocean covers about 165 million km² — more than all land combined."},
+  {t:1,q:"What color are ripe bananas?",o:["Green","Red","Yellow","Orange"],a:2,exp:"Ripe bananas are yellow due to the breakdown of chlorophyll."},
+  {t:1,q:"Which animal is known as man's best friend?",o:["Cat","Horse","Dog","Rabbit"],a:2,exp:"Dogs have been human companions for over 15,000 years."},
+  {t:1,q:"How many continents are there on Earth?",o:["Five","Six","Seven","Eight"],a:2,exp:"The seven continents are Africa, Antarctica, Asia, Australia, Europe, North America, and South America."},
+  {t:1,q:"What gas do plants absorb during photosynthesis?",o:["Oxygen","Nitrogen","Carbon Dioxide","Helium"],a:2,exp:"Plants absorb CO2 and release oxygen during photosynthesis."},
+  {t:1,q:"What is the smallest prime number?",o:["0","1","2","3"],a:2,exp:"2 is the smallest and only even prime number."},
+  {t:1,q:"In which sport would you perform a 'slam dunk'?",o:["Volleyball","Tennis","Basketball","Baseball"],a:2,exp:"A slam dunk is a basketball move where the player forces the ball through the hoop."},
+  {t:1,q:"What country is home to the kangaroo?",o:["New Zealand","South Africa","India","Australia"],a:3,exp:"Kangaroos are native to Australia and are national symbols of the country."},
+  {t:1,q:"What is the boiling point of water at sea level in Celsius?",o:["90°","95°","100°","110°"],a:2,exp:"Water boils at exactly 100°C (212°F) at sea level."},
+  {t:1,q:"How many hours are in a day?",o:["12","18","24","36"],a:2,exp:"A full Earth day — one rotation — takes 24 hours."},
+
+  /* ── MEDIUM (tier 2, Q6-Q10) ── */
+  {t:2,q:"What is the chemical symbol for gold?",o:["Go","Gd","Au","Ag"],a:2,exp:"Au comes from the Latin word 'aurum' meaning gold."},
+  {t:2,q:"Who painted the Mona Lisa?",o:["Michelangelo","Raphael","Leonardo da Vinci","Caravaggio"],a:2,exp:"Leonardo da Vinci painted the Mona Lisa between 1503 and 1519."},
+  {t:2,q:"What is the longest river in the world?",o:["Amazon","Yangtze","Nile","Mississippi"],a:2,exp:"The Nile River in Africa is approximately 6,650 km long."},
+  {t:2,q:"In what year did World War II end?",o:["1943","1944","1945","1946"],a:2,exp:"World War II ended in 1945 — V-E Day was May 8 and V-J Day was September 2."},
+  {t:2,q:"What is the speed of light in a vacuum?",o:["200,000 km/s","300,000 km/s","400,000 km/s","150,000 km/s"],a:1,exp:"The speed of light is approximately 299,792 km/s — rounded to 300,000 km/s."},
+  {t:2,q:"Which element has the atomic number 1?",o:["Helium","Oxygen","Carbon","Hydrogen"],a:3,exp:"Hydrogen is the first element on the periodic table with atomic number 1."},
+  {t:2,q:"What is the largest organ in the human body?",o:["Liver","Brain","Lungs","Skin"],a:3,exp:"The skin is the largest organ — covering approximately 1.7 to 2.0 square metres in adults."},
+  {t:2,q:"In which city is the Eiffel Tower located?",o:["Lyon","Marseille","Paris","Bordeaux"],a:2,exp:"The Eiffel Tower was built in Paris in 1889 for the World's Fair."},
+  {t:2,q:"What is the square root of 144?",o:["10","11","12","13"],a:2,exp:"12 × 12 = 144, so the square root of 144 is 12."},
+  {t:2,q:"Which Shakespeare play features the character Hamlet?",o:["Othello","Hamlet","Macbeth","King Lear"],a:1,exp:"Hamlet, Prince of Denmark, is the protagonist of Shakespeare's tragedy 'Hamlet'."},
+  {t:2,q:"How many bones are in the adult human body?",o:["186","206","226","246"],a:1,exp:"An adult human body has 206 bones. Babies are born with about 270."},
+  {t:2,q:"What is the capital of Japan?",o:["Osaka","Kyoto","Tokyo","Hiroshima"],a:2,exp:"Tokyo has been Japan's capital since 1869 and is the world's largest metropolitan area."},
+  {t:2,q:"Which planet has the most moons?",o:["Jupiter","Saturn","Uranus","Neptune"],a:1,exp:"Saturn leads with 146 confirmed moons as of 2024, edging past Jupiter."},
+  {t:2,q:"What currency does the United Kingdom use?",o:["Euro","Dollar","Pound Sterling","Franc"],a:2,exp:"The UK uses the Pound Sterling (GBP), one of the world's oldest currencies."},
+  {t:2,q:"In computing, what does CPU stand for?",o:["Central Processing Unit","Computer Power Unit","Core Program Utility","Central Program Unit"],a:0,exp:"CPU stands for Central Processing Unit — the primary processor of a computer."},
+
+  /* ── HARD (tier 3, Q11-Q15) ── */
+  {t:3,q:"What is the Pythagorean theorem?",o:["a+b=c","a²+b²=c²","a×b=c²","a³+b³=c³"],a:1,exp:"In a right triangle, the square of the hypotenuse equals the sum of squares of the other two sides."},
+  {t:3,q:"Which philosopher wrote 'Critique of Pure Reason'?",o:["Hegel","Descartes","Kant","Nietzsche"],a:2,exp:"Immanuel Kant published Critique of Pure Reason in 1781, a foundational work in modern philosophy."},
+  {t:3,q:"What is the half-life of Carbon-14?",o:["5,370 years","5,730 years","6,050 years","4,980 years"],a:1,exp:"Carbon-14 has a half-life of approximately 5,730 years, used in radiocarbon dating."},
+  {t:3,q:"In music, how many semitones are in an octave?",o:["10","11","12","13"],a:2,exp:"An octave contains 12 semitones in the standard chromatic scale used in Western music."},
+  {t:3,q:"What does 'habeas corpus' literally mean in Latin?",o:["You shall have the body","The law speaks","In good faith","Beyond reasonable doubt"],a:0,exp:"Habeas corpus means 'you shall have the body' — a legal action requiring a person under arrest to be brought before a judge."},
+  {t:3,q:"Which country has the most UNESCO World Heritage Sites?",o:["China","France","Italy","Spain"],a:2,exp:"Italy leads with 58 UNESCO World Heritage Sites as of 2023."},
+  {t:3,q:"What is the Fibonacci sequence starting digit after 1,1,2,3,5?",o:["7","8","9","11"],a:1,exp:"The Fibonacci sequence is 1,1,2,3,5,8 — each number is the sum of the two before it."},
+  {t:3,q:"In what year was the first iPhone released?",o:["2005","2006","2007","2008"],a:2,exp:"Steve Jobs unveiled the first iPhone on January 9, 2007."},
+  {t:3,q:"What is the powerhouse of the cell?",o:["Nucleus","Ribosome","Mitochondria","Golgi apparatus"],a:2,exp:"Mitochondria generate most of the cell's ATP energy supply through cellular respiration."},
+  {t:3,q:"Which gas makes up approximately 78% of Earth's atmosphere?",o:["Oxygen","Carbon Dioxide","Nitrogen","Argon"],a:2,exp:"Nitrogen (N₂) makes up about 78.09% of Earth's atmosphere."},
+  {t:3,q:"How many symphonies did Beethoven compose?",o:["7","8","9","10"],a:2,exp:"Beethoven composed 9 symphonies — the 9th 'Choral' is his most celebrated."},
+  {t:3,q:"What is the largest number that divides both 48 and 64?",o:["8","12","16","24"],a:2,exp:"The GCD of 48 and 64 is 16. 48=16×3 and 64=16×4."},
+  {t:3,q:"In which country did the Industrial Revolution begin?",o:["France","Germany","United States","Great Britain"],a:3,exp:"The Industrial Revolution began in Great Britain in the mid-18th century."},
+  {t:3,q:"What does 'DNS' stand for in computing?",o:["Dynamic Network System","Domain Name System","Data Node Server","Digital Naming Standard"],a:1,exp:"DNS stands for Domain Name System — it translates domain names to IP addresses."},
+  {t:3,q:"Which element is a liquid at room temperature besides mercury?",o:["Gallium","Bromine","Cesium","Francium"],a:1,exp:"Bromine is one of only two elements (with mercury) that is liquid at room temperature."}
+,
+
+  /* ── EASY BONUS (tier 1) ── */
+  {t:1,q:"What color is the sky on a clear day?",o:["Green","Blue","Red","Yellow"],a:1,exp:"The sky appears blue due to Rayleigh scattering of sunlight by the atmosphere."},
+  {t:1,q:"How many fingers does a typical human have?",o:["8","9","10","12"],a:2,exp:"Humans have 10 fingers — 5 on each hand, including thumbs."},
+  {t:1,q:"What do bees produce?",o:["Milk","Honey","Silk","Wax only"],a:1,exp:"Bees produce honey from flower nectar as a food source."},
+  {t:1,q:"Which direction does the sun rise from?",o:["West","North","South","East"],a:3,exp:"The sun rises in the east and sets in the west due to Earth's rotation."},
+  {t:1,q:"How many wheels does a tricycle have?",o:["2","3","4","1"],a:1,exp:"Tri- means three, so a tricycle has three wheels."},
+  {t:1,q:"Which animal is the tallest in the world?",o:["Elephant","Giraffe","Horse","Camel"],a:1,exp:"Giraffes are the tallest land animals, reaching up to 5.5 metres."},
+  {t:1,q:"What shape has 4 equal sides?",o:["Triangle","Rectangle","Circle","Square"],a:3,exp:"A square has 4 equal sides and 4 right angles."},
+  {t:1,q:"How many months are in a year?",o:["10","11","12","13"],a:2,exp:"The Gregorian calendar has 12 months in a year."},
+  {t:1,q:"Which planet do we live on?",o:["Mars","Venus","Earth","Jupiter"],a:2,exp:"Earth is the third planet from the Sun and the only known planet with life."},
+  {t:1,q:"What do caterpillars turn into?",o:["Moths only","Bees","Butterflies or moths","Dragonflies"],a:2,exp:"Caterpillars are the larval stage of butterflies and moths."},
+  {t:1,q:"How many sides does a triangle have?",o:["2","3","4","5"],a:1,exp:"A triangle has exactly 3 sides and 3 angles."},
+  {t:1,q:"What instrument has black and white keys?",o:["Guitar","Violin","Piano","Drum"],a:2,exp:"A piano has 88 keys — 52 white and 36 black."},
+  {t:1,q:"What do you call frozen water?",o:["Steam","Rain","Ice","Snow"],a:2,exp:"Water freezes into ice at 0 degrees Celsius."},
+  {t:1,q:"What is the opposite of day?",o:["Evening","Twilight","Dawn","Night"],a:3,exp:"Night is the period of darkness opposite to day."},
+  {t:1,q:"How many zeros are in one hundred?",o:["1","2","3","4"],a:1,exp:"100 has two zeros."},
+
+  /* ── MEDIUM BONUS (tier 2) ── */
+  {t:2,q:"What is the largest planet in our solar system?",o:["Saturn","Neptune","Jupiter","Uranus"],a:2,exp:"Jupiter is the largest planet, with a mass 318 times that of Earth."},
+  {t:2,q:"Who wrote Romeo and Juliet?",o:["Charles Dickens","William Shakespeare","Jane Austen","Homer"],a:1,exp:"Shakespeare wrote Romeo and Juliet around 1594-1596."},
+  {t:2,q:"What is the chemical symbol for iron?",o:["Ir","In","Fe","Fo"],a:2,exp:"Fe comes from the Latin word ferrum, meaning iron."},
+  {t:2,q:"What is the hardest natural substance on Earth?",o:["Gold","Diamond","Quartz","Granite"],a:1,exp:"Diamond scores 10 on the Mohs hardness scale — the maximum."},
+  {t:2,q:"How many players are on a standard soccer team?",o:["9","10","11","12"],a:2,exp:"A soccer team has 11 players including the goalkeeper."},
+  {t:2,q:"What gas do humans exhale?",o:["Oxygen","Nitrogen","Carbon dioxide","Helium"],a:2,exp:"Humans exhale carbon dioxide as a byproduct of cellular respiration."},
+  {t:2,q:"Which country has the largest land area?",o:["USA","China","Canada","Russia"],a:3,exp:"Russia is the world's largest country by land area at 17.1 million km2."},
+  {t:2,q:"What is the main language spoken in Brazil?",o:["Spanish","English","Portuguese","French"],a:2,exp:"Brazil was colonised by Portugal, making Portuguese the official language."},
+  {t:2,q:"How many chambers does the human heart have?",o:["2","3","4","5"],a:2,exp:"The heart has 4 chambers: left and right atria, and left and right ventricles."},
+  {t:2,q:"What is the name of the force that keeps us on the ground?",o:["Magnetism","Friction","Tension","Gravity"],a:3,exp:"Gravity is the attractive force between masses — Earth's gravity keeps us grounded."},
+  {t:2,q:"What is the smallest country in the world?",o:["Monaco","San Marino","Liechtenstein","Vatican City"],a:3,exp:"Vatican City covers just 0.44 km2 inside Rome — the world's smallest sovereign state."},
+  {t:2,q:"What does www stand for in a website address?",o:["Wide Web World","World Wide Web","Web World Wide","Worldwide Web Window"],a:1,exp:"WWW stands for World Wide Web, coined by Tim Berners-Lee in 1989."},
+  {t:2,q:"What is the name of the longest river in South America?",o:["Nile","Orinoco","Amazon","Parana"],a:2,exp:"The Amazon is the world's largest river by water volume and South America's longest."},
+  {t:2,q:"What is the currency of Japan?",o:["Won","Yuan","Ringgit","Yen"],a:3,exp:"The Japanese Yen (JPY) is one of the most traded currencies in the world."},
+  {t:2,q:"In which sport would you perform a 'hat-trick'?",o:["Basketball","Tennis","Soccer","Both soccer and cricket"],a:3,exp:"A hat-trick means scoring three goals (soccer) or taking three wickets (cricket)."},
+
+  /* ── HARD BONUS (tier 3) ── */
+  {t:3,q:"What is the speed of sound at sea level in m/s?",o:["230","343","412","500"],a:1,exp:"Sound travels at approximately 343 m/s in dry air at 20 degrees Celsius at sea level."},
+  {t:3,q:"Which element has the highest melting point?",o:["Iron","Titanium","Tungsten","Osmium"],a:2,exp:"Tungsten melts at 3,422 degrees Celsius — the highest of all pure elements."},
+  {t:3,q:"What Latin phrase means 'after death'?",o:["In absentia","Post mortem","Prima facie","Ad hoc"],a:1,exp:"Post mortem literally means after death in Latin, used in medical and legal contexts."},
+  {t:3,q:"Which country invented paper?",o:["Egypt","China","India","Greece"],a:1,exp:"China invented paper around 105 AD, attributed to Cai Lun during the Han Dynasty."},
+  {t:3,q:"What is the layer of Earth between the crust and core?",o:["Lithosphere","Stratosphere","Mantle","Asthenosphere"],a:2,exp:"The mantle is the thick layer between Earth's crust and its core, composed of silicate rock."},
+  {t:3,q:"What is the sum of angles in a triangle?",o:["90","180","270","360"],a:1,exp:"The interior angles of any triangle always sum to exactly 180 degrees."},
+  {t:3,q:"Who proposed the theory of general relativity?",o:["Isaac Newton","Niels Bohr","Albert Einstein","Max Planck"],a:2,exp:"Einstein published his general theory of relativity in 1915."},
+  {t:3,q:"What is the rarest blood type in humans?",o:["O negative","A negative","B negative","AB negative"],a:3,exp:"AB negative is the rarest blood type, found in less than 1% of the global population."},
+  {t:3,q:"Which war ended on the 11th hour of the 11th day of the 11th month 1918?",o:["World War II","Korean War","World War I","Vietnam War"],a:2,exp:"World War I ended with the Armistice on November 11, 1918 at 11:00 AM."},
+  {t:3,q:"What is the study of earthquakes called?",o:["Volcanology","Seismology","Geology","Meteorology"],a:1,exp:"Seismology is the scientific study of earthquakes and seismic waves."},
+  {t:3,q:"How many zeros are in one trillion?",o:["9","10","11","12"],a:3,exp:"One trillion equals 1,000,000,000,000 — twelve zeros."},
+  {t:3,q:"What does the Richter scale measure?",o:["Wind speed","Earthquake magnitude","Ocean depth","Volcanic activity"],a:1,exp:"The Richter scale measures the magnitude of earthquakes based on seismographic readings."},
+  {t:3,q:"Which mathematician's last theorem was proven in 1995?",o:["Euler","Fermat","Gauss","Ramanujan"],a:1,exp:"Fermat's Last Theorem, stated in 1637, was finally proven by Andrew Wiles in 1995."},
+  {t:3,q:"What is the currency used in ancient Rome called?",o:["Drachma","Talent","Denarius","Solidus"],a:2,exp:"The denarius was the standard Roman silver coin used from 211 BC."},
+  {t:3,q:"What is the term for a word that reads the same forwards and backwards?",o:["Anagram","Palindrome","Homophone","Synonym"],a:1,exp:"A palindrome reads the same in both directions — examples: racecar, level, madam."}
+];
+
+
+var PRIZE_LADDER=[0,2,5,10,20,50,100,150,250,400,600,1000,1500,2500,5000,10000];
+var SAFE_FLOORS=[5,10];
+
+/* ─────────────────────────────────────────────────────
+   WHO WANTS TO BE A MILLIONAIRE  (redesigned)
+───────────────────────────────────────────────────── */
+function gameMillionaire(C){
+  C.style.cssText='padding:16px 20px;overflow-y:auto;height:100%;box-sizing:border-box;display:flex;flex-direction:column;';
+  var questions=[];
+  var usedIdx={1:[],2:[],3:[]};
+  function pickQ(tier){
+    var all=TRIVIA_QUESTIONS.map(function(q,i){return {q:q,i:i};}).filter(function(x){return x.q.t===tier&&!usedIdx[tier].includes(x.i);});
+    if(!all.length)return null;
+    var pick=all[Math.floor(Math.random()*all.length)];
+    usedIdx[tier].push(pick.i);return pick.q;
+  }
+  for(var i=0;i<5;i++){var q=pickQ(1);if(q)questions.push(q);}
+  for(var i=0;i<5;i++){var q=pickQ(2);if(q)questions.push(q);}
+  for(var i=0;i<5;i++){var q=pickQ(3);if(q)questions.push(q);}
+
+  var qIdx=0,lifelines={fifty:true,audience:true,friend:true,swap:true},gameOver=false,eliminated=[],safeFloor=0;
+  var LETTERS=['A','B','C','D'];
+
+  /* Feedback state — explicit vars, never leaked across renders */
+  var _feedMsg=null,_feedIdx=null,_feedOk=null,_feedExp=null;
+  function showFeedback(msg,idx,ok,exp){_feedMsg=msg;_feedIdx=idx;_feedOk=ok;_feedExp=exp;}
+  function clearFeedback(){_feedMsg=null;_feedIdx=null;_feedOk=null;_feedExp=null;}
+  function render(){
+    var feedbackMsg=_feedMsg,answeredIdx=_feedIdx,isCorrect=_feedOk,explain=_feedExp;
+    C.innerHTML='';
+    var q=questions[qIdx];
+
+    /* ── outer wrapper: dark theatre feel ── */
+    var wrap=document.createElement('div');
+    wrap.style.cssText='font-family:var(--font-sans);max-width:960px;width:100%;margin:0 auto;padding:10px 0;user-select:none;box-sizing:border-box;flex:1';
+
+    /* ── top bar: question counter + prize ── */
+    var topBar=document.createElement('div');
+    topBar.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';
+    topBar.innerHTML='<div style="font-size:12px;color:var(--color-text-tertiary);letter-spacing:.5px;text-transform:uppercase">Question '+(qIdx+1)+' of 15</div>'
+      +'<div style="font-size:13px;font-weight:600;color:#f5c842;letter-spacing:.3px">💰 '+(PRIZE_LADDER[qIdx+1]||0).toLocaleString()+' credits</div>';
+    wrap.appendChild(topBar);
+
+    /* ── prize ladder (horizontal scroll strip) ── */
+    var strip=document.createElement('div');
+    strip.style.cssText='display:flex;gap:3px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;scrollbar-width:none';
+    for(var li=1;li<=15;li++){
+      var isCur=(li-1===qIdx),isSafe=SAFE_FLOORS.includes(li),isPast=(li-1<qIdx);
+      var cell=document.createElement('div');
+      cell.style.cssText='flex-shrink:0;font-size:10px;padding:3px 7px;border-radius:4px;white-space:nowrap;font-weight:'+(isCur?'700':'400')+';'
+        +(isCur?'background:#f5c842;color:#1a1a2e;'
+        :isSafe?'background:rgba(74,222,128,.18);color:#4ade80;border:1px solid rgba(74,222,128,.3);'
+        :isPast?'background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);'
+        :'background:rgba(255,255,255,.06);color:rgba(255,255,255,.55);');
+      cell.textContent=li+'·'+(PRIZE_LADDER[li]||0).toLocaleString()+(isSafe&&!isCur?' ★':'');
+      strip.appendChild(cell);
+    }
+    wrap.appendChild(strip);
+
+    /* ── question box ── */
+    var qBox=document.createElement('div');
+    qBox.style.cssText='background:linear-gradient(135deg,rgba(30,30,60,.95),rgba(20,20,50,.95));border:1px solid rgba(245,200,66,.25);border-radius:14px;padding:24px 28px;margin-bottom:18px;text-align:center;min-height:80px;display:flex;align-items:center;justify-content:center';
+    qBox.innerHTML='<div style="font-size:15px;font-weight:500;color:#fff;line-height:1.5">'+q.q+'</div>';
+    wrap.appendChild(qBox);
+
+    /* ── answer grid ── */
+    var ag=document.createElement('div');
+    ag.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px';
+    q.o.forEach(function(opt,oi){
+      if(eliminated.includes(oi))return;
+      var btn=document.createElement('button');
+      var isThisCorrect=(oi===q.a);
+      var revealed=feedbackMsg!==null;
+      var isChosen=(oi===answeredIdx);
+      var bg,border,clr;
+      if(!revealed){bg='rgba(30,30,70,.8)';border='rgba(100,100,200,.4)';clr='#d4d4f8';}
+      else if(isThisCorrect){bg='rgba(22,163,74,.25)';border='#4ade80';clr='#4ade80';}
+      else if(isChosen&&!isCorrect){bg='rgba(185,28,28,.25)';border='#f87171';clr='#f87171';}
+      else{bg='rgba(30,30,70,.4)';border='rgba(100,100,200,.2)';clr='rgba(180,180,220,.5)';}
+      btn.style.cssText='background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:15px 18px;font-size:15px;cursor:'+(revealed||gameOver?'default':'pointer')+';text-align:left;color:'+clr+';transition:all .15s;display:flex;align-items:center;gap:12px';
+      var badge=document.createElement('span');
+      badge.style.cssText='flex-shrink:0;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:rgba(245,200,66,.15);color:#f5c842;border:1px solid rgba(245,200,66,.3)';
+      badge.textContent=LETTERS[oi];
+      btn.appendChild(badge);
+      btn.appendChild(document.createTextNode(opt));
+      if(!revealed&&!gameOver){
+        btn.onmouseenter=function(){this.style.background='rgba(50,50,100,.9)';this.style.borderColor='rgba(245,200,66,.5)';};
+        btn.onmouseleave=function(){this.style.background=bg;this.style.borderColor=border;};
+        btn.onclick=(function(idx){return function(){answer(idx);};})(oi);
+      }
+      ag.appendChild(btn);
+    });
+    wrap.appendChild(ag);
+
+    /* ── feedback box ── */
+    if(feedbackMsg!==null){
+      var fb=document.createElement('div');
+      var fbOk=isCorrect;
+      fb.style.cssText='border-radius:10px;padding:14px 18px;margin-bottom:14px;line-height:1.6;border:1px solid '+(fbOk?'rgba(74,222,128,.3)':'rgba(248,113,113,.3)')+';background:'+(fbOk?'rgba(22,163,74,.12)':'rgba(185,28,28,.12)')+';display:flex;align-items:flex-start;justify-content:space-between;gap:12px';
+      var fbText=document.createElement('div');
+      fbText.innerHTML='<div style="font-weight:600;font-size:14px;color:'+(fbOk?'#4ade80':'#f87171')+';margin-bottom:3px">'+(fbOk?'✓ Correct!':'✗ '+feedbackMsg)+'</div>'+(explain?'<div style="font-size:13px;color:rgba(200,200,230,.75)">'+explain+'</div>':'');
+      fb.appendChild(fbText);
+      if(fbOk){
+        var nextBtn=document.createElement('button');
+        nextBtn.style.cssText='flex-shrink:0;padding:8px 18px;border-radius:8px;border:1px solid rgba(74,222,128,.4);background:rgba(22,163,74,.2);color:#4ade80;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap';
+        nextBtn.textContent='Next ➜';
+        nextBtn.onclick=function(){qIdx++;eliminated=[];clearFeedback();render();};
+        fb.appendChild(nextBtn);
+      }
+      wrap.appendChild(fb);
+    }
+
+    /* ── lifelines ── */
+    var llRow=document.createElement('div');
+    llRow.style.cssText='display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap';
+    var llDefs=[
+      {key:'fifty',icon:'ti-percentage',label:'50:50'},
+      {key:'audience',icon:'ti-users',label:'Ask Audience'},
+      {key:'friend',icon:'ti-phone',label:'Call a Friend'},
+      {key:'swap',icon:'ti-refresh',label:'Swap Question'}
+    ];
+    llDefs.forEach(function(ld){
+      var avail=lifelines[ld.key]&&feedbackMsg===null&&!gameOver;
+      var ll=document.createElement('button');
+      ll.style.cssText='display:flex;align-items:center;gap:5px;font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid '+(avail?'rgba(245,200,66,.4)':'rgba(255,255,255,.1)')+';background:'+(avail?'rgba(245,200,66,.08)':'rgba(255,255,255,.03)')+';color:'+(avail?'#f5c842':'rgba(255,255,255,.25)')+';cursor:'+(avail?'pointer':'not-allowed')+';transition:all .15s';
+      ll.innerHTML='<i class="ti '+ld.icon+'" style="font-size:12px" aria-hidden="true"></i>'+ld.label+(lifelines[ld.key]?'':'<span style="margin-left:3px;opacity:.5">✗</span>');
+      if(avail)ll.onclick=function(){useLifeline(ld.key);};
+      llRow.appendChild(ll);
+    });
+    wrap.appendChild(llRow);
+
+    /* ── walk away ── */
+    if(feedbackMsg===null&&!gameOver&&qIdx>0){
+      var wa=document.createElement('button');
+      wa.style.cssText='font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.4);cursor:pointer';
+      wa.textContent='Walk away — keep '+PRIZE_LADDER[qIdx].toLocaleString()+' credits';
+      wa.onclick=function(){clearFeedback();endGame(PRIZE_LADDER[qIdx],'You walked away!');};
+      wrap.appendChild(wa);
+    }
+
+    C.appendChild(wrap);
+
+    /* Scroll ladder to current */
+    var curCell=strip.children[qIdx];
+    if(curCell)curCell.scrollIntoView({block:'nearest',inline:'center'});
+  }
+
+  function answer(oi){
+    var q=questions[qIdx];
+    if(oi===q.a){
+      SND.correct();
+      /* Show feedback on the CURRENT question — do NOT advance qIdx yet */
+      if(SAFE_FLOORS.includes(qIdx+1))safeFloor=qIdx+1;
+      if(qIdx+1>=15){
+        showFeedback('Correct! ✓',oi,true,q.exp);render();
+        setTimeout(function(){qIdx++;clearFeedback();endGame(PRIZE_LADDER[15],'🏆 MILLIONAIRE! You answered all 15 correctly!');},2000);
+        return;
+      }
+      showFeedback('Correct! ✓',oi,true,q.exp);render();
+      /* Show "Next Question" button instead of auto-advancing */
+    } else {
+      SND.wrong();
+      var fallback=PRIZE_LADDER[safeFloor]||0;
+      showFeedback('Wrong! Correct answer: '+LETTERS[q.a]+'. '+q.o[q.a],oi,false,q.exp);render();
+      setTimeout(function(){endGame(fallback,'Wrong answer — safe floor: '+fallback.toLocaleString()+' credits.');},3000);
+    }
+  }
+
+  function useLifeline(key){
+    if(!lifelines[key])return;
+    lifelines[key]=false;
+    var q=questions[qIdx];
+    if(key==='fifty'){
+      var wrong=[0,1,2,3].filter(function(i){return i!==q.a;});
+      wrong.sort(function(){return Math.random()-.5;});
+      eliminated=[wrong[0],wrong[1]];render();
+    } else if(key==='audience'){
+      render();
+      setTimeout(function(){
+        var pcts=[0,0,0,0];
+        pcts[q.a]=Math.floor(Math.random()*22)+52;
+        var rem=100-pcts[q.a];
+        var others=[0,1,2,3].filter(function(i){return i!==q.a;});
+        others.forEach(function(i,idx){pcts[i]=idx<2?Math.floor(rem*(0.5+Math.random()*0.5)/(3-idx)):rem;rem-=pcts[i];});
+        var poll=document.createElement('div');
+        poll.style.cssText='background:rgba(30,30,70,.8);border:1px solid rgba(100,100,200,.3);border-radius:10px;padding:12px 14px;margin-top:8px';
+        poll.innerHTML='<div style="font-size:11px;font-weight:600;color:#f5c842;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📊 Audience vote</div>';
+        [0,1,2,3].filter(function(i){return !eliminated.includes(i);}).forEach(function(i){
+          var row=document.createElement('div');
+          row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:5px';
+          var barWrap=document.createElement('div');
+          barWrap.style.cssText='flex:1;height:16px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden';
+          var fill=document.createElement('div');
+          fill.style.cssText='height:100%;border-radius:4px;background:rgba(245,200,66,.6);width:0%;transition:width .9s ease';
+          barWrap.appendChild(fill);
+          row.innerHTML='<span style="font-size:11px;color:#f5c842;width:14px">'+LETTERS[i]+'</span>';
+          row.appendChild(barWrap);
+          row.innerHTML+='<span style="font-size:11px;color:rgba(200,200,230,.8);min-width:28px">'+pcts[i]+'%</span>';
+          poll.appendChild(row);
+          setTimeout(function(){fill.style.width=pcts[i]+'%';},80);
+        });
+        C.querySelector('div').appendChild(poll);
+      },30);
+    } else if(key==='friend'){
+      render();
+      setTimeout(function(){
+        var friendDiv=document.createElement('div');
+        friendDiv.style.cssText='background:rgba(30,30,70,.8);border:1px solid rgba(100,100,200,.3);border-radius:10px;padding:12px 14px;margin-top:8px';
+        friendDiv.innerHTML='<div style="font-size:11px;font-weight:600;color:#f5c842;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">📞 Calling Koby...</div>'
+          +'<div id="koby-msg" style="font-size:12px;color:rgba(180,180,220,.7);font-style:italic">Koby is thinking...</div>';
+        C.querySelector('div').appendChild(friendDiv);
+        fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:160,
+            system:'You are Koby, a friendly colleague being called as a lifeline on Who Wants to Be a Millionaire. Give a brief conversational hint about which answer you think is right. Be genuine — express your confidence honestly, maybe crack a small joke. Keep it under 55 words. End with "— Koby".',
+            messages:[{role:'user',content:'Question: "'+q.q+'"\nA: '+q.o[0]+'\nB: '+q.o[1]+'\nC: '+q.o[2]+'\nD: '+q.o[3]+'\n\nGive your hint.'}]})
+        }).then(function(r){return r.json();}).then(function(d){
+          var el=document.getElementById('koby-msg');
+          if(el)el.outerHTML='<div style="font-size:12px;color:#d4d4f8;line-height:1.6">'+(d.content&&d.content[0]?d.content[0].text:'I\'m not sure on this one — maybe B? Good luck! — Koby')+'</div>';
+        }).catch(function(){
+          var el=document.getElementById('koby-msg');
+          if(el)el.outerHTML='<div style="font-size:12px;color:#d4d4f8">"Bad signal here... I think it might be B? Don\'t quote me! — Koby"</div>';
+        });
+      },30);
+    } else if(key==='swap'){
+      var newQ=pickQ(q.t);
+      if(newQ){questions[qIdx]=newQ;}
+      eliminated=[];render();
+    }
+  }
+
+  function endGame(prize,msg){
+    gameOver=true;
+    var actualPrize=prize>0?Math.round(prize*0.01):0;
+    if(actualPrize>0)awardCredit(cu.nickname.toLowerCase(),actualPrize);
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='font-family:var(--font-sans);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
+    var emoji=prize>=PRIZE_LADDER[15]?'🏆':prize>=PRIZE_LADDER[10]?'🎉':prize>=PRIZE_LADDER[5]?'👍':'😬';
+    wrap.innerHTML='<div style="font-size:42px;margin-bottom:14px">'+emoji+'</div>'
+      +'<div style="font-size:17px;font-weight:500;color:#fff;margin-bottom:8px">'+msg+'</div>'
+      +'<div style="font-size:28px;font-weight:700;color:#f5c842;margin:16px 0">+'+actualPrize.toLocaleString()+' credits</div>'
+      +'<div style="font-size:11px;color:rgba(200,200,230,.4);margin-top:2px">ladder value: '+prize.toLocaleString()+' × 0.01</div>'
+      +'<div style="font-size:12px;color:rgba(200,200,230,.5);margin-bottom:20px">You reached Q'+(qIdx)+' of 15</div>';
+    var pb=document.createElement('button');
+    pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
+    pb.textContent='Play again (3 credits)';
+    pb.onclick=function(){spendCredit(3,function(){questions=[];usedIdx={1:[],2:[],3:[]};for(var i=0;i<5;i++){var q=pickQ(1);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(2);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(3);if(q)questions.push(q);}qIdx=0;lifelines={fifty:true,audience:true,friend:true,swap:true};gameOver=false;eliminated=[];safeFloor=0;render();});};
+    wrap.appendChild(pb);
+    C.appendChild(wrap);
+  }
+
+  render();
+}
+
+/* ─────────────────────────────────────────────────────
+   DEAL OR NO DEAL  (redesigned)
+   20 cases · rounds: 5→2→2→2→1→1... · banker offers
+───────────────────────────────────────────────────── */
+function gameDealOrNoDeal(C){
+  C.style.cssText='padding:16px 20px;overflow-y:auto;height:100%;box-sizing:border-box;display:flex;flex-direction:column;';
+  var ALL_PRIZES=[1,2,3,4,5,7,10,12,15,20,25,30,35,40,50,60,70,80,90,100];
+  function pickPlayerPrize(){
+    var r=Math.random()*100;
+    var low=[1,2,3,4,5,7,10,12],mid=[15,20,25,30,35,40],high=[50,60,70,80,90,100];
+    var pool=r<60?low:r<88?mid:high;
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+  var playerPrize=pickPlayerPrize();
+  var allP=ALL_PRIZES.slice();
+  /* Fisher-Yates shuffle all prizes into cases */
+  for(var i=allP.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=allP[i];allP[i]=allP[j];allP[j]=t;}
+  /* Ensure playerPrize ends up in a case; just assign shuffled */
+  /* Re-inject playerPrize at index 0 then re-shuffle so it's random */
+  var cases=allP.map(function(p,i){return{num:i+1,prize:p,open:false,isPlayer:false};});
+
+  var playerCase=null;
+  /* Rounds: 5 open, then 2,2,2,1,1,1... */
+  var ROUNDS=[5,2,2,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+  var round=0,openedThisRound=0;
+  var phase='pick'; /* pick | play | offer | final */
+
+  function leftCount(){return cases.filter(function(c){return !c.open&&!c.isPlayer;}).length;}
+  function expectedValue(){
+    var vals=cases.filter(function(c){return !c.open&&!c.isPlayer;}).map(function(c){return c.prize;});
+    if(!vals.length)return 0;
+    return +(vals.reduce(function(s,v){return s+v;},0)/vals.length).toFixed(1);
+  }
+  function bankerOffer(){
+    var ev=expectedValue();
+    var factor=Math.min(0.88,0.38+round*0.08);
+    return Math.max(1,Math.round(ev*factor));
+  }
+  function toOpenThisRound(){
+    var target=ROUNDS[round]||1;
+    return Math.max(0,target-openedThisRound);
+  }
+
+  function render(){
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='font-family:var(--font-sans);max-width:960px;width:100%;margin:0 auto;padding:10px 0;user-select:none;box-sizing:border-box;flex:1';
+
+    /* ── header ── */
+    var hdr=document.createElement('div');
+    hdr.style.cssText='text-align:center;margin-bottom:14px';
+    hdr.innerHTML='<div style="font-size:18px;font-weight:700;color:#f5c842;letter-spacing:1px;text-transform:uppercase">Deal or No Deal</div>'
+      +'<div style="font-size:11px;color:rgba(200,200,230,.5);margin-top:3px">'
+      +(phase==='pick'?'Pick your briefcase to start'
+      :phase==='offer'?'Banker is calling...'
+      :phase==='final'?'Final decision'
+      :(playerCase?'Your case: #'+playerCase.num+' · Open '+toOpenThisRound()+' case'+(toOpenThisRound()!==1?'s':''):''))
+      +'</div>';
+    wrap.appendChild(hdr);
+
+    /* ── main layout: left prizes | cases | right prizes ── */
+    var mainRow=document.createElement('div');
+    mainRow.style.cssText='display:grid;grid-template-columns:110px 1fr 110px;gap:14px;margin-bottom:14px;align-items:start';
+    /* Left prize column */
+    var lCol=document.createElement('div');lCol.style.cssText='display:flex;flex-direction:column;gap:2px';
+    /* Right prize column */
+    var rCol=document.createElement('div');rCol.style.cssText='display:flex;flex-direction:column;gap:2px';
+    ALL_PRIZES.forEach(function(p,pi){
+      var gone=cases.some(function(c){return c.prize===p&&c.open;});
+      var isHigh=p>=50,isMid=p>=25;
+      var cell=document.createElement('div');
+      cell.style.cssText='font-size:13px;padding:5px 8px;border-radius:5px;text-align:center;font-weight:500;'
+        +(gone?'opacity:.18;text-decoration:line-through;color:rgba(255,255,255,.3)'
+        :isHigh?'background:rgba(239,68,68,.22);color:#f87171;border:1px solid rgba(239,68,68,.3)'
+        :isMid?'background:rgba(251,191,36,.18);color:#fbbf24;border:1px solid rgba(251,191,36,.25)'
+        :'background:rgba(255,255,255,.06);color:rgba(200,200,230,.75)');
+      cell.textContent=p+' cr';
+      if(pi<10)lCol.appendChild(cell);else rCol.appendChild(cell);
+    });
+    /* Cases grid */
+    var grid=document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:repeat(5,1fr);gap:6px';
+    cases.forEach(function(c){
+      var btn=document.createElement('button');
+      var isP=c.isPlayer,isO=c.open;
+      var canClick=(phase==='pick'&&!isO)||(phase==='play'&&!isO&&!isP&&toOpenThisRound()>0);
+      var bg=isP?'rgba(245,200,66,.18)':isO?'rgba(255,255,255,.04)':'rgba(30,30,80,.8)';
+      var border=isP?'rgba(245,200,66,.6)':isO?'rgba(255,255,255,.1)':'rgba(100,100,200,.4)';
+      var clr=isP?'#f5c842':isO?'rgba(255,255,255,.3)':'#d4d4f8';
+      btn.style.cssText='background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:18px 4px;text-align:center;cursor:'+(canClick?'pointer':'default')+';transition:all .15s;color:'+clr+';font-size:15px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center';
+      if(isO){
+        btn.innerHTML='<div style="font-size:10px;text-decoration:line-through;opacity:.5">#'+c.num+'</div><div style="font-size:12px;font-weight:600;color:'+(c.prize>=50?'#f87171':c.prize>=15?'#fbbf24':'rgba(200,200,230,.6)')+'">'+c.prize+'</div>';
+      } else if(isP){
+        btn.innerHTML='<div style="font-size:13px;font-weight:700">'+c.num+'</div><div style="font-size:9px;color:#f5c842;margin-top:2px">★ yours</div>';
+      } else {
+        btn.innerHTML='<div style="font-size:14px;font-weight:600">'+c.num+'</div>';
+      }
+      if(canClick){
+        btn.onmouseenter=function(){this.style.background='rgba(245,200,66,.12)';this.style.borderColor='rgba(245,200,66,.5)';};
+        btn.onmouseleave=function(){this.style.background=bg;this.style.borderColor=border;};
+        if(phase==='pick')btn.onclick=(function(cc){return function(){cc.isPlayer=true;playerCase=cc;phase='play';render();};})(c);
+        else btn.onclick=(function(cc){return function(){openCase(cc);};})(c);
+      }
+      grid.appendChild(btn);
+    });
+    mainRow.appendChild(lCol);mainRow.appendChild(grid);mainRow.appendChild(rCol);
+    wrap.appendChild(mainRow);
+
+
+    /* ── banker offer (offer phase) ── */
+    if(phase==='offer'){
+      var offer=bankerOffer(),ev=expectedValue();
+      var offerBox=document.createElement('div');
+      offerBox.style.cssText='background:linear-gradient(135deg,rgba(20,20,50,.95),rgba(30,10,10,.95));border:1px solid rgba(245,200,66,.4);border-radius:12px;padding:18px 16px;text-align:center;margin-top:4px';
+      offerBox.innerHTML='<div style="font-size:11px;color:rgba(200,200,230,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">🏦 Banker\'s Offer</div>'
+        +'<div style="font-size:32px;font-weight:800;color:#f5c842;margin:6px 0">'+offer+' credits</div>'
+        +'<div style="font-size:11px;color:rgba(200,200,230,.4);margin-bottom:14px">Expected value: '+ev+' cr</div>'
+        +'<div style="display:flex;gap:10px">'
+        +'<button id="dnd-deal" style="flex:1;padding:10px;border:none;border-radius:8px;background:rgba(22,163,74,.3);color:#4ade80;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:1px;border:1px solid rgba(74,222,128,.4)">DEAL</button>'
+        +'<button id="dnd-nodeal" style="flex:1;padding:10px;border:none;border-radius:8px;background:rgba(185,28,28,.3);color:#f87171;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:1px;border:1px solid rgba(248,113,113,.4)">NO DEAL</button>'
+        +'</div>';
+      wrap.appendChild(offerBox);
+      setTimeout(function(){
+        var d=document.getElementById('dnd-deal'),nd=document.getElementById('dnd-nodeal');
+        if(d)d.onclick=function(){var realOffer=Math.max(1,Math.round(offer*0.3));SND.win();awardCredit(cu.nickname.toLowerCase(),realOffer);endDND(realOffer,offer,'Deal! You take the banker\'s offer.');};
+        if(nd)nd.onclick=function(){SND.card();openedThisRound=0;phase='play';render();};
+      },50);
+    }
+
+    /* ── final offer ── */
+    if(phase==='final'){
+      var finalOffer=bankerOffer();
+      var remaining=cases.filter(function(c){return !c.open&&!c.isPlayer;});
+      var switchCase=remaining[0];
+      var fBox=document.createElement('div');
+      fBox.style.cssText='background:linear-gradient(135deg,rgba(20,20,50,.95),rgba(30,10,10,.95));border:1px solid rgba(245,200,66,.4);border-radius:12px;padding:16px;text-align:center;margin-top:4px';
+            var fInfo=document.createElement('div');
+      fInfo.innerHTML='<div style="font-size:11px;color:rgba(200,200,230,.5);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">🏦 Final Offer</div>'
+        +'<div style="font-size:28px;font-weight:800;color:#f5c842;margin:6px 0">'+finalOffer+' credits</div>'
+        +'<div style="font-size:11px;color:rgba(200,200,230,.4);margin-bottom:14px">Make your choice</div>';
+      fBox.appendChild(fInfo);
+      var fBtnRow=document.createElement('div');
+      fBtnRow.style.cssText='display:flex;gap:8px;flex-wrap:wrap;justify-content:center';
+      var fdBtn=document.createElement('button');
+      fdBtn.style.cssText='flex:1;min-width:0;padding:9px 10px;border:1px solid rgba(74,222,128,.4);border-radius:8px;background:rgba(22,163,74,.25);color:#4ade80;font-size:12px;font-weight:700;cursor:pointer';
+      fdBtn.textContent='Take '+finalOffer+' cr';
+      fdBtn.onclick=function(){var realFinal=Math.max(1,Math.round(finalOffer*0.3));SND.win();awardCredit(cu.nickname.toLowerCase(),realFinal);endDND(realFinal,finalOffer,'Banker deal taken!');};
+      fBtnRow.appendChild(fdBtn);
+      if(switchCase){
+        var swBtn=document.createElement('button');
+        swBtn.style.cssText='flex:1;min-width:0;padding:9px 10px;border:1px solid rgba(96,165,250,.4);border-radius:8px;background:rgba(37,99,235,.2);color:#93c5fd;font-size:12px;font-weight:700;cursor:pointer';
+        swBtn.textContent='Switch to #'+switchCase.num;
+        swBtn.onclick=function(){var tmp=playerCase.prize;playerCase.prize=switchCase.prize;switchCase.prize=tmp;switchCase.open=true;revealPlayerCase();};
+        fBtnRow.appendChild(swBtn);
+      }
+      var opBtn=document.createElement('button');
+      opBtn.style.cssText='flex:1;min-width:0;padding:9px 10px;border:1px solid rgba(245,200,66,.4);border-radius:8px;background:rgba(245,200,66,.12);color:#f5c842;font-size:12px;font-weight:700;cursor:pointer';
+      opBtn.textContent='Open my #'+playerCase.num;
+      opBtn.onclick=function(){revealPlayerCase();};
+      fBtnRow.appendChild(opBtn);
+      fBox.appendChild(fBtnRow);
+      wrap.appendChild(fBox);
+    }
+
+    C.appendChild(wrap);
+  }
+
+  function openCase(c){
+    c.open=true;openedThisRound++;SND.card();
+    var left=leftCount();
+    if(left<=1){
+      /* Only player's case + 1 remaining — final decision */
+      phase='final';render();
+    } else if(openedThisRound>=(ROUNDS[round]||1)){
+      /* Round complete — banker offer */
+      phase='offer';render();
+    } else {
+      render();
+    }
+  }
+
+  function revealPlayerCase(){
+    var prize=playerCase.prize;
+    var realPrize=Math.max(1,Math.round(prize*0.3));
+    /* Show the reveal without ending the game yet */
+    playerCase.open=true;
+    SND.win();
+    awardCredit(cu.nickname.toLowerCase(),realPrize);
+    /* Show result screen */
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='font-family:var(--font-sans);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
+    wrap.innerHTML='<div style="font-size:11px;color:rgba(200,200,230,.4);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Your case #'+playerCase.num+' contained</div>'
+      +'<div style="font-size:48px;font-weight:800;color:'+(prize>=50?'#f87171':prize>=15?'#fbbf24':'#4ade80')+';margin:10px 0">'+prize+' cr</div>'
+      +'<div style="font-size:14px;color:#f5c842;margin:4px 0">You receive: '+realPrize+' credits (×0.3)</div>'
+      +'<div style="font-size:28px;margin:8px 0">'+(prize>=50?'🎉':prize>=20?'😊':prize>=10?'👍':'😅')+'</div>'
+      +'<div style="font-size:14px;color:rgba(200,200,230,.6);margin-bottom:20px">Added to your balance!</div>';
+    var pb=document.createElement('button');
+    pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
+    pb.textContent='Play again (3 credits)';
+    pb.onclick=function(){spendCredit(3,function(){gameDealOrNoDeal(C);});};
+    wrap.appendChild(pb);
+    C.appendChild(wrap);
+  }
+
+  function endDND(realPrize,origPrize,msg){
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='font-family:var(--font-sans);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
+    wrap.innerHTML='<div style="font-size:28px;margin-bottom:12px">'+(origPrize>=50?'🎉':origPrize>=20?'👍':'😅')+'</div>'
+      +'<div style="font-size:15px;font-weight:500;color:#fff;margin-bottom:8px">'+msg+'</div>'
+      +'<div style="font-size:30px;font-weight:700;color:#f5c842;margin:10px 0">+'+realPrize+' credits</div>'
+      +'<div style="font-size:11px;color:rgba(200,200,230,.4);margin-bottom:12px">Case value: '+origPrize+' cr × 0.3</div>';
+    var pb=document.createElement('button');
+    pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
+    pb.textContent='Play again (3 credits)';
+    pb.onclick=function(){spendCredit(3,function(){gameDealOrNoDeal(C);});};
+    wrap.appendChild(pb);
+    C.appendChild(wrap);
+  }
+
+  render();
+}
+</script>
