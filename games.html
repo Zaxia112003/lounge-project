@@ -106,7 +106,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <!-- Notification bell -->
     <button id="notif-btn" style="display:none;position:relative;background:none;border:none;cursor:pointer;font-size:18px;padding:4px;line-height:1;" onclick="toggleNotifPanel()" aria-label="Notifications">🔔<span id="notif-badge" style="display:none;position:absolute;top:0;right:0;width:8px;height:8px;border-radius:50%;background:var(--red);"></span></button>
     <!-- Manager settings button (replaces logo area, visible to manager only) -->
-    <button id="mgr-credits-btn" style="display:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:16px;display:none;align-items:center;justify-content:center;" onclick="toggleMgrPanel()" title="Manager Settings" aria-label="Manager Settings">⚙️</button>
+    <button id="mgr-credits-btn" style="display:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-size:16px;align-items:center;justify-content:center;" onclick="toggleMgrPanel()" title="Manager Settings" aria-label="Manager Settings">⚙️</button>
     <div class="user-chip" id="user-chip" style="display:none">
       <div class="av" id="user-av"></div>
       <div class="user-nick" id="user-nick"></div>
@@ -684,25 +684,7 @@ function gcMgrDiscardFromPanel(reqId){
   setTimeout(function(){mgrRenderRequests();},600);
 }
 
-function renderMgrPanel(){
-  var pane=G('mgr-pane');if(!pane)return;
-  var members=_allCredits;
-  var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Team Credits</div>';
-  var keys=Object.keys(members);
-  if(!keys.length){html+='<div style="font-size:11px;color:var(--muted)">Loading…</div>';pane.innerHTML=html;return;}
-  keys.sort().forEach(function(nick){
-    var c=members[nick];
-    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">'
-      +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nick+'</div>'
-        +'<div style="font-size:10px;color:var(--muted)">'+c+' credit'+(c!==1?'s':'')+'</div>'
-      +'</div>'
-      +'<button onclick="mgrAdjCredit(\''+nick+'\',-1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">−</button>'
-      +'<button onclick="mgrAdjCredit(\''+nick+'\',1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>'
-      +'</div>';
-  });
-  pane.innerHTML=html;
-}
+/* renderMgrPanel defined above */
 
 function mgrAdjCredit(nick,delta){
   db.collection('player_credits').doc(nick).get().then(function(snap){
@@ -1410,9 +1392,7 @@ function init(){
   if(cu.role==='manager'){
     var mgrBtn=G('mgr-credits-btn');
     if(mgrBtn){mgrBtn.style.display='flex';}
-    /* Manager gets gear icon, members get plain logo */
-    var logo=G('header-logo');
-    if(logo)logo.style.display='none'; /* hide logo for manager — gear icon replaces it */
+    /* Logo stays visible for all — gear is added beside it for managers */
     loadAllCredits();
   }
   db.collection('player_credits').doc(nick.toLowerCase()).onSnapshot(function(snap){
@@ -3938,7 +3918,7 @@ function gameTongIts(C){
     Promise.all([gsUpdate(updates),myHandUpdate(newHand)]).then(function(){
       SND.card();
       if(updates.gover){doSettle(updates.gameResult);}
-      else if(nextTurn!==mySeat){doAITurns(nextTurn,allMelds);}
+      else if(nextTurn!==mySeat){GS._aiRunning=false;doAITurns(nextTurn,allMelds);}
     });
   }
 
@@ -4152,8 +4132,9 @@ function gameTongIts(C){
             /* Consider calling draw */
             var dw=deadwood(aiHand);
             /* Find next occupied seat (skip empty seats in 2-player mode) */
-            var nextTurn=seat;
+            /* Find next occupied seat — never gets stuck on self */
             var seats2=normSeats(rdata.seats||[]);
+            var nextTurn=mySeat; /* default: pass to player */
             for(var si=1;si<=3;si++){
               var cand=(seat+si)%3;
               if(seats2[cand]){nextTurn=cand;break;}
@@ -4171,6 +4152,8 @@ function gameTongIts(C){
             ]).then(function(){
               if(!updates.pendingDraw&&nextTurn!==mySeat){
                 setTimeout(function(){doAITurns(nextTurn,aeMelds);},2200);
+              } else {
+                GS._aiRunning=false; /* turn passes to player — release guard */
               }
             });
           });
@@ -4523,7 +4506,8 @@ function gameTongIts(C){
     if(isHost){stateRef().update({handSizes:handSizes}).catch(function(){});}
 
     /* Trigger AI if it's their turn and host is running */
-    if(isHost&&!gover&&!pendingDraw&&turn!==mySeat&&seatIsAI(turn)){
+    if(isHost&&!gover&&!pendingDraw&&turn!==mySeat&&seatIsAI(turn)&&!GS._aiRunning){
+      GS._aiRunning=true;
       setTimeout(function(){doAITurns(turn,allMelds);},1800);
     }
   }
