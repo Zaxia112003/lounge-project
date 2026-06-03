@@ -403,8 +403,214 @@ function awardCredit(nick,amount){
   }).catch(function(){});
 }
 
-/* ── MANAGER CREDIT PANEL ── */
+/* ── MANAGER HUB — Credits + Shifts + Badge Requests ── */
 var _allCredits={};
+var _gcShifts={};  /* {nick: {start:'09:00', end:'18:00'}} */
+
+function renderMgrPanel(){
+  var pane=G('mgr-pane');if(!pane)return;
+  pane.innerHTML=
+    '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">👑 Manager Hub</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:14px">'
+    +'<button class="mgr-tab mgr-tab-on" id="mt-credits" onclick="mgrSwitchTab(\'credits\')">💰 Credits</button>'
+    +'<button class="mgr-tab" id="mt-shifts" onclick="mgrSwitchTab(\'shifts\')">🕐 Shifts</button>'
+    +'<button class="mgr-tab" id="mt-requests" onclick="mgrSwitchTab(\'requests\')">🎖 Requests</button>'
+    +'</div>'
+    +'<div id="mgr-tab-credits"></div>'
+    +'<div id="mgr-tab-shifts" style="display:none"></div>'
+    +'<div id="mgr-tab-requests" style="display:none"></div>';
+
+  /* Inject tab CSS once */
+  if(!G('mgr-tab-style')){
+    var st=document.createElement('style');st.id='mgr-tab-style';
+    st.textContent='.mgr-tab{font-size:11px;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .12s;}'
+      +'.mgr-tab:hover{border-color:var(--accent);color:var(--text);}'
+      +'.mgr-tab-on{background:rgba(124,58,237,.18);border-color:var(--accent);color:var(--accent2);font-weight:600;}';
+    document.head.appendChild(st);
+  }
+
+  mgrRenderCredits();
+  mgrLoadShifts();
+  mgrRenderRequests();
+}
+
+function mgrSwitchTab(tab){
+  ['credits','shifts','requests'].forEach(function(t){
+    var pane=G('mgr-tab-'+t);if(pane)pane.style.display=t===tab?'':'none';
+    var btn=G('mt-'+t);if(btn)btn.className='mgr-tab'+(t===tab?' mgr-tab-on':'');
+  });
+}
+
+/* ── CREDITS TAB ── */
+function mgrRenderCredits(){
+  var pane=G('mgr-tab-credits');if(!pane)return;
+  var members=_allCredits;
+  var keys=Object.keys(members);
+  if(!keys.length){pane.innerHTML='<div style="font-size:11px;color:var(--muted)">Loading…</div>';return;}
+  var html='';
+  keys.sort().forEach(function(nick){
+    var c=members[nick];
+    var sh=_gcShifts[nick];
+    var shLabel=sh?sh.start+'–'+sh.end:'no shift set';
+    html+='<div style="margin-bottom:8px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12px;font-weight:600;color:var(--text)">'+nick+'</div>'
+          +'<div style="font-size:10px;color:var(--muted)" id="credit-lbl-'+nick+'">'+c+' credit'+(c!==1?'s':'')+' · '+shLabel+'</div>'
+        +'</div>'
+        +'<button onclick="mgrAdjCredit(\''+nick+'\',-1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">−</button>'
+        +'<button onclick="mgrAdjCredit(\''+nick+'\',1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;align-items:center">'
+        +'<input id="credit-input-'+nick+'" type="number" min="0" value="'+c+'" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;" placeholder="Set amount">'
+        +'<button onclick="mgrSetCredit(\''+nick+'\')" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;white-space:nowrap">Set</button>'
+      +'</div>'
+    +'</div>';
+  });
+  pane.innerHTML=html||'<div style="font-size:11px;color:var(--muted)">No members found.</div>';
+}
+
+function mgrAdjCredit(nick,delta){
+  db.collection('player_credits').doc(nick).get().then(function(snap){
+    var c=snap.exists?(snap.data().credits||0):0;
+    var nc=Math.max(0,c+delta);
+    db.collection('player_credits').doc(nick).set({credits:nc},{merge:true}).then(function(){
+      _allCredits[nick]=nc;mgrRenderCredits();
+      toast((delta>0?'+1':'−1')+' credit for '+nick+' → '+nc);
+    });
+  }).catch(function(){toast('Error updating credits.');});
+}
+
+function mgrSetCredit(nick){
+  var el=G('credit-input-'+nick);if(!el)return;
+  var val=parseInt(el.value)||0;
+  if(val<0){toast('Cannot set negative credits');return;}
+  db.collection('player_credits').doc(nick).set({credits:val},{merge:true}).then(function(){
+    _allCredits[nick]=val;mgrRenderCredits();
+    toast('Credits for '+nick+' set to '+val);
+  }).catch(function(){toast('Error updating credits.');});
+}
+
+function loadAllCredits(){
+  db.collection('player_credits').get().then(function(snap){
+    snap.forEach(function(d){
+      var key=d.id.toLowerCase();
+      var val=d.data().credits||0;
+      _allCredits[key]=Math.max(_allCredits[key]||0,val);
+      if(d.id!==key){
+        db.collection('player_credits').doc(key).set({credits:_allCredits[key]},{merge:true});
+        db.collection('player_credits').doc(d.id).delete();
+      }
+    });
+    db.collection('player_credits').onSnapshot(function(snap){
+      snap.forEach(function(d){_allCredits[d.id.toLowerCase()]=d.data().credits||0;});
+      mgrRenderCredits();
+    });
+    mgrRenderCredits();
+  }).catch(function(){var p=G('mgr-pane');if(p)p.innerHTML='<div style="font-size:11px;color:var(--muted)">Could not load credits.</div>';});
+}
+
+/* ── SHIFTS TAB ── */
+function mgrLoadShifts(){
+  if(!db)return;
+  db.collection('gc_settings').doc('shifts').get().then(function(snap){
+    _gcShifts=snap.exists?(snap.data()||{}):{};
+    mgrRenderShifts();
+    mgrRenderCredits(); /* refresh credit tab to show shift labels */
+  }).catch(function(){mgrRenderShifts();});
+}
+
+function mgrRenderShifts(){
+  var pane=G('mgr-tab-shifts');if(!pane)return;
+  /* Build member list from _allCredits keys + any extras from _gcShifts */
+  var nicks=Object.keys(_allCredits);
+  if(!nicks.length&&!Object.keys(_gcShifts).length){
+    pane.innerHTML='<div style="font-size:11px;color:var(--muted)">No members loaded yet. Ensure Credits tab has loaded first.</div>';return;
+  }
+  /* Add any nicks in shifts but not in credits */
+  Object.keys(_gcShifts).forEach(function(n){if(!nicks.includes(n))nicks.push(n);});
+  nicks.sort();
+  var html='<div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5">Set each member\'s shift window. Game Corner locks outside these hours. Changes save immediately to Firestore and apply within seconds.</div>';
+  nicks.forEach(function(nick){
+    var sh=_gcShifts[nick]||{start:'09:00',end:'18:00'};
+    html+='<div style="margin-bottom:8px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">'+nick+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<input type="time" id="shift-start-'+nick+'" value="'+(sh.start||'09:00')+'" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;">'
+        +'<span style="font-size:12px;color:var(--muted)">to</span>'
+        +'<input type="time" id="shift-end-'+nick+'" value="'+(sh.end||'18:00')+'" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;">'
+        +'<button onclick="mgrSaveShift(\''+nick+'\')" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;white-space:nowrap">Save</button>'
+      +'</div>'
+    +'</div>';
+  });
+  html+='<button onclick="mgrSaveAllShifts()" style="width:100%;margin-top:4px;padding:9px;font-size:12px;font-weight:600;border-radius:8px;border:1px solid var(--accent);background:rgba(124,58,237,.2);color:var(--accent2);cursor:pointer;">Save all shifts</button>';
+  pane.innerHTML=html;
+}
+
+function mgrSaveShift(nick){
+  var startEl=G('shift-start-'+nick),endEl=G('shift-end-'+nick);
+  if(!startEl||!endEl)return;
+  var start=startEl.value,end=endEl.value;
+  if(!start||!end){toast('Please set both start and end times');return;}
+  _gcShifts[nick]={start:start,end:end};
+  db.collection('gc_settings').doc('shifts').set(_gcShifts,{merge:false}).then(function(){
+    toast('Shift saved for '+nick+': '+start+' – '+end);
+    mgrRenderCredits();
+  }).catch(function(e){toast('Error: '+e.message);});
+}
+
+function mgrSaveAllShifts(){
+  var nicks=Object.keys(_allCredits);
+  nicks.forEach(function(nick){
+    var startEl=G('shift-start-'+nick),endEl=G('shift-end-'+nick);
+    if(startEl&&endEl&&startEl.value&&endEl.value){
+      _gcShifts[nick]={start:startEl.value,end:endEl.value};
+    }
+  });
+  db.collection('gc_settings').doc('shifts').set(_gcShifts,{merge:false}).then(function(){
+    toast('All shifts saved ✓');mgrRenderCredits();
+  }).catch(function(e){toast('Error: '+e.message);});
+}
+
+/* ── BADGE REQUESTS TAB ── */
+function mgrRenderRequests(){
+  var pane=G('mgr-tab-requests');if(!pane)return;
+  pane.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Loading requests…</div>';
+  db.collection('gc_badge_requests').where('status','==','pending').orderBy('createdAt','desc').get().then(function(snap){
+    if(snap.empty){pane.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0;">No pending badge requests 🎉</div>';return;}
+    pane.innerHTML='';
+    snap.forEach(function(doc){
+      var req=doc.data();
+      var item=SHOP_ITEMS.find(function(i){return i.id===req.itemId;})||{name:req.itemId,icon:'🎖'};
+      var extra='';
+      if(req.extra&&req.extra.date)extra+='<div style="font-size:10px;color:var(--muted);margin-top:3px;">📅 Date: '+req.extra.date+'</div>';
+      if(req.extra&&req.extra.ticket)extra+='<div style="font-size:10px;color:var(--muted);margin-top:3px;">🎫 Ref: '+req.extra.ticket+'</div>';
+      if(req.extra&&req.extra.notes)extra+='<div style="font-size:10px;color:var(--muted);margin-top:3px;">📝 '+req.extra.notes+'</div>';
+      var div=document.createElement('div');
+      div.style.cssText='padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;';
+      div.innerHTML='<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+        +'<span style="font-size:18px;flex-shrink:0">'+item.icon+'</span>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-size:12px;font-weight:600;color:var(--text)">'+req.nick+' — '+item.name+'</div>'
+          +'<div style="font-size:11px;color:var(--muted)">'+new Date(req.createdAt).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</div>'
+          +extra
+        +'</div></div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button onclick="gcMgrApproveFromPanel(\''+doc.id+'\')" style="flex:1;font-size:11px;padding:6px;border-radius:7px;border:1px solid var(--green);background:rgba(34,197,94,.12);color:var(--green);cursor:pointer;font-weight:600;">Approve</button>'
+        +'<button onclick="gcMgrDiscardFromPanel(\''+doc.id+'\')" style="flex:1;font-size:11px;padding:6px;border-radius:7px;border:1px solid var(--red);background:rgba(239,68,68,.1);color:var(--red);cursor:pointer;">Discard</button>'
+        +'</div>';
+      pane.appendChild(div);
+    });
+  }).catch(function(){pane.innerHTML='<div style="font-size:11px;color:var(--muted)">Could not load requests. Firestore index may be needed.</div>';});
+}
+
+function gcMgrApproveFromPanel(reqId){
+  gcMgrApprove(reqId,'');
+}
+function gcMgrDiscardFromPanel(reqId){
+  gcMgrDiscard(reqId,'');
+  setTimeout(function(){mgrRenderRequests();},600);
+}
 
 function renderMgrPanel(){
   var pane=G('mgr-pane');if(!pane)return;
@@ -580,25 +786,42 @@ function gcIsWeekend(){
   return d===0||d===6;
 }
 
+/* Shift data loaded from gc_settings/shifts Firestore doc */
+var _gcShiftsLoaded=false;
+function gcLoadShiftsFromFirestore(){
+  if(!db||_gcShiftsLoaded)return;
+  _gcShiftsLoaded=true;
+  db.collection('gc_settings').doc('shifts').onSnapshot(function(snap){
+    if(snap.exists)_gcShifts=snap.data()||{};
+  });
+}
+
 function gcIsInShift(){
   if(!cu)return false;
-  var nick=cu.nickname;
-  /* Try window.SHIFTS first (same-file portal), fall back to localStorage */
-  var shifts=window.SHIFTS;
-  if(!shifts){
-    try{shifts=JSON.parse(localStorage.getItem('rta_SHIFTS')||'{}');}
-    catch(e){shifts={};}
-  }
-  var sh=shifts[nick];
-  /* Manager role → always in shift (exempt) */
   if(cu.role&&cu.role.toLowerCase()==='manager')return true;
-  /* No shift record → default to locked (fail safe) */
+  var nick=cu.nickname;
+  /* Try Firestore-backed _gcShifts first, then localStorage fallback */
+  var sh=_gcShifts&&_gcShifts[nick];
+  if(!sh){
+    try{
+      var lsShifts=JSON.parse(localStorage.getItem('rta_SHIFTS')||'{}');
+      var lsSh=lsShifts[nick];
+      if(lsSh&&lsSh.start!==undefined){
+        /* Convert decimal hours to HH:MM string for comparison */
+        var s=lsSh.start,e=lsSh.end;
+        var sH=Math.floor(s),sM=Math.round((s-sH)*60);
+        var eH=Math.floor(e),eM=Math.round((e-eH)*60);
+        sh={start:(sH<10?'0':'')+sH+':'+(sM<10?'0':'')+sM, end:(eH<10?'0':'')+eH+':'+(eM<10?'0':'')+eM};
+      }
+    }catch(e){}
+  }
   if(!sh)return false;
   var now=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
   var h=now.getHours(),m=now.getMinutes();
   var tot=h*60+m;
-  /* sh.start and sh.end are decimal hours e.g. 8.5 = 08:30 */
-  return tot>=sh.start*60&&tot<sh.end*60;
+  /* sh.start and sh.end are 'HH:MM' strings */
+  function toMins(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]||0);}
+  return tot>=toMins(sh.start)&&tot<toMins(sh.end);
 }
 
 function gcCheckAccess(){
@@ -6675,32 +6898,6 @@ function gcMarkNotifResolved(notifId){
   gcRenderNotifPanel();
 }
 
-/* ── CREDIT MANAGER EDIT FIELD ── */
-function renderMgrPanel(){
-  var pane=G('mgr-pane');if(!pane)return;
-  var members=_allCredits;
-  var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Team Credits</div>';
-  var keys=Object.keys(members);
-  if(!keys.length){html+='<div style="font-size:11px;color:var(--muted)">Loading…</div>';pane.innerHTML=html;return;}
-  keys.sort().forEach(function(nick){
-    var c=members[nick];
-    html+='<div style="margin-bottom:8px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:12px;font-weight:600;color:var(--text)">' + nick + '</div>'
-          +'<div style="font-size:10px;color:var(--muted)" id="credit-lbl-'+nick+'">' + c + ' credit'+(c!==1?'s':'')+'</div>'
-        +'</div>'
-        +'<button onclick="mgrAdjCredit(\''+nick+'\',-1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0">−</button>'
-        +'<button onclick="mgrAdjCredit(\''+nick+'\',1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-size:14px;flex-shrink:0">+</button>'
-      +'</div>'
-      +'<div style="display:flex;gap:6px;align-items:center">'
-        +'<input id="credit-input-'+nick+'" type="number" min="0" value="'+c+'" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;" placeholder="Set amount">'
-        +'<button onclick="mgrSetCredit(\''+nick+'\')" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;white-space:nowrap">Set</button>'
-      +'</div>'
-    +'</div>';
-  });
-  pane.innerHTML=html;
-}
 
 function mgrSetCredit(nick){
   var el=G('credit-input-'+nick);
@@ -6719,6 +6916,6 @@ function mgrSetCredit(nick){
 var _origInit=window.init;
 window.init=function(){
   if(_origInit)_origInit.apply(this,arguments);
-  setTimeout(function(){if(cu&&db)gcLoadNotifications();},1200);
+  setTimeout(function(){if(cu&&db){gcLoadNotifications();gcLoadShiftsFromFirestore();}},1200);
 };
 </script>
