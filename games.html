@@ -337,15 +337,20 @@ function spendCredit(cost,cb){
   cb();
 }
 
-function awardCredit(nick,amount){
-  /* Apply daily game credit cap (only for the current user, not performance credits) */
-  var isGameAward=arguments[2]==='game'; /* pass 'game' as 3rd arg for game winnings */
-  var effectiveAmount=amount;
-  if(isGameAward&&cu&&nick===cu.nickname.toLowerCase()&&!gcIsManager()){
-    effectiveAmount=gcCapAward(amount);
-    if(effectiveAmount>0)gcAddDayCredits(effectiveAmount);
-    if(effectiveAmount<=0)return; /* cap hit */
+function gcAwardGameCredit(nick,amount){
+  /* Award credits from game wins — subject to daily cap */
+  if(gcIsManager()){awardCredit(nick,amount);return;}
+  var effective=gcCapAward(amount);
+  if(effective<=0){
+    if(cu&&nick.toLowerCase()===cu.nickname.toLowerCase())
+      toast('🎮 Daily game credit cap ('+GC.DAILY_GAME_CAP+') reached — performance credits still available!');
+    return;
   }
+  gcAddDayCredits(effective);
+  awardCredit(nick,effective);
+}
+
+function awardCredit(nick,amount){
   var key=nick.toLowerCase();
   db.collection('player_credits').doc(key).get().then(function(snap){
     var c=snap.exists?(snap.data().credits||0):0;
@@ -512,7 +517,7 @@ var GC={
   EXTEND_COST:5,         /* credits per extension */
   MAX_EXTENSIONS:2,      /* max 2 extensions → 16 min total */
   DAILY_GAME_CAP:25,     /* max credits from games per day */
-  GAME_COOLDOWN:120,     /* 2 min between games in seconds */
+  GAME_COOLDOWN:10,      /* 10 seconds between games */
   SESSION_COOLDOWN:60*60,/* 1hr before next session if still in shift */
   _timer:null, _elapsed:0, _warned:false, _extensions:0,
   _lastGameEnd:0, _sessionEndTime:0
@@ -535,12 +540,21 @@ function gcIsWeekend(){
 function gcIsInShift(){
   if(!cu)return false;
   var nick=cu.nickname;
-  /* Read shift from SHIFTS global (loaded from Firestore team doc) */
-  var sh=window.SHIFTS&&window.SHIFTS[nick];
-  if(!sh)return true; /* no shift defined — allow by default */
+  /* Try window.SHIFTS first (same-file portal), fall back to localStorage */
+  var shifts=window.SHIFTS;
+  if(!shifts){
+    try{shifts=JSON.parse(localStorage.getItem('rta_SHIFTS')||'{}');}
+    catch(e){shifts={};}
+  }
+  var sh=shifts[nick];
+  /* Manager role → always in shift (exempt) */
+  if(cu.role&&cu.role.toLowerCase()==='manager')return true;
+  /* No shift record → default to locked (fail safe) */
+  if(!sh)return false;
   var now=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
   var h=now.getHours(),m=now.getMinutes();
   var tot=h*60+m;
+  /* sh.start and sh.end are decimal hours e.g. 8.5 = 08:30 */
   return tot>=sh.start*60&&tot<sh.end*60;
 }
 
@@ -549,7 +563,7 @@ function gcCheckAccess(){
   if(gcIsWeekend())return{ok:false,reason:'Game Corner is closed on weekends.',sub:'Come back on a weekday during your shift.',icon:'ti-calendar-off'};
   if(!gcIsInShift())return{ok:false,reason:'Game Corner is only available during your shift.',sub:'Check your shift schedule and try again when you\'re on the clock.',icon:'ti-clock-off'};
   if(!gcSessionCooldownOk()){
-    var endTime=parseInt(sessionStorage.getItem('gc_session_end')||'0');
+    var endTime=parseInt(localStorage.getItem('gc_session_end_'+(cu?cu.nickname:'x'))||'0');
     var remMs=GC.SESSION_COOLDOWN*1000-(Date.now()-endTime);
     var remMins=Math.ceil(remMs/60000);
     return{ok:false,reason:'Session cooldown active.',sub:'Next session opens in ~'+remMins+' minute'+(remMins!==1?'s':'')+'. Back to work! \uD83D\uDCAA',icon:'ti-refresh'};
@@ -584,13 +598,13 @@ function gcCapAward(raw){
 
 function gcStartSession(){
   if(gcIsManager())return;
-  GC._elapsed=parseInt(sessionStorage.getItem('gc_session_elapsed')||'0');
-  GC._extensions=parseInt(sessionStorage.getItem('gc_session_ext')||'0');
+  GC._elapsed=parseInt(localStorage.getItem('gc_sess_el_'+(cu?cu.nickname:'x'))||'0');
+  GC._extensions=parseInt(localStorage.getItem('gc_sess_ext_'+(cu?cu.nickname:'x'))||'0');
   GC._warned=false;
   clearInterval(GC._timer);
   GC._timer=setInterval(function(){
     GC._elapsed++;
-    sessionStorage.setItem('gc_session_elapsed',GC._elapsed);
+    localStorage.setItem('gc_sess_el_'+(cu?cu.nickname:'x'),GC._elapsed);
     var limit=GC.SESSION_LIMIT+GC._extensions*GC.EXTEND_SECS;
     var remaining=limit-GC._elapsed;
     /* Only show timer bar when under 5 min */
@@ -612,8 +626,8 @@ function gcStopSession(){
 }
 
 function gcResetSession(){
-  sessionStorage.removeItem('gc_session_elapsed');
-  sessionStorage.removeItem('gc_session_ext');
+  localStorage.removeItem('gc_sess_el_'+(cu?cu.nickname:'x'));
+  localStorage.removeItem('gc_sess_ext_'+(cu?cu.nickname:'x'));
   GC._elapsed=0;GC._warned=false;GC._extensions=0;
 }
 
@@ -640,16 +654,16 @@ function gcShowExtendPrompt(remaining){
   var canExtend=GC._extensions<GC.MAX_EXTENSIONS;
   var prompt=document.createElement('div');
   prompt.id='gc-extend-prompt';
-  prompt.style.cssText='padding:12px 14px;background:var(--color-background-warning);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);margin-bottom:8px;display:flex;align-items:center;gap:12px;';
+  prompt.style.cssText='padding:12px 14px;background:var(--color-background-danger);border:1.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);margin-bottom:8px;display:flex;align-items:center;gap:12px;';
   var extsLeft=GC.MAX_EXTENSIONS-GC._extensions;
-  prompt.innerHTML='<i class="ti ti-clock" style="font-size:18px;color:var(--color-text-warning);flex-shrink:0" aria-hidden="true"></i>'
+  prompt.innerHTML='<i class="ti ti-alarm" style="font-size:22px;color:var(--color-text-danger);flex-shrink:0" aria-hidden="true"></i>'
     +'<div style="flex:1;min-width:0;">'
-    +'<div style="font-size:13px;font-weight:500;color:var(--color-text-warning);">Session ending soon</div>'
-    +'<div style="font-size:12px;color:var(--color-text-warning);opacity:.8;">'+(canExtend?extsLeft+' extension'+(extsLeft!==1?'s':'')+' left · 5 credits each':'No more extensions available')+'</div>'
+    +'<div style="font-size:13px;font-weight:500;color:var(--color-text-danger);">Session ending soon</div>'
+    +'<div style="font-size:12px;color:var(--color-text-danger);opacity:.85;">'+(canExtend?extsLeft+' extension'+(extsLeft!==1?'s':'')+' left · 5 credits each':'No more extensions available')+'</div>'
     +'</div>';
   if(canExtend){
     var extBtn=document.createElement('button');
-    extBtn.style.cssText='flex-shrink:0;padding:7px 14px;background:var(--color-background-primary);border:0.5px solid var(--color-border-warning);border-radius:var(--border-radius-md);font-size:12px;font-weight:500;color:var(--color-text-warning);cursor:pointer;white-space:nowrap;';
+    extBtn.style.cssText='flex-shrink:0;padding:8px 16px;background:var(--color-background-primary);border:1.5px solid var(--color-border-danger);border-radius:var(--border-radius-md);font-size:13px;font-weight:500;color:var(--color-text-danger);cursor:pointer;white-space:nowrap;';
     extBtn.textContent='+3 min · 5 cr';
     extBtn.onclick=function(){gcExtendSession();};
     prompt.appendChild(extBtn);
@@ -664,7 +678,7 @@ function gcExtendSession(){
   if(GC._extensions>=GC.MAX_EXTENSIONS){toast('Maximum extensions reached');return;}
   spendCredit(GC.EXTEND_COST,function(){
     GC._extensions++;
-    sessionStorage.setItem('gc_session_ext',GC._extensions);
+    localStorage.setItem('gc_sess_ext_'+(cu?cu.nickname:'x'),GC._extensions);
     GC._warned=false; /* reset so next warn fires again at next 5-min threshold */
     /* Remove prompt */
     var p=G('gc-extend-prompt');if(p)p.remove();
@@ -678,7 +692,7 @@ function gcEndSession(){
   gcStopSession();
   /* Record when session ended for 1hr cooldown */
   var endTime=Date.now();
-  sessionStorage.setItem('gc_session_end',endTime);
+  localStorage.setItem('gc_session_end_'+(cu?cu.nickname:'x'),endTime);
   GC._sessionEndTime=endTime;
   gcResetSession();
   if(G('game-modal')&&G('game-modal').classList.contains('open'))closeModal();
@@ -702,7 +716,7 @@ function gcNextSessionTime(){
 
 function gcSessionCooldownOk(){
   if(gcIsManager())return true;
-  var endTime=parseInt(sessionStorage.getItem('gc_session_end')||'0');
+  var endTime=parseInt(localStorage.getItem('gc_session_end_'+(cu?cu.nickname:'x'))||'0');
   if(!endTime)return true;
   return Date.now()-endTime>=GC.SESSION_COOLDOWN*1000;
 }
@@ -725,7 +739,7 @@ function gcInjectTimerBar(){
   if(!grid||G('gc-timer-bar'))return;
   var bar=document.createElement('div');
   bar.id='gc-timer-bar';
-  bar.style.cssText='display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--color-background-warning);border-radius:var(--border-radius-md);margin-bottom:8px;border:0.5px solid var(--color-border-warning);';
+  bar.style.cssText='display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--color-background-danger);border-radius:var(--border-radius-md);margin-bottom:8px;border:1px solid var(--color-border-danger);';
   bar.innerHTML='<i class="ti ti-clock" style="font-size:16px;color:var(--color-text-secondary)" aria-hidden="true"></i>'
     +'<div style="flex:1;height:6px;background:var(--color-border-tertiary);border-radius:3px;overflow:hidden;">'
     +'<div id="gc-timer-fill" style="height:100%;border-radius:3px;background:var(--color-background-success);width:100%;transition:width 1s linear,background .3s;"></div>'
@@ -3713,7 +3727,7 @@ function gameTongIts(C){
     /* For now award credits to the player who is in the winner seat */
     var seats=GS._seats||[];
     if(winnerSeat===mySeat&&cu){
-      addCredit(myNickLc,result.totalWin);
+      gcAwardGameCredit(myNickLc,result.totalWin);
       setScore('+'+result.totalWin+' credits 🏆');
       saveScore('tongits',deadwood(myHand),false);
     }
@@ -4846,7 +4860,7 @@ function gameMillionaire(C){
   function endGame(prize,msg){
     gameOver=true;
     var actualPrize=prize>0?Math.round(prize*0.01):0;
-    if(actualPrize>0)awardCredit(cu.nickname.toLowerCase(),actualPrize);
+    if(actualPrize>0)gcAwardGameCredit(cu.nickname.toLowerCase(),actualPrize);
     C.innerHTML='';
     var wrap=document.createElement('div');
     wrap.style.cssText='font-family:var(--font-sans);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
@@ -4991,7 +5005,7 @@ function gameDealOrNoDeal(C){
       wrap.appendChild(offerBox);
       setTimeout(function(){
         var d=document.getElementById('dnd-deal'),nd=document.getElementById('dnd-nodeal');
-        if(d)d.onclick=function(){var realOffer=Math.max(1,Math.round(offer*0.3));SND.win();awardCredit(cu.nickname.toLowerCase(),realOffer);endDND(realOffer,offer,'Deal! You take the banker\'s offer.');};
+        if(d)d.onclick=function(){var realOffer=Math.max(1,Math.round(offer*0.3));SND.win();gcAwardGameCredit(cu.nickname.toLowerCase(),realOffer);endDND(realOffer,offer,'Deal! You take the banker\'s offer.');};
         if(nd)nd.onclick=function(){SND.card();openedThisRound=0;phase='play';render();};
       },50);
     }
@@ -5013,7 +5027,7 @@ function gameDealOrNoDeal(C){
       var fdBtn=document.createElement('button');
       fdBtn.style.cssText='flex:1;min-width:0;padding:9px 10px;border:1px solid rgba(74,222,128,.4);border-radius:8px;background:rgba(22,163,74,.25);color:#4ade80;font-size:12px;font-weight:700;cursor:pointer';
       fdBtn.textContent='Take '+finalOffer+' cr';
-      fdBtn.onclick=function(){var realFinal=Math.max(1,Math.round(finalOffer*0.3));SND.win();awardCredit(cu.nickname.toLowerCase(),realFinal);endDND(realFinal,finalOffer,'Banker deal taken!');};
+      fdBtn.onclick=function(){var realFinal=Math.max(1,Math.round(finalOffer*0.3));SND.win();gcAwardGameCredit(cu.nickname.toLowerCase(),realFinal);endDND(realFinal,finalOffer,'Banker deal taken!');};
       fBtnRow.appendChild(fdBtn);
       if(switchCase){
         var swBtn=document.createElement('button');
@@ -5054,7 +5068,7 @@ function gameDealOrNoDeal(C){
     /* Show the reveal without ending the game yet */
     playerCase.open=true;
     SND.win();
-    awardCredit(cu.nickname.toLowerCase(),realPrize);
+    gcAwardGameCredit(cu.nickname.toLowerCase(),realPrize);
     /* Show result screen */
     C.innerHTML='';
     var wrap=document.createElement('div');
