@@ -321,7 +321,7 @@ function updateCreditUI(){
 }
 var CREDIT_COST_NORMAL=1;
 var CREDIT_COST_CARD=3;
-var CARD_GAME_IDS=['tongits'];
+var CARD_GAME_IDS=['tongits','millionaire','dealornodeal'];
 
 function spendCredit(cost,cb){
   if(!cu){toast('Not signed in — open the Portal first.');return;}
@@ -563,12 +563,12 @@ function renderGrid(){
     {id:'minesweeper',e:'💣',n:'Minesweeper',d:'Clear the board · 1 credit'},
     {id:'wordguess',e:'📝',n:'Word Guess',d:'Guess the 5-letter word · 1 credit'},
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
-  ];
-  var multi=[
-    {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions · lifelines · win big · 1 credit'},
-    {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'20 briefcases · banker offers · press your luck · 1 credit'},
+    {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions · lifelines · win big · 3 credits'},
+    {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'20 briefcases · banker offers · press your luck · 3 credits'},
     {id:'kbquiz',e:'🧩',n:'KB Quiz',d:'10 questions from the Knowledge Base · 1 credit'},
     {id:'chess',e:'♟️',n:'Chess',d:'vs AI or vs Player · Normal or Timed · 1 credit'},
+  ];
+  var multi=[
     {id:'uno',e:'🃏',n:'UNO',d:'2–4 players · mix humans & AI · 1 credit'},
     {id:'tongits',e:'🀄',n:'Tong Its',d:'Multiplayer · 3 players · 3 credits',card:true},
   ];
@@ -4506,8 +4506,8 @@ function gameMillionaire(C){
       +'<div style="font-size:12px;color:rgba(200,200,230,.5);margin-bottom:20px">You reached Q'+(qIdx)+' of 15</div>';
     var pb=document.createElement('button');
     pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
-    pb.textContent='Play again (1 credit)';
-    pb.onclick=function(){spendCredit(1,function(){questions=[];usedIdx={1:[],2:[],3:[]};for(var i=0;i<5;i++){var q=pickQ(1);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(2);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(3);if(q)questions.push(q);}qIdx=0;lifelines={fifty:true,audience:true,friend:true,swap:true};gameOver=false;eliminated=[];safeFloor=0;render();});};
+    pb.textContent='Play again (3 credits)';
+    pb.onclick=function(){spendCredit(3,function(){questions=[];usedIdx={1:[],2:[],3:[]};for(var i=0;i<5;i++){var q=pickQ(1);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(2);if(q)questions.push(q);}for(var i=0;i<5;i++){var q=pickQ(3);if(q)questions.push(q);}qIdx=0;lifelines={fifty:true,audience:true,friend:true,swap:true};gameOver=false;eliminated=[];safeFloor=0;render();});};
     wrap.appendChild(pb);
     C.appendChild(wrap);
   }
@@ -4714,8 +4714,8 @@ function gameDealOrNoDeal(C){
       +'<div style="font-size:14px;color:rgba(200,200,230,.6);margin-bottom:20px">Added to your balance!</div>';
     var pb=document.createElement('button');
     pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
-    pb.textContent='Play again (1 credit)';
-    pb.onclick=function(){spendCredit(1,function(){gameDealOrNoDeal(C);});};
+    pb.textContent='Play again (3 credits)';
+    pb.onclick=function(){spendCredit(3,function(){gameDealOrNoDeal(C);});};
     wrap.appendChild(pb);
     C.appendChild(wrap);
   }
@@ -4730,8 +4730,8 @@ function gameDealOrNoDeal(C){
       +'<div style="font-size:11px;color:rgba(200,200,230,.4);margin-bottom:12px">Case value: '+origPrize+' cr × 0.3</div>';
     var pb=document.createElement('button');
     pb.style.cssText='font-size:13px;padding:8px 22px;border-radius:20px;border:1px solid rgba(245,200,66,.4);background:rgba(245,200,66,.08);color:#f5c842;cursor:pointer';
-    pb.textContent='Play again (1 credit)';
-    pb.onclick=function(){spendCredit(1,function(){gameDealOrNoDeal(C);});};
+    pb.textContent='Play again (3 credits)';
+    pb.onclick=function(){spendCredit(3,function(){gameDealOrNoDeal(C);});};
     wrap.appendChild(pb);
     C.appendChild(wrap);
   }
