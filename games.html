@@ -38,6 +38,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .main{max-width:900px;margin:0 auto;padding:24px 16px;}
 .section-label{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:12px;}
 .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:28px;}
+.gc-tab{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .15s;}
+.gc-tab:hover{border-color:var(--accent);color:var(--text);}
+.gc-tab-on{background:rgba(124,58,237,.2);border-color:var(--accent);color:var(--accent2);font-weight:600;}
+.shop-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;transition:border-color .15s;}
+.shop-card:hover{border-color:var(--accent);}
+.shop-section{font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin:18px 0 10px;}
+.badge-pill{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+.badge-amber{background:rgba(234,179,8,.15);color:#eab308;border:1px solid rgba(234,179,8,.3);}
+.badge-teal{background:rgba(20,184,166,.15);color:#14b8a6;border:1px solid rgba(20,184,166,.3);}
+.badge-purple{background:rgba(168,85,247,.15);color:#a855f7;border:1px solid rgba(168,85,247,.3);}
+.badge-red{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+.badge-green{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);}
+.badge-blue{background:rgba(59,130,246,.15);color:#60a5fa;border:1px solid rgba(59,130,246,.3);}
+.badge-pending{background:rgba(234,179,8,.1);color:#eab308;border:1px solid rgba(234,179,8,.2);opacity:.7;}
+.use-badge-btn{font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--accent);background:rgba(124,58,237,.1);color:var(--accent2);cursor:pointer;transition:all .12s;}
+.use-badge-btn:hover{background:rgba(124,58,237,.2);}
+.use-badge-btn:disabled{opacity:.4;cursor:default;border-color:var(--border);background:transparent;color:var(--muted);}
+.tier-legendary{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;}
+.tier-premium{background:rgba(234,179,8,.12);color:#fbbf24;border:1px solid rgba(234,179,8,.25);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;}
+.tier-boost{background:rgba(20,184,166,.12);color:#2dd4bf;border:1px solid rgba(20,184,166,.25);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;}
+.tier-cosmetic{background:rgba(168,85,247,.12);color:#c084fc;border:1px solid rgba(168,85,247,.25);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .15s,transform .15s;position:relative;overflow:hidden;}
 .tile::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,58,237,.05),transparent);opacity:0;transition:opacity .15s;}
 .tile:hover{border-color:var(--accent);transform:translateY(-2px);}
@@ -88,6 +109,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
       <input type="range" min="0" max="1" step="0.01" value="0.22" oninput="setVol(this.value)">
       <button id="music-toggle-btn" class="btn btn-outline" style="width:100%;margin-top:10px;font-size:11px" onclick="toggleMusic()">▶ Play</button>
     </div>
+    <!-- Notification bell -->
+    <button id="notif-btn" style="display:none;position:relative;background:none;border:none;cursor:pointer;font-size:18px;padding:4px;line-height:1;" onclick="toggleNotifPanel()" aria-label="Notifications">🔔<span id="notif-badge" style="display:none;position:absolute;top:0;right:0;width:8px;height:8px;border-radius:50%;background:var(--red);"></span></button>
     <!-- Manager credit panel toggle -->
     <button id="mgr-credits-btn" style="display:none;font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer" onclick="toggleMgrPanel()">👑 Credits</button>
     <div class="user-chip" id="user-chip" style="display:none">
@@ -109,6 +132,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
   <div id="mgr-pane"></div>
 </div>
 
+<!-- Notification panel -->
+<div id="notif-panel-wrap" style="display:none;position:fixed;top:58px;right:0;width:320px;height:calc(100vh - 58px);background:var(--surface);border-left:1px solid var(--border);z-index:201;overflow-y:auto;padding:16px;box-shadow:-4px 0 20px rgba(0,0,0,.3);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div style="font-size:14px;font-weight:700;color:var(--text)">🔔 Notifications</div>
+    <button onclick="toggleNotifPanel()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer">✕</button>
+  </div>
+  <div id="notif-list-panel"><div style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0;">No notifications</div></div>
+</div>
+
 <div class="main">
   <div id="nologin" style="display:none">
     <div class="nl-icon">🎮</div>
@@ -116,12 +148,23 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
     <p>Open <strong>The Lounge Portal</strong> and sign in with your PIN first.<br>Your session will carry over here automatically.</p>
   </div>
   <div id="game-grid">
-    <div class="section-label">Solo Games</div>
-    <div class="game-grid" id="solo-grid"></div>
-    <div class="section-label">Multiplayer</div>
-    <div class="game-grid" id="multi-grid"></div>
-      </div>
+    <!-- Tab nav -->
+    <div style="display:flex;gap:8px;margin-bottom:18px;" id="gc-tabs">
+      <button class="gc-tab gc-tab-on" id="tab-games" onclick="gcSwitchTab('games')">🎮 Games</button>
+      <button class="gc-tab" id="tab-shop" onclick="gcSwitchTab('shop')">🛒 Shop</button>
+      <button class="gc-tab" id="tab-badges" onclick="gcSwitchTab('badges')">🎖 My Badges</button>
     </div>
+    <!-- Games tab -->
+    <div id="gc-pane-games">
+      <div class="section-label">Solo Games</div>
+      <div class="game-grid" id="solo-grid"></div>
+      <div class="section-label">Multiplayer</div>
+      <div class="game-grid" id="multi-grid"></div>
+    </div>
+    <!-- Shop tab -->
+    <div id="gc-pane-shop" style="display:none"></div>
+    <!-- Badges tab -->
+    <div id="gc-pane-badges" style="display:none"></div>
   </div>
 </div>
 
@@ -6245,4 +6288,437 @@ function fpsAddLights(th){
     FPS.scene.add(pl);
   });
 }
+</script>
+
+<script>
+/* ════════════════════════════════════════════════════════
+   GAME CORNER SHOP — BADGES — NOTIFICATIONS
+   Firestore collections:
+     gc_shop_items   — catalog (static, read-only reference)
+     gc_inventory    — {nick: {itemId: {qty,purchasedAt,quarter,...}}}
+     gc_badge_requests — {reqId: {nick,type,status,extra,mgrRemarks,code,...}}
+     gc_notifications — {nick: [{id,msg,type,read,ts}]}
+════════════════════════════════════════════════════════ */
+
+/* ── SHOP CATALOG ── */
+var SHOP_ITEMS=[
+  /* COSMETICS */
+  {id:'ring_gold',    tier:'cosmetic', name:'Gold avatar ring',    desc:'Golden border on your portal avatar.',         price:30,  icon:'🌟', limit:null,  stackable:true},
+  {id:'ring_purple',  tier:'cosmetic', name:'Purple avatar ring',  desc:'Purple border on your portal avatar.',         price:30,  icon:'💜', limit:null,  stackable:true},
+  {id:'ring_coral',   tier:'cosmetic', name:'Coral avatar ring',   desc:'Coral border on your portal avatar.',          price:30,  icon:'🪸', limit:null,  stackable:true},
+  {id:'ring_teal',    tier:'cosmetic', name:'Teal avatar ring',    desc:'Teal border on your portal avatar.',           price:30,  icon:'💚', limit:null,  stackable:true},
+  {id:'flair',        tier:'cosmetic', name:'Name flair ✨',       desc:'Emoji badge next to your name in the Hub.',   price:20,  icon:'✨', limit:null,  stackable:false},
+  {id:'banner_sunset',tier:'cosmetic', name:'Sunset banner',       desc:'Sunset-themed banner above your card.',        price:50,  icon:'🌅', limit:null,  stackable:false},
+  {id:'banner_ocean', tier:'cosmetic', name:'Ocean banner',        desc:'Ocean-themed banner above your card.',         price:50,  icon:'🌊', limit:null,  stackable:false},
+  {id:'banner_forest',tier:'cosmetic', name:'Forest banner',       desc:'Forest-themed banner above your card.',        price:50,  icon:'🌲', limit:null,  stackable:false},
+  {id:'banner_galaxy',tier:'cosmetic', name:'Galaxy banner',       desc:'Galaxy-themed banner above your card.',        price:50,  icon:'🌌', limit:null,  stackable:false},
+  /* BOOSTS */
+  {id:'boost_2x',     tier:'boost',    name:'Credit boost 24h',    desc:'2× game credit winnings for 24 hours.',        price:50,  icon:'⚡', limit:null,  stackable:false},
+  {id:'lucky_streak', tier:'boost',    name:'Lucky streak',        desc:'+20% bonus on your next 3 game wins.',         price:40,  icon:'🍀', limit:null,  stackable:false},
+  {id:'koby_pack',    tier:'premium',  name:'Koby calls pack',     desc:'+3 extra Call a Friend lifelines in WWTBAM.', price:80,  icon:'📞', limit:null,  stackable:true},
+  {id:'name_lights',  tier:'premium',  name:'Name in lights',      desc:'Your name highlighted in gold on Hub leaderboard for 1 week.',price:200,icon:'🌟',limit:null,stackable:false},
+  /* FOOD — not stackable, slot reopens when used */
+  {id:'snack_bar',    tier:'premium',  name:'Snack bar',           desc:'One free snack. Request must be approved by manager.',price:2000,icon:'🍿',limit:'use',stackable:false,useFlow:true},
+  {id:'lunch_stub',   tier:'premium',  name:'Lunch stub',          desc:'One free lunch. Request must be approved by manager.',price:2000,icon:'🍱',limit:'use',stackable:false,useFlow:true},
+  /* LEGENDARY — once per quarter */
+  {id:'timeoff_badge',tier:'legendary',name:'Time-off badge',      desc:'Request a day off. Manager approves with remarks. Once per quarter.',price:3000,icon:'🏖️',limit:'quarter',stackable:false,useFlow:true,requireDate:true},
+  {id:'immunity_idol',tier:'legendary',name:'Immunity idol',       desc:'Nullifies one quality error from defect density. Once per quarter.',price:2500,icon:'🗿',limit:'quarter',stackable:false,useFlow:true,requireTicket:true},
+  {id:'golden_idol',  tier:'legendary',name:'Golden idol',         desc:'Nullifies one escalation SLA miss. Once per quarter.',price:2500,icon:'🏆',limit:'quarter',stackable:false,useFlow:true,requireTicket:true,goldenIdol:true}
+];
+
+/* ── HELPERS ── */
+function gcCurrentQuarter(){
+  var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+  return d.getFullYear()+'Q'+Math.ceil((d.getMonth()+1)/3);
+}
+function gcQuarterEnd(){
+  var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'}));
+  var q=Math.ceil((d.getMonth()+1)/3);
+  var endMonth=[2,5,8,11][q-1];
+  var endDate=new Date(d.getFullYear(),endMonth+1,0);
+  return endDate.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+}
+
+/* ── TAB SWITCHING ── */
+function gcSwitchTab(tab){
+  ['games','shop','badges'].forEach(function(t){
+    var pane=G('gc-pane-'+t);if(pane)pane.style.display=t===tab?'':'none';
+    var btn=G('tab-'+t);if(btn)btn.className='gc-tab'+(t===tab?' gc-tab-on':'');
+  });
+  if(tab==='shop')gcRenderShop();
+  if(tab==='badges')gcRenderBadges();
+}
+
+/* ── SHOP RENDER ── */
+function gcRenderShop(){
+  var pane=G('gc-pane-shop');if(!pane)return;
+  var nick=cu?cu.nickname.toLowerCase():'';
+  /* Load inventory then render */
+  db.collection('gc_inventory').doc(nick).get().then(function(snap){
+    var inv=snap.exists?(snap.data()||{}):{};
+    var quarter=gcCurrentQuarter();
+    pane.innerHTML='';
+
+    var sections={cosmetic:'Cosmetics',boost:'Boosts & power-ups',premium:'Premium',legendary:'Legendary — once per quarter'};
+    var order=['cosmetic','boost','premium','legendary'];
+    order.forEach(function(tier){
+      var items=SHOP_ITEMS.filter(function(i){return i.tier===tier;});
+      if(!items.length)return;
+      var sec=document.createElement('div');sec.className='shop-section';sec.textContent=sections[tier];pane.appendChild(sec);
+      var grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:8px;';
+      items.forEach(function(item){
+        var owned=inv[item.id];
+        var ownedQty=owned?1:0;
+        var blockedQuarter=item.limit==='quarter'&&owned&&owned.quarter===quarter;
+        var blockedStack=!item.stackable&&owned&&owned.active;
+        var blocked=blockedQuarter||blockedStack;
+        var card=document.createElement('div');card.className='shop-card';
+        if(blocked)card.style.opacity='.55';
+        var tierEl='<span class="tier-'+item.tier+'">'+item.tier+'</span>';
+        var statusMsg=blockedQuarter?'<div style="font-size:10px;color:var(--red);margin-top:4px;">Already purchased this quarter</div>':blockedStack?'<div style="font-size:10px;color:var(--amber);margin-top:4px;">Use current one first</div>':'';
+        card.innerHTML='<div style="font-size:22px;margin-bottom:6px">'+item.icon+'</div>'
+          +tierEl
+          +'<div style="font-size:13px;font-weight:600;color:var(--text);margin:6px 0 3px">'+item.name+'</div>'
+          +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.4">'+item.desc+'</div>'
+          +statusMsg
+          +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">'
+          +'<span style="font-size:13px;font-weight:700;color:var(--accent2)">'+item.price.toLocaleString()+' cr</span>'
+          +(blocked?'<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:not-allowed;">Locked</button>'
+          :'<button onclick="gcBuyItem(\''+item.id+'\')" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;">Buy</button>')
+          +'</div>';
+        grid.appendChild(card);
+      });
+      pane.appendChild(grid);
+    });
+  }).catch(function(){var pane=G('gc-pane-shop');if(pane)pane.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;">Could not load shop.</div>';});
+}
+
+function gcBuyItem(itemId){
+  var item=SHOP_ITEMS.find(function(i){return i.id===itemId;});
+  if(!item){return;}
+  if(!cu||!db){toast('Sign in required');return;}
+  var nick=cu.nickname.toLowerCase();
+  /* Confirm */
+  if(!confirm('Buy '+item.name+' for '+item.price+' credits?'))return;
+  spendCredit(item.price,function(){
+    var quarter=gcCurrentQuarter();
+    var data={active:true,purchasedAt:Date.now(),quarter:quarter,itemId:itemId,name:item.name,icon:item.icon,tier:item.tier,useFlow:item.useFlow||false,requireDate:item.requireDate||false,requireTicket:item.requireTicket||false,goldenIdol:item.goldenIdol||false};
+    var update={};update[itemId]=data;
+    db.collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
+      toast(item.icon+' '+item.name+' purchased!');
+      gcRenderShop();
+    }).catch(function(e){toast('Purchase error: '+e.message);});
+  });
+}
+
+/* ── BADGES RENDER ── */
+function gcRenderBadges(){
+  var pane=G('gc-pane-badges');if(!pane)return;
+  var nick=cu?cu.nickname.toLowerCase():'';
+  pane.innerHTML='<div style="color:var(--muted);font-size:12px;padding:10px">Loading badges…</div>';
+  db.collection('gc_inventory').doc(nick).get().then(function(snap){
+    var inv=snap.exists?(snap.data()||{}):{};
+    var items=Object.values(inv).filter(function(v){return v&&v.active;});
+    pane.innerHTML='';
+    if(!items.length){
+      pane.innerHTML='<div style="text-align:center;padding:40px 20px;"><div style="font-size:32px;margin-bottom:12px">🎖</div><div style="font-size:14px;color:var(--muted)">No active badges or items yet.</div><div style="font-size:12px;color:var(--muted2);margin-top:6px">Visit the Shop tab to buy cosmetics and badges.</div></div>';
+      return;
+    }
+    var sec=document.createElement('div');sec.className='shop-section';sec.textContent='Active items';pane.appendChild(sec);
+    items.forEach(function(item){
+      var row=document.createElement('div');
+      row.id='badge-row-'+item.itemId;
+      row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);margin-bottom:8px;';
+      var isPending=item.pending;
+      var left='<div style="display:flex;align-items:center;gap:10px">'
+        +'<span style="font-size:22px">'+item.icon+'</span>'
+        +'<div>'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+item.name+(isPending?' <span class="badge-pending badge-pill" style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(234,179,8,.15);color:var(--amber);">pending approval</span>':'')+'</div>'
+        +(item.quarter?'<div style="font-size:10px;color:var(--muted)">Expires end of Q · '+gcQuarterEnd()+'</div>':'')
+        +'</div></div>';
+      var right='';
+      if(item.useFlow&&!isPending){
+        right='<button class="use-badge-btn" onclick="gcOpenUseModal(\''+item.itemId+'\')">Use badge</button>';
+      } else if(isPending){
+        right='<span style="font-size:11px;color:var(--amber)">⏳ pending</span>';
+      }
+      row.innerHTML=left+right;
+      pane.appendChild(row);
+    });
+
+    /* Pending requests coming back to member */
+    db.collection('gc_badge_requests').where('nick','==',nick).where('status','==','pending').get().then(function(reqs){
+      reqs.forEach(function(r){
+        var d=r.data();
+        var row=G('badge-row-'+d.itemId);
+        if(row){
+          var btn=row.querySelector('.use-badge-btn');
+          if(btn){btn.textContent='⏳ pending';btn.disabled=true;}
+        }
+      });
+    }).catch(function(){});
+  }).catch(function(){pane.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;">Could not load badges.</div>';});
+}
+
+/* ── USE BADGE MODAL ── */
+var _gcUseItemId=null;
+function gcOpenUseModal(itemId){
+  var nick=cu.nickname.toLowerCase();
+  db.collection('gc_inventory').doc(nick).get().then(function(snap){
+    var inv=snap.exists?(snap.data()||{}):{};
+    var item=inv[itemId];
+    if(!item)return;
+    _gcUseItemId=itemId;
+    var modalHtml='<div style="padding:18px;max-width:400px;">'
+      +'<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">'+item.icon+' Use '+item.name+'</div>'
+      +'<div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5">This sends a request to your manager for approval.</div>';
+    if(item.requireDate){
+      modalHtml+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Requested date off *</div>'
+        +'<input type="date" id="use-date" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;margin-bottom:12px;">'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Notes (optional)</div>'
+        +'<textarea id="use-notes" rows="2" placeholder="Any context for your manager…" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;resize:none;margin-bottom:12px;"></textarea>';
+    } else if(item.requireTicket||item.goldenIdol){
+      var ticketLabel=item.goldenIdol?'Escalation ticket / address':'Error ticket / address';
+      modalHtml+='<div style="font-size:11px;color:var(--muted);margin-bottom:4px">'+ticketLabel+' *</div>'
+        +'<input type="text" id="use-ticket" placeholder="e.g. ERR-2024-0042" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;margin-bottom:12px;">'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Notes (optional)</div>'
+        +'<textarea id="use-notes" rows="2" placeholder="Any context…" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;resize:none;margin-bottom:12px;"></textarea>';
+    }
+    modalHtml+='<div style="display:flex;gap:8px;margin-top:4px;">'
+      +'<button onclick="gcSubmitUseRequest(\''+itemId+'\')" style="flex:1;padding:9px;background:rgba(124,58,237,.2);border:1px solid var(--accent);border-radius:8px;color:var(--accent2);font-size:13px;font-weight:600;cursor:pointer;">Send request</button>'
+      +'<button onclick="closeModal()" style="padding:9px 16px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer;">Cancel</button>'
+      +'</div></div>';
+    openModal(itemId,'Use badge');
+    G('modal-body').innerHTML=modalHtml;
+  }).catch(function(){});
+}
+
+function gcSubmitUseRequest(itemId){
+  var nick=cu.nickname.toLowerCase();
+  var extra={};
+  var dateEl=G('use-date'),ticketEl=G('use-ticket'),notesEl=G('use-notes');
+  if(dateEl)extra.date=dateEl.value;
+  if(ticketEl)extra.ticket=ticketEl.value;
+  if(notesEl)extra.notes=notesEl.value;
+  /* Mark as pending in inventory */
+  var upd={};upd[itemId+'.pending']=true;
+  db.collection('gc_inventory').doc(nick).update(upd).then(function(){
+    /* Create request doc */
+    var reqId=nick+'_'+itemId+'_'+Date.now();
+    db.collection('gc_badge_requests').doc(reqId).set({
+      reqId:reqId,nick:nick,itemId:itemId,
+      status:'pending',extra:extra,
+      createdAt:Date.now(),mgrRemarks:'',code:''
+    }).then(function(){
+      /* Notify manager */
+      gcPushManagerNotif(nick,itemId,reqId,extra);
+      closeModal();
+      toast('Request sent to manager ✓');
+      gcRenderBadges();
+    });
+  }).catch(function(e){toast('Error: '+e.message);});
+}
+
+function gcPushManagerNotif(memberNick,itemId,reqId,extra){
+  /* Find manager nick from TEAM_DIR or fallback */
+  var inv=SHOP_ITEMS.find(function(i){return i.id===itemId;})||{name:itemId,icon:'🎖'};
+  var mgrNick=null;
+  if(window.TEAM){
+    var mgr=window.TEAM.find(function(m){return m.role==='manager';});
+    if(mgr)mgrNick=mgr.nickname.toLowerCase();
+  }
+  if(!mgrNick){try{var shifts=JSON.parse(localStorage.getItem('rta_SHIFTS')||'{}');var keys=Object.keys(shifts);/* fallback — can't identify manager */}catch(e){}}
+  if(!mgrNick)return;
+  var msg=memberNick+' wants to use their '+inv.icon+' '+inv.name+'.'+(extra.date?' Date: '+extra.date:'')+(extra.ticket?' Ref: '+extra.ticket:'');
+  gcAddNotification(mgrNick,{type:'badge_request',reqId:reqId,memberNick:memberNick,itemId:itemId,msg:msg,ts:Date.now(),read:false,actionable:true});
+}
+
+/* ── NOTIFICATIONS ── */
+var _gcNotifs=[];
+function gcAddNotification(nick,notif){
+  notif.id=nick+'_'+Date.now()+'_'+Math.random().toString(36).substr(2,4);
+  db.collection('gc_notifications').doc(nick).get().then(function(snap){
+    var notifs=snap.exists?(snap.data().notifs||[]):[];
+    notifs.unshift(notif);
+    if(notifs.length>50)notifs=notifs.slice(0,50);
+    db.collection('gc_notifications').doc(nick).set({notifs:notifs});
+  }).catch(function(){});
+}
+
+function gcLoadNotifications(){
+  if(!cu||!db)return;
+  var nick=cu.nickname.toLowerCase();
+  db.collection('gc_notifications').doc(nick).onSnapshot(function(snap){
+    if(!snap.exists)return;
+    _gcNotifs=snap.data().notifs||[];
+    gcRenderNotifBell();
+    gcRenderNotifPanel();
+  });
+}
+
+function gcRenderNotifBell(){
+  var btn=G('notif-btn');var badge=G('notif-badge');
+  if(!btn)return;
+  btn.style.display='';
+  var unread=_gcNotifs.filter(function(n){return !n.read;}).length;
+  if(badge)badge.style.display=unread>0?'block':'none';
+}
+
+function toggleNotifPanel(){
+  var wrap=G('notif-panel-wrap');
+  if(!wrap)return;
+  wrap.style.display=wrap.style.display==='none'||!wrap.style.display?'block':'none';
+  if(wrap.style.display==='block')gcRenderNotifPanel();
+}
+
+function gcRenderNotifPanel(){
+  var list=G('notif-list-panel');if(!list)return;
+  if(!_gcNotifs.length){list.innerHTML='<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px 0;">No notifications</div>';return;}
+  list.innerHTML='';
+  var isManager=gcIsManager();
+  _gcNotifs.forEach(function(n){
+    var div=document.createElement('div');
+    div.style.cssText='padding:12px;background:'+(n.read?'transparent':'rgba(124,58,237,.06)')+';border:1px solid '+(n.read?'var(--border)':'rgba(124,58,237,.2)')+';border-radius:10px;margin-bottom:8px;';
+    var actionHtml='';
+    if(isManager&&n.actionable&&n.type==='badge_request'&&!n.resolved){
+      actionHtml='<div style="display:flex;gap:6px;margin-top:8px;">'
+        +'<button onclick="gcMgrApprove(\''+n.reqId+'\',\''+n.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid var(--green);background:rgba(34,197,94,.12);color:var(--green);cursor:pointer;">Approve</button>'
+        +'<button onclick="gcMgrDiscard(\''+n.reqId+'\',\''+n.id+'\')" style="font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid var(--red);background:rgba(239,68,68,.1);color:var(--red);cursor:pointer;">Discard</button>'
+        +'</div>';
+    }
+    div.innerHTML='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+      +'<div style="font-size:12px;color:var(--text);line-height:1.5;flex:1;">'+n.msg+'</div>'
+      +'<button onclick="gcMarkRead(\''+n.id+'\')" style="font-size:16px;background:none;border:none;cursor:pointer;color:var(--muted);flex-shrink:0;padding:0;" title="Dismiss">✕</button>'
+      +'</div>'
+      +'<div style="font-size:10px;color:var(--muted2);margin-top:4px;">'+new Date(n.ts).toLocaleString('en-AU',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})+'</div>'
+      +actionHtml;
+    list.appendChild(div);
+  });
+}
+
+function gcMarkRead(notifId){
+  var nick=cu.nickname.toLowerCase();
+  _gcNotifs=_gcNotifs.filter(function(n){return n.id!==notifId;});
+  db.collection('gc_notifications').doc(nick).set({notifs:_gcNotifs});
+  gcRenderNotifBell();
+  gcRenderNotifPanel();
+}
+
+/* ── MANAGER APPROVAL FLOW ── */
+function gcMgrApprove(reqId,notifId){
+  db.collection('gc_badge_requests').doc(reqId).get().then(function(snap){
+    if(!snap.exists)return;
+    var req=snap.data();
+    var item=SHOP_ITEMS.find(function(i){return i.id===req.itemId;})||{name:req.itemId,icon:'🎖',requireDate:false,requireTicket:false};
+    /* Build approval modal */
+    var isFood=req.itemId==='snack_bar'||req.itemId==='lunch_stub';
+    var fieldHtml=isFood
+      ?'<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Redemption code *</div><input type="text" id="mgr-code" placeholder="e.g. SNACK-2024-JB" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;margin-bottom:12px;">'
+      :'<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Remarks *</div><textarea id="mgr-remarks" rows="3" placeholder="e.g. Approved for 15 May. Enjoy your day!" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;resize:none;margin-bottom:12px;"></textarea>';
+    var modalHtml='<div style="padding:18px;">'
+      +'<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">'+item.icon+' Approve '+item.name+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:14px;">From: '+req.nick+(req.extra&&req.extra.date?' · Date: '+req.extra.date:'')+(req.extra&&req.extra.ticket?' · Ref: '+req.extra.ticket:'')+'</div>'
+      +fieldHtml
+      +'<div style="display:flex;gap:8px;">'
+      +'<button onclick="gcMgrSendApproval(\''+reqId+'\',\''+notifId+'\','+isFood+')" style="flex:1;padding:9px;background:rgba(34,197,94,.15);border:1px solid var(--green);border-radius:8px;color:var(--green);font-size:13px;font-weight:600;cursor:pointer;">Approve &amp; send</button>'
+      +'<button onclick="closeModal()" style="padding:9px 14px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer;">Cancel</button>'
+      +'</div></div>';
+    openModal('mgr-approve','Approve request');
+    G('modal-body').innerHTML=modalHtml;
+  });
+}
+
+function gcMgrSendApproval(reqId,notifId,isFood){
+  var codeEl=G('mgr-code'),remarksEl=G('mgr-remarks');
+  var value=codeEl?codeEl.value:remarksEl?remarksEl.value:'';
+  if(!value.trim()){toast('Please fill in the field');return;}
+  db.collection('gc_badge_requests').doc(reqId).get().then(function(snap){
+    if(!snap.exists)return;
+    var req=snap.data();
+    /* Update request */
+    db.collection('gc_badge_requests').doc(reqId).update({status:'approved',mgrRemarks:value,resolvedAt:Date.now()});
+    /* Remove badge from member inventory */
+    var upd={};upd[req.itemId]=firebase.firestore.FieldValue.delete();
+    db.collection('gc_inventory').doc(req.nick).update(upd);
+    /* Notify member */
+    var msg=isFood?'Your '+req.itemId.replace('_',' ')+' has been approved! Redemption code: '+value+'. Show this when collecting.':'Your badge use request has been approved. Manager remarks: '+value;
+    gcAddNotification(req.nick,{type:'badge_approved',msg:msg,ts:Date.now(),read:false,actionable:false});
+    /* Mark notif as resolved */
+    gcMarkNotifResolved(notifId);
+    closeModal();
+    toast('Approved and member notified ✓');
+  });
+}
+
+function gcMgrDiscard(reqId,notifId){
+  db.collection('gc_badge_requests').doc(reqId).get().then(function(snap){
+    if(!snap.exists)return;
+    var req=snap.data();
+    db.collection('gc_badge_requests').doc(reqId).update({status:'discarded',resolvedAt:Date.now()});
+    /* Remove badge from member inventory */
+    var upd={};upd[req.itemId]=firebase.firestore.FieldValue.delete();
+    db.collection('gc_inventory').doc(req.nick).update(upd);
+    /* Notify member */
+    gcAddNotification(req.nick,{type:'badge_discarded',msg:'Your '+req.itemId.replace(/_/g,' ')+' use request was reviewed and not approved this time. The badge has been removed.',ts:Date.now(),read:false,actionable:false});
+    gcMarkNotifResolved(notifId);
+    toast('Request discarded');
+    gcRenderNotifPanel();
+  });
+}
+
+function gcMarkNotifResolved(notifId){
+  var nick=cu.nickname.toLowerCase();
+  _gcNotifs=_gcNotifs.map(function(n){return n.id===notifId?Object.assign({},n,{resolved:true,read:true}):n;});
+  _gcNotifs=_gcNotifs.filter(function(n){return !n.resolved;});
+  db.collection('gc_notifications').doc(nick).set({notifs:_gcNotifs});
+  gcRenderNotifBell();
+  gcRenderNotifPanel();
+}
+
+/* ── CREDIT MANAGER EDIT FIELD ── */
+function renderMgrPanel(){
+  var pane=G('mgr-pane');if(!pane)return;
+  var members=_allCredits;
+  var html='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Team Credits</div>';
+  var keys=Object.keys(members);
+  if(!keys.length){html+='<div style="font-size:11px;color:var(--muted)">Loading…</div>';pane.innerHTML=html;return;}
+  keys.sort().forEach(function(nick){
+    var c=members[nick];
+    html+='<div style="margin-bottom:8px;padding:10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:12px;font-weight:600;color:var(--text)">' + nick + '</div>'
+          +'<div style="font-size:10px;color:var(--muted)" id="credit-lbl-'+nick+'">' + c + ' credit'+(c!==1?'s':'')+'</div>'
+        +'</div>'
+        +'<button onclick="mgrAdjCredit(\''+nick+'\',-1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;font-size:14px;flex-shrink:0">−</button>'
+        +'<button onclick="mgrAdjCredit(\''+nick+'\',1)" style="width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-size:14px;flex-shrink:0">+</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;align-items:center">'
+        +'<input id="credit-input-'+nick+'" type="number" min="0" value="'+c+'" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;" placeholder="Set amount">'
+        +'<button onclick="mgrSetCredit(\''+nick+'\')" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--accent);background:rgba(124,58,237,.15);color:var(--accent2);cursor:pointer;white-space:nowrap">Set</button>'
+      +'</div>'
+    +'</div>';
+  });
+  pane.innerHTML=html;
+}
+
+function mgrSetCredit(nick){
+  var el=G('credit-input-'+nick);
+  if(!el)return;
+  var val=parseInt(el.value)||0;
+  if(val<0){toast('Cannot set negative credits');return;}
+  db.collection('player_credits').doc(nick).set({credits:val},{merge:true}).then(function(){
+    _allCredits[nick]=val;
+    var lbl=G('credit-lbl-'+nick);
+    if(lbl)lbl.textContent=val+' credit'+(val!==1?'s':'');
+    toast('Credits for '+nick+' set to '+val);
+  }).catch(function(){toast('Error updating credits.');});
+}
+
+/* ── BOOT: load notifs on init ── */
+var _origInit=window.init;
+window.init=function(){
+  if(_origInit)_origInit.apply(this,arguments);
+  setTimeout(function(){if(cu&&db)gcLoadNotifications();},1200);
+};
 </script>
