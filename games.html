@@ -6303,27 +6303,27 @@ function fpsAddLights(th){
 /* ── SHOP CATALOG ── */
 var SHOP_ITEMS=[
   /* COSMETICS */
-  {id:'ring_gold',    tier:'cosmetic', name:'Gold avatar ring',    desc:'Golden border on your portal avatar.',         price:30,  icon:'🌟', limit:null,  stackable:true},
-  {id:'ring_purple',  tier:'cosmetic', name:'Purple avatar ring',  desc:'Purple border on your portal avatar.',         price:30,  icon:'💜', limit:null,  stackable:true},
-  {id:'ring_coral',   tier:'cosmetic', name:'Coral avatar ring',   desc:'Coral border on your portal avatar.',          price:30,  icon:'🪸', limit:null,  stackable:true},
-  {id:'ring_teal',    tier:'cosmetic', name:'Teal avatar ring',    desc:'Teal border on your portal avatar.',           price:30,  icon:'💚', limit:null,  stackable:true},
-  {id:'flair',        tier:'cosmetic', name:'Name flair ✨',       desc:'Emoji badge next to your name in the Hub.',   price:20,  icon:'✨', limit:null,  stackable:false},
-  {id:'banner_sunset',tier:'cosmetic', name:'Sunset banner',       desc:'Sunset-themed banner above your card.',        price:50,  icon:'🌅', limit:null,  stackable:false},
-  {id:'banner_ocean', tier:'cosmetic', name:'Ocean banner',        desc:'Ocean-themed banner above your card.',         price:50,  icon:'🌊', limit:null,  stackable:false},
-  {id:'banner_forest',tier:'cosmetic', name:'Forest banner',       desc:'Forest-themed banner above your card.',        price:50,  icon:'🌲', limit:null,  stackable:false},
-  {id:'banner_galaxy',tier:'cosmetic', name:'Galaxy banner',       desc:'Galaxy-themed banner above your card.',        price:50,  icon:'🌌', limit:null,  stackable:false},
+  {id:'ring_gold',    tier:'cosmetic', name:'Gold avatar ring',    desc:"Drip in gold. Everyone sees this glowing ring around your avatar. Flex it.",                            price:200, icon:'🌟', limit:null,  stackable:true},
+  {id:'ring_purple',  tier:'cosmetic', name:'Purple avatar ring',  desc:"Purple is the colour of royalty. Own it. Rock it. Let them wonder.",                                    price:200, icon:'💜', limit:null,  stackable:true},
+  {id:'ring_coral',   tier:'cosmetic', name:'Coral avatar ring',   desc:"Warm, bold, and impossible to ignore. Your avatar just levelled up.",                                   price:200, icon:'🪸', limit:null,  stackable:true},
+  {id:'ring_teal',    tier:'cosmetic', name:'Teal avatar ring',    desc:"Cool, calm, collected. Teal hits different. Limited supply of chill vibes.",                            price:200, icon:'💚', limit:null,  stackable:true},
+  {id:'flair',        tier:'cosmetic', name:'Name flair ✨',       desc:"A little sparkle next to your name. Small flex, big energy.",                                           price:200, icon:'✨', limit:null,  stackable:false},
+  {id:'banner_sunset',tier:'cosmetic', name:'Sunset banner',       desc:"Golden hour energy on your card. Bestowed upon those who vibe differently.",                            price:250, icon:'🌅', limit:null,  stackable:false},
+  {id:'banner_ocean', tier:'cosmetic', name:'Ocean banner',        desc:"Deep blue, no drama. For the ones who stay cool when the tide gets high.",                              price:250, icon:'🌊', limit:null,  stackable:false},
+  {id:'banner_forest',tier:'cosmetic', name:'Forest banner',       desc:"Earthy, grounded, and suspiciously wise. The forest knows things.",                                     price:250, icon:'🌲', limit:null,  stackable:false},
+  {id:'banner_galaxy',tier:'cosmetic', name:'Galaxy banner',       desc:"You're not just in the building — you're in another dimension. Rare energy.",                          price:250, icon:'🌌', limit:null,  stackable:false},
   /* BOOSTS */
-  {id:'boost_2x',     tier:'boost',    name:'Credit boost 24h',    desc:'2× game credit winnings for 24 hours.',        price:50,  icon:'⚡', limit:null,  stackable:false},
-  {id:'lucky_streak', tier:'boost',    name:'Lucky streak',        desc:'+20% bonus on your next 3 game wins.',         price:40,  icon:'🍀', limit:null,  stackable:false},
-  {id:'koby_pack',    tier:'premium',  name:'Koby calls pack',     desc:'+3 extra Call a Friend lifelines in WWTBAM.', price:80,  icon:'📞', limit:null,  stackable:true},
-  {id:'name_lights',  tier:'premium',  name:'Name in lights',      desc:'Your name highlighted in gold on Hub leaderboard for 1 week.',price:200,icon:'🌟',limit:null,stackable:false},
+  {id:'boost_2x',     tier:'boost',    name:'Credit boost 24h',    desc:"Double or nothing. For the next 24 hours, every game win pays out DOUBLE. Go get it.",                price:300, icon:'⚡', limit:null,  stackable:false},
+  {id:'lucky_streak', tier:'boost',    name:'Lucky streak',        desc:"Luck loaded. Your next 3 wins get a +20% bonus. No skill required (but it helps).",                   price:250, icon:'🍀', limit:null,  stackable:false},
+  {id:'koby_pack',    tier:'premium',  name:'Koby calls pack',     desc:"Koby to the rescue, 3 more times. Dial him up in WWTBAM when things get spicy.",                      price:300, icon:'📞', limit:null,  stackable:true},
+  {id:'name_lights',  tier:'premium',  name:'Name in lights',      desc:"Hollywood treatment for a week. Your name glows gold on the leaderboard. Let them see you.",          price:400, icon:'💫', limit:null,  stackable:false},
   /* FOOD — not stackable, slot reopens when used */
-  {id:'snack_bar',    tier:'premium',  name:'Snack bar',           desc:'One free snack. Request must be approved by manager.',price:2000,icon:'🍿',limit:'use',stackable:false,useFlow:true},
-  {id:'lunch_stub',   tier:'premium',  name:'Lunch stub',          desc:'One free lunch. Request must be approved by manager.',price:2000,icon:'🍱',limit:'use',stackable:false,useFlow:true},
+  {id:'snack_bar',    tier:'premium',  name:'Snack bar',           desc:"You earned it. Literally. Redeem for one free snack — manager's treat. Pending their sign-off.",       price:2000,icon:'🍿',limit:'use',stackable:false,useFlow:true},
+  {id:'lunch_stub',   tier:'premium',  name:'Lunch stub',          desc:"A full free lunch, on the house. Because crushing your targets deserves more than a pat on the back.", price:2000,icon:'🍱',limit:'use',stackable:false,useFlow:true},
   /* LEGENDARY — once per quarter */
-  {id:'timeoff_badge',tier:'legendary',name:'Time-off badge',      desc:'Request a day off. Manager approves with remarks. Once per quarter.',price:3000,icon:'🏖️',limit:'quarter',stackable:false,useFlow:true,requireDate:true},
-  {id:'immunity_idol',tier:'legendary',name:'Immunity idol',       desc:'Nullifies one quality error from defect density. Once per quarter.',price:2500,icon:'🗿',limit:'quarter',stackable:false,useFlow:true,requireTicket:true},
-  {id:'golden_idol',  tier:'legendary',name:'Golden idol',         desc:'Nullifies one escalation SLA miss. Once per quarter.',price:2500,icon:'🏆',limit:'quarter',stackable:false,useFlow:true,requireTicket:true,goldenIdol:true}
+  {id:'timeoff_badge',tier:'legendary',name:'Time-off badge',      desc:"You absolute legend. Cash this in for a day off — your manager will make it official. Once per quarter, so spend it wisely.",               price:5000,icon:'🏖️',limit:'quarter',stackable:false,useFlow:true,requireDate:true},
+  {id:'immunity_idol',tier:'legendary',name:'Immunity idol',       desc:"Oops, it happens. Pull this out and one quality slip disappears like it never existed. Ancient power, quarterly rarity.",                     price:3000,icon:'🗿',limit:'quarter',stackable:false,useFlow:true,requireTicket:true},
+  {id:'golden_idol',  tier:'legendary',name:'Golden idol',         desc:"Missed an escalation? Not anymore. The golden idol erases one SLA miss and asks zero questions. Guard it well — one per quarter.",          price:4200,icon:'🏆',limit:'quarter',stackable:false,useFlow:true,requireTicket:true,goldenIdol:true}
 ];
 
 /* ── HELPERS ── */
