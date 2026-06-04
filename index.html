@@ -1219,6 +1219,8 @@ window.dispatchEvent(new Event('firebase-ready'));
         <button class="btn btn-outline btn-sm" onclick="signOut()" style="font-size:10px;padding:3px 10px">&#8617; Sign Out</button>
       </div>
     </div>
+    <!-- Cosmetic banner strip — populated from gc_inventory -->
+    <div id="cosmetic-banner-strip" style="display:none;height:6px;flex-shrink:0;"></div>
     <div class="main-content" id="main-content" style="max-width:none;flex:1;overflow-y:auto"></div>
   </div>
 </div>
@@ -3131,6 +3133,8 @@ function buildMain(){
     localStorage.setItem('lounge_full',cu.fullName);
     localStorage.setItem('lounge_role',cu.role);
   }
+  /* Load cosmetics from gc_inventory and apply to header */
+  loadPortalCosmetics();
   /* Subscribe to all Firestore game data collections */
   /* gameDataSubscribe removed — games now in standalone games.html */
   statusSubscribe();
@@ -4961,6 +4965,101 @@ function statusDotHTML(key,size){
 }
 
 var _statusCache={};
+/* ── PORTAL COSMETICS — reads gc_inventory and applies banner/ring/flair ── */
+var BANNER_STYLES={
+  banner_sunset:{bg:'#FAC77522',color:'#633806',label:'🌅 Sunset Dreamer'},
+  banner_ocean: {bg:'#E6F1FB',  color:'#0C447C',label:'🌊 Ocean Tide'},
+  banner_forest:{bg:'#EAF3DE',  color:'#27500A',label:'🌲 Forest Path'},
+  banner_galaxy:{bg:'#1a1a2e',  color:'#c084fc',label:'🌌 Galaxy Brain'}
+};
+var RING_COLORS={
+  ring_gold:'#EF9F27',ring_purple:'#7F77DD',
+  ring_teal:'#1D9E75',ring_coral:'#D85A30'
+};
+
+function loadPortalCosmetics(){
+  if(!cu||!fsDb())return;
+  var nick=cu.nickname.toLowerCase();
+  fsDb().collection('gc_inventory').doc(nick).get().then(function(snap){
+    if(!snap.exists)return;
+    var inv=snap.data()||{};
+    var equipped=inv.equipped||{};
+    /* Apply banner to header strip */
+    var strip=document.getElementById('cosmetic-banner-strip');
+    if(strip){
+      var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
+      if(bannerKey&&BANNER_STYLES[bannerKey]){
+        var bs=BANNER_STYLES[bannerKey];
+        strip.style.cssText='height:28px;flex-shrink:0;display:flex;align-items:center;padding:0 32px;font-size:11px;font-weight:500;background:'+bs.bg+';color:'+bs.color+';letter-spacing:.3px;';
+        strip.textContent=bs.label;
+      } else {
+        strip.style.display='none';
+      }
+    }
+    /* Apply avatar ring to header avatar if present */
+    var headerAvatar=document.querySelector('.main-brand-header .av-wrap, #header-av-wrap');
+    if(headerAvatar){
+      var ringKey=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&equipped[k];});
+      var existingRing=headerAvatar.querySelector('.portal-av-ring');
+      if(existingRing)existingRing.remove();
+      if(ringKey&&RING_COLORS[ringKey]){
+        var ring=document.createElement('div');
+        ring.className='portal-av-ring';
+        ring.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
+        headerAvatar.appendChild(ring);
+      }
+    }
+  }).catch(function(){});
+}
+
+/* Also apply cosmetics to My Team member cards */
+function applyMemberCosmetics(nick,cardEl){
+  if(!fsDb()||!nick||!cardEl)return;
+  var nickLc=nick.toLowerCase();
+  fsDb().collection('gc_inventory').doc(nickLc).get().then(function(snap){
+    if(!snap.exists)return;
+    var inv=snap.data()||{};
+    var equipped=inv.equipped||{};
+    /* Banner */
+    var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
+    var existingBanner=cardEl.querySelector('.member-cosmetic-banner');
+    if(existingBanner)existingBanner.remove();
+    if(bannerKey&&BANNER_STYLES[bannerKey]){
+      var bs=BANNER_STYLES[bannerKey];
+      var bannerEl=document.createElement('div');
+      bannerEl.className='member-cosmetic-banner';
+      bannerEl.style.cssText='height:22px;border-radius:8px 8px 0 0;background:'+bs.bg+';display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:500;color:'+bs.color+';margin:-12px -12px 8px -12px;';
+      bannerEl.textContent=bs.label;
+      cardEl.insertBefore(bannerEl,cardEl.firstChild);
+    }
+    /* Ring on avatar */
+    var avWrap=cardEl.querySelector('.av-wrap,.member-av-wrap');
+    if(avWrap){
+      var existingRing=avWrap.querySelector('.portal-av-ring');
+      if(existingRing)existingRing.remove();
+      var ringKey=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&equipped[k];});
+      if(ringKey&&RING_COLORS[ringKey]){
+        var ringEl=document.createElement('div');
+        ringEl.className='portal-av-ring';
+        ringEl.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
+        avWrap.style.position='relative';
+        avWrap.appendChild(ringEl);
+      }
+    }
+    /* Name flair */
+    if(equipped.flair){
+      var nameEl=cardEl.querySelector('.member-name,.av-name');
+      if(nameEl&&!nameEl.querySelector('.gc-flair')){
+        var flairSpan=document.createElement('span');
+        flairSpan.className='gc-flair';
+        flairSpan.style.cssText='font-size:12px;margin-left:4px;';
+        flairSpan.textContent='✨';
+        nameEl.appendChild(flairSpan);
+      }
+    }
+  }).catch(function(){});
+}
+
 function statusSubscribe(){
   if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
   window._fsOnSnapshot(window._fsColl(fsDb(),'playerStatus'),function(snap){
@@ -8544,34 +8643,7 @@ function getKBContext(){
 var aiHistory=[];
 var aiOpen=false;
 
-/* ── KOBY IDLE HINTS ── */
-var _kobyIdleTimer=null;
-var _kobyLastActivity=Date.now();
-var KOBY_HINTS=[
-  'On a break? Try typing <strong>games</strong> to open Game Corner 🎮',
-  'Did you know? Type <strong>games</strong> and I\'ll take you to Game Corner! 🐸',
-  'Psst — you can earn credits by uploading contracts and spend them on games 🃏',
-  'Quiet shift? Type <strong>games</strong> — UNO is waiting for you 🃏',
-  'Need a breather? Game Corner has Minesweeper, Chess, UNO and more 🎮',
-  'Fun fact: Sheena once cleared Minesweeper on Hard. Allegedly 💣',
-  'Reminder: KB Quiz is a thing. Knowledge = power = credits 🧠',
-  'Type <strong>games</strong> if you\'re looking for a reason to not do work 🐸',
-];
-var _kobyHintIdx=0;
-function _kobyResetIdleTimer(){
-  _kobyLastActivity=Date.now();
-  clearTimeout(_kobyIdleTimer);
-  _kobyIdleTimer=setTimeout(_kobyDropIdleHint, 4*60*1000); /* 4 min idle */
-}
-function _kobyDropIdleHint(){
-  if(!aiOpen)return; /* only when chat is open */
-  var msgs=G('ai-messages');if(!msgs)return;
-  var hint=KOBY_HINTS[_kobyHintIdx%KOBY_HINTS.length];
-  _kobyHintIdx++;
-  msgs.innerHTML+=aiKobyBubble(hint);
-  msgs.scrollTop=msgs.scrollHeight;
-  _kobyIdleTimer=setTimeout(_kobyDropIdleHint, 5*60*1000); /* next hint in 5 min */
-}
+/* ── KOBY IDLE HINTS — disabled, only initial hint kept ── */
 
 function openAI(){
   aiHistory=[];
@@ -8592,7 +8664,6 @@ function openAI(){
     m.scrollTop=m.scrollHeight;
   },800);
   setTimeout(function(){G('ai-input').focus();},300);
-  _kobyResetIdleTimer();
 }
 
 function aiTimestamp(){
