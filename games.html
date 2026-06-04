@@ -6754,17 +6754,30 @@ function gcRenderBadges(){
       row.id='badge-row-'+item.itemId;
       row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);margin-bottom:8px;';
       var isPending=item.pending;
+      var tier=item.tier||'cosmetic';
+      var isCosmetic=tier==='cosmetic';
+      var isBoost=tier==='boost';
+      var isPremiumPlus=tier==='premium'||tier==='legendary';
+      /* Expiry only for legendary (quarter-limited) */
+      var showExpiry=item.limit==='quarter'||tier==='legendary';
       var left='<div style="display:flex;align-items:center;gap:10px">'
         +'<span style="font-size:22px">'+item.icon+'</span>'
         +'<div>'
         +'<div style="font-size:13px;font-weight:600;color:var(--text)">'+item.name+(isPending?' <span class="badge-pending badge-pill" style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(234,179,8,.15);color:var(--amber);">pending approval</span>':'')+'</div>'
-        +(item.quarter?'<div style="font-size:10px;color:var(--muted)">Expires end of Q · '+gcQuarterEnd()+'</div>':'')
+        +(showExpiry?'<div style="font-size:10px;color:var(--muted)">Expires end of Q · '+gcQuarterEnd()+'</div>':'<div style="font-size:10px;color:var(--muted)">'+(isCosmetic?'Cosmetic · permanent':(isBoost?'Boost · one-time use':'Premium item'))+'</div>')
         +'</div></div>';
       var right='';
-      if(item.useFlow&&!isPending){
-        right='<button class="use-badge-btn" onclick="gcOpenUseModal(\''+item.itemId+'\')">Use badge</button>';
-      } else if(isPending){
+      if(isPending){
         right='<span style="font-size:11px;color:var(--amber)">⏳ pending</span>';
+      } else if(isCosmetic){
+        /* Equip button — no manager approval needed */
+        right='<button class="use-badge-btn" onclick="gcEquipCosmetic(\''+item.itemId+'\')">Equip</button>';
+      } else if(isBoost){
+        /* Activate button — instant, no manager approval */
+        right='<button class="use-badge-btn" onclick="gcActivateBoost(\''+item.itemId+'\')">Activate</button>';
+      } else if(item.useFlow){
+        /* Premium/Legendary — manager approval flow */
+        right='<button class="use-badge-btn" onclick="gcOpenUseModal(\''+item.itemId+'\')">Use badge</button>';
       }
       row.innerHTML=left+right;
       pane.appendChild(row);
@@ -6782,6 +6795,35 @@ function gcRenderBadges(){
       });
     }).catch(function(){});
   }).catch(function(){pane.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;">Could not load badges.</div>';});
+}
+
+/* ── EQUIP COSMETIC (no approval needed) ── */
+function gcEquipCosmetic(itemId){
+  if(!cu||!db)return;
+  var nick=cu.nickname.toLowerCase();
+  var update={};update['equipped.'+itemId]=true;update['equippedAt.'+itemId]=Date.now();
+  db.collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
+    toast('✨ '+itemId.replace(/_/g,' ')+' equipped! Visible on your portal profile.');
+    gcRenderBadges();
+  }).catch(function(e){toast('Error: '+e.message);});
+}
+
+/* ── ACTIVATE BOOST (instant, no approval) ── */
+function gcActivateBoost(itemId){
+  if(!cu||!db)return;
+  var nick=cu.nickname.toLowerCase();
+  var item=SHOP_ITEMS.find(function(i){return i.id===itemId;})||{name:itemId};
+  if(!confirm('Activate '+item.name+'? This will be used immediately.'))return;
+  /* Record activation and set expiry based on boost type */
+  var expiresAt=Date.now()+(itemId==='boost_2x'?24*60*60*1000:7*24*60*60*1000);
+  var upd={};
+  upd[itemId+'.activated']=true;
+  upd[itemId+'.activatedAt']=Date.now();
+  upd[itemId+'.expiresAt']=expiresAt;
+  db.collection('gc_inventory').doc(nick).set(upd,{merge:true}).then(function(){
+    toast('⚡ '+item.name+' activated!');
+    gcRenderBadges();
+  }).catch(function(e){toast('Error: '+e.message);});
 }
 
 /* ── USE BADGE MODAL ── */
