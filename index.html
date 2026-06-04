@@ -4994,56 +4994,72 @@ var RING_COLORS={
 };
 
 function loadPortalCosmetics(){
-  if(!cu||!fsDb())return;
+  if(!cu||!fsDb()||!window._fsGetDoc||!window._fsDoc)return;
   var nick=cu.nickname.toLowerCase();
-  fsDb().collection('gc_inventory').doc(nick).get().then(function(snap){
-    if(!snap.exists)return;
+  window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nick)).then(function(snap){
+    if(!snap.exists())return;
     var inv=snap.data()||{};
     var equipped=inv.equipped||{};
-    /* Apply full header theme for equipped banner */
     var header=document.getElementById('main-brand-header');
+    if(!header)return;
     var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
-    if(header){
-      if(bannerKey&&BANNER_THEMES[bannerKey]){
-        var bt=BANNER_THEMES[bannerKey];
-        header.style.background=bt.bg;
-        header.style.boxShadow='0 2px 20px '+bt.shadow;
-        /* Update text colors */
-        var title=header.querySelector('.main-brand-title');
-        var sub=header.querySelector('.main-brand-sub');
-        var loggedIn=header.querySelector('#main-loggedin');
-        if(title)title.style.color=bt.color;
-        if(sub)sub.style.color='rgba(255,255,255,.6)';
-        if(loggedIn)loggedIn.style.color='rgba(255,255,255,.55)';
-        /* Add pattern overlay div */
-        var existing=header.querySelector('.banner-pattern');
-        if(!existing){var pat=document.createElement('div');pat.className='banner-pattern';pat.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:0;border-radius:inherit;';header.style.position='relative';header.style.overflow='hidden';header.appendChild(pat);}
-        var patEl=header.querySelector('.banner-pattern');
-        if(patEl)patEl.style.background=bt.pattern;
-        /* Push all header children above pattern */
-        Array.from(header.children).forEach(function(c){if(!c.classList.contains('banner-pattern'))c.style.position='relative';c.style.zIndex='1';});
-      } else {
-        /* Remove banner theming */
-        header.style.background='';header.style.boxShadow='';
-        var title=header.querySelector('.main-brand-title');
-        var sub=header.querySelector('.main-brand-sub');
-        var loggedIn=header.querySelector('#main-loggedin');
-        if(title)title.style.color='';if(sub)sub.style.color='';if(loggedIn)loggedIn.style.color='';
-        var pat=header.querySelector('.banner-pattern');if(pat)pat.remove();
-      }
+    if(bannerKey&&BANNER_THEMES[bannerKey]){
+      var bt=BANNER_THEMES[bannerKey];
+      header.style.background=bt.bg;
+      header.style.boxShadow='0 2px 20px '+bt.shadow;
+      var title=header.querySelector('.main-brand-title');
+      var sub=header.querySelector('.main-brand-sub');
+      var loggedIn=document.getElementById('main-loggedin');
+      if(title)title.style.color=bt.color;
+      if(sub){sub.style.color='rgba(255,255,255,.6)';}
+      if(loggedIn)loggedIn.style.color='rgba(255,255,255,.55)';
+    } else {
+      header.style.background='';header.style.boxShadow='';
+      var title=header.querySelector('.main-brand-title');
+      var sub=header.querySelector('.main-brand-sub');
+      var loggedIn=document.getElementById('main-loggedin');
+      if(title)title.style.color='';
+      if(sub)sub.style.color='';
+      if(loggedIn)loggedIn.style.color='';
     }
-    /* Avatar ring on header profile pic if present */
-    var avWrap=document.querySelector('.main-brand-header .av-wrap');
+  }).catch(function(e){console.warn('loadPortalCosmetics:',e);});
+}
+
+function applyMemberCosmetics(nick,cardEl){
+  if(!fsDb()||!nick||!cardEl||!window._fsGetDoc||!window._fsDoc)return;
+  var nickLc=nick.toLowerCase();
+  window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nickLc)).then(function(snap){
+    if(!snap.exists())return;
+    var inv=snap.data()||{};
+    var equipped=inv.equipped||{};
+    /* Banner strip on card */
+    var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
+    var existingBanner=cardEl.querySelector('.member-cosmetic-banner');if(existingBanner)existingBanner.remove();
+    if(bannerKey&&BANNER_THEMES[bannerKey]){
+      var bt=BANNER_THEMES[bannerKey];
+      var bannerEl=document.createElement('div');bannerEl.className='member-cosmetic-banner';
+      bannerEl.style.cssText='height:20px;border-radius:8px 8px 0 0;background:'+bt.bg+';margin:-12px -12px 8px -12px;';
+      cardEl.insertBefore(bannerEl,cardEl.firstChild);
+    }
+    /* Ring on avatar */
+    var avWrap=cardEl.querySelector('.av-wrap,.member-av-wrap');
     if(avWrap){
-      var existingRing=avWrap.querySelector('.portal-av-ring');if(existingRing)existingRing.remove();
+      var exR=avWrap.querySelector('.portal-av-ring');if(exR)exR.remove();
       var ringKey=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&equipped[k];});
       if(ringKey&&RING_COLORS[ringKey]){
-        var ring=document.createElement('div');ring.className='portal-av-ring';
-        ring.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
-        avWrap.style.position='relative';avWrap.appendChild(ring);
+        var ringEl=document.createElement('div');ringEl.className='portal-av-ring';
+        ringEl.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
+        avWrap.style.position='relative';avWrap.appendChild(ringEl);
       }
     }
-  }).catch(function(){});
+    /* Name flair */
+    if(equipped.flair){
+      var nameEl=cardEl.querySelector('.member-name,.av-name');
+      if(nameEl&&!nameEl.querySelector('.gc-flair')){
+        var fl=document.createElement('span');fl.className='gc-flair';fl.style.cssText='font-size:12px;margin-left:4px;';fl.textContent='✨';nameEl.appendChild(fl);
+      }
+    }
+  }).catch(function(e){console.warn('applyMemberCosmetics:',e);});
 }
 
 /* Apply cosmetics to a My Team member card element */
@@ -8726,7 +8742,6 @@ async function sendAIMessage(){
   var input=G('ai-input');
   var text=input.value.trim();
   if(!text)return;
-  _kobyResetIdleTimer();
 
   /* Silent admin test mode toggle */
   if(text.trim()==='112003'){
@@ -8744,15 +8759,6 @@ async function sendAIMessage(){
       msgs.innerHTML+=aiKobyBubble('🎮 Opening Game Corner for you!');
       msgs.scrollTop=msgs.scrollHeight;
     }
-    setTimeout(function(){window.open('https://lounge-project-ae.netlify.app/games','_blank');},300);
-    return;
-  }
-
-  /* ── SHORTCUT: type 'games' (any case) → open Game Corner ── */
-  if(/^games?$/i.test(text.trim())){
-    input.value='';input.style.height='auto';
-    var msgs=G('ai-messages');
-    if(msgs){msgs.innerHTML+=aiKobyBubble('🎮 Opening Game Corner for you!');msgs.scrollTop=msgs.scrollHeight;}
     setTimeout(function(){window.open('https://lounge-project-ae.netlify.app/games','_blank');},300);
     return;
   }
