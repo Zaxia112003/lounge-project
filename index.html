@@ -4966,11 +4966,27 @@ function statusDotHTML(key,size){
 
 var _statusCache={};
 /* ── PORTAL COSMETICS — reads gc_inventory and applies banner/ring/flair ── */
-var BANNER_STYLES={
-  banner_sunset:{bg:'#FAC77522',color:'#633806',label:'🌅 Sunset Dreamer'},
-  banner_ocean: {bg:'#E6F1FB',  color:'#0C447C',label:'🌊 Ocean Tide'},
-  banner_forest:{bg:'#EAF3DE',  color:'#27500A',label:'🌲 Forest Path'},
-  banner_galaxy:{bg:'#1a1a2e',  color:'#c084fc',label:'🌌 Galaxy Brain'}
+var BANNER_THEMES={
+  banner_sunset:{
+    bg:'linear-gradient(135deg,#7c3626 0%,#c0622a 35%,#e8943a 65%,#f5c842 100%)',
+    color:'#fff5e6',shadow:'rgba(192,98,42,0.4)',
+    pattern:'radial-gradient(ellipse at 30% 50%,rgba(245,200,66,.15) 0%,transparent 60%)'
+  },
+  banner_ocean:{
+    bg:'linear-gradient(135deg,#0a2a4a 0%,#0e4d7a 40%,#1a7bb5 70%,#2eafd4 100%)',
+    color:'#e0f4ff',shadow:'rgba(14,77,122,0.5)',
+    pattern:'radial-gradient(ellipse at 70% 30%,rgba(46,175,212,.2) 0%,transparent 55%)'
+  },
+  banner_forest:{
+    bg:'linear-gradient(135deg,#0d2b0e 0%,#1a5c1e 40%,#2d8a33 70%,#52b84a 100%)',
+    color:'#e8ffe5',shadow:'rgba(26,92,30,0.5)',
+    pattern:'radial-gradient(ellipse at 50% 80%,rgba(82,184,74,.18) 0%,transparent 55%)'
+  },
+  banner_galaxy:{
+    bg:'linear-gradient(135deg,#05020f 0%,#120a2e 30%,#1e0d4a 55%,#4a1a7a 75%,#7c3bbf 90%,#b06ce0 100%)',
+    color:'#e8d5ff',shadow:'rgba(76,26,120,0.6)',
+    pattern:'radial-gradient(ellipse at 60% 40%,rgba(176,108,224,.25) 0%,transparent 50%),radial-gradient(ellipse at 20% 70%,rgba(100,50,180,.2) 0%,transparent 40%)'
+  }
 };
 var RING_COLORS={
   ring_gold:'#EF9F27',ring_purple:'#7F77DD',
@@ -4984,35 +5000,53 @@ function loadPortalCosmetics(){
     if(!snap.exists)return;
     var inv=snap.data()||{};
     var equipped=inv.equipped||{};
-    /* Apply banner to header strip */
-    var strip=document.getElementById('cosmetic-banner-strip');
-    if(strip){
-      var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
-      if(bannerKey&&BANNER_STYLES[bannerKey]){
-        var bs=BANNER_STYLES[bannerKey];
-        strip.style.cssText='height:28px;flex-shrink:0;display:flex;align-items:center;padding:0 32px;font-size:11px;font-weight:500;background:'+bs.bg+';color:'+bs.color+';letter-spacing:.3px;';
-        strip.textContent=bs.label;
+    /* Apply full header theme for equipped banner */
+    var header=document.getElementById('main-brand-header');
+    var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
+    if(header){
+      if(bannerKey&&BANNER_THEMES[bannerKey]){
+        var bt=BANNER_THEMES[bannerKey];
+        header.style.background=bt.bg;
+        header.style.boxShadow='0 2px 20px '+bt.shadow;
+        /* Update text colors */
+        var title=header.querySelector('.main-brand-title');
+        var sub=header.querySelector('.main-brand-sub');
+        var loggedIn=header.querySelector('#main-loggedin');
+        if(title)title.style.color=bt.color;
+        if(sub)sub.style.color='rgba(255,255,255,.6)';
+        if(loggedIn)loggedIn.style.color='rgba(255,255,255,.55)';
+        /* Add pattern overlay div */
+        var existing=header.querySelector('.banner-pattern');
+        if(!existing){var pat=document.createElement('div');pat.className='banner-pattern';pat.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:0;border-radius:inherit;';header.style.position='relative';header.style.overflow='hidden';header.appendChild(pat);}
+        var patEl=header.querySelector('.banner-pattern');
+        if(patEl)patEl.style.background=bt.pattern;
+        /* Push all header children above pattern */
+        Array.from(header.children).forEach(function(c){if(!c.classList.contains('banner-pattern'))c.style.position='relative';c.style.zIndex='1';});
       } else {
-        strip.style.display='none';
+        /* Remove banner theming */
+        header.style.background='';header.style.boxShadow='';
+        var title=header.querySelector('.main-brand-title');
+        var sub=header.querySelector('.main-brand-sub');
+        var loggedIn=header.querySelector('#main-loggedin');
+        if(title)title.style.color='';if(sub)sub.style.color='';if(loggedIn)loggedIn.style.color='';
+        var pat=header.querySelector('.banner-pattern');if(pat)pat.remove();
       }
     }
-    /* Apply avatar ring to header avatar if present */
-    var headerAvatar=document.querySelector('.main-brand-header .av-wrap, #header-av-wrap');
-    if(headerAvatar){
+    /* Avatar ring on header profile pic if present */
+    var avWrap=document.querySelector('.main-brand-header .av-wrap');
+    if(avWrap){
+      var existingRing=avWrap.querySelector('.portal-av-ring');if(existingRing)existingRing.remove();
       var ringKey=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&equipped[k];});
-      var existingRing=headerAvatar.querySelector('.portal-av-ring');
-      if(existingRing)existingRing.remove();
       if(ringKey&&RING_COLORS[ringKey]){
-        var ring=document.createElement('div');
-        ring.className='portal-av-ring';
+        var ring=document.createElement('div');ring.className='portal-av-ring';
         ring.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
-        headerAvatar.appendChild(ring);
+        avWrap.style.position='relative';avWrap.appendChild(ring);
       }
     }
   }).catch(function(){});
 }
 
-/* Also apply cosmetics to My Team member cards */
+/* Apply cosmetics to a My Team member card element */
 function applyMemberCosmetics(nick,cardEl){
   if(!fsDb()||!nick||!cardEl)return;
   var nickLc=nick.toLowerCase();
@@ -5020,41 +5054,31 @@ function applyMemberCosmetics(nick,cardEl){
     if(!snap.exists)return;
     var inv=snap.data()||{};
     var equipped=inv.equipped||{};
-    /* Banner */
+    /* Banner strip on card */
     var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
-    var existingBanner=cardEl.querySelector('.member-cosmetic-banner');
-    if(existingBanner)existingBanner.remove();
-    if(bannerKey&&BANNER_STYLES[bannerKey]){
-      var bs=BANNER_STYLES[bannerKey];
-      var bannerEl=document.createElement('div');
-      bannerEl.className='member-cosmetic-banner';
-      bannerEl.style.cssText='height:22px;border-radius:8px 8px 0 0;background:'+bs.bg+';display:flex;align-items:center;padding:0 10px;font-size:10px;font-weight:500;color:'+bs.color+';margin:-12px -12px 8px -12px;';
-      bannerEl.textContent=bs.label;
+    var existingBanner=cardEl.querySelector('.member-cosmetic-banner');if(existingBanner)existingBanner.remove();
+    if(bannerKey&&BANNER_THEMES[bannerKey]){
+      var bt=BANNER_THEMES[bannerKey];
+      var bannerEl=document.createElement('div');bannerEl.className='member-cosmetic-banner';
+      bannerEl.style.cssText='height:20px;border-radius:8px 8px 0 0;background:'+bt.bg+';margin:-12px -12px 8px -12px;';
       cardEl.insertBefore(bannerEl,cardEl.firstChild);
     }
-    /* Ring on avatar */
+    /* Ring */
     var avWrap=cardEl.querySelector('.av-wrap,.member-av-wrap');
     if(avWrap){
-      var existingRing=avWrap.querySelector('.portal-av-ring');
-      if(existingRing)existingRing.remove();
+      var exR=avWrap.querySelector('.portal-av-ring');if(exR)exR.remove();
       var ringKey=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&equipped[k];});
       if(ringKey&&RING_COLORS[ringKey]){
-        var ringEl=document.createElement('div');
-        ringEl.className='portal-av-ring';
+        var ringEl=document.createElement('div');ringEl.className='portal-av-ring';
         ringEl.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
-        avWrap.style.position='relative';
-        avWrap.appendChild(ringEl);
+        avWrap.style.position='relative';avWrap.appendChild(ringEl);
       }
     }
-    /* Name flair */
+    /* Flair */
     if(equipped.flair){
       var nameEl=cardEl.querySelector('.member-name,.av-name');
       if(nameEl&&!nameEl.querySelector('.gc-flair')){
-        var flairSpan=document.createElement('span');
-        flairSpan.className='gc-flair';
-        flairSpan.style.cssText='font-size:12px;margin-left:4px;';
-        flairSpan.textContent='✨';
-        nameEl.appendChild(flairSpan);
+        var fl=document.createElement('span');fl.className='gc-flair';fl.style.cssText='font-size:12px;margin-left:4px;';fl.textContent='✨';nameEl.appendChild(fl);
       }
     }
   }).catch(function(){});

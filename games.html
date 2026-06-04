@@ -6771,8 +6771,10 @@ function gcRenderBadges(){
       if(isPending){
         right='<span style="font-size:11px;color:var(--amber)">⏳ pending</span>';
       } else if(isCosmetic){
-        /* Equip button — check if already equipped */
-        var isEquipped=invEquipped[item.itemId];
+        var isEquipped=!!(invEquipped&&invEquipped[item.itemId]);
+        right=isEquipped
+          ?'<span style="font-size:11px;font-weight:600;color:var(--green);padding:4px 10px;border-radius:8px;border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.08);">Equipped ✓</span>'
+          :'<button class="use-badge-btn" onclick="gcEquipCosmetic(\''+item.itemId+'\')">’Equip</button>';
         right='<button class="use-badge-btn" '+(isEquipped?'style="border-color:var(--green);color:var(--green);background:rgba(34,197,94,.1);" disabled':'onclick="gcEquipCosmetic(\''+item.itemId+'\')"')+'>'+(isEquipped?'Equipped ✓':'Equip')+'</button>';
       } else if(isBoost){
         /* Activate button — instant, no manager approval */
@@ -6806,7 +6808,8 @@ function gcEquipCosmetic(itemId){
   var update={};update['equipped.'+itemId]=true;update['equippedAt.'+itemId]=Date.now();
   db.collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
     toast('✨ '+itemId.replace(/_/g,' ')+' equipped! Visible on your portal profile.');
-    gcRenderBadges();
+    /* Small delay so Firestore propagates before re-fetch */
+    setTimeout(function(){gcRenderBadges();},500);
   }).catch(function(e){toast('Error: '+e.message);});
 }
 
