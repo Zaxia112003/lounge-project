@@ -1644,6 +1644,19 @@ async function fsLoadAll(){
       var annSeenSnap=await window._fsGetDocs(window._fsColl(fsDb(),'ann_seen'));
       window._annSeenCache={};
       annSeenSnap.forEach(function(d){window._annSeenCache[d.id]=d.data().seenBy||[];});
+      /* Populate annSeenIds for the current user so bell is accurate immediately */
+      if(cu){
+        Object.keys(window._annSeenCache).forEach(function(fsDocId){
+          if((window._annSeenCache[fsDocId]||[]).indexOf(cu.nickname)>-1){
+            /* Add the Firestore doc id */
+            annSeenIds.add(fsDocId);
+            /* Also add the numeric a.id so annUnreadCount() checks match */
+            var match=mdAnnouncements.find(function(a){return a._fsId===fsDocId||String(a.id)===fsDocId;});
+            if(match){annSeenIds.add(match.id);}
+          }
+        });
+        if(typeof annUpdateBadge==='function')annUpdateBadge();
+      }
     }catch(e){}
     var tmplSnap=await window._fsGetDocs(window._fsColl(fsDb(),'TEMPLATES'));
     tmplSnap.forEach(function(d){
@@ -1948,6 +1961,12 @@ var TEAM_DIR={
 /* Award history: [{nick, award, label, date}] — auto-populated when awards are saved */
 var awardHistory=[];
 var annSeenIds=new Set();
+function annIsSeen(a){
+  /* Check both numeric a.id and Firestore _fsId since both forms are used */
+  return annSeenIds.has(a.id)||annSeenIds.has(a._fsId)||
+         (a._fsId&&annSeenIds.has(String(a._fsId)))||
+         (a.id!==undefined&&annSeenIds.has(String(a.id)));
+}
 let qpCustomRange={from:'',to:''};
 var tabNotifs={perf:0,quality:0,cal:0};
 
@@ -2560,10 +2579,11 @@ function updateNotifBell(){
   var errCount=(window._pendingReviews||[]).filter(function(r){return r.status==='pending_review'||r.status==='acknowledged';}).length;
   var photoCount=(window.pwPending||[]).length;
   var faqCount=(ChatDB&&ChatDB.getThreads?ChatDB.getThreads().filter(function(t){return t.kbStatus==='pending'&&t.archived!==true;}).length:0);
-  var total=errCount+photoCount+faqCount;
+  var annCount=cu?mdAnnouncements.filter(function(a){return !annIsSeen(a);}).length:0;
+  var total=errCount+photoCount+faqCount+annCount;
   var wrap=G('notif-bell-wrap');
   var badge=G('notif-bell-badge');
-  if(wrap)wrap.style.display=(cu&&cu.role==='manager'&&total>0)?'block':'none';
+  if(wrap)wrap.style.display=(cu&&cu.role==='manager'&&total>0)?'flex':'none';
   if(badge){badge.textContent=total;badge.style.display=total>0?'flex':'none';}
 }
 function openNotifBell(){
@@ -2572,6 +2592,19 @@ function openNotifBell(){
   var photoPending=window.pwPending||[];
   var list=G('review-list');if(!list)return;
   var html='';
+  /* Unread announcements — shown for all roles */
+  var unreadAnns=mdAnnouncements.filter(function(a){return !annIsSeen(a);}).sort(function(a,b){return b.postedAt-a.postedAt;});
+  if(unreadAnns.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">&#128226; Announcements ('+unreadAnns.length+')</div>';
+    html+=unreadAnns.map(function(a){
+      var annId=a._fsId||String(a.id);
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px" onclick="G(\'modal-reviews\').classList.remove(\'open\');viewAnn(\''+(a._fsId||a.id)+'\')">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+a.title+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+a.author+' &middot; '+timeAgo(new Date(a.postedAt).toISOString())+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(247,43,110,.1);color:#f72b6e;padding:2px 8px;border-radius:8px;flex-shrink:0">New</span>'
+        +'</div>';
+    }).join('');
+  }
   if(errPending.length){
     html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">Error Reviews ('+errPending.length+')</div>';
     window._reviewListCache=errPending;
@@ -2815,16 +2848,18 @@ async function loadPendingReviews(){
 
 function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
-  /* Bell shows for: Pending (not yet seen/acked) OR Completed-unread (manager finished) */
+  /* Bell shows for: Pending callouts + unread announcements */
   var myCallouts=callouts.filter(function(co){
     var isMyError=co.uploader===cu.nickname&&co.status==='Pending'&&co.status!=='discarded';
     var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname&&co.status==='Pending';
     return isMyError||isMyEsc;
   });
+  var annCount=mdAnnouncements.filter(function(a){return !annIsSeen(a);}).length;
+  var total=myCallouts.length+annCount;
   var wrap=G('member-bell-wrap');
   var badge=G('member-bell-badge');
-  if(wrap)wrap.style.display=myCallouts.length>0?'block':'none';
-  if(badge){badge.textContent=myCallouts.length;badge.style.display=myCallouts.length>0?'flex':'none';}
+  if(wrap)wrap.style.display=total>0?'flex':'none';
+  if(badge){badge.textContent=total;badge.style.display=total>0?'flex':'none';}
 }
 function memberBellClick(){
   /* Open uploader notification panel */
@@ -2840,6 +2875,18 @@ function openMemberBellPanel(){
   });
   var list=G('member-notif-list');if(!list)return;
   var html='';
+  /* Unread announcements at the top */
+  var unreadAnns=mdAnnouncements.filter(function(a){return !annIsSeen(a);}).sort(function(a,b){return b.postedAt-a.postedAt;});
+  if(unreadAnns.length){
+    html+='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">&#128226; Announcements ('+unreadAnns.length+')</div>';
+    html+=unreadAnns.map(function(a){
+      return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px" onclick="closeMemberNotif();viewAnn(\''+(a._fsId||a.id)+'\')">'
+        +'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+a.title+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+a.author+' &middot; '+timeAgo(new Date(a.postedAt).toISOString())+'</div></div>'
+        +'<span style="font-size:10px;background:rgba(247,43,110,.1);color:#f72b6e;padding:2px 8px;border-radius:8px;flex-shrink:0">New</span>'
+        +'</div>';
+    }).join('');
+  }
   var pending=myCallouts.filter(function(co){return co.status==='Pending';});
   var completed=myCallouts.filter(function(co){return co.status==='Completed';});
   if(pending.length){
@@ -3905,7 +3952,7 @@ function renderMyDay(){
     +'<div class="sect ann-board">'
     +'<div class="sect-head">'
     +'<div style="display:flex;align-items:center;gap:8px"><span class="sect-title">&#128226; Announcements</span>'
-    +'<span class="ann-unread-badge" id="ann-unread-badge"></span></div>'
+    +'</div>'
     +(isManager?'<button class="btn btn-outline btn-sm" onclick="openAddArticleModal(\'ann\')" style="font-size:11px">+ Post</button>':'')
     +'</div>'
     +'<div class="ann-list" id="ann-list"></div>'
@@ -3969,7 +4016,7 @@ function renderMyDay(){
 
 /* ── ANNOUNCEMENTS ── */
 function annUnreadCount(){
-  return mdAnnouncements.filter(function(a){return !annSeenIds.has(a.id);}).length;
+  return mdAnnouncements.filter(function(a){return !annIsSeen(a);}).length;
 }
 function annMarkAllSeen(){
   mdAnnouncements.forEach(function(a){annSeenIds.add(a.id);});
@@ -3977,11 +4024,9 @@ function annMarkAllSeen(){
   if(badge){badge.textContent='';badge.classList.remove('show');}
 }
 function annUpdateBadge(){
-  var cnt=annUnreadCount();
-  var badge=G('ann-unread-badge');
-  if(!badge)return;
-  if(cnt>0){badge.textContent=cnt+' new';badge.classList.add('show');}
-  else{badge.textContent='';badge.classList.remove('show');}
+  /* Badge moved to notification bell — update both bells instead */
+  if(typeof updateNotifBell==='function')updateNotifBell();
+  if(typeof updateMemberBell==='function')updateMemberBell();
 }
 function deleteAnnouncement(fsId){
   if(!confirm('Remove this announcement?'))return;
@@ -6009,8 +6054,8 @@ function renderAnnouncements(){
     return tmp.textContent||tmp.innerText||'';
   }
   var cards=sorted.map(function(a){
-    var unseen=!annSeenIds.has(a.id);
-    var dot=unseen?'<span class="ann-new-dot"></span>':'';
+    var unseen=!annIsSeen(a);
+    var dot='';
     var plainBody=stripHtml(a.body||'');
     var preview=plainBody.length>PREVIEW_LEN
       ?plainBody.slice(0,PREVIEW_LEN)+'...'
@@ -6210,8 +6255,8 @@ function renderSpaceAnn(){
     return;
   }
   el.innerHTML=sorted.map(function(a){
-    var unseen=!annSeenIds.has(a.id);
-    var dot=unseen?'<span class="ann-new-dot"></span>':'';
+    var unseen=!annIsSeen(a);
+    var dot='';
     return '<div class="space-ann-card" data-id="'+a.id+'" onclick="viewAnn('+a.id+')">'
       +'<div class="space-ann-card-title">'+(cu&&cu.role==="manager"?"<button data-artid='"+a.id+"' onclick=\"event.stopPropagation();deleteArticle(this.dataset.artid)\" style=\"float:right;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:2px 4px\" title=\"Delete\">&#128465;</button>":"")+dot+a.title+'</div>'
       +'<div class="space-ann-card-preview">'+a.body+'</div>'
@@ -6226,6 +6271,9 @@ function viewAnn(id){
   if(!a&&window.KB_ARTICLES)a=(KB_ARTICLES||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
   if(!a&&window.mdArticles)a=(mdArticles||[]).find(function(x){return String(x.id)===rawId||String(x.id)===String(id);});
   if(!a)return;
+  /* Add both numeric id and _fsId to annSeenIds so checks always match */
+  annSeenIds.add(a.id);
+  if(a._fsId)annSeenIds.add(a._fsId);
   annSeenIds.add(id);
   if(fsDb()&&cu&&a._fsId){
     var seenRef=window._fsDoc(fsDb(),'ann_seen',a._fsId);
