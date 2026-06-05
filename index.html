@@ -2224,6 +2224,11 @@ function buildSidebar(){
 function switchPanel(id,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
+  /* For icon buttons in sb-settings-nav, manage a highlight style */
+  var gBtn=G('sb-games-btn');
+  if(gBtn&&gBtn.classList.contains('sb-icon-btn')){
+    gBtn.style.background=id==='games'?'rgba(139,45,255,.18)':'';
+  }
   document.querySelectorAll('.dash-panel').forEach(p=>p.classList.remove('active'));
   const panel=G(id+'-panel');if(panel)panel.classList.add('active');
   if(id==='the-lounge')renderLounge();
@@ -2231,6 +2236,7 @@ function switchPanel(id,btn){
   if(id==='overview')renderTeamOverview();
   if(id==='callouts'||id==='quality-portal')renderQualityPortal();
   if(id==='attendance')renderAttendance();
+  if(id==='games')renderGamesTab();
 }
 
 
@@ -8888,6 +8894,30 @@ async function sendAIMessage(){
     return;
   }
 
+  /* ── SHORTCUT: "game on" → inject Games tab into sidebar ── */
+  if(/^game\s+on$/i.test(text.trim())){
+    input.value='';input.style.height='auto';
+    var msgs=G('ai-messages');
+    injectGamesTab();
+    if(msgs){
+      msgs.innerHTML+=aiKobyBubble('🎮 Game mode activated! Check the sidebar — the Games tab is now unlocked for you.');
+      msgs.scrollTop=msgs.scrollHeight;
+    }
+    return;
+  }
+
+  /* ── SHORTCUT: "game off" → remove Games tab from sidebar ── */
+  if(/^game\s+off$/i.test(text.trim())){
+    input.value='';input.style.height='auto';
+    var msgs=G('ai-messages');
+    removeGamesTab();
+    if(msgs){
+      msgs.innerHTML+=aiKobyBubble('🎮 Game mode off. The Games tab has been removed from the sidebar.');
+      msgs.scrollTop=msgs.scrollHeight;
+    }
+    return;
+  }
+
   /* KC/Quiz topic guard — detect copy-pasted quiz questions */
   var hasOptions=/\b[A-D]\.\s/.test(text);
   var hasKCTerms=/what do you do|flag to escalation|do not upload|vendor nature|section 32|S32|equivalent agenc|AKA address|uploader.*contract|submission shows/i.test(text);
@@ -12619,5 +12649,108 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="game-modal-body" id="game-modal-body"></div>
   </div>
 </div>
+<!-- GAMES TAB PANEL -->
+<div class="dash-panel" id="games-panel">
+  <div class="panel-header">
+    <div class="panel-title">🎮 Games</div>
+    <div class="panel-sub">Unlocked via Koby · Type <strong>game off</strong> in Koby to hide this tab</div>
+  </div>
+  <div id="games-tab-body"></div>
+</div>
+
+<script>
+function injectGamesTab(){
+  /* Idempotent — do nothing if already injected */
+  if(G('sb-games-btn'))return;
+  var isManager=cu&&cu.role==='manager';
+  var isEsc=cu&&cu.role==='escalation';
+  if(isManager||isEsc){
+    /* Manager/Escalation: sidebar is icon-only — inject into .sb-settings-nav like other icon buttons */
+    var settingsNav=document.querySelector('.sb-settings-nav');
+    var btn=document.createElement('div');
+    btn.id='sb-games-btn';
+    btn.className='sb-icon-btn';
+    btn.title='Games';
+    btn.style.cssText='width:36px;height:36px;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    btn.textContent='🎮';
+    btn.onclick=function(){switchPanel('games',btn);};
+    /* Insert before Koby button so it sits above it */
+    var kobyRef=G('sb-koby-btn');
+    if(settingsNav&&kobyRef)settingsNav.insertBefore(btn,kobyRef);
+    else if(settingsNav)settingsNav.appendChild(btn);
+  } else {
+    /* Uploader: nav-items is visible — append as a standard nav-item */
+    var nav=G('nav-items');
+    var btn=document.createElement('button');
+    btn.id='sb-games-btn';
+    btn.className='nav-item';
+    btn.dataset.panel='games';
+    btn.innerHTML='<span class="nav-icon">🎮</span><span>Games</span>';
+    btn.onclick=function(){switchPanel('games',btn);};
+    if(nav)nav.appendChild(btn);
+  }
+  /* Ensure panel exists in main content — append if missing */
+  var mc=G('main-content');
+  var panel=G('games-panel');
+  if(mc&&panel&&!mc.contains(panel))mc.appendChild(panel);
+  /* Persist unlocked state for this session */
+  try{localStorage.setItem('lounge_games_tab','1');}catch(e){}
+}
+
+function removeGamesTab(){
+  var btn=G('sb-games-btn');
+  if(btn)btn.remove();
+  /* If games panel is active, switch to lounge */
+  var panel=G('games-panel');
+  if(panel&&panel.classList.contains('active')){
+    panel.classList.remove('active');
+    var lounge=G('the-lounge-panel');
+    if(lounge)lounge.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  }
+  try{localStorage.removeItem('lounge_games_tab');}catch(e){}
+}
+
+function renderGamesTab(){
+  var el=G('games-tab-body');if(!el)return;
+  var cards=GAMES.map(function(g){
+    return '<div class="game-hover-card" onclick="openGameCorner()" style="'
+      +'display:flex;align-items:center;gap:14px;padding:14px 16px;'
+      +'border:1px solid var(--border);border-radius:12px;cursor:pointer;'
+      +'background:var(--bg2);transition:border-color .15s;margin-bottom:10px">'
+      +'<div style="font-size:28px;flex-shrink:0">'+g.emoji+'</div>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-family:var(--font-d);font-size:13px;font-weight:700;color:var(--text)">'+g.label+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+g.desc+'</div>'
+      +'</div>'
+      +'<span style="font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;'
+      +'padding:2px 8px;border-radius:4px;background:rgba(139,45,255,.12);color:var(--accent)">'
+      +(g.type==='multi'?'Multiplayer':'Solo')+'</span>'
+      +'</div>';
+  }).join('');
+  el.innerHTML='<div style="max-width:560px">'
+    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px">Available Games</div>'
+    +cards
+    +'<div style="margin-top:18px;padding:12px 14px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);font-size:11px;color:var(--muted);line-height:1.7">'
+    +'🐸 All games open in the Game Corner. Type <strong style="color:var(--text)">game off</strong> in Koby to hide this tab.'
+    +'</div></div>';
+}
+
+/* Restore Games tab on session restore if it was previously unlocked */
+(function(){
+  try{
+    if(localStorage.getItem('lounge_games_tab')==='1'){
+      /* Wait until dash is ready before injecting */
+      var _waitForDash=setInterval(function(){
+        if(G('nav-items')&&G('main-content')){
+          clearInterval(_waitForDash);
+          injectGamesTab();
+        }
+      },300);
+    }
+  }catch(e){}
+})();
+</script>
+
 </body>
 </html>
