@@ -1137,7 +1137,7 @@ window.dispatchEvent(new Event('firebase-ready'));
       <img class="brand-photo" id="bl-photo" src="" alt=""/>
     </div>
     <div class="brand-name">The Lounge Project</div>
-    <div class="brand-sub">v.49ae</div>
+    <div class="brand-sub">v.50ae</div>
   </div>
   <div class="scr active" id="scr-login">
     <div class="stitle">Welcome Back</div>
@@ -1214,7 +1214,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="main-brand-header" id="main-brand-header">
       <div>
         <div class="main-brand-title" onclick="goLounge()" style="cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">The Lounge Project</div>
-        <div class="main-brand-sub" style="color:var(--accent)">v.49ae</div>
+        <div class="main-brand-sub" style="color:var(--accent)">v.50ae</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-left:auto">
         <span id="main-loggedin" style="font-size:11px;color:var(--muted);font-family:var(--font-d)"></span>
@@ -10321,6 +10321,8 @@ async function submitQScoreFromOverlay(){
   }
   /* Notify manager — now calloutFsId will be set */
   sendManagerReviewNotif(newCo);
+  var uplName=(uplMem&&uplMem.fullName)||upl;
+  pushNotif('📋','Contract error logged for '+uplName+': "'+addr+'". Pending manager review.','qscore');
   renderQualityPortal();
   closeDailyLog();
 }
