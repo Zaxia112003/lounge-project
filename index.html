@@ -1193,6 +1193,8 @@ window.dispatchEvent(new Event('firebase-ready'));
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
 
+      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none;font-size:18px;align-items:center;justify-content:center;">🐸</div>
+
       <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
         <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
           <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -2064,7 +2066,6 @@ function handleLogin(){
 
 function goDash(){
   G('pg-login').classList.remove('active');
-  var kfab=G('koby-fab');if(kfab)kfab.style.display='flex';
   G('pg-dash').classList.add('active');
   /* Load persisted theme + accent per user — localStorage first (instant), Firestore as source of truth */
   try{
@@ -2169,9 +2170,12 @@ function buildSidebar(){
     dlBtn.style.cssText='width:36px;height:36px;';
     dlBtn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     dlBtn.onclick=function(){openDailyLog();};
+    var kobyRef=G('sb-koby-btn');
     var bellRef=G('notif-bell-wrap')||G('member-bell-wrap');
-    if(settingsNav&&bellRef)settingsNav.insertBefore(dlBtn,bellRef);
+    var insertRef=kobyRef||bellRef;
+    if(settingsNav&&insertRef)settingsNav.insertBefore(dlBtn,insertRef);
     else if(settingsNav)settingsNav.appendChild(dlBtn);
+    if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
   } else if(role==='manager'){
     var mwBtn=document.createElement('button');
@@ -2181,11 +2185,16 @@ function buildSidebar(){
     mwBtn.style.cssText='width:36px;height:36px;';
     mwBtn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     mwBtn.onclick=function(){openMgrWrite();};
+    var kobyRef=G('sb-koby-btn');
     var bellRef=G('notif-bell-wrap')||G('member-bell-wrap');
-    if(settingsNav&&bellRef)settingsNav.insertBefore(mwBtn,bellRef);
+    var insertRef=kobyRef||bellRef;
+    if(settingsNav&&insertRef)settingsNav.insertBefore(mwBtn,insertRef);
     else if(settingsNav)settingsNav.appendChild(mwBtn);
+    if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
   } else {
+    var kobyRef=G('sb-koby-btn');
+    if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='';
   }
 
@@ -2203,8 +2212,6 @@ function switchPanel(id,btn){
   if(id==='overview')renderTeamOverview();
   if(id==='callouts'||id==='quality-portal')renderQualityPortal();
   if(id==='attendance')renderAttendance();
-  /* Keep Koby fab visible on all panel switches */
-  var kfab=G('koby-fab');if(kfab&&kfab.style.display==='none'&&!window._aiOpen)kfab.style.display='flex';
 }
 
 
@@ -8756,8 +8763,10 @@ function openAI(){
   var overlay=G('ai-overlay');
   if(!panel)return;
   panel.classList.add('open');
+  if(overlay)overlay.classList.add('open');
   aiOpen=true;
-  var fab=G('koby-fab');if(fab)fab.style.display='none';
+  /* Highlight sidebar koby button while panel is open */
+  var sbKoby=G('sb-koby-btn');if(sbKoby)sbKoby.style.background='rgba(18,140,126,.35)';
   var msgs=G('ai-messages');
   msgs.innerHTML='';
   msgs.innerHTML+=aiKobyBubble('Hey! Ask me anything about contracts, vendors, addresses, or escalation procedures. Fair warning: I might sneak in a pun. 🐸');
@@ -8798,10 +8807,12 @@ function closeAI(){
   var overlay=G('ai-overlay');
   if(!panel)return;
   panel.classList.remove('open');
+  if(overlay)overlay.classList.remove('open');
   aiOpen=false;
   aiHistory=[];
   clearTimeout(_kobyIdleTimer);
-  var fab=G('koby-fab');if(fab)fab.style.display='flex';
+  /* Reset sidebar koby button highlight */
+  var sbKoby=G('sb-koby-btn');if(sbKoby)sbKoby.style.background='';
 }
 
 async function sendAIMessage(){
@@ -11740,6 +11751,26 @@ document.addEventListener('DOMContentLoaded',function(){
     var globalTheme=localStorage.getItem('lounge_theme_default')||'whatsapp';
     setTheme(globalTheme,null);
   }catch(e){setTheme('whatsapp',null);}
+  /* Restore session on refresh — reads lounge_nick saved at login */
+  try{
+    var _sn=localStorage.getItem('lounge_nick');
+    var _sf=localStorage.getItem('lounge_full');
+    var _sr=localStorage.getItem('lounge_role');
+    if(_sn&&_sf&&_sr&&TEAM_DIR[_sn]){
+      cu={nickname:_sn,fullName:_sf,role:_sr,firstLogin:false};
+      var _doRestore=function(){
+        fsLoadAll().then(function(){
+          fsStartRealtimeListeners();
+          goDash();
+        }).catch(function(){
+          fsStartRealtimeListeners();
+          goDash();
+        });
+      };
+      if(window._fsReady){_doRestore();}
+      else{window.addEventListener('firebase-ready',_doRestore,{once:true});}
+    }
+  }catch(e){}
   document.addEventListener('keydown',function(e){
     var tag=document.activeElement?document.activeElement.tagName:'';
     var inInput=tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(document.activeElement&&document.activeElement.isContentEditable);
@@ -12289,7 +12320,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- AI ASSISTANT OVERLAY -->
 <!-- KOBY FAB -->
-<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby" style="display:none;font-size:26px;background:#128C7E">🐸</button>
+<button class="koby-fab" id="koby-fab" onclick="openAI()" title="Ask Koby" style="display:none;font-size:26px;background:#128C7E;pointer-events:none;opacity:0">🐸</button>
 
 <div class="ai-overlay" id="ai-overlay" onclick="closeAI()"></div>
 
