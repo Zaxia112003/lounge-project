@@ -771,7 +771,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .game-tile:hover{border-color:var(--accent);transform:translateY(-2px);}
 .game-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
 .game-tile-icon{font-size:24px;margin-bottom:6px;}
-.game-tile-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.game-tile-name{font-size:12px;font-weight:700;color:#ffffff;margin-bottom:2px;}
 .game-tile-desc{font-size:10px;color:var(--muted);margin-bottom:8px;}
 .game-tile-scores{border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;min-height:32px;}
 .game-tile-score-row{display:flex;align-items:center;gap:5px;font-size:10px;}
@@ -1073,6 +1073,64 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .qual-err-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;}
 .qual-err-count{margin-left:auto;font-weight:700;color:var(--text);}
 .qual-trend{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid rgba(255,255,255,.04);font-size:11px;color:var(--muted);}
+
+/* ══ TEXTURE PACK PALETTE OVERRIDES ══ */
+body.tp-dark-forest{
+  --tp-sidebar-bg:#1a2520;
+  --tp-sidebar-border:rgba(90,125,106,0.18);
+  --tp-icon-bg:rgba(58,82,69,0.6);
+  --tp-icon-active:rgba(90,125,106,0.85);
+  --tp-content-tint:rgba(200,212,206,0.06);
+  --tp-accent-tint:rgba(74,112,96,0.15);
+  --tp-accent-color:#5a7d6a;
+}
+body.tp-galaxy{
+  --tp-sidebar-bg:#1a1530;
+  --tp-sidebar-border:rgba(107,91,171,0.18);
+  --tp-icon-bg:rgba(53,45,96,0.6);
+  --tp-icon-active:rgba(107,91,171,0.85);
+  --tp-content-tint:rgba(221,216,245,0.05);
+  --tp-accent-tint:rgba(107,91,171,0.15);
+  --tp-accent-color:#8b75d7;
+}
+body.tp-sunset{
+  --tp-sidebar-bg:#261518;
+  --tp-sidebar-border:rgba(192,97,106,0.18);
+  --tp-icon-bg:rgba(92,48,53,0.6);
+  --tp-icon-active:rgba(192,97,106,0.85);
+  --tp-content-tint:rgba(245,212,214,0.05);
+  --tp-accent-tint:rgba(192,97,106,0.15);
+  --tp-accent-color:#c0616a;
+}
+body.tp-ocean{
+  --tp-sidebar-bg:#0d1e2e;
+  --tp-sidebar-border:rgba(58,127,193,0.18);
+  --tp-icon-bg:rgba(30,63,96,0.6);
+  --tp-icon-active:rgba(58,127,193,0.85);
+  --tp-content-tint:rgba(200,223,245,0.05);
+  --tp-accent-tint:rgba(58,127,193,0.15);
+  --tp-accent-color:#3a7fc1;
+}
+body[class*="tp-"] .sidebar{
+  background:var(--tp-sidebar-bg) !important;
+  border-right-color:var(--tp-sidebar-border) !important;
+}
+body[class*="tp-"] .sb-icon-btn:hover,
+body[class*="tp-"] .sb-icon-btn.active{
+  background:var(--tp-icon-active) !important;
+}
+body[class*="tp-"] .nav-item.active,
+body[class*="tp-"] .nav-item:hover{
+  background:var(--tp-accent-tint) !important;
+  border-left-color:var(--tp-accent-color) !important;
+}
+body[class*="tp-"] .sb-settings-nav .sb-icon-btn:hover{
+  background:var(--tp-icon-bg) !important;
+}
+body[class*="tp-"] #pg-dash>.main-content-wrap>.main-content,
+body[class*="tp-"] .lounge-pane.active{
+  background:var(--tp-content-tint);
+}
 </style>
 <!-- Firebase SDK -->
 <script type="module">
@@ -5120,34 +5178,13 @@ var RING_COLORS={
 };
 
 function loadPortalCosmetics(){
+  /* Unified: reads gc_inventory and applies both header banner + texture palette */
   if(!cu||!fsDb()||!window._fsGetDoc||!window._fsDoc)return;
   var nick=cu.nickname.toLowerCase();
   window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nick)).then(function(snap){
-    if(!snap.exists())return;
-    var inv=snap.data()||{};
+    var inv=snap.exists()?(snap.data()||{}):{};
     var equipped=inv.equipped||{};
-    var header=document.getElementById('main-brand-header');
-    if(!header)return;
-    var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
-    if(bannerKey&&BANNER_THEMES[bannerKey]){
-      var bt=BANNER_THEMES[bannerKey];
-      header.style.background=bt.bg;
-      header.style.boxShadow='0 2px 20px '+bt.shadow;
-      var title=header.querySelector('.main-brand-title');
-      var sub=header.querySelector('.main-brand-sub');
-      var loggedIn=document.getElementById('main-loggedin');
-      if(title)title.style.color=bt.color;
-      if(sub){sub.style.color='rgba(255,255,255,.6)';}
-      if(loggedIn)loggedIn.style.color='rgba(255,255,255,.55)';
-    } else {
-      header.style.background='';header.style.boxShadow='';
-      var title=header.querySelector('.main-brand-title');
-      var sub=header.querySelector('.main-brand-sub');
-      var loggedIn=document.getElementById('main-loggedin');
-      if(title)title.style.color='';
-      if(sub)sub.style.color='';
-      if(loggedIn)loggedIn.style.color='';
-    }
+    if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(equipped);
   }).catch(function(e){console.warn('loadPortalCosmetics:',e);});
 }
 
@@ -12793,7 +12830,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div style="display:flex;gap:8px;margin-bottom:18px;">
       <button class="gc-tab gc-tab-on" id="gc-tab-games" onclick="gcSwitchTab('games')">🎮 Games</button>
       <button class="gc-tab" id="gc-tab-shop" onclick="gcSwitchTab('shop')">🛒 Shop</button>
-      <button class="gc-tab" id="gc-tab-badges" onclick="gcSwitchTab('badges')">🎖 My Badges</button>
+      <button class="gc-tab" id="gc-tab-badges" onclick="gcSwitchTab('badges')">📦 Inventory</button>
     </div>
     <!-- Games pane -->
     <div id="gc-pane-games">
@@ -13209,25 +13246,25 @@ var GC_BANNER_THEMES={
 
 /* ── SHOP CATALOG ── */
 var GC_SHOP_ITEMS=[
-  {id:'ring_gold',tier:'cosmetic',name:'Gold avatar ring',desc:'Drip in gold. A glowing ring around your avatar.',price:200,icon:'🌟',limit:null,stackable:true},
-  {id:'ring_purple',tier:'cosmetic',name:'Purple avatar ring',desc:'Purple is the colour of royalty. Own it.',price:200,icon:'💜',limit:null,stackable:true},
-  {id:'ring_coral',tier:'cosmetic',name:'Coral avatar ring',desc:'Warm, bold, and impossible to ignore.',price:200,icon:'🪸',limit:null,stackable:true},
-  {id:'ring_teal',tier:'cosmetic',name:'Teal avatar ring',desc:'Cool, calm, collected. Teal hits different.',price:200,icon:'💚',limit:null,stackable:true},
-  {id:'flair',tier:'cosmetic',name:'Name flair ✨',desc:'A little sparkle next to your name.',price:200,icon:'✨',limit:null,stackable:false},
-  {id:'banner_sunset',tier:'cosmetic',name:'Sunset banner',desc:'Golden hour energy on your card.',price:250,icon:'🌅',limit:null,stackable:false},
-  {id:'banner_ocean',tier:'cosmetic',name:'Ocean banner',desc:'Deep blue, no drama.',price:250,icon:'🌊',limit:null,stackable:false},
-  {id:'banner_forest',tier:'cosmetic',name:'Forest banner',desc:'Earthy, grounded, and suspiciously wise.',price:250,icon:'🌲',limit:null,stackable:false},
-  {id:'banner_galaxy',tier:'cosmetic',name:'Galaxy banner',desc:"You're in another dimension. Rare energy.",price:250,icon:'🌌',limit:null,stackable:false},
-  {id:'boost_2x',tier:'boost',name:'Credit boost 24h',desc:'Double payouts for the next 24 hours.',price:300,icon:'⚡',limit:null,stackable:false},
-  {id:'lucky_streak',tier:'boost',name:'Lucky streak',desc:'Your next 3 wins get a +20% bonus.',price:250,icon:'🍀',limit:null,stackable:false},
-  {id:'koby_pack',tier:'boost',name:'Koby calls pack',desc:'3 extra Koby lifelines for WWTBAM.',price:300,icon:'📞',limit:null,stackable:true,useFlow:false},
-  {id:'name_lights',tier:'boost',name:'Name in lights',desc:'Your name glows gold on the leaderboard for a week.',price:400,icon:'💫',limit:null,stackable:false,useFlow:false},
-  {id:'snack_bar_pass',tier:'premium',name:'Snack bar pass',desc:'Treat yourself — redeemable for a snack on the house.',price:2000,icon:'🍫',limit:'quarter',stackable:false,useFlow:false},
-  {id:'lunch_stub',tier:'premium',name:'Lunch stub',desc:'A free lunch on the team. You earned it.',price:2500,icon:'🍱',limit:'quarter',stackable:false,useFlow:false},
-  {id:'coffee_cup',tier:'premium',name:'Coffee cup',desc:'Unlimited brews for a day. Fuel up.',price:1800,icon:'☕',limit:'quarter',stackable:false,useFlow:false},
-  {id:'airplane_ticket',tier:'legendary',name:'Airplane ticket',desc:'A round-trip ticket. Destination: your call.',price:5000,icon:'✈️',limit:'quarter',stackable:false,useFlow:false},
-  {id:'wood_idol',tier:'legendary',name:'Wood idol',desc:'A carved trophy for the grinders. Rare drop.',price:3500,icon:'🪵',limit:'quarter',stackable:false,useFlow:false},
-  {id:'golden_idol',tier:'legendary',name:'Golden idol',desc:'The rarest reward. Only the elite reach this.',price:4500,icon:'🏆',limit:'quarter',stackable:false,useFlow:false}
+  {id:'ring_gold',tier:'cosmetic',name:'Gold avatar ring',desc:'Dripping in gold. Your avatar just went main character.',price:200,icon:'🌟',limit:null,stackable:true},
+  {id:'ring_purple',tier:'cosmetic',name:'Purple avatar ring',desc:'Royalty called. They want their colour back.',price:200,icon:'💜',limit:null,stackable:true},
+  {id:'ring_coral',tier:'cosmetic',name:'Coral avatar ring',desc:'Hot, bold, and absolutely not taking the back seat.',price:200,icon:'🪸',limit:null,stackable:true},
+  {id:'ring_teal',tier:'cosmetic',name:'Teal avatar ring',desc:'Calm on the outside. Secretly winning on the inside.',price:200,icon:'💚',limit:null,stackable:true},
+  {id:'flair',tier:'cosmetic',name:'Name flair ✨',desc:'Because your name alone was not sparkly enough.',price:200,icon:'✨',limit:null,stackable:false},
+  {id:'banner_sunset',tier:'cosmetic',name:'Sunset Dream',desc:'Golden hour, good vibes. Portal goes full aesthetic.',price:250,icon:'🌅',limit:null,stackable:false},
+  {id:'banner_ocean',tier:'cosmetic',name:'Ocean Tide',desc:'Deep, moody, and lowkey dramatic. In the best way.',price:250,icon:'🌊',limit:null,stackable:false},
+  {id:'banner_forest',tier:'cosmetic',name:'Dark Forest',desc:'Ancient trees, zero Wi-Fi, 100% vibes.',price:250,icon:'🌲',limit:null,stackable:false},
+  {id:'banner_galaxy',tier:'cosmetic',name:'Galaxy Adventure',desc:'Out of office. Out of this world. Way out there.',price:250,icon:'🌌',limit:null,stackable:false},
+  {id:'boost_2x',tier:'boost',name:'Credit boost 24h',desc:'Double credits for 24 hours. Go absolutely feral.',price:300,icon:'⚡',limit:null,stackable:false},
+  {id:'lucky_streak',tier:'boost',name:'Lucky streak',desc:'Next 3 wins get a 20% bonus. The universe is on your side.',price:250,icon:'🍀',limit:null,stackable:false},
+  {id:'koby_pack',tier:'boost',name:'Koby calls pack',desc:'Three lifelines, all saved by the frog. No judgement.',price:300,icon:'📞',limit:null,stackable:true,useFlow:false},
+  {id:'name_lights',tier:'boost',name:'Name in lights',desc:'Gold-lit leaderboard status for a week. Unmissable.',price:400,icon:'💫',limit:null,stackable:false,useFlow:false},
+  {id:'snack_bar_pass',tier:'premium',name:'Snack bar pass',desc:'Free snack on the house. You uploaded enough to deserve this.',price:2000,icon:'🍫',limit:'quarter',stackable:false,useFlow:false},
+  {id:'lunch_stub',tier:'premium',name:'Lunch stub',desc:'Free lunch, zero documents required. Finally.',price:2500,icon:'🍱',limit:'quarter',stackable:false,useFlow:false},
+  {id:'coffee_cup',tier:'premium',name:'Coffee cup',desc:'Unlimited brews for a day. Your sleep schedule is your problem.',price:1800,icon:'☕',limit:'quarter',stackable:false,useFlow:false},
+  {id:'airplane_ticket',tier:'legendary',name:'Airplane ticket',desc:'Round trip, anywhere. Pack light, flex heavy.',price:5000,icon:'✈️',limit:'quarter',stackable:false,useFlow:false},
+  {id:'wood_idol',tier:'legendary',name:'Wood idol',desc:'A trophy carved from sheer stubbornness. Respect.',price:3500,icon:'🪵',limit:'quarter',stackable:false,useFlow:false},
+  {id:'golden_idol',tier:'legendary',name:'Golden idol',desc:'The rarest flex in the portal. You actually made it.',price:4500,icon:'🏆',limit:'quarter',stackable:false,useFlow:false}
 ];
 
 /* ── Shop render ── */
@@ -13264,7 +13301,7 @@ function gcRenderShop(){
         var _purchasedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #22c55e;background:rgba(34,197,94,.08);color:#22c55e;cursor:not-allowed;">Purchased</button>';
         var _lockedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #2a2d4a;background:transparent;color:#8892b0;cursor:not-allowed;">Locked</button>';
         card.innerHTML=bannerPreview+'<div style="font-size:22px;margin-bottom:6px">'+item.icon+'</div>'
-          +tierEl+'<div style="font-size:13px;font-weight:600;color:#e8eaf6;margin:6px 0 3px">'+item.name+'</div>'
+          +tierEl+'<div style="font-size:14px;font-weight:700;color:#ffffff;margin:6px 0 3px">'+item.name+'</div>'
           +'<div style="font-size:11px;color:#8892b0;margin-bottom:8px;line-height:1.4">'+item.desc+'</div>'
           +statusMsg+'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
           +'<span style="font-size:13px;font-weight:700;color:#9461f7">'+item.price.toLocaleString()+' cr</span>'
@@ -13305,6 +13342,17 @@ function gcBuyItem(itemId){
 }
 
 /* ── Badges render ── */
+
+/* ── Display name overrides — maps itemId to current canonical name ── */
+var GC_DISPLAY_NAMES={
+  'banner_forest':'Dark Forest',
+  'banner_galaxy':'Galaxy',
+  'banner_sunset':'Sunset',
+  'banner_ocean':'Ocean'
+};
+function gcDisplayName(item){
+  return GC_DISPLAY_NAMES[item.itemId]||item.name||item.itemId;
+}
 function gcRenderBadges(){
   var pane=G('gc-pane-badges');if(!pane)return;
   var nick=cu?cu.nickname.toLowerCase():'';
@@ -13324,12 +13372,12 @@ function gcRenderBadges(){
       row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--border);margin-bottom:8px;';
       var isCosmetic=item.tier==='cosmetic',isBoost=item.tier==='boost';
       var left='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">'+item.icon+'</span>'
-        +'<div><div style="font-size:13px;font-weight:600;color:#e8eaf6">'+item.name+'</div>'
+        +'<div><div style="font-size:14px;font-weight:700;color:#ffffff">'+gcDisplayName(item)+'</div>'
         +'<div style="font-size:10px;color:#8892b0">'+(isCosmetic?'Cosmetic · permanent':(isBoost?'Boost · one-time use':'Premium item'))+'</div></div></div>';
       var right='';
       if(isCosmetic){
         var isEquipped=!!(invEquipped&&invEquipped[item.itemId]);
-        right='<button class="gc-use-badge-btn" '+(isEquipped?'style="border-color:#22c55e;color:#22c55e;background:rgba(34,197,94,.1);" disabled':'onclick="gcEquipCosmetic(\''+item.itemId+'\')"')+'>'+(isEquipped?'Equipped ✓':'Equip')+'</button>';
+        right='<button class="gc-use-badge-btn" onclick="gcEquipCosmetic(\''+item.itemId+'\')" style="'+(isEquipped?'border-color:#22c55e;color:#22c55e;background:rgba(34,197,94,.1);':'')+'">'+( isEquipped?'Equipped ✓':'Equip')+'</button>';
       } else if(isBoost){
         right='<button class="gc-use-badge-btn" onclick="gcActivateBoost(\''+item.itemId+'\')">Activate</button>';
       }
@@ -13337,6 +13385,26 @@ function gcRenderBadges(){
     });
   }).catch(function(){if(G('gc-pane-badges'))G('gc-pane-badges').innerHTML='<div style="color:#8892b0;padding:20px;text-align:center;">Could not load badges.</div>';});
 }
+
+/* ── Texture pack palette — applies body class for CSS variable overrides ── */
+var TEXTURE_PACK_MAP={
+  'banner_forest':'tp-dark-forest',
+  'banner_sunset':'tp-sunset',
+  'banner_ocean':'tp-ocean',
+  'banner_galaxy':'tp-galaxy'
+};
+
+function applyPortalPalette(equippedMap){
+  /* Remove any existing texture pack class */
+  Object.values(TEXTURE_PACK_MAP).forEach(function(cls){document.body.classList.remove(cls);});
+  if(!equippedMap)return;
+  var bannerKey=Object.keys(equippedMap).find(function(k){return k.startsWith('banner_')&&equippedMap[k];});
+  if(bannerKey&&TEXTURE_PACK_MAP[bannerKey]){
+    document.body.classList.add(TEXTURE_PACK_MAP[bannerKey]);
+  }
+}
+window.applyPortalPalette=applyPortalPalette;
+
 
 /* ── Portal header banner — called on equip and on login ── */
 function applyPortalHeaderBanner(equippedMap){
@@ -13378,6 +13446,8 @@ function applyPortalHeaderBanner(equippedMap){
     if(hLoggedIn){hLoggedIn.style.color='';}
     if(hSignOut){hSignOut.style.color='';hSignOut.style.borderColor='';}
   }
+  /* Also apply/remove texture pack palette */
+  if(window.applyPortalPalette)applyPortalPalette(equippedMap);
 }
 window.applyPortalHeaderBanner=applyPortalHeaderBanner;
 
@@ -13387,18 +13457,30 @@ function gcEquipCosmetic(itemId){
   var nick=cu.nickname.toLowerCase();
   gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
     var inv=snap.exists()?(snap.data()||{}):{}; var equipped=inv.equipped||{};
+    var isCurrentlyEquipped=!!(equipped&&equipped[itemId]);
     var update={};
+    if(isCurrentlyEquipped){
+      /* UNEQUIP — toggle off */
+      update['equipped.'+itemId]=false;
+      return gcDb().collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
+        var newEquipped=Object.assign({},equipped);
+        newEquipped[itemId]=false;
+        if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
+        gcRenderBadges();
+        gcToast('\u274c '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+ ' unequipped');
+      });
+    }
+    /* EQUIP — turn on, turn off siblings of same type */
     if(isBanner){Object.keys(equipped).forEach(function(k){if(k.startsWith('banner_')&&k!==itemId)update['equipped.'+k]=false;});}
     update['equipped.'+itemId]=true;
     update['equippedAt.'+itemId]=Date.now();
     return gcDb().collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
-      /* Build equipped map from what we just wrote — no extra read needed */
       var newEquipped=Object.assign({},equipped);
       if(isBanner){Object.keys(newEquipped).forEach(function(k){if(k.startsWith('banner_'))newEquipped[k]=false;});}
       newEquipped[itemId]=true;
       if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
       gcRenderBadges();
-      gcToast('\u2728 '+itemId.replace(/_/g,' ')+' equipped!');
+      gcToast('\u2728 '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' equipped!');
     });
   }).catch(function(e){gcToast('Error: '+e.message);});
 }
