@@ -1248,43 +1248,6 @@ window.dispatchEvent(new Event('firebase-ready'));
         <!-- APPEARANCE -->
         <div class="spane active" id="spane-appearance">
           <div class="s-section">
-            <div class="s-section-title">Theme</div>
-            <div class="theme-previews">
-              <div class="theme-prev" id="theme-dark" onclick="setTheme('dark',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#07080f,#0e1020)"></div>
-                <div class="theme-prev-label">Dark</div>
-              </div>
-              <div class="theme-prev active" id="theme-light" onclick="setTheme('light',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#f0f2ff,#ffffff)"></div>
-                <div class="theme-prev-label" style="color:#333">Light</div>
-              </div>
-              <div class="theme-prev" id="theme-midnight" onclick="setTheme('midnight',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#02030a,#07080f)"></div>
-                <div class="theme-prev-label">Midnight</div>
-              </div>
-              <div class="theme-prev" id="theme-ocean" onclick="setTheme('ocean',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#0a1628,#38b2ff)"></div>
-                <div class="theme-prev-label">Ocean</div>
-              </div>
-              <div class="theme-prev" id="theme-forest" onclick="setTheme('forest',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#0a1a0f,#2ecc71)"></div>
-                <div class="theme-prev-label">Forest</div>
-              </div>
-              <div class="theme-prev" id="theme-sunset" onclick="setTheme('sunset',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#1a0a0a,#ff6b35)"></div>
-                <div class="theme-prev-label">Sunset</div>
-              </div>
-              <div class="theme-prev" id="theme-lavender" onclick="setTheme('lavender',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#ede8ff,#7c3aed)"></div>
-                <div class="theme-prev-label" style="color:#2d1b6e">Lavender</div>
-              </div>
-              <div class="theme-prev" id="theme-whatsapp" onclick="setTheme('whatsapp',this)">
-                <div class="theme-prev-swatch" style="background:linear-gradient(135deg,#128c7e,#25d366)"></div>
-                <div class="theme-prev-label" style="color:#075e54">WhatsApp</div>
-              </div>
-            </div>
-          </div>
-          <div class="s-section">
             <div class="s-section-title">Accent Color</div>
             <div class="color-swatches" id="accent-swatches">
               <div class="swatch active" style="background:#8b2dff" data-color="#8b2dff" onclick="setAccent('#8b2dff',this)" title="Purple"></div>
@@ -2098,7 +2061,9 @@ function goDash(){
   /* Load persisted theme + accent per user — localStorage first (instant), Firestore as source of truth */
   try{
     var savedTheme=localStorage.getItem('lounge_theme_'+cu.nickname);
-    if(savedTheme)settings.theme=savedTheme;
+    /* Light mode only — ignore any saved non-light theme */
+    if(savedTheme&&savedTheme!=='light'){localStorage.setItem('lounge_theme_'+cu.nickname,'light');}
+    settings.theme='light';setTheme('light',null);
     var savedAccent=localStorage.getItem('lounge_accent_'+cu.nickname);
     if(savedAccent){settings.accent=savedAccent;document.documentElement.style.setProperty('--accent',savedAccent);}
   }catch(e){}
@@ -4446,13 +4411,18 @@ var MP_GAMES=GAMES.filter(function(g){return g.type==='multi';});
 function openGame(){gcOpenGameCornerPanel();}
 function openGameCorner(){gcOpenGameCornerPanel();}
 function gcOpenGameCornerPanel(){
-  /* Re-append panel if needed */
+  /* Re-attach panel to main-content if it was displaced */
   var gcPanel=G('games-panel');var mc=G('main-content');
   if(gcPanel&&mc&&!mc.contains(gcPanel))mc.appendChild(gcPanel);
-  /* Switch all panels */
+  /* Hide all panels, show games panel */
   document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
   if(gcPanel)gcPanel.classList.add('active');
-  renderGamesTab();
+  /* renderGamesTab is defined further down — call safely */
+  if(typeof renderGamesTab==='function'){
+    renderGamesTab();
+  } else {
+    setTimeout(function(){if(typeof renderGamesTab==='function')renderGamesTab();},200);
+  }
 }
 function closeGame(){}
 function renderGamesGrid(){
@@ -6859,12 +6829,11 @@ function viewArticle(id){
 
 
 function renderHubInLounge(){
-  var src=G('the-hub-panel');
-  var dst=G('lounge-pane-the-hub');
-  if(!src||!dst)return;
-  if(!dst.querySelector('.panel-header')){
-    dst.innerHTML=src.innerHTML;
-  }
+  /* Show the-hub-panel as the active panel instead of duplicating its HTML */
+  var hub=G('the-hub-panel');
+  if(!hub){return;}
+  document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
+  hub.classList.add('active');
   renderDashboard();
 }
 
@@ -11925,11 +11894,11 @@ function devEnter(){
 
 /* ── INIT ── */
 document.addEventListener('DOMContentLoaded',function(){
-  /* Apply theme immediately on load (login screen visible) — use saved global or default */
+  /* Always force light mode — themes removed from portal */
   try{
-    var globalTheme=localStorage.getItem('lounge_theme_default')||'whatsapp';
-    setTheme(globalTheme,null);
-  }catch(e){setTheme('whatsapp',null);}
+    localStorage.setItem('lounge_theme_default','light');
+    setTheme('light',null);
+  }catch(e){setTheme('light',null);}
   /* Restore session on refresh — reads lounge_nick saved at login */
   try{
     var _sn=localStorage.getItem('lounge_nick');
@@ -13155,10 +13124,12 @@ function gcLoadShiftsFromFirestore(){
   setTimeout(function(){if(!G('gc-solo-grid')||!G('gc-solo-grid').children.length)gcRenderGrid();},3000);
 }
 
-function gcRenderGrid(){
-  /* Wait until the panel elements are in the live DOM */
+function gcRenderGrid(_retries){
+  /* Wait until the panel elements are in the live DOM — max 20 retries (3s) */
+  _retries=(_retries||0)+1;
   if(!G('gc-pane-games')||!G('gc-solo-grid')){
-    setTimeout(gcRenderGrid,150);return;
+    if(_retries<20){setTimeout(function(){gcRenderGrid(_retries);},150);}
+    return;
   }
   try{
   var pane=G('gc-pane-games');
@@ -13246,8 +13217,14 @@ var GC_SHOP_ITEMS=[
   {id:'banner_galaxy',tier:'cosmetic',name:'Galaxy banner',desc:"You're in another dimension. Rare energy.",price:250,icon:'🌌',limit:null,stackable:false},
   {id:'boost_2x',tier:'boost',name:'Credit boost 24h',desc:'Double payouts for the next 24 hours.',price:300,icon:'⚡',limit:null,stackable:false},
   {id:'lucky_streak',tier:'boost',name:'Lucky streak',desc:'Your next 3 wins get a +20% bonus.',price:250,icon:'🍀',limit:null,stackable:false},
-  {id:'koby_pack',tier:'premium',name:'Koby calls pack',desc:'3 extra Koby lifelines for WWTBAM.',price:300,icon:'📞',limit:null,stackable:true,useFlow:false},
-  {id:'name_lights',tier:'premium',name:'Name in lights',desc:'Your name glows gold on the leaderboard for a week.',price:400,icon:'💫',limit:null,stackable:false,useFlow:false}
+  {id:'koby_pack',tier:'boost',name:'Koby calls pack',desc:'3 extra Koby lifelines for WWTBAM.',price:300,icon:'📞',limit:null,stackable:true,useFlow:false},
+  {id:'name_lights',tier:'boost',name:'Name in lights',desc:'Your name glows gold on the leaderboard for a week.',price:400,icon:'💫',limit:null,stackable:false,useFlow:false},
+  {id:'snack_bar_pass',tier:'premium',name:'Snack bar pass',desc:'Treat yourself — redeemable for a snack on the house.',price:2000,icon:'🍫',limit:'quarter',stackable:false,useFlow:false},
+  {id:'lunch_stub',tier:'premium',name:'Lunch stub',desc:'A free lunch on the team. You earned it.',price:2500,icon:'🍱',limit:'quarter',stackable:false,useFlow:false},
+  {id:'coffee_cup',tier:'premium',name:'Coffee cup',desc:'Unlimited brews for a day. Fuel up.',price:1800,icon:'☕',limit:'quarter',stackable:false,useFlow:false},
+  {id:'airplane_ticket',tier:'legendary',name:'Airplane ticket',desc:'A round-trip ticket. Destination: your call.',price:5000,icon:'✈️',limit:'quarter',stackable:false,useFlow:false},
+  {id:'wood_idol',tier:'legendary',name:'Wood idol',desc:'A carved trophy for the grinders. Rare drop.',price:3500,icon:'🪵',limit:'quarter',stackable:false,useFlow:false},
+  {id:'golden_idol',tier:'legendary',name:'Golden idol',desc:'The rarest reward. Only the elite reach this.',price:4500,icon:'🏆',limit:'quarter',stackable:false,useFlow:false}
 ];
 
 /* ── Shop render ── */
@@ -13266,25 +13243,30 @@ function gcRenderShop(){
       var grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:8px;';
       items.forEach(function(item){
         var owned=inv[item.id];
-        var blockedQuarter=item.limit==='quarter'&&owned&&owned.quarter===quarter;
-        var blockedStack=!item.stackable&&owned&&owned.active;
-        var blocked=blockedQuarter||blockedStack;
+        var isOwned=!!(owned&&(owned.active||owned.purchasedAt));
+        var isCosmeticOwned=item.tier==='cosmetic'&&isOwned;
+        var blockedQuarter=item.limit==='quarter'&&isOwned&&owned.quarter===quarter;
+        var blocked=blockedQuarter||isCosmeticOwned||(!item.stackable&&isOwned);
+        var showPurchased=isOwned&&!item.stackable;
         var card=document.createElement('div');card.className='gc-shop-card';
-        if(blocked)card.style.opacity='.55';
+        if(blocked)card.style.opacity='.6';
         var tierEl='<span class="gc-tier-'+item.tier+'">'+item.tier+'</span>';
-        var statusMsg=blockedQuarter?'<div style="font-size:10px;color:#ef4444;margin-top:4px;">Already purchased this quarter</div>':blockedStack?'<div style="font-size:10px;color:#eab308;margin-top:4px;">Use current one first</div>':'';
+        var statusMsg=blockedQuarter?'<div style="font-size:10px;color:#ef4444;margin-top:4px;">Already purchased this quarter</div>':'';
         var bannerPreview='';
         if(item.id&&item.id.startsWith('banner_')&&GC_BANNER_THEMES[item.id]){
           var _bt=GC_BANNER_THEMES[item.id];
-          bannerPreview='<div style="height:52px;border-radius:6px;margin-bottom:8px;overflow:hidden;background-image:url('+_bt.uri+');background-position:'+_bt.pos+';background-size:'+_bt.sz+';background-repeat:'+_bt.rep+';"></div>';
+          var _ownedBadge=isCosmeticOwned?'<span style="position:absolute;right:6px;top:4px;font-size:9px;font-weight:700;background:rgba(34,197,94,.25);color:#22c55e;border:1px solid #22c55e;padding:1px 6px;border-radius:4px;">Owned</span>':'';
+          bannerPreview='<div style="position:relative;height:52px;border-radius:6px;margin-bottom:8px;overflow:hidden;background-image:url('+_bt.uri+');background-position:'+_bt.pos+';background-size:'+_bt.sz+';background-repeat:'+_bt.rep+';">'+_ownedBadge+'</div>';
         }
+        var _purchasedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #22c55e;background:rgba(34,197,94,.08);color:#22c55e;cursor:not-allowed;">Purchased</button>';
+        var _lockedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #2a2d4a;background:transparent;color:#8892b0;cursor:not-allowed;">Locked</button>';
         card.innerHTML=bannerPreview+'<div style="font-size:22px;margin-bottom:6px">'+item.icon+'</div>'
           +tierEl+'<div style="font-size:13px;font-weight:600;color:#e8eaf6;margin:6px 0 3px">'+item.name+'</div>'
           +'<div style="font-size:11px;color:#8892b0;margin-bottom:8px;line-height:1.4">'+item.desc+'</div>'
           +statusMsg+'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
           +'<span style="font-size:13px;font-weight:700;color:#9461f7">'+item.price.toLocaleString()+' cr</span>'
-          +(blocked?'<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #2a2d4a;background:transparent;color:#8892b0;cursor:not-allowed;">Locked</button>'
-          :'<button onclick="gcBuyItem(\''+item.id+'\')" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.15);color:#9461f7;cursor:pointer;">Buy</button>')
+          +(blocked?(showPurchased?_purchasedBtn:_lockedBtn)
+          :'<button onclick="gcBuyItem(''+item.id+'')" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.15);color:#9461f7;cursor:pointer;">Buy</button>')
           +'</div>';
         grid.appendChild(card);
       });
@@ -13358,55 +13340,45 @@ function applyPortalHeaderBanner(equippedMap){
   var header=document.getElementById('main-brand-header');
   if(!header)return;
   var bannerKey=Object.keys(equippedMap||{}).find(function(k){return k.startsWith('banner_')&&equippedMap[k];});
+  /* Remove any old overlay div from previous implementation */
+  var oldOv=document.getElementById('main-brand-header-overlay');if(oldOv)oldOv.remove();
   if(bannerKey&&GC_BANNER_THEMES[bannerKey]){
     var bt=GC_BANNER_THEMES[bannerKey];
-    header.style.backgroundImage='url('+bt.uri+')';
-    header.style.backgroundPosition=bt.pos;
-    header.style.backgroundSize=bt.sz;
-    header.style.backgroundRepeat=bt.rep;
+    /* Layer: dark gradient over pixel art — no extra DOM nodes needed */
+    header.style.backgroundImage='linear-gradient(rgba(8,6,18,.52),rgba(8,6,18,.52)),url('+bt.uri+')';
+    header.style.backgroundPosition='center,'+bt.pos;
+    header.style.backgroundSize='auto,'+bt.sz;
+    header.style.backgroundRepeat='no-repeat,'+bt.rep;
     header.style.backgroundColor='#0a0814';
-    /* Dark overlay so text stays readable */
-    var ov=document.getElementById('main-brand-header-overlay');
-    if(!ov){
-      ov=document.createElement('div');
-      ov.id='main-brand-header-overlay';
-      ov.style.cssText='position:absolute;inset:0;background:rgba(8,6,18,.42);pointer-events:none;z-index:0;';
-      header.style.position='relative';
-      header.appendChild(ov);
-    }
-    /* Ensure children sit above overlay */
-    Array.from(header.children).forEach(function(c){if(c.id!=='main-brand-header-overlay')c.style.position='relative',c.style.zIndex='1';});
   } else {
-    /* Remove banner */
     header.style.backgroundImage='';
     header.style.backgroundPosition='';
     header.style.backgroundSize='';
     header.style.backgroundRepeat='';
     header.style.backgroundColor='';
-    var ov2=document.getElementById('main-brand-header-overlay');
-    if(ov2)ov2.remove();
   }
 }
 window.applyPortalHeaderBanner=applyPortalHeaderBanner;
 
 function gcEquipCosmetic(itemId){
   if(!cu||!gcDb())return;
-  /* If equipping a banner, unequip other banners first */
   var isBanner=itemId.startsWith('banner_');
-  gcDb().collection('gc_inventory').doc(cu.nickname.toLowerCase()).get().then(function(snap){
+  var nick=cu.nickname.toLowerCase();
+  gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
     var inv=snap.exists()?(snap.data()||{}):{}; var equipped=inv.equipped||{};
     var update={};
     if(isBanner){Object.keys(equipped).forEach(function(k){if(k.startsWith('banner_')&&k!==itemId)update['equipped.'+k]=false;});}
-    update['equipped.'+itemId]=true;update['equippedAt.'+itemId]=Date.now();
-    return gcDb().collection('gc_inventory').doc(cu.nickname.toLowerCase()).set(update,{merge:true});
-  }).then(function(){
-    gcToast('✨ '+itemId.replace(/_/g,' ')+' equipped!');
-    /* Refresh inventory to get latest equipped map, then apply header banner */
-    gcDb().collection('gc_inventory').doc(cu.nickname.toLowerCase()).get().then(function(snap){
-      var inv=snap.exists()?(snap.data()||{}):{};
-      if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(inv.equipped||{});
+    update['equipped.'+itemId]=true;
+    update['equippedAt.'+itemId]=Date.now();
+    return gcDb().collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
+      /* Build equipped map from what we just wrote — no extra read needed */
+      var newEquipped=Object.assign({},equipped);
+      if(isBanner){Object.keys(newEquipped).forEach(function(k){if(k.startsWith('banner_'))newEquipped[k]=false;});}
+      newEquipped[itemId]=true;
+      if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
+      gcRenderBadges();
+      gcToast('\u2728 '+itemId.replace(/_/g,' ')+' equipped!');
     });
-    setTimeout(function(){gcRenderBadges();},500);
   }).catch(function(e){gcToast('Error: '+e.message);});
 }
 
@@ -14119,13 +14091,16 @@ function removeGamesTab(){
 
 function renderGamesTab(){
   if(!cu)return;
-  if(!gcDb()){setTimeout(renderGamesTab,400);return;}
+  if(!gcDb()){setTimeout(renderGamesTab,300);return;}
   var mgrBtn=G('gc-mgr-btn');
   if(mgrBtn)mgrBtn.style.display=cu.role==='manager'?'flex':'none';
-  gcDb().collection('player_credits').doc(cu.nickname.toLowerCase()).onSnapshot(function(snap){
-    try{gcCredits=snap.exists()?(snap.data().credits||0):0;gcCreditsLoaded=true;gcUpdateCreditUI();}catch(e){}
-  },function(){});
-  /* Render grid — gcRenderGrid polls until DOM elements exist */
+  /* Subscribe to credit updates */
+  try{
+    gcDb().collection('player_credits').doc(cu.nickname.toLowerCase()).onSnapshot(function(snap){
+      try{gcCredits=snap.exists()?(snap.data().credits||0):0;gcCreditsLoaded=true;gcUpdateCreditUI();}catch(e){}
+    },function(){});
+  }catch(e){}
+  /* Load shifts then render grid */
   if(_gcShiftsLoaded){gcRenderGrid();}else{gcLoadShiftsFromFirestore();}
   setTimeout(function(){try{gcLoadNotifications();}catch(e){}},1500);
 }
