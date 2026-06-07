@@ -4414,12 +4414,29 @@ function gcOpenGameCornerPanel(){
   /* Hide all panels, show games panel */
   document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
   if(gcPanel)gcPanel.classList.add('active');
-  /* renderGamesTab is defined further down — call safely */
-  if(typeof renderGamesTab==='function'){
+  /* Wait for Firebase to be ready before rendering — fixes blank panel on first load */
+  function _tryRender(attempts){
+    if(typeof renderGamesTab!=='function'){
+      if(attempts<20)setTimeout(function(){_tryRender(attempts+1);},150);
+      return;
+    }
+    if(!gcDb()){
+      /* Firebase not ready yet — show a loading state and retry */
+      var pane=G('gc-pane-games');
+      if(pane&&!pane.children.length){
+        pane.innerHTML='<div style="text-align:center;padding:40px;color:#8892b0;font-size:13px;">Loading Game Corner<span id="gc-load-dots">...</span></div>';
+        /* Animate dots so it doesn't look frozen */
+        var dots=0;var dInt=setInterval(function(){
+          var el=G('gc-load-dots');if(!el){clearInterval(dInt);return;}
+          dots=(dots+1)%4;el.textContent='.'.repeat(dots)||'';
+        },400);
+      }
+      if(attempts<30)setTimeout(function(){_tryRender(attempts+1);},200);
+      return;
+    }
     renderGamesTab();
-  } else {
-    setTimeout(function(){if(typeof renderGamesTab==='function')renderGamesTab();},200);
   }
+  _tryRender(0);
 }
 function closeGame(){}
 function renderGamesGrid(){
@@ -8934,18 +8951,7 @@ async function sendAIMessage(){
     return;
   }
 
-  /* ── SHORTCUT: "games" → open Game Corner in new tab ── */
-  if(/^games?$/i.test(text.trim())){
-    input.value='';input.style.height='auto';
-    var msgs=G('ai-messages');
-    gcOpenGameCornerPanel();
-    closeAI();
-    if(msgs){
-      msgs.innerHTML+=aiKobyBubble('🎮 Game Corner loading! Type <strong>game off</strong> or click the brand name to return.');
-      msgs.scrollTop=msgs.scrollHeight;
-    }
-    return;
-  }
+  /* ── SHORTCUT: "games" / partial matches removed — only exact "game on" works ── */
 
   /* ── SHORTCUT: "game on" → open Game Corner panel ── */
   if(/^game\s+on$/i.test(text.trim())){
@@ -12723,9 +12729,9 @@ document.addEventListener('DOMContentLoaded',function(){
 .gc-border{border-color:#2a2d4a;}.gc-border2{border-color:#3a3d5a;}
 .gc-text{color:var(--text);}.gc-muted{color:var(--muted);}.gc-muted2{color:#6272a4;}
 .gc-accent{color:#9461f7;}.gc-green{color:#22c55e;}.gc-red{color:#ef4444;}.gc-amber{color:#eab308;}
-.gc-tab{background:#222537;border:1px solid #2a2d4a;border-radius:8px;padding:6px 14px;font-size:12px;color:#8892b0;cursor:pointer;transition:all .15s;font-family:var(--font-b);}
-.gc-tab:hover{border-color:#7c3aed;color:#e8eaf6;}
-.gc-tab-on{background:rgba(124,58,237,.2);border-color:#7c3aed;color:#9461f7;font-weight:600;}
+.gc-tab{background:#222537;border:1px solid #2a2d4a;border-radius:8px;padding:6px 14px;font-size:12px;color:#c4c9e2;cursor:pointer;transition:all .15s;font-family:var(--font-b);}
+.gc-tab:hover{border-color:#7c3aed;color:#f0f2ff;}
+.gc-tab-on{background:rgba(124,58,237,.2);border-color:#7c3aed;color:#c4a8ff;font-weight:600;}
 .gc-tile{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .15s,transform .15s;position:relative;overflow:hidden;}
 .gc-tile::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,58,237,.05),transparent);opacity:0;transition:opacity .15s;}
 .gc-tile:hover{border-color:#7c3aed;transform:translateY(-2px);}
@@ -13347,12 +13353,30 @@ function applyPortalHeaderBanner(equippedMap){
     header.style.backgroundSize='auto,'+bt.sz;
     header.style.backgroundRepeat='no-repeat,'+bt.rep;
     header.style.backgroundColor='#0a0814';
+    /* Force readable white text over any banner */
+    var hTitle=header.querySelector('.main-brand-title');
+    var hSub=header.querySelector('.main-brand-sub');
+    var hLoggedIn=document.getElementById('main-loggedin');
+    var hSignOut=header.querySelector('.btn-outline');
+    if(hTitle){hTitle.style.color='#ffffff';}
+    if(hSub){hSub.style.color='rgba(255,255,255,.75)';}
+    if(hLoggedIn){hLoggedIn.style.color='rgba(255,255,255,.75)';}
+    if(hSignOut){hSignOut.style.color='rgba(255,255,255,.8)';hSignOut.style.borderColor='rgba(255,255,255,.3)';}
   } else {
     header.style.backgroundImage='';
     header.style.backgroundPosition='';
     header.style.backgroundSize='';
     header.style.backgroundRepeat='';
     header.style.backgroundColor='';
+    /* Reset text colors to theme defaults */
+    var hTitle=header.querySelector('.main-brand-title');
+    var hSub=header.querySelector('.main-brand-sub');
+    var hLoggedIn=document.getElementById('main-loggedin');
+    var hSignOut=header.querySelector('.btn-outline');
+    if(hTitle){hTitle.style.color='';}
+    if(hSub){hSub.style.color='';}
+    if(hLoggedIn){hLoggedIn.style.color='';}
+    if(hSignOut){hSignOut.style.color='';hSignOut.style.borderColor='';}
   }
 }
 window.applyPortalHeaderBanner=applyPortalHeaderBanner;
