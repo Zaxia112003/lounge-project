@@ -2192,8 +2192,7 @@ function buildSidebar(){
   if(existingDL)existingDL.remove();
   var existingMW=document.getElementById('sb-mgr-write-btn');
   if(existingMW)existingMW.remove();
-  var existingGC=document.getElementById('sb-games-btn');
-  if(existingGC)existingGC.remove();
+
 
   var settingsNav=document.querySelector('.sb-settings-nav');
 
@@ -2212,16 +2211,7 @@ function buildSidebar(){
     else if(settingsNav)settingsNav.appendChild(dlBtn);
     if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
-    /* Games btn for escalation */
-    try{if(localStorage.getItem('lounge_games_tab')==='1'){
-      var gcBtn=document.createElement('div');
-      gcBtn.id='sb-games-btn';gcBtn.className='sb-icon-btn';gcBtn.title='Games';
-      gcBtn.style.cssText='width:36px;height:36px;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-      gcBtn.textContent='🎮';gcBtn.onclick=function(){switchPanel('games',gcBtn);};
-      var bellRef3=G('notif-bell-wrap')||G('member-bell-wrap');
-      if(settingsNav&&bellRef3)settingsNav.insertBefore(gcBtn,bellRef3);
-      else if(settingsNav)settingsNav.appendChild(gcBtn);
-    }}catch(e){}
+
   } else if(role==='manager'){
     var mwBtn=document.createElement('button');
     mwBtn.id='sb-mgr-write-btn';
@@ -2237,29 +2227,12 @@ function buildSidebar(){
     else if(settingsNav)settingsNav.appendChild(mwBtn);
     if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
-    /* Games btn for manager */
-    try{if(localStorage.getItem('lounge_games_tab')==='1'){
-      var gcBtn=document.createElement('div');
-      gcBtn.id='sb-games-btn';gcBtn.className='sb-icon-btn';gcBtn.title='Games';
-      gcBtn.style.cssText='width:36px;height:36px;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-      gcBtn.textContent='🎮';gcBtn.onclick=function(){switchPanel('games',gcBtn);};
-      var bellRef3=G('notif-bell-wrap')||G('member-bell-wrap');
-      if(settingsNav&&bellRef3)settingsNav.insertBefore(gcBtn,bellRef3);
-      else if(settingsNav)settingsNav.appendChild(gcBtn);
-    }}catch(e){}
+
   } else {
     var kobyRef=G('sb-koby-btn');
     if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='';
-    /* Games btn for uploader */
-    try{if(localStorage.getItem('lounge_games_tab')==='1'){
-      var nav2=G('nav-items');
-      var gcBtn=document.createElement('button');
-      gcBtn.id='sb-games-btn';gcBtn.className='nav-item';gcBtn.dataset.panel='games';
-      gcBtn.innerHTML='<span class="nav-icon">🎮</span><span>Games</span>';
-      gcBtn.onclick=function(){switchPanel('games',gcBtn);};
-      if(nav2)nav2.appendChild(gcBtn);
-    }}catch(e){}
+
   }
 
 
@@ -2270,11 +2243,7 @@ function buildSidebar(){
 function switchPanel(id,btn){
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  /* For icon buttons in sb-settings-nav, manage a highlight style */
-  var gBtn=G('sb-games-btn');
-  if(gBtn&&gBtn.classList.contains('sb-icon-btn')){
-    gBtn.style.background=id==='games'?'rgba(139,45,255,.18)':'';
-  }
+
   document.querySelectorAll('.dash-panel').forEach(p=>p.classList.remove('active'));
   const panel=G(id+'-panel');if(panel)panel.classList.add('active');
   if(id==='the-lounge')renderLounge();
@@ -4467,8 +4436,17 @@ var GAMES=[
   {id:'uno',label:'UNO',emoji:'🃏',type:'multi',desc:'Classic card game'},
 ];
 var MP_GAMES=GAMES.filter(function(g){return g.type==='multi';});
-function openGame(){openGameCorner();}
-function openGameCorner(){window.open('https://lounge-project-ae.netlify.app/games','_blank');}
+function openGame(){gcOpenGameCornerPanel();}
+function openGameCorner(){gcOpenGameCornerPanel();}
+function gcOpenGameCornerPanel(){
+  /* Re-append panel if needed */
+  var gcPanel=G('games-panel');var mc=G('main-content');
+  if(gcPanel&&mc&&!mc.contains(gcPanel))mc.appendChild(gcPanel);
+  /* Switch all panels */
+  document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
+  if(gcPanel)gcPanel.classList.add('active');
+  renderGamesTab();
+}
 function closeGame(){}
 function renderGamesGrid(){
   var row=G('games-scroll-row');if(!row)return;
@@ -4491,6 +4469,35 @@ function moodLoadAggregate(cb){
   window._fsGetDoc(window._fsDoc(fsDb(),'moodLog',todayKey))
     .then(function(snap){cb(snap.exists()?snap.data():null);})
     .catch(function(){cb(null);});
+}
+
+/* ── Mood local helpers (today's submitted value) ── */
+function moodGetToday(){
+  return JSON.parse(localStorage.getItem('rta_mood_'+moodTodayKey())||'null');
+}
+function moodSaveToday(idx){
+  /* 1. Persist locally so bubble doesn't re-show */
+  localStorage.setItem('rta_mood_'+moodTodayKey(),JSON.stringify(idx));
+  /* 2. Write aggregate to moodLog (anonymous — keyed by date only) */
+  if(fsDb()){
+    var todayKey=moodTodayKey();
+    var field='mood_'+idx; /* mood_0 … mood_4 */
+    try{
+      var inc={};inc[field]=window._fsIncrement?window._fsIncrement(1):1;
+      window._fsSetDoc(window._fsDoc(fsDb(),'moodLog',todayKey),inc,{merge:true});
+    }catch(e){}
+  }
+  /* 3. Game Corner: +5cr for submitting mood today (once per person per day) */
+  if(cu&&cu.nickname&&gcDb()){
+    var nickLc=cu.nickname.toLowerCase();
+    var moodAwardKey=nickLc+'_mood_'+moodTodayKey();
+    gcDb().collection('gc_awards').doc(moodAwardKey).get().then(function(snap){
+      if(snap.exists())return;
+      gcAwardCredit(nickLc,5);
+      gcDb().collection('gc_awards').doc(moodAwardKey).set({nick:cu.nickname,type:'mood',date:moodTodayKey(),credits:5,awardedAt:Date.now()});
+      setTimeout(function(){if(typeof gcToast==='function')gcToast('😊 Thanks for checking in! +5 credits');},800);
+    }).catch(function(){});
+  }
 }
 
 function renderMoodTile(){
@@ -4796,7 +4803,7 @@ function renderMyDaySlaTrend(){
 function showKobyMoodBubble(){
   if(!cu||cu.role==='manager')return;
   var existing=moodGetToday();
-  if(existing!==null&&existing!==undefined)return;
+  if(existing!==null&&existing!==undefined)return; /* already rated today */
   /* Remove existing bubble if any */
   var old=G('koby-mood-bubble');if(old)old.remove();
   var bubble=document.createElement('div');
@@ -5828,9 +5835,9 @@ async function kcFinish(){
     answers:slimAnswers
   });
   if(passed)s.completed=true;
-  /* Award 5 credits silently for a perfect score (10/10) */
-  if(score===KC_Q_COUNT&&cu){
-    credAward(cu.nickname,5);
+  /* Award KC credits via Game Corner system — pass +50cr, perfect +100cr */
+  if(passed&&window.gcAwardKCCredits){
+    gcAwardKCCredits(score,KC_Q_COUNT);
   }
   try{
     await kcSaveState(nick,s);
@@ -8879,7 +8886,7 @@ function openAI(){
   setTimeout(function(){
     if(!aiOpen)return;
     var m=G('ai-messages');if(!m)return;
-    m.innerHTML+=aiKobyBubble('On a break? Type <strong>games</strong> and I\'ll take you to Game Corner 🎮');
+    m.innerHTML+=aiKobyBubble('On a break? Type <strong>game on</strong> to open the Game Corner 🎮 — type <strong>game off</strong> to come back.');
     m.scrollTop=m.scrollHeight;
   },800);
   setTimeout(function(){G('ai-input').focus();},300);
@@ -8937,33 +8944,38 @@ async function sendAIMessage(){
   if(/^games?$/i.test(text.trim())){
     input.value='';input.style.height='auto';
     var msgs=G('ai-messages');
+    gcOpenGameCornerPanel();
+    closeAI();
     if(msgs){
-      msgs.innerHTML+=aiKobyBubble('🎮 Opening Game Corner for you!');
+      msgs.innerHTML+=aiKobyBubble('🎮 Game Corner loading! Type <strong>game off</strong> or click the brand name to return.');
       msgs.scrollTop=msgs.scrollHeight;
     }
-    setTimeout(function(){window.open('https://lounge-project-ae.netlify.app/games','_blank');},300);
     return;
   }
 
-  /* ── SHORTCUT: "game on" → inject Games tab into sidebar ── */
+  /* ── SHORTCUT: "game on" → open Game Corner panel ── */
   if(/^game\s+on$/i.test(text.trim())){
     input.value='';input.style.height='auto';
     var msgs=G('ai-messages');
-    injectGamesTab();
+    gcOpenGameCornerPanel();
+    closeAI();
     if(msgs){
-      msgs.innerHTML+=aiKobyBubble('🎮 Game mode activated! Check the sidebar — the Games tab is now unlocked for you.');
+      msgs.innerHTML+=aiKobyBubble('🎮 Loading Game Corner! Type <strong>game off</strong> or click the brand name to return.');
       msgs.scrollTop=msgs.scrollHeight;
     }
     return;
   }
 
-  /* ── SHORTCUT: "game off" → remove Games tab from sidebar ── */
+  /* ── SHORTCUT: "game off" → return to The Lounge ── */
   if(/^game\s+off$/i.test(text.trim())){
     input.value='';input.style.height='auto';
     var msgs=G('ai-messages');
-    removeGamesTab();
+    document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
+    var lounge=G('the-lounge-panel');if(lounge)lounge.classList.add('active');
+    if(typeof renderLounge==='function')renderLounge();
+    closeAI();
     if(msgs){
-      msgs.innerHTML+=aiKobyBubble('🎮 Game mode off. The Games tab has been removed from the sidebar.');
+      msgs.innerHTML+=aiKobyBubble('🏠 Back to The Lounge!');
       msgs.scrollTop=msgs.scrollHeight;
     }
     return;
@@ -10255,6 +10267,14 @@ function mwDetailConfirm(){
       ahtSecs:ex.ahtSecs||0
     };
     fsSavePerfData(r.nick);
+    /* ── Game Corner: upload-hour credits (+1 per contract per hour, no cap) ── */
+    if(window.gcAwardUploadCredits&&r.byHourInShift){
+      gcAwardUploadCredits(r.nick,dateKey,r.byHourInShift);
+    }
+    /* ── Game Corner: streak detection (runs against last 5/3 days of perfData) ── */
+    if(window.gcCheckStreaks){
+      gcCheckStreaks(r.nick);
+    }
   });
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
   mwDetailReset();closeMgrWrite();
@@ -13538,20 +13558,98 @@ function gcAwardPerformanceCredits(nick,date,metrics){
   gcDb().collection('gc_awards').doc(docKey).get().then(function(snap){
     if(snap.exists())return;
     var awards=[];
-    if(metrics.aduActual!=null&&metrics.aduTarget!=null&&metrics.aduActual>=metrics.aduTarget)awards.push({reason:'ADU target hit',credits:5});
-    if(metrics.piActual!=null&&metrics.piTarget!=null&&metrics.piActual>=metrics.piTarget)awards.push({reason:'PI target hit',credits:5});
-    if(metrics.defectDensity!=null&&metrics.defectDensity===0)awards.push({reason:'Zero defect density',credits:3});
+    /* PI quality tiers — absolute thresholds, no cap */
+    var pi=metrics.piActual;
+    if(pi!=null){
+      if(pi>=16.0)awards.push({reason:'PI tier ≥16.0',credits:30});
+      else if(pi>=14.0)awards.push({reason:'PI tier 14.0–15.9',credits:20});
+      else if(pi>=11.0)awards.push({reason:'PI tier 11.0–13.9',credits:10});
+    }
+    /* Zero defect density */
+    if(metrics.defectDensity!=null&&metrics.defectDensity===0)awards.push({reason:'Zero defect density',credits:5});
     var total=awards.reduce(function(s,a){return s+a.credits;},0);
     if(total>0){
       gcAwardCredit(nick.toLowerCase(),total);
-      gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'performance',date:date,awards:awards,total:total,awardedAt:Date.now()});
+      gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'performance',date:date,awards:awards,total:total,piActual:pi,defectDensity:metrics.defectDensity,awardedAt:Date.now()});
       if(typeof pushNotif==='function')pushNotif('🎮',nick+' earned '+total+' performance credits ('+awards.map(function(a){return a.reason;}).join(', ')+')','credit');
     }
   }).catch(function(){});
 }
 window.gcAwardPerformanceCredits=gcAwardPerformanceCredits;
 
-/* ── KC credit award ── */
+/* ── Upload-hour credit award (+1 per contract, per hour, per day, no cap) ── */
+function gcAwardUploadCredits(nick,date,byHourInShift){
+  if(!gcDb()||!nick||!byHourInShift)return;
+  var nickLc=nick.toLowerCase();
+  Object.keys(byHourInShift).forEach(function(hour){
+    var count=byHourInShift[hour]||0;
+    if(count<=0)return;
+    var docKey=nickLc+'_upl_'+date+'_'+hour;
+    gcDb().collection('gc_awards').doc(docKey).get().then(function(snap){
+      if(snap.exists())return; /* already credited this hour */
+      gcAwardCredit(nickLc,count);
+      gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'upload_hour',date:date,hour:parseInt(hour),contracts:count,awardedAt:Date.now()});
+    }).catch(function(){});
+  });
+}
+window.gcAwardUploadCredits=gcAwardUploadCredits;
+
+/* ── Streak detection — called after each perf data save ── */
+function gcCheckStreaks(nick){
+  if(!gcDb()||!nick||!perfData[nick])return;
+  try{
+    var nickLc=nick.toLowerCase();
+    var sh=window.SHIFTS&&window.SHIFTS[nick];
+    var piTarget=sh&&sh.end>sh.start?parseFloat((((sh.end-sh.start)||9)*1.8).toFixed(1)):16.2;
+    /* Build last 7 calendar days (Sydney), excluding today — data may be partial */
+    var today=getSydneyDate();
+    var days=[];
+    for(var i=1;i<=7;i++){
+      var d=new Date(today.getTime()-i*86400000);
+      days.push(d.toISOString().slice(0,10));
+    }
+    /* Per-day metrics helper */
+    function dayMetrics(dateStr){
+      var dd=perfData[nick]&&perfData[nick][dateStr];
+      if(!dd||!dd.uploadsTotal)return null;
+      var activeH=Object.keys(dd.uploadsByHourInShift||{}).length||1;
+      var inShift=dd.uploadsInShift!=null?dd.uploadsInShift:(dd.uploadsTotal||0);
+      var pi=+(inShift/activeH).toFixed(1);
+      var errs=(callouts||[]).filter(function(c){return c.uploader===nick&&c.date===dateStr&&(c.type==='qscore'||c.type==='qesc')&&c.status!=='discarded';}).length;
+      var defDens=dd.uploadsTotal>0?+(errs/dd.uploadsTotal*1000).toFixed(1):null;
+      return {pi:pi,defDens:defDens};
+    }
+    /* ── 5-day zero-defect streak → +15 cr ── */
+    var last5=days.slice(0,5);
+    var allZeroDefect=last5.every(function(d){var m=dayMetrics(d);return m&&m.defDens===0;});
+    if(allZeroDefect){
+      var streakDate=last5[0]; /* anchor on most recent day */
+      var streakKey=nickLc+'_streak_defect_'+streakDate;
+      gcDb().collection('gc_awards').doc(streakKey).get().then(function(snap){
+        if(snap.exists())return;
+        gcAwardCredit(nickLc,15);
+        gcDb().collection('gc_awards').doc(streakKey).set({nick:nick,type:'streak_defect',anchorDate:streakDate,credits:15,awardedAt:Date.now()});
+        if(typeof gcToast==='function'&&cu&&cu.nickname===nick)setTimeout(function(){gcToast('🔥 5-day zero-defect streak! +15 credits');},600);
+      }).catch(function(){});
+    }
+    /* ── 3-day passing PI streak → +10 cr ── */
+    var last3=days.slice(0,3);
+    var allPiPass=last3.every(function(d){var m=dayMetrics(d);return m&&m.pi>=piTarget;});
+    if(allPiPass){
+      var piStreakDate=last3[0];
+      var piStreakKey=nickLc+'_streak_pi_'+piStreakDate;
+      gcDb().collection('gc_awards').doc(piStreakKey).get().then(function(snap){
+        if(snap.exists())return;
+        gcAwardCredit(nickLc,10);
+        gcDb().collection('gc_awards').doc(piStreakKey).set({nick:nick,type:'streak_pi',anchorDate:piStreakDate,piTarget:piTarget,credits:10,awardedAt:Date.now()});
+        if(typeof gcToast==='function'&&cu&&cu.nickname===nick)setTimeout(function(){gcToast('📈 3-day PI streak! +10 credits');},700);
+      }).catch(function(){});
+    }
+  }catch(e){/* silent */}
+}
+window.gcCheckStreaks=gcCheckStreaks;
+
+/* ── KC credit award — pass ≥80%: +50cr, perfect 100%: +100cr ── */
 function gcAwardKCCredits(score,total){
   if(!cu||!gcDb())return;
   var pct=Math.round(score/total*100);if(pct<80)return;
@@ -13559,7 +13657,7 @@ function gcAwardKCCredits(score,total){
   if(sessionStorage.getItem(storeKey))return;
   gcDb().collection('gc_awards').doc(cu.nickname+'_kc_'+weekKey).get().then(function(snap){
     if(snap.exists())return;
-    var award=pct===100?10:5;
+    var award=pct===100?100:50;
     gcAwardCredit(cu.nickname.toLowerCase(),award);
     gcDb().collection('gc_awards').doc(cu.nickname+'_kc_'+weekKey).set({nick:cu.nickname,type:'kc',pct:pct,award:award,week:weekKey,awardedAt:Date.now()});
     sessionStorage.setItem(storeKey,'1');
@@ -13934,26 +14032,11 @@ function gcGameMinesweeper(C){
 /* ════════════════════════════════════════════════════════
    SIDEBAR INJECTION / REMOVAL
 ════════════════════════════════════════════════════════ */
-function injectGamesTab(){
-  try{localStorage.setItem('lounge_games_tab','1');}catch(e){}
-  /* Remove any stale button first */
-  var old=G('sb-games-btn');if(old)old.remove();
-  /* Rebuild sidebar cleanly — it will re-inject the button from localStorage */
-  if(typeof buildSidebar==='function')buildSidebar();
-  /* Ensure panel is in main-content */
-  var mc=G('main-content');var panel=G('games-panel');
-  if(mc&&panel&&!mc.contains(panel))mc.appendChild(panel);
-}
-
+function injectGamesTab(){gcOpenGameCornerPanel();}
 function removeGamesTab(){
-  var btn=G('sb-games-btn');if(btn)btn.remove();
-  var panel=G('games-panel');
-  if(panel&&panel.classList.contains('active')){
-    panel.classList.remove('active');
-    var lounge=G('the-lounge-panel');if(lounge)lounge.classList.add('active');
-    document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
-  }
-  try{localStorage.removeItem('lounge_games_tab');}catch(e){}
+  document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
+  var lounge=G('the-lounge-panel');if(lounge)lounge.classList.add('active');
+  if(typeof renderLounge==='function')renderLounge();
 }
 
 function renderGamesTab(){
