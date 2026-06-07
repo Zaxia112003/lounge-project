@@ -3260,9 +3260,6 @@ function buildUploaderDOM(){
     <div class="lounge-pane" id="lounge-pane-my-team"></div>
     <div class="lounge-pane" id="lounge-pane-the-hub" style="margin:-28px -32px 0;padding:28px 32px">
     </div>
-    
-      <div id="template-list"></div>
-    </div>
   </div>
   <div class="dash-panel" id="the-hub-panel">
     <div class="panel-header"><div class="panel-sub" id="dash-sub" style="font-size:15px;font-weight:600;color:var(--muted);font-family:var(--font-d)">${shLabel}</div></div>
@@ -13266,7 +13263,7 @@ function gcRenderShop(){
           +statusMsg+'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
           +'<span style="font-size:13px;font-weight:700;color:#9461f7">'+item.price.toLocaleString()+' cr</span>'
           +(blocked?(showPurchased?_purchasedBtn:_lockedBtn)
-          :'<button onclick="gcBuyItem(''+item.id+'')" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.15);color:#9461f7;cursor:pointer;">Buy</button>')
+          :'<button onclick="gcBuyItem(\''+item.id+'\')" style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #7c3aed;background:rgba(124,58,237,.15);color:#9461f7;cursor:pointer;">Buy</button>')
           +'</div>';
         grid.appendChild(card);
       });
