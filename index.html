@@ -16,6 +16,7 @@
   --pink:#f72b6e;--purple:#8b2dff;--blue:#2d7fff;--teal:#00d4b4;--amber:#ffb830;
   --red:#ff3d3d;--green:#1dd17a;--orange:#ff7a30;
   --accent:#8b2dff;
+  --gc-name-color:#1a1a2e;
   --grad:linear-gradient(135deg,#f72b6e,#8b2dff,#2d7fff);
   --grad2:linear-gradient(90deg,#f72b6e,#8b2dff);
   --font-d:'Rajdhani',sans-serif;--font-b:'Exo 2',sans-serif;
@@ -1602,17 +1603,12 @@ async function fsLoadAll(){
     if(seen[key])TEAM.splice(i,1);
     else seen[key]=true;
   }
-  /* If Firestore team collection is empty, seed from hardcoded TEAM_DIR */
   if(TEAM.length===0&&typeof TEAM_DIR!=='undefined'){
     Object.keys(TEAM_DIR).forEach(function(nick){
       var dir=TEAM_DIR[nick];
-      var member={nickname:nick,fullName:dir.fullName,role:(dir.role||'uploader').toLowerCase(),
-                  email:dir.email||'',birthday:dir.birthday||'TBC',hireDate:dir.hireDate||'TBC'};
+      var member={nickname:nick,fullName:dir.fullName,role:(dir.role||'uploader').toLowerCase(),email:dir.email||'',birthday:dir.birthday||'TBC',hireDate:dir.hireDate||'TBC'};
       TEAM.push(member);
-      if(window._db&&window._fsSetDoc&&window._fsDoc){
-        var payload=Object.assign({},member);
-        window._fsSetDoc(window._fsDoc(window._db,'team',nick),payload,{merge:true}).catch(function(){});
-      }
+      if(window._db&&window._fsSetDoc&&window._fsDoc){window._fsSetDoc(window._fsDoc(window._db,'team',nick),Object.assign({},member),{merge:true}).catch(function(){});}
     });
   }
   /* Rebuild store from loaded TEAM */
@@ -1705,129 +1701,17 @@ async function fsLoadAll(){
 /* ── REAL-TIME LISTENERS ── */
 function fsStartRealtimeListeners(){
   if(!window._fsReady||!window._db)return;
-  /* Unsubscribe any existing */
-  _unsubscribers.forEach(function(u){try{u();}catch(e){}});
-  _unsubscribers=[];
+  _unsubscribers.forEach(function(u){try{u();}catch(e){}});_unsubscribers=[];
   pwStartListeners();
-
-  /* mdAnnouncements */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'mdAnnouncements'),function(snap){
-    mdAnnouncements.length=0;
-    snap.forEach(function(d){mdAnnouncements.push(Object.assign({_fsId:d.id},d.data()));});
-    mdAnnouncements.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
-    if(G('ann-list'))renderAnnouncements();
-    annUpdateBadge();
-  }));
-
-  /* callouts */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'callouts'),function(snap){
-    callouts.length=0;
-    snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});
-    if(typeof updateMemberBell==='function')updateMemberBell();
-    if(G('qp-list'))renderQualityPortal();
-    if(G('esc-qp-list'))renderEscQuality();
-    if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
-    if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
-    if(G('daily-tbl'))renderDailyTbl();
-    if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();
-    if(G('mgr-kpi-card'))renderMgrKpiCard();
-    if(G('mgr-error-trend'))renderMgrErrorTrend();
-    if(G('my-day-stats-strip'))renderMyDayStatsStrip();
-    if(G('my-day-errors-card'))renderMyDayErrors();
-    if(loungeTab==='the-hub'&&cu&&cu.role==='escalation'){var _eh=G('lounge-pane-the-hub');if(_eh&&_eh.classList.contains('active'))renderEscalationHub();}
-  }));
-
-  /* perfData */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'perfData'),function(snap){
-    snap.forEach(function(d){
-      if(!perfData[d.id])perfData[d.id]={};
-      var raw=d.data();
-      /* Normalize old schema (ahuDay/uploadsByHour) to new schema on read */
-      Object.keys(raw).forEach(function(dk){
-        var rec=raw[dk];
-        if(rec&&typeof rec==='object'){
-          if(rec.uploadsTotal==null&&rec.uploadsByHour!=null){
-            var byH=rec.uploadsByHour;
-            rec.uploadsTotal=Object.keys(byH).reduce(function(s,h){return s+(byH[h]||0);},0);
-          }
-          if(rec.uploadsInShift==null&&rec.uploadsTotal!=null)rec.uploadsInShift=rec.uploadsTotal;
-          if(rec.uploadsOffShift==null)rec.uploadsOffShift=0;
-          if(rec.uploadsByHourInShift==null&&rec.uploadsByHour!=null)rec.uploadsByHourInShift=rec.uploadsByHour;
-        }
-      });
-      Object.assign(perfData[d.id],raw);
-    });
-    if(G('kpi-grid'))renderDashboard();
-    if(G('team-tbl'))renderTeamOverview();
-    if(G('mgr-kpi-card'))renderMgrKpiCard();
-    if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
-    if(G('mgr-upload-trend'))renderMgrUploadTrend();
-    if(G('mgr-error-trend'))renderMgrErrorTrend();
-    if(G('my-day-trend-card'))renderMyDayTrend();
-    if(G('my-day-stats-strip'))renderMyDayStatsStrip();
-  }));
-
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'avatars'),function(snap){
-    if(!window.AVATARS)window.AVATARS={};
-    snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
-    buildSidebar();
-  }));
-
-  /* articles realtime */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'articles'),function(snap){
-    if(!window.mdArticles)window.mdArticles=[];
-    window.mdArticles.length=0;
-    snap.forEach(function(d){
-      var data=Object.assign({id:d.id},d.data());
-      if(data.category==='tmpl'){data.category='template';window._fsSetDoc(window._fsDoc(window._db,'articles',d.id),{category:'template'},{merge:true});}
-      if(data.category==='faq'){data.category='kb';window._fsSetDoc(window._fsDoc(window._db,'articles',d.id),{category:'kb'},{merge:true});}
-      window.mdArticles.push(data);
-    });
-    var annFromArticles=window.mdArticles.filter(function(a){return a.category==='ann'||a.type==='ann'||a.category==='announcement';}).map(function(a){return {id:a.id,title:a.title,body:a.body,author:a.createdBy||a.author||'',postedAt:a.createdAt?new Date(a.createdAt).getTime():Date.now(),_fromArticles:true};});
-    mdAnnouncements=mdAnnouncements.filter(function(a){return !a._fromArticles;});
-    annFromArticles.forEach(function(a){mdAnnouncements.push(a);});
-    if(typeof renderArticles==='function')renderArticles();
-    if(typeof renderAnnouncements==='function')renderAnnouncements();
-  }));
-
-  /* timerSessions */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'timerSessions'),function(snap){
-    allTimerSessions.length=0;
-    snap.forEach(function(d){allTimerSessions.push(Object.assign({_fsId:d.id},d.data()));});
-  }));
-
-  /* mdAwards */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsDoc(window._db,'mdAwards','current'),function(snap){
-    if(snap.exists()){
-      var data=snap.data();
-      mdAwards.hero=data.hero||null;mdAwards.quarter=data.quarter||null;
-      mdAwards.quality=data.quality||null;mdAwards.uploads=data.uploads||null;
-      if(G('awards-panel')||document.querySelector('.award-col'))renderAwards&&renderAwards();
-    }
-  }));
-
-  /* chatStore */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'chatStore'),function(snap){
-    var threads=[];
-    snap.forEach(function(d){threads.push(Object.assign({id:d.id},d.data()));});
-    threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
-    chatStore.threads=threads;
-    updateNotifBell();
-    if(cu&&cu.role==='manager')renderPendingApprovals();
-  }));
-
-  /* attendance */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'attendance'),function(snap){
-    snap.forEach(function(d){
-      var data=d.data();
-      if(data.nick&&data.date){
-        if(!attendance[data.nick])attendance[data.nick]={};
-        attendance[data.nick][data.date]={status:data.status,notes:data.notes||'',weight:data.weight};
-      }
-    });
-    var calWrap=G('att-cal-wrap');
-    if(calWrap&&typeof renderAttCalendar==='function')renderAttCalendar();
-  }));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'mdAnnouncements'),function(snap){mdAnnouncements.length=0;snap.forEach(function(d){mdAnnouncements.push(Object.assign({_fsId:d.id},d.data()));});mdAnnouncements.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});if(G('ann-list'))renderAnnouncements();annUpdateBadge();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'callouts'),function(snap){callouts.length=0;snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});if(typeof updateMemberBell==='function')updateMemberBell();if(G('qp-list'))renderQualityPortal();if(G('esc-qp-list'))renderEscQuality();if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('daily-tbl'))renderDailyTbl();if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();if(G('my-day-errors-card'))renderMyDayErrors();if(loungeTab==='the-hub'&&cu&&cu.role==='escalation'){var _eh=G('lounge-pane-the-hub');if(_eh&&_eh.classList.contains('active'))renderEscalationHub();}}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'perfData'),function(snap){snap.forEach(function(d){if(!perfData[d.id])perfData[d.id]={};var raw=d.data();Object.keys(raw).forEach(function(dk){var rec=raw[dk];if(rec&&typeof rec==='object'){if(rec.uploadsTotal==null&&rec.uploadsByHour!=null){var byH=rec.uploadsByHour;rec.uploadsTotal=Object.keys(byH).reduce(function(s,h){return s+(byH[h]||0);},0);}if(rec.uploadsInShift==null&&rec.uploadsTotal!=null)rec.uploadsInShift=rec.uploadsTotal;if(rec.uploadsOffShift==null)rec.uploadsOffShift=0;if(rec.uploadsByHourInShift==null&&rec.uploadsByHour!=null)rec.uploadsByHourInShift=rec.uploadsByHour;}});Object.assign(perfData[d.id],raw);});if(G('kpi-grid'))renderDashboard();if(G('team-tbl'))renderTeamOverview();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('mgr-upload-trend'))renderMgrUploadTrend();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-trend-card'))renderMyDayTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'avatars'),function(snap){if(!window.AVATARS)window.AVATARS={};snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});buildSidebar();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'articles'),function(snap){if(!window.mdArticles)window.mdArticles=[];window.mdArticles.length=0;snap.forEach(function(d){var data=Object.assign({id:d.id},d.data());if(data.category==='tmpl'){data.category='template';window._fsSetDoc(window._fsDoc(window._db,'articles',d.id),{category:'template'},{merge:true});}if(data.category==='faq'){data.category='kb';window._fsSetDoc(window._fsDoc(window._db,'articles',d.id),{category:'kb'},{merge:true});}window.mdArticles.push(data);});var annFromArticles=window.mdArticles.filter(function(a){return a.category==='ann'||a.type==='ann'||a.category==='announcement';}).map(function(a){return {id:a.id,title:a.title,body:a.body,author:a.createdBy||a.author||'',postedAt:a.createdAt?new Date(a.createdAt).getTime():Date.now(),_fromArticles:true};});mdAnnouncements=mdAnnouncements.filter(function(a){return !a._fromArticles;});annFromArticles.forEach(function(a){mdAnnouncements.push(a);});if(typeof renderArticles==='function')renderArticles();if(typeof renderAnnouncements==='function')renderAnnouncements();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'timerSessions'),function(snap){allTimerSessions.length=0;snap.forEach(function(d){allTimerSessions.push(Object.assign({_fsId:d.id},d.data()));});}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsDoc(window._db,'mdAwards','current'),function(snap){if(snap.exists()){var data=snap.data();mdAwards.hero=data.hero||null;mdAwards.quarter=data.quarter||null;mdAwards.quality=data.quality||null;mdAwards.uploads=data.uploads||null;if(G('awards-panel')||document.querySelector('.award-col'))renderAwards&&renderAwards();}}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'chatStore'),function(snap){var threads=[];snap.forEach(function(d){threads.push(Object.assign({id:d.id},d.data()));});threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});chatStore.threads=threads;updateNotifBell();if(cu&&cu.role==='manager')renderPendingApprovals();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'attendance'),function(snap){snap.forEach(function(d){var data=d.data();if(data.nick&&data.date){if(!attendance[data.nick])attendance[data.nick]={};attendance[data.nick][data.date]={status:data.status,notes:data.notes||'',weight:data.weight};}});var calWrap=G('att-cal-wrap');if(calWrap&&typeof renderAttCalendar==='function')renderAttCalendar();}));
 }
 
 /* Stop listeners on sign out */
@@ -2155,19 +2039,7 @@ function goDash(){
           var d=snap.data();
           if(d.theme&&d.theme!==settings.theme){setTheme(d.theme,null);try{localStorage.setItem('lounge_theme_'+cu.nickname,d.theme);}catch(ex){}}
           if(d.accent&&d.accent!==settings.accent){settings.accent=d.accent;document.documentElement.style.setProperty('--accent',d.accent);try{localStorage.setItem('lounge_accent_'+cu.nickname,d.accent);}catch(ex){}}
-          /* Restore equipped texture pack — defer so GC block functions are ready */
-          if(d.equippedBanner){
-            var _banner=d.equippedBanner;
-            var _applyBanner=function(){
-              if(window.applyPortalHeaderBanner&&window.GC_BANNER_THEMES){
-                var eq={};eq[_banner]=true;
-                applyPortalHeaderBanner(eq);
-              } else {
-                setTimeout(_applyBanner,200);
-              }
-            };
-            setTimeout(_applyBanner,300);
-          }
+          if(d.equippedBanner){var _b=d.equippedBanner;var _applyB=function(){if(window.applyPortalHeaderBanner&&window.GC_BANNER_THEMES){var eq={};eq[_b]=true;applyPortalHeaderBanner(eq);}else{setTimeout(_applyB,200);}};setTimeout(_applyB,300);}
         }
       }).catch(function(){});
     }catch(e){}
@@ -2179,6 +2051,11 @@ function goDash(){
     snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
   }).catch(function(){});}catch(e){}}
   buildSidebar();buildMain();
+  if(cu&&cu.role!=='manager'&&fsDb()&&window._fsQuery&&window._fsWhere&&window._fsOnSnapshot){
+    try{var _itemQ=window._fsQuery(window._fsColl(fsDb(),'portal_notifications'),window._fsWhere('targetNick','==',cu.nickname),window._fsWhere('resolved','==',false));
+      window._fsOnSnapshot(_itemQ,function(snap){window._memberItemNotifs=[];snap.forEach(function(d){var data=d.data();if(data.type==='item_approved'||data.type==='item_rejected'){window._memberItemNotifs.push(Object.assign({docId:d.id},data));}});updateMemberBell();});
+    }catch(ex){}
+  }
   /* Re-append Games panel AFTER buildMain (which wipes main-content) */
   try{
     var _gcP=G('games-panel');var _mc=G('main-content');
@@ -2208,12 +2085,9 @@ function openModal(id){
 function closeModal(id){G(id).classList.remove('open');}
 function avEl(nick,sz=30){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
-  /* Try by nickname key first */
   if(AVATARS[key])return `<img src="${AVATARS[key]}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" alt="${nick}"/>`;
-  /* Try by fullName via TEAM_DIR */
   const dir=TEAM_DIR[key]||TEAM_DIR[nick]||{};
   if(dir.fullName&&AVATARS[dir.fullName])return `<img src="${AVATARS[dir.fullName]}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" alt="${nick}"/>`;
-  /* Default: Koby frog favicon */
   const kobySvg='data:image/svg+xml,'+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐸</text></svg>");
   return `<img src="${kobySvg}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2)" alt="${nick}"/>`;
 }
@@ -2539,16 +2413,8 @@ function uniAttSetView(v){
 var _pinBuffer='';
 var _pinMode='verify';
 async function fsGetPin(nickname){
-  try{
-    var snap=await window._fsGetDoc(window._fsDoc(window._db,'pins',nickname));
-    if(snap.exists()&&snap.data().pin)return snap.data().pin;
-  }catch(e){}
-  try{
-    var all=await window._fsGetDocs(window._fsColl(window._db,'pins'));
-    var found=null;
-    all.forEach(function(d){if(d.id===nickname)found=d.data().pin||null;});
-    if(found)return found;
-  }catch(e){}
+  try{var snap=await window._fsGetDoc(window._fsDoc(window._db,'pins',nickname));if(snap.exists()&&snap.data().pin)return snap.data().pin;}catch(e){}
+  try{var all=await window._fsGetDocs(window._fsColl(window._db,'pins'));var found=null;all.forEach(function(d){if(d.id===nickname)found=d.data().pin||null;});if(found)return found;}catch(e){}
   return '000000';
 }
 async function fsSavePin(nickname,pin){
@@ -2601,9 +2467,7 @@ function pinBack(){
 }
 async function pinSubmit(){
   var errEl=G('pin-err');
-  if(!window._fsGetDoc||!window._db){
-    if(_pinBuffer!=='000000'){if(errEl)errEl.textContent='Please wait, loading...';return;}
-  }
+  if(!window._fsGetDoc||!window._db){if(_pinBuffer!=='000000'){if(errEl)errEl.textContent='Please wait, loading...';return;}}
   var stored=await fsGetPin(cu.nickname);
   if(_pinBuffer===stored){
     fsStartRealtimeListeners();
@@ -2943,16 +2807,15 @@ async function loadPendingReviews(){
 
 function updateMemberBell(){
   if(!cu||cu.role==='manager')return;
-  /* Bell shows for: Pending callouts + unread announcements */
   var myCallouts=callouts.filter(function(co){
     var isMyError=co.uploader===cu.nickname&&co.status==='Pending'&&co.status!=='discarded';
     var isMyEsc=cu.role==='escalation'&&(co.type==='qesc'||co.type==='qesc_esc')&&co.escalationMember===cu.nickname&&co.status==='Pending';
     return isMyError||isMyEsc;
   });
   var annCount=mdAnnouncements.filter(function(a){return !annIsSeen(a);}).length;
-  var total=myCallouts.length+annCount;
-  var wrap=G('member-bell-wrap');
-  var badge=G('member-bell-badge');
+  var itemNotifCount=(window._memberItemNotifs||[]).length;
+  var total=myCallouts.length+annCount+itemNotifCount;
+  var wrap=G('member-bell-wrap');var badge=G('member-bell-badge');
   if(wrap)wrap.style.display=total>0?'flex':'none';
   if(badge){badge.textContent=total;badge.style.display=total>0?'flex':'none';}
 }
@@ -3001,6 +2864,10 @@ function openMemberBellPanel(){
     html+=completed.map(function(co){
       return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="closeMemberNotif();openMemberCompleteView('+co.id+')">'        +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+co.address+'</div>'        +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtDate(co.date)+'</div></div>'        +'<span style="font-size:10px;background:rgba(34,197,94,.12);color:var(--green);padding:2px 8px;border-radius:8px;flex-shrink:0">Completed</span>'        +'</div>';
     }).join('');
+  }
+  var itemNotifs=window._memberItemNotifs||[];
+  if(itemNotifs.length){
+    html='<div style="padding:7px 16px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3)">🎮 Game Corner ('+itemNotifs.length+')</div>'+itemNotifs.map(function(n){var isApproved=n.type==='item_approved';return '<div style="padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer" onclick="gcMarkItemNotifRead(\''+n.docId+'\')">'+'<div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:'+(isApproved?'var(--green)':'var(--red)')+'">'+n.msg+'</div>'+'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+timeAgo(new Date(n.createdAt).toISOString())+'</div></div>'+'<span style="font-size:10px;background:'+(isApproved?'rgba(34,197,94,.12)':'rgba(255,61,61,.12)')+';color:'+(isApproved?'var(--green)':'var(--red)')+';padding:2px 8px;border-radius:8px;flex-shrink:0">'+(isApproved?'Approved':'Rejected')+'</span>'+'</div>';}).join('')+html;
   }
   if(!html)html='<div style="padding:24px;text-align:center;font-size:12px;color:var(--muted)">No notifications.</div>';
   list.innerHTML=html;
@@ -4517,10 +4384,7 @@ var MP_GAMES=GAMES.filter(function(g){return g.type==='multi';});
 function openGame(){gcOpenGameCornerPanel();}
 function openGameCorner(){gcOpenGameCornerPanel();}
 function gcOpenGameCornerPanel(){
-  /* Clear any stale session lockout from old time-limited version */
-  try{var _sKey='gc_session_end_'+(cu?cu.nickname:'x');localStorage.removeItem(_sKey);
-      localStorage.removeItem('gc_sess_el_'+(cu?cu.nickname:'x'));
-      localStorage.removeItem('gc_sess_ext_'+(cu?cu.nickname:'x'));}catch(ex){}
+  try{var _sKey='gc_session_end_'+(cu?cu.nickname:'x');localStorage.removeItem(_sKey);localStorage.removeItem('gc_sess_el_'+(cu?cu.nickname:'x'));localStorage.removeItem('gc_sess_ext_'+(cu?cu.nickname:'x'));}catch(ex){}
   /* Re-attach panel to main-content if it was displaced */
   var gcPanel=G('games-panel');var mc=G('main-content');
   if(gcPanel&&mc&&!mc.contains(gcPanel))mc.appendChild(gcPanel);
@@ -5329,57 +5193,50 @@ function gcBadgeRequestSubscribe(){
       snap.docChanges().forEach(function(change){
         if(change.type==='added'){
           var d=change.doc.data();var docId=change.doc.id;
-          pushNotif(d.itemIcon||'🎖',d.msg+' <button onclick="gcPortalApprove(\''+docId+'\')" style="margin-left:8px;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #22c55e;background:rgba(34,197,94,.1);color:#22c55e;cursor:pointer;">Approve</button>'
-            +' <button onclick="gcPortalDiscard(\''+docId+'\')" style="margin-left:4px;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #ef4444;background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;">Discard</button>','badge_request');
+          pushNotif(d.itemIcon||'🏆',d.msg+' <button onclick="gcPortalApprove(\''+docId+'\')" style="margin-left:8px;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #22c55e;background:rgba(34,197,94,.1);color:#22c55e;cursor:pointer;font-weight:600;">✓ Approve</button>'
+            +' <button onclick="gcPortalReject(\''+docId+'\')" style="margin-left:4px;font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid #ef4444;background:rgba(239,68,68,.1);color:#ef4444;cursor:pointer;font-weight:600;">✗ Reject</button>','badge_request');
         }
       });
     });
   }catch(e){console.warn('gcBadgeRequestSubscribe:',e);}
 }
 
+function gcMarkItemNotifRead(docId){
+  if(!fsDb()||!docId)return;
+  window._fsUpdateDoc(window._fsDoc(fsDb(),'portal_notifications',docId),{resolved:true}).catch(function(){});
+  window._memberItemNotifs=(window._memberItemNotifs||[]).filter(function(n){return n.docId!==docId;});
+  updateMemberBell();
+}
 function gcPortalApprove(docId){
   if(!fsDb()||!window._fsGetDoc||!window._fsDoc||!window._fsUpdateDoc)return;
   window._fsGetDoc(window._fsDoc(fsDb(),'portal_notifications',docId)).then(function(snap){
-    if(!snap.exists())return;
-    var d=snap.data();
-    var isFood=d.itemId==='snack_bar'||d.itemId==='lunch_stub';
-    var label=isFood?'Enter redemption code:':'Enter remarks for member:';
-    var val=prompt(label);
-    if(!val)return;
-    /* Update request in gc_badge_requests */
-    window._fsUpdateDoc(window._fsDoc(fsDb(),'gc_badge_requests',d.reqId),{status:'approved',mgrRemarks:val,resolvedAt:Date.now()}).catch(function(){});
-    /* Remove badge from member inventory */
-    (function(){var upd={};upd[d.itemId]=null;window._fsUpdateDoc(window._fsDoc(fsDb(),'gc_inventory',d.memberNick),upd).catch(function(){});})();
-    /* Write result notification back to member via gc_notifications */
-    var resultMsg=isFood?'Your '+d.itemName+' has been approved! Redemption code: '+val+'. Show this when collecting.':'Your '+d.itemName+' request was approved. Manager remarks: '+val;
-    window._fsGetDoc(window._fsDoc(fsDb(),'gc_notifications',d.memberNick)).then(function(ns){
-      var notifs=ns.exists()?(ns.data().notifs||[]):[];
-      notifs.unshift({id:d.memberNick+'_'+Date.now(),type:'badge_approved',msg:resultMsg,ts:Date.now(),read:false,actionable:false});
-      window._fsSetDoc(window._fsDoc(fsDb(),'gc_notifications',d.memberNick),{notifs:notifs},{merge:true}).catch(function(){});
-    }).catch(function(){});
-    /* Mark portal_notification resolved */
-    window._fsUpdateDoc(window._fsDoc(fsDb(),'portal_notifications',docId),{resolved:true}).catch(function(){});
-    pushNotif('✅','Approved: '+d.itemName+' for '+d.memberNick,'badge_approved');
+    if(!snap.exists())return;var d=snap.data();
+    var note=prompt('Add a note for '+(d.memberFull||d.memberNick)+' (optional):','')||'';
+    if(!confirm('Approve '+d.itemIcon+' '+d.itemName+' for '+(d.memberFull||d.memberNick)+'?'))return;
+    var invUpd={};invUpd[d.itemId+'.active']=true;invUpd[d.itemId+'.status']='approved';invUpd[d.itemId+'.approvedAt']=Date.now();invUpd[d.itemId+'.mgrNote']=note||'';
+    window._fsUpdateDoc(window._fsDoc(fsDb(),'gc_inventory',d.memberNick),invUpd).catch(function(){});
+    window._fsAddDoc(window._fsColl(fsDb(),'portal_notifications'),{type:'item_approved',targetNick:d.memberNick,resolved:false,itemId:d.itemId,itemName:d.itemName,itemIcon:d.itemIcon,msg:'✅ '+d.itemIcon+' '+d.itemName+' approved!'+(note?' Note: '+note:''),createdAt:Date.now()}).catch(function(){});
+    window._fsUpdateDoc(window._fsDoc(fsDb(),'portal_notifications',docId),{resolved:true,mgrNote:note||''}).catch(function(){});
+    pushNotif('✅','Approved: '+d.itemName+' for '+(d.memberFull||d.memberNick),'badge_approved');
   }).catch(function(e){console.warn('gcPortalApprove:',e);});
 }
-
-function gcPortalDiscard(docId){
+function gcPortalReject(docId){
   if(!fsDb()||!window._fsGetDoc||!window._fsDoc||!window._fsUpdateDoc)return;
   window._fsGetDoc(window._fsDoc(fsDb(),'portal_notifications',docId)).then(function(snap){
-    if(!snap.exists())return;
-    var d=snap.data();
-    /* Remove badge from member inventory */
-    (function(){var upd={};upd[d.itemId]=null;window._fsUpdateDoc(window._fsDoc(fsDb(),'gc_inventory',d.memberNick),upd).catch(function(){});})();
-    /* Notify member */
-    window._fsGetDoc(window._fsDoc(fsDb(),'gc_notifications',d.memberNick)).then(function(ns){
-      var notifs=ns.exists()?(ns.data().notifs||[]):[];
-      notifs.unshift({id:d.memberNick+'_'+Date.now(),type:'badge_discarded',msg:'Your '+d.itemName+' request was reviewed and not approved this time. The badge has been removed.',ts:Date.now(),read:false,actionable:false});
-      window._fsSetDoc(window._fsDoc(fsDb(),'gc_notifications',d.memberNick),{notifs:notifs},{merge:true}).catch(function(){});
-    }).catch(function(){});
-    window._fsUpdateDoc(window._fsDoc(fsDb(),'portal_notifications',docId),{resolved:true}).catch(function(){});
-    pushNotif('🗑️','Discarded: '+d.itemName+' for '+d.memberNick,'badge_discarded');
-  }).catch(function(e){console.warn('gcPortalDiscard:',e);});
+    if(!snap.exists())return;var d=snap.data();
+    var reason=prompt('Reason for rejection (required):','');
+    if(reason===null)return;if(!reason.trim()){alert('Please provide a reason.');return;}
+    if(!confirm('Reject '+d.itemIcon+' '+d.itemName+' for '+(d.memberFull||d.memberNick)+'?'))return;
+    var invUpd={};invUpd[d.itemId+'.active']=false;invUpd[d.itemId+'.status']='rejected';invUpd[d.itemId+'.rejectedAt']=Date.now();invUpd[d.itemId+'.mgrNote']=reason;
+    window._fsUpdateDoc(window._fsDoc(fsDb(),'gc_inventory',d.memberNick),invUpd).catch(function(){});
+    if(d.price&&d.memberNick){gcAwardCredit(d.memberNick,d.price);}
+    window._fsAddDoc(window._fsColl(fsDb(),'portal_notifications'),{type:'item_rejected',targetNick:d.memberNick,resolved:false,itemId:d.itemId,itemName:d.itemName,itemIcon:d.itemIcon,msg:'❌ '+d.itemIcon+' '+d.itemName+' not approved. Reason: '+reason+'. Credits refunded.',createdAt:Date.now()}).catch(function(){});
+    window._fsUpdateDoc(window._fsDoc(fsDb(),'portal_notifications',docId),{resolved:true,mgrNote:reason}).catch(function(){});
+    pushNotif('❌','Rejected: '+d.itemName+' — credits refunded to '+(d.memberFull||d.memberNick),'badge_rejected');
+  }).catch(function(e){console.warn('gcPortalReject:',e);});
 }
+function gcPortalDiscard(docId){gcPortalReject(docId);}
+
 
 function statusSubscribe(){
   if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
@@ -6498,16 +6355,7 @@ function switchLoungeTab(tab, btn){
     if(cu&&cu.role==='escalation')renderEscalationHub();
     else if(cu&&cu.role==='manager')renderManagerHub();
     else renderHubInLounge();
-    setTimeout(function(){
-      if(loungeTab!=='the-hub')return;
-      if(cu&&cu.role==='escalation')renderEscalationHub();
-      else if(cu&&cu.role==='manager'){
-        if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();
-        if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
-        if(G('mgr-hub-pane-attendance')&&G('mgr-hub-pane-attendance').classList.contains('active'))renderMgrHubAttendance();
-      }
-      else if(G('kpi-grid'))renderDashboard();
-    },800);
+    setTimeout(function(){if(loungeTab!=='the-hub')return;if(cu&&cu.role==='escalation')renderEscalationHub();else if(cu&&cu.role==='manager'){if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();}else if(G('kpi-grid'))renderDashboard();},800);
   }
   document.querySelectorAll('.lounge-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.lounge-pane').forEach(function(p){p.classList.remove('active');});
@@ -9968,20 +9816,120 @@ function openMemberProfile(nick){
   var fmtShift=function(h){var hr=Math.floor(h),min=h%1===0.5?'30':'00';return hr+':'+min;};
   G('member-profile-shift').textContent=sh?fmtShift(sh.start)+' – '+fmtShift(sh.end)+' AEST':'No fixed schedule';
   var isManager=cu&&cu.role==='manager';
-  /* Show/hide edit button for managers (not for their own card) */
   var editBtn=G('member-profile-shift-edit-btn');
   if(editBtn)editBtn.style.display=(isManager&&nick!==cu.nickname)?'':'none';
-  /* Store current nick on the edit section for save function */
   var editDiv=G('member-profile-shift-edit');
   if(editDiv){editDiv.dataset.nick=nick;editDiv.style.display='none';}
   if(G('member-profile-shift-err'))G('member-profile-shift-err').textContent='';
-  /* Pre-fill inputs with current shift */
   if(G('member-profile-shift-start'))G('member-profile-shift-start').value=sh?sh.start:'';
   if(G('member-profile-shift-end'))G('member-profile-shift-end').value=sh?sh.end:'';
-  renderAwardHistoryList(nick, history, isManager);
+  renderAwardHistoryList(nick,history,isManager);
+  var bannerEl=G('member-profile-banner');
+  if(bannerEl){bannerEl.style.backgroundImage='';bannerEl.style.backgroundSize='';bannerEl.style.backgroundPosition='';bannerEl.style.backgroundRepeat='';bannerEl.style.backgroundColor='var(--bg2)';}
+  /* banner label removed */
+  if(G('member-profile-cosmetics'))G('member-profile-cosmetics').innerHTML='';
+  if(G('member-profile-badges'))G('member-profile-badges').innerHTML='';
+  var avatarWrap=G('member-profile-avatar');
+  if(avatarWrap){avatarWrap.style.cssText='flex-shrink:0';var oldRing=avatarWrap.querySelector('.profile-ring');if(oldRing)oldRing.remove();}
+  var nickLc=nick.toLowerCase();
+  if(fsDb()&&window._fsGetDoc&&window._fsDoc){
+    /* Load gc_inventory and userSettings in parallel */
+    Promise.all([
+      window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nickLc)).catch(function(){return null;}),
+      window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',nick)).catch(function(){return null;})
+    ]).then(function(results){
+      var invSnap=results[0]; var settingsSnap=results[1];
+      var inv=invSnap&&invSnap.exists()?(invSnap.data()||{}):{};
+      /* Attach equippedBanner from userSettings as fallback */
+      if(settingsSnap&&settingsSnap.exists()&&settingsSnap.data().equippedBanner){
+        inv._equippedBanner=settingsSnap.data().equippedBanner;
+      }
+      renderMemberProfileCosmetics(nick,inv);
+    }).catch(function(){renderMemberProfileCosmetics(nick,{});});
+  } else {renderMemberProfileCosmetics(nick,{});}
   G('modal-member-profile').classList.add('open');
 }
 
+function renderMemberProfileCosmetics(nick,inv){
+  var equipped=inv.equipped||{};
+  var ringColors={ring_gold:'#EF9F27',ring_purple:'#7F77DD',ring_teal:'#1D9E75',ring_coral:'#D85A30'};
+  /* Find equipped banner — truthy check (not just ===true, could be any truthy) */
+  var equippedBanner=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&!!equipped[k];});
+  /* Also check userSettings equippedBanner as fallback */
+  if(!equippedBanner&&inv._equippedBanner)equippedBanner=inv._equippedBanner;
+  var equippedRing=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&!!equipped[k];});
+  /* ── Banner header ── */
+  var bannerEl=G('member-profile-banner');
+  var bannerTint=null;var bannerShadow=null;
+  if(equippedBanner&&typeof BANNER_THEMES!=='undefined'&&BANNER_THEMES[equippedBanner]){
+    bannerTint=BANNER_THEMES[equippedBanner].color||null;
+    bannerShadow=BANNER_THEMES[equippedBanner].shadow||null;
+  }
+  if(equippedBanner&&bannerEl){
+    var bt=(typeof GC_BANNER_THEMES!=='undefined'&&GC_BANNER_THEMES[equippedBanner])||null;
+    if(bt){
+      bannerEl.style.backgroundImage='url('+bt.uri+')';
+      bannerEl.style.backgroundSize=bt.sz||'cover';
+      bannerEl.style.backgroundPosition=bt.pos||'center center';
+      bannerEl.style.backgroundRepeat=bt.rep||'no-repeat';
+      bannerEl.style.backgroundColor='#0a0814';
+    }
+  }
+  /* Subtle texture tint on body */
+  var bodyEl=G('member-profile-body');
+  if(bodyEl)bodyEl.style.background=bannerTint?'linear-gradient(160deg,'+bannerTint+'33 0%,transparent 60%)':'';
+  /* Role pill — tint with pack accent when equipped */
+  var roleEl=G('member-profile-role');
+  if(roleEl){
+    if(bannerShadow){
+      roleEl.style.background=bannerShadow.replace(/,[\d.]+\)$/,',0.85)');
+      roleEl.style.color='#fff';
+    } else {
+      roleEl.style.background='rgba(0,0,0,.18)';
+      roleEl.style.color='#fff';
+    }
+  }
+  /* Apply accent color to info row labels (EMAIL, BIRTHDAY, HIRE DATE, SHIFT) */
+  var packAccent=bannerShadow?bannerShadow.replace(/,[\d.]+\)$/,',0.85)'):'';
+  var infoLabels=document.querySelectorAll('#modal-member-profile .mp-row-label');
+  infoLabels.forEach(function(el){el.style.color=packAccent||'';});
+  /* ── Ring on avatar ── */
+  var avatarWrap=G('member-profile-avatar');
+  if(avatarWrap&&equippedRing&&ringColors[equippedRing]){
+    var color=ringColors[equippedRing];
+    avatarWrap.style.cssText='flex-shrink:0;position:relative;width:64px;height:64px;display:inline-block';
+    var img=avatarWrap.querySelector('img,div');
+    if(img){img.style.border='3px solid '+color;img.style.borderRadius='50%';}
+    var ringDiv=document.createElement('div');ringDiv.className='profile-ring';
+    ringDiv.style.cssText='position:absolute;inset:-4px;border-radius:50%;border:3px solid '+color+';pointer-events:none;box-sizing:border-box;z-index:1';
+    avatarWrap.appendChild(ringDiv);
+  }
+  /* ── Equipped section (always render) ── */
+  var cosEl=G('member-profile-cosmetics');
+  if(cosEl){
+    var chips=[];
+    if(equippedBanner)chips.push('<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg2)">🎨 '+equippedBanner.replace('banner_','').replace(/_/g,' ')+' banner</span>');
+    if(equippedRing)chips.push('<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid '+ringColors[equippedRing]+';background:var(--bg2)"><span style="width:10px;height:10px;border-radius:50%;border:2px solid '+ringColors[equippedRing]+';display:inline-block;flex-shrink:0"></span>'+equippedRing.replace('ring_','').replace(/_/g,' ')+' ring</span>');
+    var chipsHtml=chips.length?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+chips.join('')+'</div>':'<span style="font-size:12px;color:var(--muted)">Nothing equipped yet.</span>';
+    var _sectionHd=function(label){return '<div style="font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:'+(bannerShadow?bannerShadow.replace(/,[^,]+\)$/,',0.9)'):'var(--muted)')+';margin-bottom:8px">'+label+'</div>';};
+    cosEl.innerHTML=_sectionHd('Equipped')+chipsHtml;
+  }
+  /* ── Badges (always render) ── */
+  var badgeEl=G('member-profile-badges');
+  if(badgeEl){
+    var badgeItems=Object.values(inv).filter(function(v){return v&&typeof v==='object'&&v.itemId&&(v.status==='approved'||v.active===true)&&(v.tier==='premium'||v.tier==='legendary');});
+    var badgesHtml=badgeItems.length
+      ?'<div style="display:flex;gap:10px;flex-wrap:wrap">'+badgeItems.map(function(b){return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;width:52px"><span style="font-size:24px;line-height:1">'+(b.icon||'🏅')+'</span><span style="font-size:9px;color:var(--muted);text-align:center;line-height:1.3">'+(b.name||b.itemId).replace(/_/g,' ')+'</span></div>';}).join('')+'</div>'
+      :'<span style="font-size:12px;color:var(--muted)">No badges yet.</span>';
+    badgeEl.innerHTML=_sectionHd('Badges').replace('margin-bottom:8px','margin:12px 0 8px')+badgesHtml;
+  }
+  /* ── Achievements (always render) ── */
+  var achEl=G('member-profile-achievements');
+  if(achEl){
+    achEl.innerHTML=_sectionHd('Achievements').replace('margin-bottom:8px','margin:12px 0 8px')
+      +'<span style="font-size:12px;color:var(--muted)">Coming soon.</span>';
+  }
+}
 function memberProfileToggleShiftEdit(){
   var div=G('member-profile-shift-edit');
   if(!div)return;
@@ -12354,30 +12302,35 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <!-- MEMBER PROFILE MODAL -->
 <div class="modal-overlay" id="modal-member-profile" onclick="if(event.target===this)this.classList.remove('open')">
-  <div class="modal" style="max-width:420px">
-    <button class="modal-close" onclick="G('modal-member-profile').classList.remove('open')">&#x2715;</button>
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-      <div id="member-profile-avatar"></div>
-      <div>
-        <div id="member-profile-name" style="font-family:var(--font-d);font-size:18px;font-weight:700;color:var(--text)"></div>
-        <div id="member-profile-role" style="font-size:12px;color:var(--accent);font-weight:600;margin-top:2px"></div>
+  <div class="modal" style="max-width:420px;overflow:hidden;padding:0">
+    <button class="modal-close" onclick="G('modal-member-profile').classList.remove('open')" style="position:absolute;top:10px;right:10px;z-index:3;background:rgba(0,0,0,.35);border-color:transparent;color:#fff">&#x2715;</button>
+    <!-- Banner: pure image, no content inside -->
+    <div id="member-profile-banner" style="height:110px;background:var(--bg2);position:relative;overflow:hidden;flex-shrink:0;border-radius:16px 16px 0 0;margin:-1px -1px 0 -1px;"></div>
+    <!-- Overlap zone: avatar + name side by side, avatar breaks out of banner -->
+    <div style="position:relative;padding:0 18px;margin-top:-40px;margin-bottom:4px;display:flex;align-items:flex-end;gap:12px;z-index:2">
+      <div id="member-profile-avatar" style="flex-shrink:0;position:relative"></div>
+      <div style="padding-bottom:6px;min-width:0">
+        <!-- Name: dark on white body, but upper half may overlap banner — text-shadow ensures readability -->
+        <div id="member-profile-name" style="font-family:var(--font-d);font-size:17px;font-weight:700;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.9),0 0 20px rgba(0,0,0,.8);line-height:1.2"></div>
+        <div id="member-profile-role" style="font-size:11px;font-weight:600;margin-top:4px;display:inline-block;padding:2px 10px;border-radius:20px;background:rgba(0,0,0,.18);color:#fff;backdrop-filter:blur(4px)"></div>
       </div>
     </div>
+    <div id="member-profile-body" style="padding:16px 20px 20px">
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Email</span>
+        <span class="mp-row-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Email</span>
         <span id="member-profile-email" style="font-size:12px;color:var(--text)"></span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Birthday</span>
+        <span class="mp-row-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Birthday</span>
         <span id="member-profile-birthday" style="font-size:12px;color:var(--text)"></span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Hire Date</span>
+        <span class="mp-row-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Hire Date</span>
         <span id="member-profile-hire" style="font-size:12px;color:var(--text)"></span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Shift</span>
+        <span class="mp-row-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Shift</span>
         <div style="display:flex;align-items:center;gap:8px">
           <span id="member-profile-shift" style="font-size:12px;color:var(--text)"></span>
           <button id="member-profile-shift-edit-btn" onclick="memberProfileToggleShiftEdit()" style="display:none;font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer">Edit</button>
@@ -12400,8 +12353,9 @@ document.addEventListener('DOMContentLoaded',function(){
         <div id="member-profile-shift-err" style="font-size:11px;color:var(--red);margin-top:4px"></div>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="G('modal-member-profile').classList.remove('open')">Close</button>
+    <div id="member-profile-cosmetics" style="margin-top:16px"></div>
+    <div id="member-profile-badges" style="margin-top:4px"></div>
+    <div id="member-profile-achievements" style="margin-top:4px;padding-bottom:20px"></div>
     </div>
   </div>
 </div>
@@ -12841,7 +12795,7 @@ document.addEventListener('DOMContentLoaded',function(){
 .gc-tile.multi{border-color:rgba(34,197,94,.2);}
 .gc-tile.multi:hover{border-color:#22c55e;}
 .gc-tile-icon{font-size:28px;margin-bottom:8px;}
-.gc-tile-name{font-size:13px;font-weight:700;font-family:var(--font-d);display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#e8eaf6;}
+.gc-tile-name{font-size:13px;font-weight:500;font-family:var(--font-d);display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:var(--gc-name-color,#1a1a2e);}
 .gc-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;}
 .gc-solo-b{background:rgba(124,58,237,.15);color:#9461f7;}
 .gc-multi-b{background:rgba(34,197,94,.12);color:#22c55e;}
@@ -13335,7 +13289,7 @@ var GC_SHOP_ITEMS=[
 /* ── Shop render ── */
 function gcRenderShop(){
   var pane=G('gc-pane-shop');if(!pane)return;
-  if(!gcDb()){pane.innerHTML='<div style="color:#8892b0;padding:20px;text-align:center">Shop loading…</div>';setTimeout(gcRenderShop,400);return;}
+  if(!gcDb()){pane.innerHTML='<div style="color:#8892b0;padding:20px;text-align:center">Shop loading...</div>';setTimeout(gcRenderShop,400);return;}
   var nick=cu?cu.nickname.toLowerCase():'';
   gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
     var inv=snap.exists()?(snap.data()||{}):{};
@@ -13367,7 +13321,7 @@ function gcRenderShop(){
         var _purchasedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #22c55e;background:rgba(34,197,94,.08);color:#22c55e;cursor:not-allowed;">Purchased</button>';
         var _lockedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #2a2d4a;background:transparent;color:#8892b0;cursor:not-allowed;">Locked</button>';
         card.innerHTML=bannerPreview+'<div style="font-size:22px;margin-bottom:6px">'+item.icon+'</div>'
-          +tierEl+'<div style="font-size:14px;font-weight:700;color:#ffffff;margin:6px 0 3px">'+item.name+'</div>'
+          +tierEl+'<div style="font-size:14px;font-weight:500;color:var(--gc-name-color,#1a1a2e);margin:6px 0 3px">'+item.name+'</div>'
           +'<div style="font-size:11px;color:#8892b0;margin-bottom:8px;line-height:1.4">'+item.desc+'</div>'
           +statusMsg+'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
           +'<span style="font-size:13px;font-weight:700;color:#9461f7">'+item.price.toLocaleString()+' cr</span>'
@@ -13385,28 +13339,31 @@ function gcBuyItem(itemId){
   var item=GC_SHOP_ITEMS.find(function(i){return i.id===itemId;});
   if(!item||!cu||!gcDb()){gcToast('Sign in required');return;}
   if(!gcIsManager()&&gcCredits<item.price){gcToast('Not enough credits! You need '+item.price.toLocaleString()+' cr. Keep playing! 🎮');return;}
-  if(!confirm('Buy '+item.name+' for '+item.price.toLocaleString()+' credits?'))return;
+  var needsApproval=!gcIsManager()&&(item.tier==='premium'||item.tier==='legendary');
+  var confirmMsg=needsApproval?'Redeem '+item.name+' for '+item.price.toLocaleString()+' credits?\n\nCredits will be deducted now. Your manager will review and approve the request.':'Buy '+item.name+' for '+item.price.toLocaleString()+' credits?';
+  if(!confirm(confirmMsg))return;
   gcSpendCredit(item.price,function(){
     var quarter=gcCurrentQuarter();
-    var data={active:true,purchasedAt:Date.now(),quarter:quarter,itemId:itemId,name:item.name,icon:item.icon,tier:item.tier,useFlow:item.useFlow||false,requireDate:item.requireDate||false,requireTicket:item.requireTicket||false};
+    var status=needsApproval?'pending_approval':'active';
+    var data={active:!needsApproval,status:status,purchasedAt:Date.now(),quarter:quarter,itemId:itemId,name:item.name,icon:item.icon,tier:item.tier,useFlow:item.useFlow||false};
     var update={};update[itemId]=data;
     gcDb().collection('gc_inventory').doc(cu.nickname.toLowerCase()).set(update,{merge:true}).then(function(){
-      gcToast(item.icon+' '+item.name+' purchased! Pending manager approval.');
-      /* Route approval request to portal notification bell */
-      if(fsDb()&&typeof window._fsAddDoc==='function'){
-        window._fsAddDoc(window._fsColl(fsDb(),'portal_notifications'),{
-          type:'badge_request',targetRole:'manager',resolved:false,
-          memberNick:cu.nickname,memberFull:cu.fullName||cu.nickname,
-          itemId:itemId,itemName:item.name,itemIcon:item.icon,itemTier:item.tier,
-          price:item.price,createdAt:Date.now(),
-          msg:cu.nickname+' requested: '+item.icon+' '+item.name+' ('+item.tier+')'
-        }).catch(function(){});
-      }
-      gcRenderShop();
+      if(needsApproval){
+        gcToast(item.icon+' '+item.name+' submitted! Waiting for manager approval. ⏰');
+        if(fsDb()&&typeof window._fsAddDoc==='function'){
+          window._fsAddDoc(window._fsColl(fsDb(),'portal_notifications'),{
+            type:'badge_request',targetRole:'manager',resolved:false,
+            memberNick:cu.nickname,memberFull:cu.fullName||cu.nickname,
+            itemId:itemId,itemName:item.name,itemIcon:item.icon,itemTier:item.tier,
+            price:item.price,createdAt:Date.now(),
+            msg:cu.nickname+' requested: '+item.icon+' '+item.name+' ('+item.tier+')'
+          }).catch(function(){});
+        }
+      } else {gcToast(item.icon+' '+item.name+' purchased!');}
+      gcRenderShop();gcRenderBadges();
     }).catch(function(e){gcToast('Purchase error: '+e.message);});
   });
 }
-
 /* ── Badges render ── */
 
 /* ── Display name overrides — maps itemId to current canonical name ── */
@@ -13421,9 +13378,9 @@ function gcDisplayName(item){
 }
 function gcRenderBadges(){
   var pane=G('gc-pane-badges');if(!pane)return;
-  if(!gcDb()){pane.innerHTML='<div style="color:#8892b0;font-size:12px;padding:10px">Loading…</div>';setTimeout(gcRenderBadges,400);return;}
+  if(!gcDb()){pane.innerHTML='<div style="color:#8892b0;font-size:12px;padding:10px">Loading...</div>';setTimeout(gcRenderBadges,400);return;}
   var nick=cu?cu.nickname.toLowerCase():'';
-  pane.innerHTML='<div style="color:#8892b0;font-size:12px;padding:10px">Loading badges…</div>';
+  pane.innerHTML='<div style="color:#8892b0;font-size:12px;padding:10px">Loading badgestyle="color:#8892b0;font-size:12px;padding:10px">Loading badges…</div>';
   gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
     var inv=snap.exists()?(snap.data()||{}):{};
     var invEquipped=inv.equipped||{};
@@ -13439,7 +13396,7 @@ function gcRenderBadges(){
       row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--border);margin-bottom:8px;';
       var isCosmetic=item.tier==='cosmetic',isBoost=item.tier==='boost';
       var left='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:22px">'+item.icon+'</span>'
-        +'<div><div style="font-size:14px;font-weight:700;color:#ffffff">'+gcDisplayName(item)+'</div>'
+        +'<div><div style="font-size:14px;font-weight:500;color:var(--gc-name-color,#1a1a2e)">'+gcDisplayName(item)+'</div>'
         +'<div style="font-size:10px;color:#8892b0">'+(isCosmetic?'Cosmetic · permanent':(isBoost?'Boost · one-time use':'Premium item'))+'</div></div></div>';
       var right='';
       if(isCosmetic){
@@ -13464,10 +13421,33 @@ var TEXTURE_PACK_MAP={
 function applyPortalPalette(equippedMap){
   /* Remove any existing texture pack class */
   Object.values(TEXTURE_PACK_MAP).forEach(function(cls){document.body.classList.remove(cls);});
-  if(!equippedMap)return;
+  if(!equippedMap){
+    /* Restore user's custom accent when no pack */
+    var savedAccent=cu?localStorage.getItem('lounge_accent_'+cu.nickname):null;
+    if(savedAccent)document.documentElement.style.setProperty('--accent',savedAccent);
+    else document.documentElement.style.removeProperty('--accent');
+    return;
+  }
   var bannerKey=Object.keys(equippedMap).find(function(k){return k.startsWith('banner_')&&equippedMap[k];});
   if(bannerKey&&TEXTURE_PACK_MAP[bannerKey]){
     document.body.classList.add(TEXTURE_PACK_MAP[bannerKey]);
+    /* Override --accent with texture pack accent color while pack is active */
+    var packAccents={
+      'banner_forest':'#5a7d6a',
+      'banner_galaxy':'#8b75d7',
+      'banner_sunset':'#c0616a',
+      'banner_ocean':'#3a7fc1'
+    };
+    if(packAccents[bannerKey]){
+      document.documentElement.style.setProperty('--accent',packAccents[bannerKey]);
+      document.documentElement.style.setProperty('--gc-name-color',packAccents[bannerKey]);
+    }
+  } else {
+    /* No banner equipped — restore user's custom accent, reset gc name color to default */
+    var savedAccent=cu?localStorage.getItem('lounge_accent_'+cu.nickname):null;
+    if(savedAccent)document.documentElement.style.setProperty('--accent',savedAccent);
+    else document.documentElement.style.removeProperty('--accent');
+    document.documentElement.style.setProperty('--gc-name-color','#1a1a2e');
   }
 }
 window.applyPortalPalette=applyPortalPalette;
@@ -13533,10 +13513,7 @@ function gcEquipCosmetic(itemId){
         var newEquipped=Object.assign({},equipped);
         newEquipped[itemId]=false;
         if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
-        /* Clear from userSettings too */
-        if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){
-          try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:''},{merge:true}).catch(function(){});}catch(ex){}
-        }
+        if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:''},{merge:true}).catch(function(){});}catch(ex){}}
         gcRenderBadges();
         gcToast('\u274c '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+ ' unequipped');
       });
@@ -13550,10 +13527,7 @@ function gcEquipCosmetic(itemId){
       if(isBanner){Object.keys(newEquipped).forEach(function(k){if(k.startsWith('banner_'))newEquipped[k]=false;});}
       newEquipped[itemId]=true;
       if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
-      /* Also persist to userSettings so it survives refresh without GC block timing issue */
-      if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){
-        try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:itemId},{merge:true}).catch(function(){});}catch(ex){}
-      }
+      if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:itemId},{merge:true}).catch(function(){});}catch(ex){}}
       gcRenderBadges();
       gcToast('\u2728 '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' equipped!');
     });
