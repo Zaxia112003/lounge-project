@@ -2155,6 +2155,19 @@ function goDash(){
           var d=snap.data();
           if(d.theme&&d.theme!==settings.theme){setTheme(d.theme,null);try{localStorage.setItem('lounge_theme_'+cu.nickname,d.theme);}catch(ex){}}
           if(d.accent&&d.accent!==settings.accent){settings.accent=d.accent;document.documentElement.style.setProperty('--accent',d.accent);try{localStorage.setItem('lounge_accent_'+cu.nickname,d.accent);}catch(ex){}}
+          /* Restore equipped texture pack — defer so GC block functions are ready */
+          if(d.equippedBanner){
+            var _banner=d.equippedBanner;
+            var _applyBanner=function(){
+              if(window.applyPortalHeaderBanner&&window.GC_BANNER_THEMES){
+                var eq={};eq[_banner]=true;
+                applyPortalHeaderBanner(eq);
+              } else {
+                setTimeout(_applyBanner,200);
+              }
+            };
+            setTimeout(_applyBanner,300);
+          }
         }
       }).catch(function(){});
     }catch(e){}
@@ -2195,8 +2208,14 @@ function openModal(id){
 function closeModal(id){G(id).classList.remove('open');}
 function avEl(nick,sz=30){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
+  /* Try by nickname key first */
   if(AVATARS[key])return `<img src="${AVATARS[key]}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" alt="${nick}"/>`;
-  return `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:${Math.floor(sz*.38)}px;font-weight:700;color:#fff;flex-shrink:0;font-family:var(--font-d)">${nick.slice(0,2).toUpperCase()}</div>`;
+  /* Try by fullName via TEAM_DIR */
+  const dir=TEAM_DIR[key]||TEAM_DIR[nick]||{};
+  if(dir.fullName&&AVATARS[dir.fullName])return `<img src="${AVATARS[dir.fullName]}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" alt="${nick}"/>`;
+  /* Default: Koby frog favicon */
+  const kobySvg='data:image/svg+xml,'+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐸</text></svg>");
+  return `<img src="${kobySvg}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2)" alt="${nick}"/>`;
 }
 function buildSidebar(){
   /* Show Add Article button to manager and Jelie */
@@ -4498,6 +4517,10 @@ var MP_GAMES=GAMES.filter(function(g){return g.type==='multi';});
 function openGame(){gcOpenGameCornerPanel();}
 function openGameCorner(){gcOpenGameCornerPanel();}
 function gcOpenGameCornerPanel(){
+  /* Clear any stale session lockout from old time-limited version */
+  try{var _sKey='gc_session_end_'+(cu?cu.nickname:'x');localStorage.removeItem(_sKey);
+      localStorage.removeItem('gc_sess_el_'+(cu?cu.nickname:'x'));
+      localStorage.removeItem('gc_sess_ext_'+(cu?cu.nickname:'x'));}catch(ex){}
   /* Re-attach panel to main-content if it was displaced */
   var gcPanel=G('games-panel');var mc=G('main-content');
   if(gcPanel&&mc&&!mc.contains(gcPanel))mc.appendChild(gcPanel);
@@ -13046,7 +13069,7 @@ function gcAwardCredit(nick,amount){
 }
 
 /* ── Safeguards ── */
-var GC_S={SESSION_LIMIT:15*60,WARN_AT:5*60,EXTEND_SECS:5*60,EXTEND_COST:10,MAX_EXTENSIONS:999,DAILY_GAME_CAP:25,GAME_COOLDOWN:10,SESSION_COOLDOWN:60*60,_timer:null,_elapsed:0,_warned:false,_extensions:0,_lastGameEnd:0};
+var GC_S={SESSION_LIMIT:999*60,WARN_AT:999*60,EXTEND_SECS:5*60,EXTEND_COST:10,MAX_EXTENSIONS:999,DAILY_GAME_CAP:999,DAILY_CREDIT_CAP:70,GAME_COOLDOWN:5,SESSION_COOLDOWN:0,_timer:null,_elapsed:0,_warned:false,_extensions:0,_lastGameEnd:0};
 
 function gcIsManager(){return cu&&cu.role&&cu.role.toLowerCase()==='manager';}
 function gcGetSydneyDay(){return new Date(new Date().toLocaleString('en-US',{timeZone:'Australia/Sydney'})).getDay();}
@@ -13064,7 +13087,7 @@ function gcIsInShift(){
   return tot>=toMins(sh.start)&&tot<toMins(sh.end);
 }
 function gcIsOutsideShift(){return gcIsWeekend()||!gcIsInShift();}
-function gcEffectiveCap(){return gcIsOutsideShift()?5:GC_S.DAILY_GAME_CAP;}
+function gcEffectiveCap(){return gcIsOutsideShift()?5:GC_S.DAILY_CREDIT_CAP;}
 function gcCheckAccess(){
   if(gcIsManager())return{ok:true};
   if(!gcSessionCooldownOk()){var endTime=parseInt(localStorage.getItem('gc_session_end_'+(cu?cu.nickname:'x'))||'0');var remMs=GC_S.SESSION_COOLDOWN*1000-(Date.now()-endTime);var remMins=Math.ceil(remMs/60000);return{ok:false,reason:'Session cooldown active.',sub:'Next session opens in ~'+remMins+' minute'+(remMins!==1?'s':'')+'. Back to work! 💪'};}
@@ -13510,6 +13533,10 @@ function gcEquipCosmetic(itemId){
         var newEquipped=Object.assign({},equipped);
         newEquipped[itemId]=false;
         if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
+        /* Clear from userSettings too */
+        if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){
+          try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:''},{merge:true}).catch(function(){});}catch(ex){}
+        }
         gcRenderBadges();
         gcToast('\u274c '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+ ' unequipped');
       });
@@ -13523,6 +13550,10 @@ function gcEquipCosmetic(itemId){
       if(isBanner){Object.keys(newEquipped).forEach(function(k){if(k.startsWith('banner_'))newEquipped[k]=false;});}
       newEquipped[itemId]=true;
       if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
+      /* Also persist to userSettings so it survives refresh without GC block timing issue */
+      if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){
+        try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:itemId},{merge:true}).catch(function(){});}catch(ex){}
+      }
       gcRenderBadges();
       gcToast('\u2728 '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' equipped!');
     });
