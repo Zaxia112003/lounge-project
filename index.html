@@ -771,7 +771,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .game-tile:hover{border-color:var(--accent);transform:translateY(-2px);}
 .game-tile:hover{border-color:var(--accent);transform:translateY(-1px);}
 .game-tile-icon{font-size:24px;margin-bottom:6px;}
-.game-tile-name{font-size:12px;font-weight:700;color:#ffffff;margin-bottom:2px;}
+.game-tile-name{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px;}
 .game-tile-desc{font-size:10px;color:var(--muted);margin-bottom:8px;}
 .game-tile-scores{border-top:1px solid var(--border);padding-top:6px;display:flex;flex-direction:column;gap:3px;min-height:32px;}
 .game-tile-score-row{display:flex;align-items:center;gap:5px;font-size:10px;}
@@ -1547,7 +1547,7 @@ function fsDb(){return window._db;}
 async function fsLoadCollection(colName,localRef,mapFn){
   if(!window._db||!window._fsColl)return;
   try{
-    var snap=await window._fsGetDocs(window._fsColl(fsDb(),colName));
+    var snap=await window._fsGetDocs(window._fsColl(window._db,colName));
     var items=[];
     snap.forEach(function(d){items.push(Object.assign({_fsId:d.id},d.data()));});
     if(mapFn)items=items.map(mapFn);
@@ -1602,7 +1602,20 @@ async function fsLoadAll(){
     if(seen[key])TEAM.splice(i,1);
     else seen[key]=true;
   }
-  /* Team loaded from Firestore — no seeding needed */
+  /* If Firestore team collection is empty, seed from hardcoded TEAM_DIR */
+  if(TEAM.length===0&&typeof TEAM_DIR!=='undefined'){
+    Object.keys(TEAM_DIR).forEach(function(nick){
+      var dir=TEAM_DIR[nick];
+      var member={nickname:nick,fullName:dir.fullName,role:(dir.role||'uploader').toLowerCase(),
+                  email:dir.email||'',birthday:dir.birthday||'TBC',hireDate:dir.hireDate||'TBC'};
+      TEAM.push(member);
+      /* Write to Firestore so future loads work */
+      if(window._db&&window._fsSetDoc&&window._fsDoc){
+        var payload=Object.assign({},member);
+        window._fsSetDoc(window._fsDoc(window._db,'team',nick),payload,{merge:true}).catch(function(){});
+      }
+    });
+  }
   /* Rebuild store from loaded TEAM */
   TEAM.forEach(function(m){
     if(m.role)m.role=m.role.toLowerCase(); /* normalize */
@@ -1699,7 +1712,7 @@ function fsStartRealtimeListeners(){
   pwStartListeners();
 
   /* mdAnnouncements */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'mdAnnouncements'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'mdAnnouncements'),function(snap){
     mdAnnouncements.length=0;
     snap.forEach(function(d){mdAnnouncements.push(Object.assign({_fsId:d.id},d.data()));});
     mdAnnouncements.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
@@ -1708,7 +1721,7 @@ function fsStartRealtimeListeners(){
   }));
 
   /* callouts */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'callouts'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'callouts'),function(snap){
     callouts.length=0;
     snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});
     if(typeof updateMemberBell==='function')updateMemberBell();
@@ -1722,38 +1735,64 @@ function fsStartRealtimeListeners(){
     if(G('mgr-error-trend'))renderMgrErrorTrend();
     if(G('my-day-stats-strip'))renderMyDayStatsStrip();
     if(G('my-day-errors-card'))renderMyDayErrors();
+    /* Escalation hub re-render when callouts arrive */
+    if(loungeTab==='the-hub'&&cu&&cu.role==='escalation'){var _eh=G('lounge-pane-the-hub');if(_eh&&_eh.classList.contains('active'))renderEscalationHub();}
   }));
 
   /* perfData */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'perfData'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'perfData'),function(snap){
     snap.forEach(function(d){
       /* doc id = nickname, data = {date1:{...}, date2:{...}} */
       if(!perfData[d.id])perfData[d.id]={};
-      Object.assign(perfData[d.id],d.data());
+      var raw=d.data();
+      /* Normalize old schema → new schema on read */
+      Object.keys(raw).forEach(function(dateKey){
+        var rec=raw[dateKey];
+        if(rec&&typeof rec==='object'){
+          /* Old schema: uploadsTotal = sum of uploadsByHour values */
+          if(rec.uploadsTotal==null&&rec.uploadsByHour!=null){
+            var byH=rec.uploadsByHour;
+            rec.uploadsTotal=Object.keys(byH).reduce(function(s,h){return s+(byH[h]||0);},0);
+          }
+          /* Old schema had no shift split — treat all as in-shift */
+          if(rec.uploadsInShift==null&&rec.uploadsTotal!=null){
+            rec.uploadsInShift=rec.uploadsTotal;
+          }
+          if(rec.uploadsOffShift==null){
+            rec.uploadsOffShift=0;
+          }
+          /* Old schema: uploadsByHour maps to uploadsByHourInShift */
+          if(rec.uploadsByHourInShift==null&&rec.uploadsByHour!=null){
+            rec.uploadsByHourInShift=rec.uploadsByHour;
+          }
+        }
+      });
+      Object.assign(perfData[d.id],raw);
     });
     if(G('kpi-grid'))renderDashboard();
     if(G('team-tbl'))renderTeamOverview();
     if(G('mgr-kpi-card'))renderMgrKpiCard();
+    if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();
     if(G('mgr-upload-trend'))renderMgrUploadTrend();
     if(G('mgr-error-trend'))renderMgrErrorTrend();
     if(G('my-day-trend-card'))renderMyDayTrend();
     if(G('my-day-stats-strip'))renderMyDayStatsStrip();
   }));
 
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'avatars'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'avatars'),function(snap){
     if(!window.AVATARS)window.AVATARS={};
     snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
     buildSidebar();
   }));
   /* articles realtime — user-created KB/FAQ/announcements */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'articles'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'articles'),function(snap){
     if(!window.mdArticles)window.mdArticles=[];
     window.mdArticles.length=0;
     snap.forEach(function(d){
       var data=Object.assign({id:d.id},d.data());
       /* Migrate legacy category values */
-      if(data.category==='tmpl'){data.category='template';window._fsSetDoc(window._fsDoc(fsDb(),'articles',d.id),{category:'template'},{merge:true});}
-      if(data.category==='faq'){data.category='kb';window._fsSetDoc(window._fsDoc(fsDb(),'articles',d.id),{category:'kb'},{merge:true});}
+      if(data.category==='tmpl'){data.category='template';window._fsSetDoc(window._fsDoc(window._db,'articles',d.id),{category:'template'},{merge:true});}
+      if(data.category==='faq'){data.category='kb';window._fsSetDoc(window._fsDoc(window._db,'articles',d.id),{category:'kb'},{merge:true});}
       window.mdArticles.push(data);
     });
     /* Merge ann-type articles into mdAnnouncements so they appear in My Day */
@@ -1770,12 +1809,12 @@ function fsStartRealtimeListeners(){
     if(typeof renderAnnouncements==='function')renderAnnouncements();
   }));
   /* timerSessions realtime */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'timerSessions'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'timerSessions'),function(snap){
     allTimerSessions.length=0;
     snap.forEach(function(d){allTimerSessions.push(Object.assign({_fsId:d.id},d.data()));});
   }));
   /* mdAwards */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsDoc(fsDb(),'mdAwards','current'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsDoc(window._db,'mdAwards','current'),function(snap){
     if(snap.exists()){
       var data=snap.data();
       mdAwards.hero=data.hero||null;
@@ -1787,7 +1826,7 @@ function fsStartRealtimeListeners(){
   }));
 
   /* chatStore */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'chatStore'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'chatStore'),function(snap){
     var threads=[];
     snap.forEach(function(d){threads.push(Object.assign({id:d.id},d.data()));});
     threads.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
@@ -1797,7 +1836,7 @@ function fsStartRealtimeListeners(){
   }));
 
   /* attendance — sync manager-logged attendance to uploader/escalation views */
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(fsDb(),'attendance'),function(snap){
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'attendance'),function(snap){
     snap.forEach(function(d){
       var data=d.data();
       if(data.nick&&data.date){
@@ -1903,19 +1942,19 @@ function fsDeleteAttendance(nick,date){
 }
 
 function fsSaveTeamMember(m){
-  if(!fsDb())return;
+  var db=window._db;if(!db)return;
   var dir=TEAM_DIR[m.nickname]||{};
   var payload={nickname:m.nickname,fullName:m.fullName,role:m.role,email:dir.email||'',birthday:dir.birthday||'TBC',hireDate:dir.hireDate||'TBC'};
   /* Include shift schedule if defined */
   if(m.shiftStart!==undefined&&m.shiftStart!==null)payload.shiftStart=m.shiftStart;
   if(m.shiftEnd!==undefined&&m.shiftEnd!==null)payload.shiftEnd=m.shiftEnd;
-  window._fsSetDoc(window._fsDoc(fsDb(),'team',m.nickname),payload,{merge:true});
+  window._fsSetDoc(window._fsDoc(db,'team',m.nickname),payload,{merge:true});
 }
 
 function fsDeleteTeamMember(nick){
-  if(!fsDb())return;
+  var db=window._db;if(!db)return;
   /* Only delete the team membership document — preserve ALL data collections */
-  window._fsDeleteDoc(window._fsDoc(fsDb(),'team',nick));
+  window._fsDeleteDoc(window._fsDoc(db,'team',nick));
   /* perfData, callouts, attendanceLog, awardHistory intentionally preserved */
 }
 
@@ -2500,8 +2539,18 @@ function uniAttSetView(v){
 var _pinBuffer='';
 var _pinMode='verify';
 async function fsGetPin(nickname){
-  try{var snap=await window._fsGetDocs(window._fsColl(window._db,'pins'));var found='000000';snap.forEach(function(d){if(d.id===nickname)found=d.data().pin||'000000';});return found;}
-  catch(e){return '000000';}
+  try{
+    var snap=await window._fsGetDoc(window._fsDoc(window._db,'pins',nickname));
+    if(snap.exists()&&snap.data().pin)return snap.data().pin;
+  }catch(e){}
+  /* Fallback: scan collection (handles rule differences) */
+  try{
+    var all=await window._fsGetDocs(window._fsColl(window._db,'pins'));
+    var found=null;
+    all.forEach(function(d){if(d.id===nickname)found=d.data().pin||null;});
+    if(found)return found;
+  }catch(e){}
+  return '000000';
 }
 async function fsSavePin(nickname,pin){
   try{await window._fsSetDoc(window._fsDoc(window._db,'pins',nickname),{pin:pin},{merge:true});}
@@ -2553,6 +2602,10 @@ function pinBack(){
 }
 async function pinSubmit(){
   var errEl=G('pin-err');
+  if(!window._fsGetDoc||!window._db){
+    /* Firebase not ready yet — allow access with 000000 only for first-time setup */
+    if(_pinBuffer!=='000000'){if(errEl)errEl.textContent='Please wait, loading...';return;}
+  }
   var stored=await fsGetPin(cu.nickname);
   if(_pinBuffer===stored){
     fsStartRealtimeListeners();goDash();
@@ -3238,13 +3291,7 @@ function buildMain(){
   }
   /* Load cosmetics from gc_inventory and apply to header */
   loadPortalCosmetics();
-  /* Apply equipped header banner from Game Corner */
-  if(window.applyPortalHeaderBanner&&typeof gcDb==='function'&&gcDb()&&cu&&cu.nickname){
-    gcDb().collection('gc_inventory').doc(cu.nickname.toLowerCase()).get().then(function(snap){
-      var inv=snap.exists()?(snap.data()||{}):{};
-      applyPortalHeaderBanner(inv.equipped||{});
-    }).catch(function(){});
-  }
+  /* loadPortalCosmetics handles banner + palette with Firebase retry loop */
   /* Subscribe to Game Corner badge requests from members */
   if(cu&&cu.role==='manager')gcBadgeRequestSubscribe();
   /* Subscribe to all Firestore game data collections */
@@ -4513,9 +4560,9 @@ function gamesScrollRight(){var r=G('games-scroll-row');if(r)r.scrollBy({left:20
 function moodTodayKey(){return getSydneyDate().toISOString().slice(0,10);}
 
 function moodLoadAggregate(cb){
-  if(!fsDb()){cb(null);return;}
+  if(!window._db){cb(null);return;}
   var todayKey=moodTodayKey();
-  window._fsGetDoc(window._fsDoc(fsDb(),'moodLog',todayKey))
+  window._fsGetDoc(window._fsDoc(window._db,'moodLog',todayKey))
     .then(function(snap){cb(snap.exists()?snap.data():null);})
     .catch(function(){cb(null);});
 }
@@ -5178,14 +5225,24 @@ var RING_COLORS={
 };
 
 function loadPortalCosmetics(){
-  /* Unified: reads gc_inventory and applies both header banner + texture palette */
-  if(!cu||!fsDb()||!window._fsGetDoc||!window._fsDoc)return;
-  var nick=cu.nickname.toLowerCase();
-  window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nick)).then(function(snap){
-    var inv=snap.exists()?(snap.data()||{}):{};
-    var equipped=inv.equipped||{};
-    if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(equipped);
-  }).catch(function(e){console.warn('loadPortalCosmetics:',e);});
+  /* Unified: reads gc_inventory and applies header banner + texture palette.
+     Uses window._db directly (set by Firebase init) to avoid dependency on gcDb().
+     Retries until Firebase is ready — fixes blank texture on refresh. */
+  function _doLoad(retries){
+    if(!cu)return;
+    var db=window._db;
+    if(!db||!window._fsGetDoc||!window._fsDoc){
+      if(retries<30)setTimeout(function(){_doLoad(retries+1);},200);
+      return;
+    }
+    var nick=cu.nickname.toLowerCase();
+    window._fsGetDoc(window._fsDoc(db,'gc_inventory',nick)).then(function(snap){
+      var inv=snap.exists()?(snap.data()||{}):{};
+      var equipped=inv.equipped||{};
+      if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(equipped);
+    }).catch(function(e){console.warn('loadPortalCosmetics:',e);});
+  }
+  _doLoad(0);
 }
 
 function applyMemberCosmetics(nick,cardEl){
@@ -5327,8 +5384,8 @@ function gcPortalDiscard(docId){
 }
 
 function statusSubscribe(){
-  if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
-  window._fsOnSnapshot(window._fsColl(fsDb(),'playerStatus'),function(snap){
+  if(!window._db||!window._fsOnSnapshot||!window._fsColl)return;
+  window._fsOnSnapshot(window._fsColl(window._db,'playerStatus'),function(snap){
     snap.forEach(function(d){var data=d.data();_statusCache[data.nick]=data.status||'online';});
     /* Refresh team page if open */
     var teamPane=G('lounge-pane-my-team');
@@ -5698,9 +5755,9 @@ async function kcSaveState(nick,state){
 var _kcUnsub=null;
 function kcSubscribe(){
   if(_kcUnsub){_kcUnsub();_kcUnsub=null;}
-  if(!fsDb()||!window._fsOnSnapshot||!window._fsColl)return;
+  if(!window._db||!window._fsOnSnapshot||!window._fsColl)return;
   window._kcCache={};
-  _kcUnsub=window._fsOnSnapshot(window._fsColl(fsDb(),'kc_results'),function(snap){
+  _kcUnsub=window._fsOnSnapshot(window._fsColl(window._db,'kc_results'),function(snap){
     window._kcCache={};
     snap.forEach(function(d){
       var data=d.data();
@@ -6443,6 +6500,16 @@ function switchLoungeTab(tab, btn){
     if(cu&&cu.role==='escalation')renderEscalationHub();
     else if(cu&&cu.role==='manager')renderManagerHub();
     else renderHubInLounge();
+    /* Re-render after a short delay to catch data from already-fired Firestore snapshots */
+    setTimeout(function(){
+      if(loungeTab!=='the-hub')return;
+      if(cu&&cu.role==='escalation')renderEscalationHub();
+      else if(cu&&cu.role==='manager'){
+        if(G('mgr-hub-pane-performance'))renderMgrHubPerformance();
+        if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();
+      }
+      else if(G('kpi-grid'))renderDashboard();
+    },1500);
   }
   document.querySelectorAll('.lounge-tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.lounge-pane').forEach(function(p){p.classList.remove('active');});
@@ -13270,6 +13337,7 @@ var GC_SHOP_ITEMS=[
 /* ── Shop render ── */
 function gcRenderShop(){
   var pane=G('gc-pane-shop');if(!pane)return;
+  if(!gcDb()){pane.innerHTML='<div style="color:#8892b0;padding:20px;text-align:center">Shop loading…</div>';setTimeout(gcRenderShop,400);return;}
   var nick=cu?cu.nickname.toLowerCase():'';
   gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
     var inv=snap.exists()?(snap.data()||{}):{};
@@ -13301,7 +13369,7 @@ function gcRenderShop(){
         var _purchasedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #22c55e;background:rgba(34,197,94,.08);color:#22c55e;cursor:not-allowed;">Purchased</button>';
         var _lockedBtn='<button disabled style="font-size:11px;padding:5px 12px;border-radius:8px;border:1px solid #2a2d4a;background:transparent;color:#8892b0;cursor:not-allowed;">Locked</button>';
         card.innerHTML=bannerPreview+'<div style="font-size:22px;margin-bottom:6px">'+item.icon+'</div>'
-          +tierEl+'<div style="font-size:14px;font-weight:700;color:#ffffff;margin:6px 0 3px">'+item.name+'</div>'
+          +tierEl+'<div style="font-size:14px;font-weight:700;color:var(--text);margin:6px 0 3px">'+item.name+'</div>'
           +'<div style="font-size:11px;color:#8892b0;margin-bottom:8px;line-height:1.4">'+item.desc+'</div>'
           +statusMsg+'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">'
           +'<span style="font-size:13px;font-weight:700;color:#9461f7">'+item.price.toLocaleString()+' cr</span>'
@@ -13355,6 +13423,7 @@ function gcDisplayName(item){
 }
 function gcRenderBadges(){
   var pane=G('gc-pane-badges');if(!pane)return;
+  if(!gcDb()){pane.innerHTML='<div style="color:#8892b0;font-size:12px;padding:10px">Loading…</div>';setTimeout(gcRenderBadges,400);return;}
   var nick=cu?cu.nickname.toLowerCase():'';
   pane.innerHTML='<div style="color:#8892b0;font-size:12px;padding:10px">Loading badges…</div>';
   gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
@@ -13467,7 +13536,7 @@ function gcEquipCosmetic(itemId){
         newEquipped[itemId]=false;
         if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
         gcRenderBadges();
-        gcToast('\u274c '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+ ' unequipped');
+        gcToast('\u274c '+(GC_DISPLAY_NAMES[itemId]||itemId.replace(/_/g,' ').replace(/^banner /,''))+' unequipped');
       });
     }
     /* EQUIP — turn on, turn off siblings of same type */
@@ -13480,7 +13549,7 @@ function gcEquipCosmetic(itemId){
       newEquipped[itemId]=true;
       if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
       gcRenderBadges();
-      gcToast('\u2728 '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' equipped!');
+      gcToast('\u2728 '+(GC_DISPLAY_NAMES[itemId]||itemId.replace(/_/g,' ').replace(/^banner /,''))+' equipped!');
     });
   }).catch(function(e){gcToast('Error: '+e.message);});
 }
