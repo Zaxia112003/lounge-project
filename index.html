@@ -1754,12 +1754,12 @@ function fsStartRealtimeListeners(){
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'avatars'),function(snap){if(!window.AVATARS)window.AVATARS={};snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}
       /* Update any visible team card img immediately */
       document.querySelectorAll('.team-card [data-nick],.av-wrap img').forEach(function(){}); 
-      var _imgs=document.querySelectorAll('.team-card');_imgs.forEach(function(card){
-        var n=card.dataset.nick;if(!n)return;
-        var dir=TEAM_DIR[n]||TEAM_DIR[n.charAt(0).toUpperCase()+n.slice(1)]||{};
-        var fn2=dir.fullName||n;
-        var src=AVATARS[fn2]||AVATARS[n]||(function(){try{return localStorage.getItem('avatar_'+fn2)||null;}catch(e){return null;}})();
-        if(src){var img=card.querySelector('.av-wrap img');if(img&&img.src!==src)img.src=src;}
+      /* Update all avatar img tags across the whole page */
+      document.querySelectorAll('img[data-nick-av]').forEach(function(img){
+        var k=img.getAttribute('data-nick-av');if(!k)return;
+        var dir=TEAM_DIR[k]||{};var fn2=dir.fullName||k;
+        var src=AVATARS[fn2]||AVATARS[k]||(function(){try{return localStorage.getItem('avatar_'+fn2)||localStorage.getItem('avatar_'+k)||null;}catch(e){return null;}})();
+        if(src&&img.src!==src)img.src=src;
       });
     });buildSidebar();
     /* Re-render My Team if active so avatar changes appear immediately */
@@ -2092,7 +2092,7 @@ function goDash(){
   /* Then check Firestore for the authoritative value (overrides localStorage if different) */
   if(fsDb()){
     try{
-      window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname)).then(function(snap){
+      window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase())).then(function(snap){
         if(snap&&snap.exists&&snap.exists()){
           var d=snap.data();
           if(d.theme&&d.theme!==settings.theme){setTheme(d.theme,null);try{localStorage.setItem('lounge_theme_'+cu.nickname,d.theme);}catch(ex){}}
@@ -2104,10 +2104,10 @@ function goDash(){
     }catch(e){}
   }
   /* Bell shown/hidden dynamically via updateNotifBell() and updateMemberBell() */
-  try{var saved=localStorage.getItem('avatar_'+cu.fullName);if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[cu.fullName]=saved;}}catch(e){}
+  try{var _avNick=cu.nickname||cu.fullName;var saved=localStorage.getItem('avatar_'+_avNick)||localStorage.getItem('avatar_'+cu.fullName);if(saved){if(!window.AVATARS)window.AVATARS={};AVATARS[_avNick]=saved;AVATARS[cu.fullName]=saved;}try{localStorage.setItem('avatar_'+_avNick,saved||'');}catch(ex){}}catch(e){}
   if(fsDb()){try{window._fsGetDocs(window._fsColl(fsDb(),'avatars')).then(function(snap){
     if(!window.AVATARS)window.AVATARS={};
-    snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}});
+    snap.forEach(function(d){var data=d.data();if(!data.dataUrl)return;var _k=[];if(data.nickname)_k.push(data.nickname);if(data.fullName)_k.push(data.fullName);_k.push(d.id);_k.forEach(function(k){if(k){AVATARS[k]=data.dataUrl;try{localStorage.setItem('avatar_'+k,data.dataUrl);}catch(ex){}}});});
   }).catch(function(){});}catch(e){}}
   buildSidebar();buildMain();
   if(cu&&cu.role!=='manager'&&fsDb()&&window._fsQuery&&window._fsWhere&&window._fsOnSnapshot){
@@ -2146,13 +2146,18 @@ function avEl(nick,sz=30){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
   const dir=TEAM_DIR[key]||TEAM_DIR[nick]||{};
   const fullName=dir.fullName||key;
-  /* Check AVATARS object (populated by Firestore snapshot) */
-  const avSrc=AVATARS[key]||AVATARS[fullName]||AVATARS[nick]
-    /* Also try localStorage cache (persists between sessions) */
-    ||(()=>{try{return localStorage.getItem('avatar_'+fullName)||null;}catch(e){return null;}})();
-  if(avSrc)return `<img src="${avSrc}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" alt="${nick}"/>`;
+  /* Try all possible key variants in AVATARS */
+  const avSrc=AVATARS[fullName]||AVATARS[key]||AVATARS[nick]
+    /* Try localStorage under all variants */
+    ||(()=>{try{
+      return localStorage.getItem('avatar_'+fullName)
+        ||localStorage.getItem('avatar_'+key)
+        ||localStorage.getItem('avatar_'+nick)
+        ||null;
+    }catch(e){return null;}})();
+  if(avSrc)return `<img src="${avSrc}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" data-nick-av="${key}" alt="${nick}"/>`;
   const kobySvg='data:image/svg+xml,'+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐸</text></svg>");
-  return `<img src="${kobySvg}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2)" alt="${nick}"/>`;
+  return `<img src="${kobySvg}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2)" data-nick-av="${key}" alt="${nick}"/>`;
 }
 function buildSidebar(){
   /* Show Add Article button to manager and Jelie */
@@ -3148,7 +3153,7 @@ function setTheme(t,el){
     localStorage.setItem(key,t);
     localStorage.setItem('lounge_theme_default',t);
   }catch(e){}
-  if(cu&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{theme:t},{merge:true}).catch(function(){});}catch(e){}}
+  if(cu&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{theme:t},{merge:true}).catch(function(){});}catch(e){}}
 }
 function setAccent(color,el){
   document.documentElement.style.setProperty('--accent',color);
@@ -3156,7 +3161,7 @@ function setAccent(color,el){
   el.classList.add('active');settings.accent=color;
   /* Persist per user */
   try{var key='lounge_accent'+(cu?'_'+cu.nickname:'');localStorage.setItem(key,color);}catch(e){}
-  if(cu&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{accent:color},{merge:true}).catch(function(){});}catch(e){}}
+  if(cu&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{accent:color},{merge:true}).catch(function(){});}catch(e){}}
 }
 function toggleCompact(inp){
   const sb=document.querySelector('.sidebar');
@@ -5212,7 +5217,7 @@ function gcUnequipSet(){
   if(cu&&fsDb()&&window._fsDoc&&window._fsSetDoc){
     var nick=cu.nickname.toLowerCase();
     gcDb().collection('gc_inventory').doc(nick).set({equippedSet:''},{merge:true}).catch(function(){});
-    window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedSet:''},{merge:true}).catch(function(){});
+    window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedSet:''},{merge:true}).catch(function(){});
   }
 }
 function gcEquipSetItem(setId,itemId){
@@ -5224,7 +5229,7 @@ function gcEquipSetItem(setId,itemId){
     var equip=cur!==setId;
     var nset=equip?setId:'';
     gcDb().collection('gc_inventory').doc(nick).set({equippedSet:nset},{merge:true});
-    window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedSet:nset},{merge:true}).catch(function(){});
+    window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedSet:nset},{merge:true}).catch(function(){});
     if(equip){gcApplySet(setId);gcToast('✨ '+(GC_SETS[setId]?GC_SETS[setId].name:'Set')+' equipped!');}
     else{gcUnequipSet();gcToast('Set unequipped.');}
     if(typeof gcRenderBadges==='function')gcRenderBadges();
@@ -5313,7 +5318,7 @@ function gcCleanLegacyItems(){
 
   Promise.all([
     window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nick)),
-    window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname))
+    window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()))
   ]).then(function(res){
     var inv=res[0].exists()?(res[0].data()||{}):{};
     var settings=res[1].exists()?(res[1].data()||{}):{};
@@ -5368,7 +5373,7 @@ function gcCleanLegacyItems(){
     if(!currentSet&&setsToGrant.length>0){
       update.equippedSet=setsToGrant[0];
       /* Also save to userSettings */
-      window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),
+      window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),
         {equippedSet:setsToGrant[0]},{merge:true}).catch(function(){});
       /* Apply visually */
       setTimeout(function(){if(typeof gcApplySet==='function')gcApplySet(setsToGrant[0]);},500);
@@ -5390,7 +5395,7 @@ function loadPortalCosmetics(){
   /* Read both gc_inventory (primary) and userSettings (fallback) */
   Promise.all([
     window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nick)),
-    window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname))
+    window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()))
   ]).then(function(results){
     var inv=results[0].exists()?(results[0].data()||{}):{};
     var settings=results[1].exists()?(results[1].data()||{}):{};
@@ -5400,7 +5405,7 @@ function loadPortalCosmetics(){
       gcApplySet(setId);
       /* Sync to userSettings if out of sync */
       if(inv.equippedSet&&!settings.equippedSet){
-        window._fsSetDoc&&window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),
+        window._fsSetDoc&&window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),
           {equippedSet:setId},{merge:true}).catch(function(){});
       }
     } else {
@@ -5427,7 +5432,7 @@ function applyMemberCosmetics(nick,cardEl){
   var nickLc=nick.toLowerCase();
   Promise.all([
     window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nickLc)),
-    window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',nick))
+    window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',nick.toLowerCase()))
   ]).then(function(results){
     var snap=results[0];if(!snap.exists())return;
     var settSnap=results[1];
@@ -9405,12 +9410,13 @@ function handleProfilePhoto(input){
       var oy=(img.height-size)/2;
       ctx.drawImage(img,ox,oy,size,size,0,0,400,400);
       var dataUrl=canvas.toDataURL('image/jpeg',0.85);
-      /* Save to AVATARS for this session */
+      /* Save to AVATARS for this session — key by nickname (consistent with My Team) */
+      var _avNick=cu.nickname||cu.fullName;
       if(!window.AVATARS)window.AVATARS={};
+      AVATARS[_avNick]=dataUrl;
       AVATARS[cu.fullName]=dataUrl;
-      /* Persist to localStorage */
-      try{localStorage.setItem('avatar_'+cu.fullName,dataUrl);}catch(e){}
-      if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'avatars',cu.fullName.replace(/ /g,'_')),{fullName:cu.fullName,dataUrl:dataUrl,updatedAt:new Date().toISOString()},{merge:true});}catch(e){}}
+      try{localStorage.setItem('avatar_'+_avNick,dataUrl);localStorage.setItem('avatar_'+cu.fullName,dataUrl);}catch(e){}
+      if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'avatars',_avNick),{nickname:_avNick,fullName:cu.fullName,dataUrl:dataUrl,updatedAt:new Date().toISOString()},{merge:true});}catch(e){}}
       /* Update sidebar avatar */
       buildSidebar();
       /* Update preview */
@@ -10173,17 +10179,22 @@ function openMemberProfile(nick){
     /* Load gc_inventory and userSettings in parallel */
     Promise.all([
       window._fsGetDoc(window._fsDoc(fsDb(),'gc_inventory',nickLc)).catch(function(){return null;}),
-      window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',nick)).catch(function(){return null;})
+      window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',nick.toLowerCase())).catch(function(){return null;})
     ]).then(function(results){
       var invSnap=results[0]; var settingsSnap=results[1];
       var inv=invSnap&&invSnap.exists()?(invSnap.data()||{}):{};
       /* Attach equippedBanner from userSettings as fallback */
+      /* gc_inventory (nickLc) is authoritative for equippedSet */
+      if(invSnap&&invSnap.exists()){
+        var _id=invSnap.data();
+        if(_id.equippedSet)inv.equippedSet=_id.equippedSet;
+      }
       if(settingsSnap&&settingsSnap.exists()){
         var _sd=settingsSnap.data();
-        if(_sd.equippedSet)inv._equippedSet=_sd.equippedSet;
-        else if(_sd.equippedBanner)inv._equippedBanner=_sd.equippedBanner;
+        /* Only use settings as fallback if inventory has nothing */
+        if(!inv.equippedSet&&_sd.equippedSet)inv._equippedSet=_sd.equippedSet;
+        if(!inv.equippedSet&&!inv._equippedSet&&_sd.equippedBanner)inv._equippedBanner=_sd.equippedBanner;
       }
-      if(invSnap&&invSnap.exists()&&invSnap.data().equippedSet)inv.equippedSet=invSnap.data().equippedSet;
       renderMemberProfileCosmetics(nick,inv);
     }).catch(function(){renderMemberProfileCosmetics(nick,{});});
   } else {renderMemberProfileCosmetics(nick,{});}
@@ -13927,14 +13938,14 @@ function gcEquipCosmetic(itemId){
         var newEquipped=Object.assign({},equipped);
         newEquipped[itemId]=false;
         if(isBanner&&window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
-        if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:''},{merge:true}).catch(function(){});}catch(ex){}}
+        if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedBanner:''},{merge:true}).catch(function(){});}catch(ex){}}
         if(itemId.startsWith('ring_')&&typeof applySidebarRing==='function'){
           applySidebarRing(newEquipped);
           if(window._fsSetDoc&&window._fsDoc&&fsDb()){
-            try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedRing:''},{merge:true}).catch(function(){});}catch(ex){}
+            try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedRing:''},{merge:true}).catch(function(){});}catch(ex){}
           }
           if(window._fsGetDoc&&window._fsDoc&&fsDb()){
-            window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname)).then(function(s){
+            window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase())).then(function(s){
               if(s.exists()&&s.data().equippedBanner){
                 var eq=Object.assign({},newEquipped);eq[s.data().equippedBanner]=true;
                 if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(eq);
@@ -13955,16 +13966,16 @@ function gcEquipCosmetic(itemId){
       if(isBanner){Object.keys(newEquipped).forEach(function(k){if(k.startsWith('banner_'))newEquipped[k]=false;});}
       newEquipped[itemId]=true;
       if(isBanner&&window.applyPortalHeaderBanner)applyPortalHeaderBanner(newEquipped);
-      if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedBanner:itemId},{merge:true}).catch(function(){});}catch(ex){}}
+      if(isBanner&&window._fsSetDoc&&window._fsDoc&&fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedBanner:itemId},{merge:true}).catch(function(){});}catch(ex){}}
       if(itemId.startsWith('ring_')&&typeof applySidebarRing==='function'){
         applySidebarRing(newEquipped);
         /* Save ring to userSettings for persistence across reloads */
         if(window._fsSetDoc&&window._fsDoc&&fsDb()){
-          try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname),{equippedRing:itemId},{merge:true}).catch(function(){});}catch(ex){}
+          try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedRing:itemId},{merge:true}).catch(function(){});}catch(ex){}
         }
         /* Re-apply banner from userSettings so texture pack isn't cleared */
         if(window._fsGetDoc&&window._fsDoc&&fsDb()){
-          window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname)).then(function(s){
+          window._fsGetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase())).then(function(s){
             if(s.exists()&&s.data().equippedBanner){
               var eq=Object.assign({},newEquipped);eq[s.data().equippedBanner]=true;
               if(window.applyPortalHeaderBanner)applyPortalHeaderBanner(eq);
