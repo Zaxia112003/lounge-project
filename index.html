@@ -13498,16 +13498,7 @@ function gcStartSession(){
 function gcStopSession(){clearInterval(GC_S._timer);GC_S._timer=null;}
 function gcResetSession(){localStorage.removeItem('gc_sess_el_'+(cu?cu.nickname:'x'));localStorage.removeItem('gc_sess_ext_'+(cu?cu.nickname:'x'));GC_S._elapsed=0;GC_S._warned=false;GC_S._extensions=0;}
 function gcUpdateTimerUI(remaining){var el=G('gc-timer-bar');if(!el)return;var mins=Math.floor(remaining/60),secs=remaining%60;var lbl=el.querySelector('#gc-timer-label');if(lbl)lbl.textContent=mins+':'+(secs<10?'0':'')+secs+' left';var bar=el.querySelector('#gc-timer-fill');if(bar){bar.style.width=Math.min(100,remaining/GC_S.WARN_AT*100)+'%';bar.style.background=remaining<=60?'#ef4444':'#eab308';}el.style.display='flex';}
-function gcShowExtendPrompt(remaining){
-  var old=G('gc-extend-prompt');if(old)old.remove();
-  var grid=G('gc-pane-games');if(!grid)return;
-  var prompt=document.createElement('div');prompt.id='gc-extend-prompt';
-  prompt.style.cssText='padding:12px 14px;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.3);border-radius:10px;margin-bottom:8px;display:flex;align-items:center;gap:12px;';
-  prompt.innerHTML='<div style="flex:1;font-size:13px;color:#f87171;">⏰ Session ending soon — <span style="font-size:12px;opacity:.85">'+GC_S.EXTEND_COST+' credits per +5 min</span></div>'
-    +'<button onclick="gcExtendSession()" style="flex-shrink:0;padding:7px 14px;background:rgba(239,68,68,.15);border:1.5px solid #ef4444;border-radius:8px;font-size:12px;font-weight:600;color:#f87171;cursor:pointer;">+5 min · '+GC_S.EXTEND_COST+' cr</button>';
-  var timerBar=G('gc-timer-bar');
-  if(timerBar&&timerBar.nextSibling)grid.insertBefore(prompt,timerBar.nextSibling);else grid.insertBefore(prompt,grid.firstChild);
-}
+function gcShowExtendPrompt(remaining){/* Session limit removed */}
 function gcExtendSession(){
   if(GC_S._extensions>=GC_S.MAX_EXTENSIONS){gcToast('Max extensions reached');return;}
   gcSpendCredit(GC_S.EXTEND_COST,function(){
@@ -13515,14 +13506,7 @@ function gcExtendSession(){
     GC_S._warned=false;var p=G('gc-extend-prompt');if(p)p.remove();var bar=G('gc-timer-bar');if(bar)bar.style.display='none';gcToast('⏱️ +5 minutes added!');
   });
 }
-function gcEndSession(){
-  gcStopSession();
-  var endTime=Date.now();localStorage.setItem('gc_session_end_'+(cu?cu.nickname:'x'),endTime);
-  gcResetSession();
-  if(G('gc-game-modal')&&G('gc-game-modal').classList.contains('open'))gcCloseModal();
-  var pane=G('gc-pane-games');
-  if(pane){pane.innerHTML='<div style="text-align:center;padding:48px 20px;color:#8892b0;"><div style="font-size:40px;margin-bottom:14px">⏳</div><div style="font-size:16px;font-weight:600;color:#e8eaf6;margin-bottom:8px;">Session time is up</div><div style="font-size:13px;line-height:1.5;">Your session has ended. A new session opens 1 hour from now.</div></div>';}
-}
+function gcEndSession(){/* Session limit removed */}
 function gcInjectTimerBar(){/* Session limit removed — timer bar disabled */}
 
 /* ── Modal ── */
@@ -14108,11 +14092,11 @@ function gcShowCreditGuide(){
   window._gcGuideLoadFn=loadGuide;
   if(fsDb()&&window._fsGetDoc&&window._fsDoc){
     window._fsGetDoc(window._fsDoc(fsDb(),"gc_config","gc_guide_content")).then(function(snap){
-      window._gcGuideContent=(snap.exists()&&snap.data().content)?snap.data().content:'## How to earn Game Corner credits\n\n**Performance credits** (uncapped)\n- Upload hours: credits per contract uploaded during your shift\n- PI quality tiers: bonus credits based on PI score\n- Defect-free streak: 15 cr bonus for consecutive clean uploads\n- PI streak: 10 cr bonus for consecutive high-PI sessions\n\n**Daily check-ins** (once per day each)\n- Mood check-in: 5 cr for submitting your daily mood\n- KC quiz: up to 20 cr based on your weekly quiz score\n\n**Game credits** (capped at 70 cr/day)\n- Winning games in the Game Corner awards game credits\n- Cap resets every day\n\n**Important rules**\n- Performance and game credits are separate pools\n- Awards are deduplicated per day\n- Manager can adjust credits manually for special cases';
+      window._gcGuideContent=(snap.exists()&&snap.data().content)?snap.data().content:'## How to earn Game Corner credits\n\n**Performance credits** (uncapped)\n- Upload hours: credits per contract uploaded during your shift\n- PI quality tiers: bonus credits based on PI score\n- Defect-free streak: 15 cr bonus for consecutive clean uploads\n- PI streak: 10 cr bonus for consecutive high-PI sessions\n\n**Daily check-ins** (once per day each)\n- Mood check-in: 5 cr for submitting your daily mood\n- KC quiz: up to 20 cr based on your weekly quiz score\n\n**Game credits** (capped at 70 cr/day)\n- Winning games in the Game Corner awards game credits\n- Cap resets every day';
       loadGuide(false);
-    }).catch(function(){window._gcGuideContent='## How to earn Game Corner credits\n\n**Performance credits** (uncapped)\n- Upload hours: credits per contract uploaded during your shift\n- PI quality tiers: bonus credits based on PI score\n- Defect-free streak: 15 cr bonus for consecutive clean uploads\n- PI streak: 10 cr bonus for consecutive high-PI sessions\n\n**Daily check-ins** (once per day each)\n- Mood check-in: 5 cr for submitting your daily mood\n- KC quiz: up to 20 cr based on your weekly quiz score\n\n**Game credits** (capped at 70 cr/day)\n- Winning games in the Game Corner awards game credits\n- Cap resets every day\n\n**Important rules**\n- Performance and game credits are separate pools\n- Awards are deduplicated per day\n- Manager can adjust credits manually for special cases';loadGuide(false);});
+    }).catch(function(){window._gcGuideContent='## How to earn Game Corner credits\n\n**Performance credits** (uncapped)\n- Upload hours: credits per contract uploaded during your shift\n- PI quality tiers: bonus credits based on PI score\n- Defect-free streak: 15 cr bonus for consecutive clean uploads\n- PI streak: 10 cr bonus for consecutive high-PI sessions\n\n**Daily check-ins** (once per day each)\n- Mood check-in: 5 cr for submitting your daily mood\n- KC quiz: up to 20 cr based on your weekly quiz score\n\n**Game credits** (capped at 70 cr/day)\n- Winning games in the Game Corner awards game credits\n- Cap resets every day';loadGuide(false);});
   } else {
-    window._gcGuideContent='## How to earn Game Corner credits\n\n**Performance credits** (uncapped)\n- Upload hours: credits per contract uploaded during your shift\n- PI quality tiers: bonus credits based on PI score\n- Defect-free streak: 15 cr bonus for consecutive clean uploads\n- PI streak: 10 cr bonus for consecutive high-PI sessions\n\n**Daily check-ins** (once per day each)\n- Mood check-in: 5 cr for submitting your daily mood\n- KC quiz: up to 20 cr based on your weekly quiz score\n\n**Game credits** (capped at 70 cr/day)\n- Winning games in the Game Corner awards game credits\n- Cap resets every day\n\n**Important rules**\n- Performance and game credits are separate pools\n- Awards are deduplicated per day\n- Manager can adjust credits manually for special cases';loadGuide(false);
+    window._gcGuideContent='## How to earn Game Corner credits\n\n**Performance credits** (uncapped)\n- Upload hours: credits per contract uploaded during your shift\n- PI quality tiers: bonus credits based on PI score\n- Defect-free streak: 15 cr bonus for consecutive clean uploads\n- PI streak: 10 cr bonus for consecutive high-PI sessions\n\n**Daily check-ins** (once per day each)\n- Mood check-in: 5 cr for submitting your daily mood\n- KC quiz: up to 20 cr based on your weekly quiz score\n\n**Game credits** (capped at 70 cr/day)\n- Winning games in the Game Corner awards game credits\n- Cap resets every day';loadGuide(false);
   }
 }
 function gcGuideToggleEdit(){
