@@ -10204,11 +10204,21 @@ function openMemberProfile(nick){
 function renderMemberProfileCosmetics(nick,inv){
   var equipped=inv.equipped||{};
   var ringColors={ring_gold:'#EF9F27',ring_purple:'#7F77DD',ring_teal:'#1D9E75',ring_coral:'#D85A30'};
-  /* Find equipped banner — truthy check (not just ===true, could be any truthy) */
-  var equippedBanner=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&!!equipped[k];});
-  /* Also check userSettings equippedBanner as fallback */
-  if(!equippedBanner&&inv._equippedBanner)equippedBanner=inv._equippedBanner;
-  var equippedRing=_setRing||Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&!!equipped[k];});
+  /* ── Resolve equippedSet FIRST — everything below depends on it ── */
+  var _eSet=inv.equippedSet||inv._equippedSet||null;
+  var _setBanner=null,_setRing=null;
+  if(_eSet&&typeof GC_SETS!=='undefined'&&GC_SETS[_eSet]){
+    _setBanner=GC_SETS[_eSet].banner||null;
+    _setRing=GC_SETS[_eSet].ring||null;
+  }
+  /* Derive banner and ring — set takes priority over legacy individual items */
+  var equippedBanner=_setBanner
+    ||Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&!!equipped[k];})
+    ||inv._equippedBanner
+    ||null;
+  var equippedRing=_setRing
+    ||Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&!!equipped[k];})
+    ||null;
   /* ── Banner header ── */
   var bannerEl=G('member-profile-banner');
   var bannerTint=null;var bannerShadow=null;
@@ -10294,10 +10304,6 @@ function renderMemberProfileCosmetics(nick,inv){
     achEl.innerHTML=_sectionHd('Achievements').replace('margin-bottom:8px','margin:12px 0 8px')
       +'<span style="font-size:12px;color:var(--muted)">Coming soon.</span>';
   }
-  /* Resolve from set first */
-  var _eSet=inv.equippedSet||inv._equippedSet||null;
-  var _setBanner=null,_setRing=null;
-  if(_eSet&&typeof GC_SETS!=='undefined'&&GC_SETS[_eSet]){_setBanner=GC_SETS[_eSet].banner;_setRing=GC_SETS[_eSet].ring;}
 }
 function memberProfileToggleShiftEdit(){
   var div=G('member-profile-shift-edit');
