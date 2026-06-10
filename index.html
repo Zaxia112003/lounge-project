@@ -2141,6 +2141,16 @@ function goDash(){
   var li=G('main-loggedin');if(li&&cu)li.innerHTML='Logged in as <span style="color:var(--accent);font-weight:700">'+cu.fullName+'</span>';
   /* Achievement login check */
   setTimeout(function(){if(typeof achLoginCheck==='function')achLoginCheck();},1500);
+  /* One-time manual grant: Aldrin already completed Minesweeper hard before fix */
+  if(cu&&cu.nickname==='Aldrin'){
+    setTimeout(function(){
+      if(typeof achGrant==='function'){
+        gcDb().collection('achievements').doc('aldrin').get().then(function(s){
+          if(!s.exists()||!s.data().bomb_expert){achGrant('Aldrin','bomb_expert',{delay:500});}
+        }).catch(function(){});
+      }
+    },2000);
+  }
   /* Init range calendars */
   setTimeout(function(){
     if(G('rcal-upl-perf-trigger'))rcalCreate('rcal-upl-perf',function(from,to){customRange={from:from,to:to};activeDateFilter='custom';document.querySelectorAll('.filter-pill').forEach(function(p){p.classList.remove('active');});renderDashboard();});
@@ -5675,7 +5685,7 @@ function achGrant(nick,achId,opts){
     /* For anniversary — replace previous tier */
     var update={};
     if(ach.tier==='anniversary'){
-      ANNIV_TIERS.forEach(function(t){if(t!==achId&&data[t])update[t]=firebase.firestore.FieldValue.delete();});
+      ANNIV_TIERS.forEach(function(t){if(t!==achId&&data[t]){try{update[t]=firebase.firestore.FieldValue.delete();}catch(ex){update[t]=null;}}});
     }
     update[achId]={granted:true,grantedAt:Date.now(),achId:achId};
     if(ach.rolling){update[achId].holderSince=Date.now();}
@@ -5692,7 +5702,7 @@ function achGrant(nick,achId,opts){
 
 /* ── Achievement: Revoke rolling achievement ── */
 function achRevoke(nick,achId){
-  if(!fsDb())return;
+  if(!gcDb())return;
   var nickLc=nick.toLowerCase();
   gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
     if(!snap.exists())return;
@@ -14272,10 +14282,10 @@ function gcSpendCredit(cost,cb){
 }
 
 function achCheckGame(gameId,opts){
-  if(!cu||!fsDb())return;
+  if(!cu||!gcDb())return;
   var nick=cu.nickname;
   opts=opts||{};
-  fsDb().collection('achievements').doc(nick.toLowerCase()).get().then(function(snap){
+  gcDb().collection('achievements').doc(nick.toLowerCase()).get().then(function(snap){
     var a=snap.exists()?(snap.data()||{}):{};
     if(gameId==='wordguess'&&opts.guesses<=2&&!a.word_nerd){achGrant(nick,'word_nerd',{delay:500});}
     if(gameId==='minesweeper'&&opts.hard&&!a.bomb_expert){achGrant(nick,'bomb_expert',{delay:500});}
@@ -14296,7 +14306,7 @@ function achCheckGame(gameId,opts){
     var allGames=['minesweeper','wordguess','solitaire','millionaire','dealornodeal','chess','kbquiz'];
     if(allGames.every(function(g){return played.indexOf(g)>-1;})&&!a.game_hoarder){achGrant(nick,'game_hoarder',{delay:800});}
     /* Credit baron — checked on login but also on game win */
-    fsDb().collection('player_credits').doc(nick.toLowerCase()).get().then(function(cs){
+    gcDb().collection('player_credits').doc(nick.toLowerCase()).get().then(function(cs){
       var credits=cs.exists()?(cs.data().credits||0):0;
       if(credits>=1000&&!a.credit_baron){achGrant(nick,'credit_baron',{delay:1000});}
     }).catch(function(){});
@@ -15726,7 +15736,7 @@ function gcGameMinesweeper(C){
             if(first){first=false;t0=Date.now();placeMines(rr,cc);}
             if(board[rr][cc]===-1){var d2=cfg();for(var i=0;i<d2.r;i++)for(var j=0;j<d2.c;j++)if(board[i][j]===-1)rev[i][j]=true;over=true;SND_GC.boom();render();gcSetScore('BOOM 💣');return;}
             SND_GC.reveal();flood(rr,cc);
-            if(checkWin()){over=true;var secs=Math.round((Date.now()-t0)/1000);SND_GC.win();gcSetScore(secs+'s');gcSaveScore('minesweeper',secs,false);gcAwardGameCredit(cu.nickname,2);achCheckGame('minesweeper',{hard:gcCurrentDifficulty==='hard'});gcToast('🎉 Cleared in '+secs+'s! +2 credits');}
+            if(checkWin()){over=true;var secs=Math.round((Date.now()-t0)/1000);SND_GC.win();gcSetScore(secs+'s');gcSaveScore('minesweeper',secs,false);gcAwardGameCredit(cu.nickname,2);achCheckGame('minesweeper',{hard:diff==='hard'});gcToast('🎉 Cleared in '+secs+'s! +2 credits');}
             render();
           });
           cell.addEventListener('contextmenu',function(e){e.preventDefault();if(over||rev[rr][cc])return;flag[rr][cc]=!flag[rr][cc];SND_GC.flag();render();});
