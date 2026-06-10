@@ -1760,8 +1760,14 @@ function fsStartRealtimeListeners(){
   _unsubscribers.forEach(function(u){try{u();}catch(e){}});_unsubscribers=[];
   pwStartListeners();
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'mdAnnouncements'),function(snap){mdAnnouncements.length=0;snap.forEach(function(d){mdAnnouncements.push(Object.assign({_fsId:d.id},d.data()));});mdAnnouncements.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});if(G('ann-list'))renderAnnouncements();annUpdateBadge();}));
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'callouts'),function(snap){callouts.length=0;snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});if(typeof updateMemberBell==='function')updateMemberBell();if(G('qp-list'))renderQualityPortal();if(G('esc-qp-list'))renderEscQuality();if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('daily-tbl'))renderDailyTbl();if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();if(G('my-day-errors-card'))renderMyDayErrors();if(loungeTab==='the-hub'&&cu&&cu.role==='escalation'){var _eh=G('lounge-pane-the-hub');if(_eh&&_eh.classList.contains('active'))renderEscalationHub();}}));
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'perfData'),function(snap){snap.forEach(function(d){if(!perfData[d.id])perfData[d.id]={};var raw=d.data();Object.keys(raw).forEach(function(dk){var rec=raw[dk];if(rec&&typeof rec==='object'){if(rec.uploadsTotal==null&&rec.uploadsByHour!=null){var byH=rec.uploadsByHour;rec.uploadsTotal=Object.keys(byH).reduce(function(s,h){return s+(byH[h]||0);},0);}if(rec.uploadsInShift==null&&rec.uploadsTotal!=null)rec.uploadsInShift=rec.uploadsTotal;if(rec.uploadsOffShift==null)rec.uploadsOffShift=0;if(rec.uploadsByHourInShift==null&&rec.uploadsByHour!=null)rec.uploadsByHourInShift=rec.uploadsByHour;}});Object.assign(perfData[d.id],raw);});if(G('kpi-grid'))renderDashboard();if(G('team-tbl'))renderTeamOverview();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('mgr-upload-trend'))renderMgrUploadTrend();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-trend-card'))renderMyDayTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'callouts'),function(snap){
+      var prevLen=callouts.length;
+      callouts.length=0;snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});
+      /* Only play sound if a genuinely new callout arrived (not initial load) */
+      if(window._calloutsReady&&callouts.length>prevLen&&typeof _playNotifSound==='function')_playNotifSound();
+      window._calloutsReady=true;
+      if(typeof updateMemberBell==='function')updateMemberBell();if(G('qp-list'))renderQualityPortal();if(G('esc-qp-list'))renderEscQuality();if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('daily-tbl'))renderDailyTbl();if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();if(G('my-day-errors-card'))renderMyDayErrors();if(loungeTab==='the-hub'&&cu&&cu.role==='escalation'){var _eh=G('lounge-pane-the-hub');if(_eh&&_eh.classList.contains('active'))renderEscalationHub();}}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'perfData'),function(snap){if(window._perfDataSaving)return;snap.forEach(function(d){if(!perfData[d.id])perfData[d.id]={};var raw=d.data();Object.keys(raw).forEach(function(dk){var rec=raw[dk];if(rec&&typeof rec==='object'){if(rec.uploadsTotal==null&&rec.uploadsByHour!=null){var byH=rec.uploadsByHour;rec.uploadsTotal=Object.keys(byH).reduce(function(s,h){return s+(byH[h]||0);},0);}if(rec.uploadsInShift==null&&rec.uploadsTotal!=null)rec.uploadsInShift=rec.uploadsTotal;if(rec.uploadsOffShift==null)rec.uploadsOffShift=0;if(rec.uploadsByHourInShift==null&&rec.uploadsByHour!=null)rec.uploadsByHourInShift=rec.uploadsByHour;}});Object.assign(perfData[d.id],raw);});if(G('kpi-grid'))renderDashboard();if(G('team-tbl'))renderTeamOverview();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('mgr-upload-trend'))renderMgrUploadTrend();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-trend-card'))renderMyDayTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();}));
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'avatars'),function(snap){if(!window.AVATARS)window.AVATARS={};snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}
       /* Update any visible team card img immediately */
       document.querySelectorAll('.team-card [data-nick],.av-wrap img').forEach(function(){}); 
@@ -2871,14 +2877,17 @@ async function loadPendingReviews(){
     });
     /* Realtime listener */
     window._fsOnSnapshot(window._fsColl(fsDb(),'errorReviews'),function(snap){
+      var prevPending=(window._pendingReviews||[]).length;
       window._pendingReviews=[];
       snap.forEach(function(d){
         var data=d.data();
-        /* Skip approved/discarded AND any we've already dismissed this session */
         if(data.status!=='approved'&&data.status!=='discarded'&&!(window._dismissedReviews||new Set()).has(d.id)){
           window._pendingReviews.push(Object.assign({_fsId:d.id},data));
         }
       });
+      /* Only play sound if a new review arrived after initial load */
+      if(window._reviewsReady&&window._pendingReviews.length>prevPending&&typeof _playNotifSound==='function')_playNotifSound();
+      window._reviewsReady=true;
       updateReviewBadge();
     });
     updateReviewBadge();
@@ -4559,7 +4568,7 @@ function renderMyDayStatsStrip(){
   var todayKey=getSydneyDate().toISOString().slice(0,10);
   var todayData=(perfData[nick]&&perfData[nick][todayKey])||{uploadsTotal:0};
   var uploads=todayData.uploadsTotal||0;
-  var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&c.date===todayKey&&c.status!=='discarded';}).length;
+  var errors=callouts.filter(function(c){return c.uploader===nick&&c.type==='qscore'&&c.date===todayKey&&c.status!=='discarded'&&c.status!=='pending_review';}).length;
   var escalations=callouts.filter(function(c){return c.uploader===nick&&c.type==='qesc'&&c.date===todayKey;}).length;
   var dd=uploads>0?Math.round((errors+escalations)/uploads*10000)/10:null;
   var ddColor=dd===null?'var(--muted)':(dd<=2?'var(--green)':dd<=5?'var(--amber)':'var(--red)');
@@ -11075,10 +11084,12 @@ function renderMemberProfileCosmetics(nick,inv){
             /* Tooltip on hover */
             var tip=document.createElement('div');
             /* Position tooltip based on slot index to avoid clipping */
-            var tipLeft=slotIdx===0?'0':slotIdx===highlights.length-1?'auto':'50%';
-            var tipRight=slotIdx===highlights.length-1?'0':'auto';
-            var tipTransform=slotIdx===0||slotIdx===highlights.length-1?'none':'translateX(-50%)';
-            tip.style.cssText='position:absolute;bottom:calc(100% + 6px);left:'+tipLeft+';right:'+tipRight+';transform:'+tipTransform+';background:#1a1a2e;border:1px solid '+r.border+';border-radius:8px;padding:8px 10px;width:150px;font-size:10px;color:#e8eaf6;line-height:1.5;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;text-align:left;';
+            /* slot 0 → left-anchored, slot 1 → centred via margin, slot 2 → right-anchored */
+            var tipStyle='position:absolute;bottom:calc(100% + 6px);background:#1a1a2e;border:1px solid '+r.border+';border-radius:8px;padding:8px 10px;width:140px;font-size:10px;color:#e8eaf6;line-height:1.5;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;text-align:left;';
+            if(slotIdx===0){tipStyle+='left:0;';}
+            else if(slotIdx===highlights.length-1){tipStyle+='right:0;';}
+            else{tipStyle+='left:50%;transform:translateX(-30%);';}
+            tip.style.cssText=tipStyle;
             tip.innerHTML='<strong style="color:'+r.color+';display:block;margin-bottom:3px;font-size:10px">'+ach.name+'</strong>'+ach.desc;
             slot.appendChild(tip);
             slot.onmouseenter=function(){tip.style.opacity='1';};
@@ -11481,6 +11492,8 @@ function mwDetailParse(){
 function mwDetailConfirm(){
   if(!mwDetailExtracted)return;
   var today=getSydneyDate().toISOString().split('T')[0];
+  /* Suppress perfData snapshot sound during batch save */
+  window._perfDataSaving=true;
   mwDetailExtracted.forEach(function(r){
     var dateKey=r.date||today;
     if(!perfData[r.nick])perfData[r.nick]={};
@@ -11497,15 +11510,11 @@ function mwDetailConfirm(){
       ahtSecs:ex.ahtSecs||0
     };
     fsSavePerfData(r.nick);
-    /* ── Game Corner: upload-hour credits (+1 per contract per hour, no cap) ── */
-    if(window.gcAwardUploadCredits&&r.byHourInShift){
-      gcAwardUploadCredits(r.nick,dateKey,r.byHourInShift);
-    }
-    /* ── Game Corner: streak detection (runs against last 5/3 days of perfData) ── */
-    if(window.gcCheckStreaks){
-      gcCheckStreaks(r.nick);
-    }
+    if(window.gcAwardUploadCredits&&r.byHourInShift){gcAwardUploadCredits(r.nick,dateKey,r.byHourInShift);}
+    if(window.gcCheckStreaks){gcCheckStreaks(r.nick);}
   });
+  /* Re-enable snapshot sound after batch, then play once */
+  setTimeout(function(){window._perfDataSaving=false;},2000);
   pushNotif('📊','Daily upload detail saved for '+mwDetailExtracted.length+' uploader(s).','detail');
   mwDetailReset();closeMgrWrite();
 }
@@ -11611,9 +11620,12 @@ function openDailyLog(){
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
   var uplOpts=uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   var todayVal=new Date().toISOString().split('T')[0];
-  /* Populate uploader dropdown for Log Error tab */
+  /* Populate uploader dropdowns */
   var upl2=G('qscore-upl2');
   if(upl2)upl2.innerHTML='<option value="">Select uploader...</option>'+uplOpts;
+  var escUpl=G('esc-log-uploader');
+  if(escUpl)escUpl.innerHTML='<option value="">Select uploader...</option>'+uplOpts;
+  var escDate=G('esc-log-date');if(escDate)escDate.value=todayVal;
   var dateEl=G('qscore-date2');if(dateEl)dateEl.value=todayVal;
   /* Reset Log Error fields */
   ['qscore-addr2','qscore-err2'].forEach(function(id){var el=G(id);if(el)el.value='';});
@@ -12005,24 +12017,25 @@ function submitDailyDetail(){
   if(ins<0||offs<0){errEl.textContent='Upload counts cannot be negative.';return;}
 
   /* Store in perfData — same structure renderDashboard uses */
-  var key=nick+'_'+date.replace(/-/g,'');
-  if(!perfData[nick])perfData[nick]=[];
-  /* Remove existing entry for same date if any */
-  perfData[nick]=perfData[nick].filter(function(e){return e.dateKey!==key;});
-  perfData[nick].push({
-    dateKey:key,
-    date:date,
-    nick:nick,
-    inShift:ins,
-    offShift:offs,
-    total:ins+offs,
+  /* Save to perfData in correct object format (dateKey → record) */
+  if(!perfData[nick])perfData[nick]={};
+  var ex=perfData[nick][date]||{};
+  perfData[nick][date]={
+    uploadsTotal:ins+offs,
+    uploadsInShift:ins,
+    uploadsOffShift:offs,
+    uploadsByHour:ex.uploadsByHour||{},
+    uploadsByHourInShift:ex.uploadsByHourInShift||{},
+    ahuDay:ex.ahuDay||null,
+    ahtTotal:ex.ahtTotal||0,
+    ahtCount:ex.ahtCount||0,
+    ahtSecs:ex.ahtSecs||0,
     notes:notes,
     loggedBy:cu.fullName
-  });
-
+  };
+  fsSavePerfData(nick);
   errEl.style.color='var(--green)';
   errEl.textContent='Daily detail saved for '+nick+' on '+date+'.';
-  /* Reset fields */
   G('esc-log-inshift').value='';
   G('esc-log-offshift').value='';
   G('esc-log-notes').value='';
@@ -13412,6 +13425,7 @@ document.addEventListener('DOMContentLoaded',function(){
           <button class="btn btn-primary" style="width:100%" onclick="submitQScoreFromOverlay()">&#9997;&#65039; Log Error</button>
         </div>
       </div>
+
     </div>
   </div>
 </div>
