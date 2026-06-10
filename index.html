@@ -10426,6 +10426,17 @@ function renderMemberProfileCosmetics(nick,inv){
     ||null;
   /* ── Banner header ── */
   var bannerEl=G('member-profile-banner');
+  /* Always reset banner before applying new one — prevents leaking across profiles */
+  if(bannerEl){
+    bannerEl.style.background='';
+    bannerEl.style.backgroundImage='';
+    bannerEl.style.backgroundSize='';
+    bannerEl.style.backgroundPosition='';
+    bannerEl.style.backgroundRepeat='';
+    bannerEl.style.backgroundColor='';
+    var _oldKoby=bannerEl.querySelector('#koby-profile-svg');
+    if(_oldKoby)_oldKoby.remove();
+  }
   var bannerTint=null;var bannerShadow=null;
   if(equippedBanner&&typeof BANNER_THEMES!=='undefined'&&BANNER_THEMES[equippedBanner]){
     bannerTint=BANNER_THEMES[equippedBanner].color||null;
@@ -10456,6 +10467,10 @@ function renderMemberProfileCosmetics(nick,inv){
   /* Subtle texture tint on body */
   var bodyEl=G('member-profile-body');
   if(bodyEl)bodyEl.style.background=bannerTint?'linear-gradient(160deg,'+bannerTint+'33 0%,transparent 60%)':'';
+  /* Reset role pill and info labels from previous profile */
+  var _roleEl=G('member-profile-role');
+  if(_roleEl){_roleEl.style.background='rgba(0,0,0,.18)';_roleEl.style.color='#fff';}
+  document.querySelectorAll('#modal-member-profile .mp-row-label').forEach(function(el){el.style.color='';});
   /* Role pill — tint with pack accent when equipped */
   var roleEl=G('member-profile-role');
   if(roleEl){
@@ -10473,7 +10488,7 @@ function renderMemberProfileCosmetics(nick,inv){
   infoLabels.forEach(function(el){el.style.color=packAccent||'';});
   /* ── Ring on avatar ── */
   var avatarWrap=G('member-profile-avatar');
-  /* Remove any existing ring */
+  /* Remove any existing ring AND reset styles from previous profile */
   if(avatarWrap){var oldPR=avatarWrap.querySelector('.profile-ring');if(oldPR)oldPR.remove();}
   if(avatarWrap&&equippedRing){
     avatarWrap.style.position='relative';
@@ -10489,6 +10504,14 @@ function renderMemberProfileCosmetics(nick,inv){
   }
   /* ── Name flair — profile card only ── */
   var profileNameEl=G('member-profile-name');
+  /* Reset name styles from previous profile */
+  if(profileNameEl){
+    profileNameEl.style.color='';
+    profileNameEl.style.animation='';
+    profileNameEl.style.textShadow='';
+    var _oldFlairSpan=profileNameEl.parentNode?profileNameEl.parentNode.querySelector('.profile-flair-wrap'):null;
+    if(_oldFlairSpan)_oldFlairSpan.remove();
+  }
   if(profileNameEl){
     /* Remove any existing flair */
     var oldFlairEl=profileNameEl.parentNode?profileNameEl.parentNode.querySelector('.profile-flair-wrap'):null;
