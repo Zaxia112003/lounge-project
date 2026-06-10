@@ -10395,9 +10395,10 @@ function openMemberProfile(nick){
       }
       if(settingsSnap&&settingsSnap.exists()){
         var _sd=settingsSnap.data();
-        /* Only use settings as fallback if inventory has nothing */
         if(!inv.equippedSet&&_sd.equippedSet)inv._equippedSet=_sd.equippedSet;
         if(!inv.equippedSet&&!inv._equippedSet&&_sd.equippedBanner)inv._equippedBanner=_sd.equippedBanner;
+        /* Load equippedFlair as fallback if not in equipped map */
+        if(_sd.equippedFlair){inv._equippedFlair=_sd.equippedFlair;}
       }
       renderMemberProfileCosmetics(nick,inv);
     }).catch(function(){renderMemberProfileCosmetics(nick,{});});
@@ -10486,6 +10487,48 @@ function renderMemberProfileCosmetics(nick,inv){
       avatarWrap.appendChild(ringDiv);
     }
   }
+  /* ── Name flair — profile card only ── */
+  var profileNameEl=G('member-profile-name');
+  if(profileNameEl){
+    /* Remove any existing flair */
+    var oldFlairEl=profileNameEl.parentNode?profileNameEl.parentNode.querySelector('.profile-flair-wrap'):null;
+    if(oldFlairEl)oldFlairEl.remove();
+    profileNameEl.style.textShadow='';
+    profileNameEl.style.color='';
+    profileNameEl.style.animation='';
+    /* Find active flair from equipped map or userSettings */
+    var activeFlair=Object.keys(equipped).find(function(k){return k.startsWith('flair_')&&equipped[k];})
+      ||inv._equippedFlair||null;
+    var FLAIR_MAP={
+      flair_gold_sparkle:{tier:1,icon:'✨',anim:'flair-sp-gold'},
+      flair_diamond_sparkle:{tier:1,icon:'💎',anim:'flair-sp-diamond'},
+      flair_blue_sparkle:{tier:1,icon:'💫',anim:'flair-sp-blue'},
+      flair_teal_glow:{tier:2,color:'#1D9E75',anim:'flair-glow-teal'},
+      flair_sky_glow:{tier:2,color:'#38b2ff',anim:'flair-glow-sky'},
+      flair_gold_glow:{tier:2,color:'#EF9F27',anim:'flair-glow-gold'}
+    };
+    if(activeFlair){
+      /* FLAIR_MAP defined at top of function */
+      var fd=FLAIR_MAP[activeFlair];
+      if(fd){
+        if(fd.tier===1){
+          /* Sparkle: append animated icon after name */
+          var flairSpan=document.createElement('span');
+          flairSpan.className='profile-flair-wrap';
+          flairSpan.style.cssText='display:inline-flex;align-items:center;gap:3px;';
+          var iconSpan=document.createElement('span');
+          iconSpan.textContent=fd.icon;
+          iconSpan.style.cssText='font-size:13px;display:inline-block;animation:'+fd.anim+' 1.9s ease-in-out infinite;';
+          flairSpan.appendChild(iconSpan);
+          profileNameEl.parentNode.insertBefore(flairSpan,profileNameEl.nextSibling);
+        } else if(fd.tier===2){
+          /* Glow: apply text-shadow + color to name element */
+          profileNameEl.style.color=fd.color;
+          profileNameEl.style.animation=fd.anim+' 2.5s ease-in-out infinite';
+        }
+      }
+    }
+  }
   /* ── Equipped section (always render) ── */
   var cosEl=G('member-profile-cosmetics');
   if(cosEl){
@@ -10494,6 +10537,16 @@ function renderMemberProfileCosmetics(nick,inv){
     if(equippedRing){
       var _rc=ringColors[equippedRing]||(typeof RING_ANIMATED!=='undefined'&&RING_ANIMATED[equippedRing]?'#8b75d7':null)||'#8892b0';
       chips.push('<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid '+_rc+';background:var(--bg2)"><span style="width:10px;height:10px;border-radius:50%;border:2px solid '+_rc+';display:inline-block;flex-shrink:0"></span>'+equippedRing.replace('ring_','').replace(/_/g,' ')+' ring</span>');
+    }
+        /* Flair chip */
+    if(activeFlair&&typeof FLAIR_MAP!=='undefined'){
+      var _fd=FLAIR_MAP[activeFlair];
+      if(_fd){
+        var _flairLabel=activeFlair.replace('flair_','').replace(/_/g,' ');
+        var _flairIcon=_fd.icon||'✨';
+        var _flairColor=_fd.color||'#8892b0';
+        chips.push('<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid '+_flairColor+';background:var(--bg2);color:'+_flairColor+'">'+_flairIcon+' '+_flairLabel+'</span>');
+      }
     }
         if(_eSet&&typeof GC_SETS!=='undefined'&&GC_SETS[_eSet]){var _so=GC_SETS[_eSet];chips.unshift('<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid '+(bannerShadow||'var(--accent)')+';background:var(--bg2);font-weight:600">'+_so.icon+' '+_so.name+'</span>');}
     var chipsHtml=chips.length?'<div style="display:flex;gap:6px;flex-wrap:wrap">'+chips.join('')+'</div>':'<span style="font-size:12px;color:var(--muted)">Nothing equipped yet.</span>';
@@ -13417,6 +13470,12 @@ document.addEventListener('DOMContentLoaded',function(){
   56%{opacity:1;transform:translateY(0)}
   100%{opacity:1;transform:translateY(0)}
 }
+@keyframes flair-sp-gold{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+@keyframes flair-sp-diamond{0%,100%{opacity:.5;transform:scale(.9) rotate(-10deg)}50%{opacity:1;transform:scale(1.15) rotate(10deg)}}
+@keyframes flair-sp-blue{0%,100%{opacity:.3;transform:scale(.75)}33%{opacity:.9;transform:scale(1.1)}66%{opacity:.6;transform:scale(.95)}}
+@keyframes flair-glow-teal{0%,100%{text-shadow:0 0 6px #1D9E75,0 0 14px #1D9E75}50%{text-shadow:0 0 14px #1D9E75,0 0 28px #1D9E75,0 0 42px #1D9E75}}
+@keyframes flair-glow-sky{0%,100%{text-shadow:0 0 6px #38b2ff,0 0 14px #38b2ff}50%{text-shadow:0 0 14px #38b2ff,0 0 28px #38b2ff,0 0 42px #38b2ff}}
+@keyframes flair-glow-gold{0%,100%{text-shadow:0 0 6px #EF9F27,0 0 14px #EF9F27}50%{text-shadow:0 0 14px #EF9F27,0 0 28px #EF9F27,0 0 42px #EF9F27}}
 @keyframes koby-blink{0%,88%,100%{transform:scaleY(1)}93%{transform:scaleY(0.1)}}
 @keyframes koby-grass{0%,100%{transform-origin:bottom center;transform:rotate(-3deg)}50%{transform-origin:bottom center;transform:rotate(3deg)}}
 @keyframes koby-ripple{0%{r:3;opacity:.55;stroke-width:1.1}100%{r:18;opacity:0;stroke-width:.25}}
@@ -13907,7 +13966,14 @@ var GC_SHOP_ITEMS=[
   {id:'set_coral',tier:'cosmetic',name:'Coral set',desc:'Hot, bold, not taking the back seat.',price:200,icon:'🪸',limit:null,stackable:false,isSet:true,setId:'coral'},
   {id:'set_teal',tier:'cosmetic',name:'Teal set',desc:'Calm on the outside. Winning on the inside.',price:200,icon:'💚',limit:null,stackable:false,isSet:true,setId:'teal'},
   {id:'set_purple_plain',tier:'cosmetic',name:'Purple set',desc:'Royalty called. They want their colour back.',price:200,icon:'💜',limit:null,stackable:false,isSet:true,setId:'purple_plain'},
-  {id:'flair',tier:'cosmetic',name:'Name flair ✨',desc:'Because your name alone was not sparkly enough.',price:200,icon:'✨',limit:null,stackable:false},
+  /* ── Name flair — Tier 1 sparkle (100 cr each) ── */
+  {id:'flair_gold_sparkle',tier:'cosmetic',name:'Gold sparkle',desc:'You didn\'t come to blend in.',price:100,icon:'✨',limit:null,stackable:false,flairTier:1,flairIcon:'✨',flairAnim:'flair-sp-gold'},
+  {id:'flair_diamond_sparkle',tier:'cosmetic',name:'Diamond sparkle',desc:'Rare. Cold. Absolutely you.',price:100,icon:'💎',limit:null,stackable:false,flairTier:1,flairIcon:'💎',flairAnim:'flair-sp-diamond'},
+  {id:'flair_blue_sparkle',tier:'cosmetic',name:'Blue sparkle',desc:'Certified main character energy.',price:100,icon:'💫',limit:null,stackable:false,flairTier:1,flairIcon:'💫',flairAnim:'flair-sp-blue'},
+  /* ── Name flair — Tier 2 glow (200 cr each) ── */
+  {id:'flair_teal_glow',tier:'cosmetic',name:'Teal glow',desc:'Your name, but make it glow up.',price:200,icon:'💚',limit:null,stackable:false,flairTier:2,flairColor:'#1D9E75',flairAnim:'flair-glow-teal'},
+  {id:'flair_sky_glow',tier:'cosmetic',name:'Sky blue glow',desc:'Floating above the rest. Literally.',price:200,icon:'💫',limit:null,stackable:false,flairTier:2,flairColor:'#38b2ff',flairAnim:'flair-glow-sky'},
+  {id:'flair_gold_glow',tier:'cosmetic',name:'Gold glow',desc:'Main character. Gold edition.',price:200,icon:'🌟',limit:null,stackable:false,flairTier:2,flairColor:'#EF9F27',flairAnim:'flair-glow-gold'},
   /* ── Texture sets (banner + texture + accent + ring bundled) ── */
   {id:'set_galaxy',tier:'cosmetic',name:'Galaxy set',desc:'Stars, particles, deep space vibes. Includes Aurora ring.',price:250,icon:'🌌',limit:null,stackable:false,isSet:true,setId:'galaxy'},
   {id:'set_dark_forest',tier:'cosmetic',name:'Dark forest set',desc:'Ancient trees, zero Wi-Fi, 100% vibes. Includes root ring.',price:250,icon:'🌲',limit:null,stackable:false,isSet:true,setId:'dark_forest'},
@@ -14172,6 +14238,7 @@ function gcEquipCosmetic(itemId){
   var _si=(typeof GC_SHOP_ITEMS!=='undefined')?GC_SHOP_ITEMS.find(function(i){return i.id===itemId;}):null;
   if(_si&&_si.isSet&&_si.setId){gcEquipSetItem(_si.setId,itemId);return;}
   var isBanner=itemId.startsWith('banner_');
+  var isFlair=itemId.startsWith('flair_');
   var nick=cu.nickname.toLowerCase();
   gcDb().collection('gc_inventory').doc(nick).get().then(function(snap){
     var inv=snap.exists()?(snap.data()||{}):{}; var equipped=inv.equipped||{};
@@ -14200,11 +14267,17 @@ function gcEquipCosmetic(itemId){
           }
         }
         gcRenderBadges();
-        gcToast('\u274c '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+ ' unequipped');
+        /* Clear flair from userSettings on unequip */
+        if(isFlair&&window._fsSetDoc&&window._fsDoc&&fsDb()){
+          try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedFlair:''},{merge:true}).catch(function(){});}catch(ex){}
+        }
+        gcToast('❌ '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' unequipped');
       });
     }
     /* EQUIP — turn on, turn off siblings of same type */
     if(isBanner){Object.keys(equipped).forEach(function(k){if(k.startsWith('banner_')&&k!==itemId)update['equipped.'+k]=false;});}
+    /* Flair: only one active at a time — deactivate all other flair_ items */
+    if(isFlair){Object.keys(equipped).forEach(function(k){if(k.startsWith('flair_')&&k!==itemId)update['equipped.'+k]=false;});}
     update['equipped.'+itemId]=true;
     update['equippedAt.'+itemId]=Date.now();
     return gcDb().collection('gc_inventory').doc(nick).set(update,{merge:true}).then(function(){
@@ -14230,7 +14303,14 @@ function gcEquipCosmetic(itemId){
         }
       }
       gcRenderBadges();
-      gcToast('\u2728 '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' equipped!');
+      /* Persist active flair to userSettings */
+      if(isFlair&&window._fsSetDoc&&window._fsDoc&&fsDb()){
+        try{window._fsSetDoc(window._fsDoc(fsDb(),'userSettings',cu.nickname.toLowerCase()),{equippedFlair:itemId},{merge:true}).catch(function(){});}catch(ex){}
+      }
+      if(isFlair&&!isCurrentlyEquipped){
+        /* Unequip: clear flair in userSettings */
+      }
+      gcToast('✨ '+itemId.replace(/_/g,' ').replace(/banner /,'').replace(/\w/g,function(c){return c.toUpperCase();})+' equipped!');
     });
   }).catch(function(e){gcToast('Error: '+e.message);});
 }
