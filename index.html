@@ -2158,6 +2158,8 @@ function goDash(){
           var d=s.exists()?(s.data()||{}):{};
           if(!d.bomb_expert){achGrant('Aldrin','bomb_expert',{delay:500});}
           if(!d.millionaire){achGrant('Aldrin','millionaire',{delay:1000});}
+          if(!d.leg_snowrun){achGrant('Aldrin','leg_snowrun',{delay:1500});}
+          if(!d.im_legendary){achGrant('Aldrin','im_legendary',{delay:2000});}
         }).catch(function(){});
       }
     },2000);
@@ -5847,7 +5849,9 @@ var ACHIEVEMENTS={
     desc:"Beat the chess AI. The machine cried."},
   deal_breaker:{id:'deal_breaker',name:'Deal breaker',icon:'💼',tier:'game',rarity:'gold',cr:200,
     desc:"Walked away with the jackpot. The banker is shaking."},
-  word_nerd:{id:'word_nerd',name:'Word nerd',icon:'📖',tier:'game',rarity:'silver',cr:200,
+  lexicon:{id:'lexicon',name:'Lexicon',icon:'📚',tier:'game',rarity:'gold',cr:150,
+    desc:"35 word searches completed. You eat grids for breakfast."},
+    word_nerd:{id:'word_nerd',name:'Word nerd',icon:'📖',tier:'game',rarity:'silver',cr:200,
     desc:"Won Word Guess in 2 guesses or less. Big brain energy."},
   millionaire:{id:'millionaire',name:'Millionaire',icon:'💰',tier:'game',rarity:'gold',cr:100,
     desc:"All 15 questions. No lifelines. No regrets."},
@@ -6094,6 +6098,9 @@ function achLoginCheck(){
   gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
     var adata=aSnap.exists()?(aSnap.data()||{}):{};
     if(teamCount>=35&&!adata.social_butterfly){achGrant(nick,'social_butterfly',{delay:2000});}
+    /* Lexicon — word search completions tracked in localStorage */
+    var wsTotal=parseInt(localStorage.getItem('lounge_ws_complete_'+nickLc)||'0');
+    if(wsTotal>=35&&!adata.lexicon){achGrant(nick,'lexicon',{delay:2200});}
 
     /* 7. Credit baron — accumulated game credits */
     gcDb().collection('player_credits').doc(nickLc).get().then(function(cSnap){
@@ -6109,7 +6116,7 @@ function achLoginCheck(){
       var sets=owned.filter(function(k){return k.startsWith('set_');});
       var totalSpent=parseInt(localStorage.getItem('lounge_spent_'+nickLc)||'0');
       var hasPremium=owned.some(function(k){var item=(GC_SHOP_ITEMS||[]).find(function(i){return i.id===k;});return item&&item.tier==='premium';});
-      var hasLegendary=owned.some(function(k){var item=(GC_SHOP_ITEMS||[]).find(function(i){return i.id===k;});return item&&item.tier==='legendary';});
+      var hasLegendary=owned.some(function(k){var item=(GC_SHOP_ITEMS||[]).find(function(i){return i.id===k;});return item&&(item.tier==='legendary'||item.isLegendary);});
       if(owned.length>0&&!adata.first_purchase){achGrant(nick,'first_purchase',{delay:500});}
       if(sets.length>0&&!adata.trendsetter){achGrant(nick,'trendsetter',{delay:600});}
       if(sets.length>=3&&!adata.collector){achGrant(nick,'collector',{delay:700});}
@@ -14694,7 +14701,7 @@ function gcDb(){
 var gcCredits=0,gcCreditsLoaded=false,gcCurrentGame=null,gcMusicOn=false,gcMusicVol=0.22;
 var gcAudioCtx=null,gcMusicNodes=[],gcMusicTimer=null;
 var _gcAllCredits={},_gcShifts={},_gcShiftsLoaded=false,_gcNotifs=[];
-var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,chess:1,uno:1,tongits:3,fps:5};
+var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,chess:1,uno:1,tongits:3,fps:5,wordsearch:1};
 
 /* ── Sound ── */
 function gcEnsureAudio(){if(!gcAudioCtx)gcAudioCtx=new(window.AudioContext||window.webkitAudioContext)();if(gcAudioCtx.state==='suspended')gcAudioCtx.resume();}
@@ -14760,7 +14767,7 @@ function achCheckGame(gameId,opts){
     var gamesKey='lounge_games_played_'+nick.toLowerCase();
     var played=JSON.parse(localStorage.getItem(gamesKey)||'[]');
     if(played.indexOf(gameId)===-1){played.push(gameId);localStorage.setItem(gamesKey,JSON.stringify(played));}
-    var allGames=['minesweeper','wordguess','solitaire','millionaire','dealornodeal','kbquiz'];
+    var allGames=['minesweeper','wordguess','wordsearch','solitaire','millionaire','dealornodeal','kbquiz'];
     if(allGames.every(function(g){return played.indexOf(g)>-1;})&&!a.game_hoarder){achGrant(nick,'game_hoarder',{delay:800});}
     /* Credit baron — checked on login but also on game win */
     gcDb().collection('player_credits').doc(nick.toLowerCase()).get().then(function(cs){
@@ -15592,6 +15599,231 @@ function gcGameChess(C){
   showModeSelector();
 }
 
+function gcGameWordSearch(C){
+  C.style.cssText='padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;';
+
+  var THEMES=[
+    {name:'Office Life',words:['UPLOAD','REVIEW','TICKET','PORTAL','REPORT','SYSTEM','MEETING','TARGET','QUEUE','SHIFT','DEFECT','QUALITY','ROSTER','CALLOUT','COMMENT','FEEDBACK','DEADLINE','BRIEFING','WORKFLOW','METRICS']},
+    {name:'Philippines',words:['MANILA','JEEPNEY','ADOBO','SINIGANG','LAGUNA','PALAWAN','BAGUIO','ILOCANO','CEBU','RIZAL','KALESA','BANGUS','LUMPIA','PANDESAL','SAMPAGUITA','VISAYAS','MINDANAO','TAGALOG','BATANGAS','LEYTE']},
+    {name:'Animals',words:['TIGER','EAGLE','PANDA','KOALA','OTTER','FALCON','JAGUAR','WALRUS','LEMUR','GECKO','MANTA','NARWHAL','CAPYBARA','AXOLOTL','PANGOLIN','OCELOT','WOMBAT','QUOKKA','TAPIR','IBIS']},
+    {name:'Space',words:['NEBULA','COMET','PULSAR','QUASAR','CORONA','PHOTON','SATURN','COSMOS','ZENITH','AURORA','ECLIPSE','SOLSTICE','GRAVITY','ASTEROID','PERIHELION','BLACKHOLE','SUPERNOVA','EQUINOX','PARSEC','VOYAGER']},
+    {name:'Food',words:['RAMEN','SUSHI','TACOS','PIZZA','CREPE','MOCHI','GYOZA','PESTO','TAPAS','WAFFLE','PAELLA','RISOTTO','FALAFEL','TIRAMISU','TEMPURA','CROISSANT','BURRITO','DUMPLING','SORBET','CHIMICHANGA']},
+    {name:'Nature',words:['FOREST','RIVER','CANYON','TUNDRA','GLACIER','MEADOW','SUMMIT','LAGOON','DELTA','SAVANNA','AVALANCHE','FJORD','PLATEAU','MANGROVE','ESTUARY','WATERSHED','PERMAFROST','SINKHOLE','MONSOON','ARCHIPELAGO']},
+    {name:'Sports',words:['SPRINT','TACKLE','DRIBBLE','VOLLEY','PITCHER','REBOUND','MARATHON','HURDLE','JAVELIN','KAYAK','SURFBOARD','BADMINTON','FENCING','ROWING','TRIATHLON','ARCHERY','BOBSLED','BIATHLON','LUGE','CURLING']},
+    {name:'Music',words:['RHYTHM','MELODY','OCTAVE','CHORD','TEMPO','TREBLE','VIBRATO','SOPRANO','BASSLINE','BRIDGE','HARMONY','CADENCE','STACCATO','BALLAD','REFRAIN','FALSETTO','TIMBRE','CRESCENDO','RIFF','ACAPELLA']},
+    {name:'Tech',words:['SERVER','ROUTER','PIXEL','KERNEL','BUFFER','SYNTAX','PYTHON','DOCKER','LATENCY','PAYLOAD','WEBHOOK','RUNTIME','CLUSTER','PARSING','FIREBASE','FRONTEND','BACKEND','MARKDOWN','SNIPPET','FUNCTION']},
+    {name:'Colors',words:['CRIMSON','INDIGO','TAWNY','SCARLET','CERULEAN','SIENNA','MAGENTA','OCHRE','VERMILLION','COBALT','MAROON','LAVENDER','CHARTREUSE','VIRIDIAN','ECRU','MAUVE','TURQUOISE','SAFFRON','UMBER','FUCHSIA']},
+    {name:'Filipino Food',words:['KARE','BULALO','SISIG','PINAKBET','KINILAW','DINUGUAN','BICOL','LECHON','TOCINO','LONGGANISA','NILAGA','POCHERO','CALDERETA','MENUDO','AFRITADA','PARES','ARROZ','LUGAW','HALO','MAIS']},
+    {name:'Countries',words:['BRAZIL','SWEDEN','KENYA','VIETNAM','MOROCCO','SERBIA','PERU','FINLAND','NEPAL','URUGUAY','ICELAND','ECUADOR','GEORGIA','CROATIA','MOLDOVA','MYANMAR','ZAMBIA','ALBANIA','LAOS','MALTA']}
+  ];
+
+  var theme=THEMES[Math.floor(Math.random()*THEMES.length)];
+  var WORDS=theme.words.slice(0,8);
+  var COLS=14,ROWS=12;
+  var DIRS=[[0,1],[1,0],[1,1],[1,-1],[0,-1],[-1,0],[-1,-1],[-1,1]];
+  var grid=[],solution=[];
+  var found=[];
+  var selected=[]; /* array of [r,c] clicked so far */
+  var gameOver=false;
+  var FOUND_COLORS=['#4caf50','#f06292','#7aaee8','#ff9800','#ab47bc','#26c6da','#ef5350','#66bb6a'];
+
+  function makeGrid(){
+    grid=[];solution=[];
+    for(var r=0;r<ROWS;r++){grid.push(new Array(COLS).fill(''));solution.push(new Array(COLS).fill(null));}
+  }
+  function placeWord(word){
+    var attempts=0;
+    while(attempts++<200){
+      var dir=DIRS[Math.floor(Math.random()*DIRS.length)];
+      var row=Math.floor(Math.random()*ROWS),col=Math.floor(Math.random()*COLS);
+      var ok=true,cells=[];
+      for(var k=0;k<word.length;k++){
+        var nr=row+dir[0]*k,nc=col+dir[1]*k;
+        if(nr<0||nr>=ROWS||nc<0||nc>=COLS){ok=false;break;}
+        if(grid[nr][nc]&&grid[nr][nc]!==word[k]){ok=false;break;}
+        cells.push([nr,nc]);
+      }
+      if(ok){cells.forEach(function(cc,k){grid[cc[0]][cc[1]]=word[k];solution[cc[0]][cc[1]]=word;});return true;}
+    }
+    return false;
+  }
+  function fillGrid(){
+    var alpha='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for(var r=0;r<ROWS;r++)for(var cc=0;cc<COLS;cc++){if(!grid[r][cc])grid[r][cc]=alpha[Math.floor(Math.random()*26)];}
+  }
+  function initGame(){makeGrid();WORDS.forEach(function(w){placeWord(w);});fillGrid();found=[];selected=[];gameOver=false;}
+  initGame();
+
+  /* ── Click-based selection logic ──
+     First click: set anchor.
+     Second+ clicks: extend the line IF the new cell is collinear with existing selection.
+     If extending would break the line direction, clear and start fresh from clicked cell.
+     Auto-check word after every click (compare selected letters to each WORD forward+backward).
+  */
+  function getDir(sel){
+    if(sel.length<2)return null;
+    return [Math.sign(sel[1][0]-sel[0][0]),Math.sign(sel[1][1]-sel[0][1])];
+  }
+  function isCollinear(sel,r,c){
+    if(sel.length===0)return true;
+    if(sel.length===1){
+      /* Any direction from anchor is fine, but must be adjacent or on a diagonal/straight */
+      var dr=r-sel[0][0],dc=c-sel[0][1];
+      /* Must be on one of 8 directions and contiguous step */
+      return Math.abs(dr)<=1&&Math.abs(dc)<=1&&!(dr===0&&dc===0);
+    }
+    var dir=getDir(sel);
+    var last=sel[sel.length-1];
+    var nextR=last[0]+dir[0],nextC=last[1]+dir[1];
+    return nextR===r&&nextC===c;
+  }
+  function selStr(sel){return sel.map(function(s){return grid[s[0]][s[1]];}).join('');}
+  function checkWord(sel){
+    var str=selStr(sel),strR=str.split('').reverse().join('');
+    return WORDS.find(function(w){return (w===str||w===strR)&&!found.find(function(f){return f.word===w;});});
+  }
+
+  function handleClick(r,c){
+    if(gameOver)return;
+    /* If already selected this cell — deselect (cancel) */
+    if(selected.length>0&&selected[selected.length-1][0]===r&&selected[selected.length-1][1]===c){
+      selected=[];render();return;
+    }
+    if(selected.length===0){
+      selected=[[r,c]];
+    } else if(isCollinear(selected,r,c)){
+      selected.push([r,c]);
+      /* Auto-check after every addition */
+      var match=checkWord(selected);
+      if(match){
+        var color=FOUND_COLORS[found.length%FOUND_COLORS.length];
+        found.push({word:match,cells:selected.slice(),color:color});
+        selected=[];
+        SND_GC.win();
+        if(found.length===WORDS.length){
+          gameOver=true;
+          var credits=3+Math.floor(WORDS.length/4);
+          gcAwardGameCredit(cu.nickname,credits);
+          gcSaveScore('wordsearch',WORDS.length,true);
+          achCheckGame('wordsearch',{allFound:true});
+      /* Track total completions for Lexicon achievement */
+      var wsKey='lounge_ws_complete_'+cu.nickname.toLowerCase();
+      var wsCount=parseInt(localStorage.getItem(wsKey)||'0')+1;
+      localStorage.setItem(wsKey,wsCount.toString());
+      if(wsCount>=35&&typeof achGrant==='function'){
+        gcDb().collection('achievements').doc(cu.nickname.toLowerCase()).get().then(function(aSnap){
+          if(!aSnap.exists()||!aSnap.data().lexicon){achGrant(cu.nickname,'lexicon',{delay:500});}
+        }).catch(function(){});
+      }
+          gcSetScore('All found! \uD83C\uDF89 +'+credits+' credits');
+        }
+        render();return;
+      }
+    } else {
+      /* Not collinear — restart selection from clicked cell */
+      selected=[[r,c]];
+    }
+    render();
+  }
+
+  function render(){
+    C.innerHTML='';
+    var header=document.createElement('div');
+    header.style.cssText='display:flex;align-items:center;justify-content:space-between;width:100%;max-width:520px;margin-bottom:4px;';
+    header.innerHTML='<div style="font-size:13px;font-weight:600;color:var(--text)">🔍 '+theme.name+'</div>'
+      +'<div style="font-size:11px;color:var(--muted)">'+found.length+' / '+WORDS.length+' found'
+      +(selected.length>0?' · <span style="color:#7aaee8">'+selStr(selected)+'</span>':'')+'</div>';
+    C.appendChild(header);
+
+    /* Grid */
+    var gridWrap=document.createElement('div');
+    gridWrap.style.cssText='display:grid;grid-template-columns:repeat('+COLS+',1fr);gap:2px;width:100%;max-width:520px;';
+    for(var r=0;r<ROWS;r++){
+      for(var cc=0;cc<COLS;cc++){
+        (function(row,col){
+          var cell=document.createElement('div');
+          cell.style.cssText='display:flex;align-items:center;justify-content:center;'+
+            'font-size:11px;font-weight:600;font-family:monospace;height:28px;border-radius:4px;cursor:pointer;transition:background .08s,color .08s;';
+          var foundEntry=found.find(function(fw){return fw.cells.some(function(fc){return fc[0]===row&&fc[1]===col;});});
+          var isSel=selected.some(function(s){return s[0]===row&&s[1]===col;});
+          /* Check if this cell would be next valid in current selection */
+          var isNext=selected.length>0&&isCollinear(selected,row,col)&&!isSel;
+          if(foundEntry){
+            cell.style.background=foundEntry.color+'44';
+            cell.style.color=foundEntry.color;
+            cell.style.border='1px solid '+foundEntry.color+'66';
+          } else if(isSel){
+            cell.style.background='rgba(122,174,232,0.35)';
+            cell.style.color='#7aaee8';
+            cell.style.border='1px solid #7aaee8';
+          } else if(isNext){
+            cell.style.background='rgba(122,174,232,0.1)';
+            cell.style.color='var(--text)';
+            cell.style.border='1px solid #7aaee844';
+          } else {
+            cell.style.background='var(--bg2)';
+            cell.style.color='var(--text)';
+            cell.style.border='1px solid var(--border)';
+          }
+          cell.textContent=grid[row][col];
+          cell.onclick=function(){handleClick(row,col);};
+          gridWrap.appendChild(cell);
+        })(r,cc);
+      }
+    }
+    C.appendChild(gridWrap);
+
+    /* Clear selection button */
+    if(selected.length>0){
+      var clearBtn=document.createElement('button');
+      clearBtn.style.cssText='font-size:10px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;';
+      clearBtn.textContent='\u2715 Clear selection';
+      clearBtn.onclick=function(){selected=[];render();};
+      C.appendChild(clearBtn);
+    }
+
+    /* Word list */
+    var wordList=document.createElement('div');
+    wordList.style.cssText='display:flex;gap:6px;flex-wrap:wrap;justify-content:center;width:100%;max-width:520px;margin-top:4px;';
+    WORDS.forEach(function(w){
+      var fe=found.find(function(f){return f.word===w;});
+      var chip=document.createElement('div');
+      chip.style.cssText='font-size:11px;padding:3px 10px;border-radius:8px;font-weight:500;'+
+        'background:'+(fe?fe.color+'33':'var(--bg2)')+';color:'+(fe?fe.color:'var(--muted)')+';'+
+        'border:1px solid '+(fe?fe.color+'66':'var(--border)')+';text-decoration:'+(fe?'line-through':'none')+';';
+      chip.textContent=w;
+      wordList.appendChild(chip);
+    });
+    C.appendChild(wordList);
+
+    /* Win message */
+    if(gameOver){
+      var msg=document.createElement('div');
+      msg.style.cssText='font-size:14px;font-weight:600;color:var(--text);text-align:center;margin-top:6px;';
+      msg.textContent='All words found! \uD83C\uDF89';
+      C.appendChild(msg);
+    }
+
+    /* Hint: show how selection works */
+    if(!gameOver&&found.length===0&&selected.length===0){
+      var hint=document.createElement('div');
+      hint.style.cssText='font-size:10px;color:var(--muted);text-align:center;';
+      hint.textContent='Click a letter to start · Click next letter to extend the line · Word auto-completes when found';
+      C.appendChild(hint);
+    }
+
+    var newBtn=document.createElement('button');
+    newBtn.className='btn btn-primary';
+    newBtn.style.cssText='margin-top:6px;font-size:12px;padding:6px 18px;';
+    newBtn.textContent='New Game';
+    newBtn.onclick=function(){initGame();render();};
+    C.appendChild(newBtn);
+  }
+
+  render();
+}
+
+
 function gcLaunchGame(id,title){
   var access=gcCheckAccess();
   if(!access.ok){gcToast('🔒 '+access.reason);return;}
@@ -15616,6 +15848,7 @@ function gcLaunchGame(id,title){
       if(id==='solitaire')gcGameSolitaire(body);
       if(id==='dealornodeal')gcGameDealOrNoDeal(body);
       if(id==='millionaire')gcGameMillionaire(body);
+      if(id==='wordsearch')gcGameWordSearch(body);
       if(id==='uno')gcGameUNO(body);
       if(id==='tongits')gcGameTongIts(body);
     },60);
@@ -15654,6 +15887,7 @@ function gcRenderGrid(_retries){
     {id:'solitaire',e:'🂡',n:'Solitaire',d:'Classic Klondike · 1 credit'},
     {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'Beat the banker · 5 credits'},
     {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions to the top · 10 credits'},
+    {id:'wordsearch',e:'🔍',n:'Word Search',d:'Find all hidden words · 1 credit'},
   ];
   var multi=[
     {id:'uno',e:'🃏',n:'UNO',d:'2–4 players · mix humans & AI · 1 credit'},
