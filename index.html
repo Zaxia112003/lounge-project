@@ -2133,6 +2133,8 @@ function goDash(){
   }catch(e){}
   if(cu&&cu.role==='manager')loadPendingReviews();
   var li=G('main-loggedin');if(li&&cu)li.innerHTML='Logged in as <span style="color:var(--accent);font-weight:700">'+cu.fullName+'</span>';
+  /* Achievement login check */
+  setTimeout(function(){if(typeof achLoginCheck==='function')achLoginCheck();},1500);
   /* Init range calendars */
   setTimeout(function(){
     if(G('rcal-upl-perf-trigger'))rcalCreate('rcal-upl-perf',function(from,to){customRange={from:from,to:to};activeDateFilter='custom';document.querySelectorAll('.filter-pill').forEach(function(p){p.classList.remove('active');});renderDashboard();});
@@ -3287,7 +3289,7 @@ function buildUploaderDOM(){
     <div class="lounge-tabs">
       <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
       <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">My Team</button>
+      <button class="lounge-tab" data-tab="my-team" onclick="if(typeof achTrackTeamOpen==='function')achTrackTeamOpen();switchLoungeTab('my-team',this)">My Team</button>
       <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">My Space</button>
       
     </div>
@@ -5507,6 +5509,466 @@ function gcMakeRingEl(ringKey,inset,borderWidth){
   return wrap;
 }
 
+/* ══════════════════════════════════════════════
+   ACHIEVEMENT SYSTEM
+   ══════════════════════════════════════════════ */
+var ACHIEVEMENTS={
+  /* Anniversary — rolling yearly, based on hire date */
+  anniv_1:{id:'anniv_1',name:'Newbie',icon:null,num:'1',tier:'anniversary',rarity:'gray',cr:100,
+    desc:"You planted your roots. Welcome to the garden.",years:1},
+  anniv_2:{id:'anniv_2',name:'Pro (bronze)',icon:null,num:'2',tier:'anniversary',rarity:'bronze',cr:200,
+    desc:"Two years in and still standing. Respect.",years:2},
+  anniv_3:{id:'anniv_3',name:'Pro (silver)',icon:null,num:'2+',tier:'anniversary',rarity:'silver',cr:300,
+    desc:"Three years. You're not new here anymore.",years:3},
+  anniv_5:{id:'anniv_5',name:'Pro (gold)',icon:null,num:'5',tier:'anniversary',rarity:'gold',cr:500,
+    desc:"Five years. The portal basically runs on your energy.",years:5},
+  anniv_v:{id:'anniv_v',name:'Veteran',icon:null,num:'5+',tier:'anniversary',rarity:'diamond',cr:1000,
+    desc:"You've outlasted trends, managers, and probably several coffee machines.",years:6},
+  /* Performance */
+  upload_monster:{id:'upload_monster',name:'Upload monster',icon:'📦',tier:'performance',rarity:'gold',cr:200,
+    desc:"2,000+ contracts in a month. Your fingers deserve a trophy."},
+  quality_vet:{id:'quality_vet',name:'Quality veteran',icon:'🎯',tier:'performance',rarity:'gold',cr:200,
+    desc:"100% quality all month. Not a scratch. Not a dent."},
+  defect_defender:{id:'defect_defender',name:'Defect Defender',icon:'🛡️',tier:'performance',rarity:'gold',cr:200,
+    desc:"Zero defects for a whole month. Untouchable."},
+  life_of_pi:{id:'life_of_pi',name:'Life of PI',icon:'🧮',tier:'performance',rarity:'gold',cr:200,
+    desc:"PI of 13.0+ in a single month. The math did not have to go that hard."},
+  the_grind:{id:'the_grind',name:'The Grind',icon:'⚙️',tier:'performance',rarity:'rare',cr:300,
+    desc:"500 performance credits in a single day. Machine mode: activated."},
+  legend_ach:{id:'legend_ach',name:'Legend',icon:'🏅',tier:'performance',rarity:'rare',cr:500,
+    desc:"A legendary item and 15 straight working days without a defect. Both. At the same time."},
+  /* Mood / General */
+  mood_bronze:{id:'mood_bronze',name:'Mood maestro',icon:'😊',tier:'general',rarity:'bronze',cr:100,
+    desc:"30 check-ins. Feelings? Logged.",sub:'bronze'},
+  mood_silver:{id:'mood_silver',name:'Mood maestro',icon:'🌤️',tier:'general',rarity:'silver',cr:200,
+    desc:"60 check-ins. Consistently tuned in.",sub:'silver'},
+  mood_gold:{id:'mood_gold',name:'Mood maestro',icon:'✨',tier:'general',rarity:'gold',cr:300,
+    desc:"90 check-ins. You never miss a vibe.",sub:'gold'},
+  social_butterfly:{id:'social_butterfly',name:'Social butterfly',icon:'🦋',tier:'general',rarity:'bronze',cr:50,
+    desc:"Checked in on the team 35 times. You actually care."},
+  ghost:{id:'ghost',name:'Ghost',icon:'👻',tier:'rare',rarity:'rare',cr:0,
+    desc:"You disappeared for a week and came back like nothing happened."},
+  /* Game Corner */
+  bomb_expert:{id:'bomb_expert',name:'Bomb expert',icon:'💣',tier:'game',rarity:'bronze',cr:150,
+    desc:"Cleared Minesweeper on hard. You don't fear consequences."},
+  carlsen_jr:{id:'carlsen_jr',name:'Carlsen Jr',icon:'♟️',tier:'game',rarity:'silver',cr:150,
+    desc:"Beat the chess AI. The machine cried."},
+  deal_breaker:{id:'deal_breaker',name:'Deal breaker',icon:'💼',tier:'game',rarity:'gold',cr:200,
+    desc:"Walked away with the jackpot. The banker is shaking."},
+  word_nerd:{id:'word_nerd',name:'Word nerd',icon:'📖',tier:'game',rarity:'silver',cr:200,
+    desc:"Won Word Guess in 2 guesses or less. Big brain energy."},
+  millionaire:{id:'millionaire',name:'Millionaire',icon:'💰',tier:'game',rarity:'gold',cr:100,
+    desc:"All 15 questions. No lifelines. No regrets."},
+  solitaire_king:{id:'solitaire_king',name:'Solitaire king',icon:'🃏',tier:'game',rarity:'bronze',cr:100,
+    desc:"Won 35 Solitaire games. Patience is a superpower."},
+  game_hoarder:{id:'game_hoarder',name:'Game hoarder',icon:'🎮',tier:'game',rarity:'silver',cr:150,
+    desc:"Played every game at least once. Completionist tendency detected."},
+  credit_baron:{id:'credit_baron',name:'Credit baron',icon:'💳',tier:'game',rarity:'gold',cr:250,
+    desc:"1,000 game credits accumulated. The economy fears you."},
+  /* Shop */
+  first_purchase:{id:'first_purchase',name:'First purchase',icon:'🛒',tier:'shop',rarity:'gray',cr:50,
+    desc:"Your first credit spent. There is no going back."},
+  trendsetter:{id:'trendsetter',name:'Trendsetter',icon:'👗',tier:'shop',rarity:'bronze',cr:50,
+    desc:"Bought a set and wore it. Drip unlocked."},
+  collector:{id:'collector',name:'The Collector',icon:'🗂️',tier:'shop',rarity:'silver',cr:50,
+    desc:"Three sets and counting. A wardrobe, not a coincidence."},
+  inevitable:{id:'inevitable',name:'I am inevitable',icon:'🤜',tier:'shop',rarity:'gold',cr:100,
+    desc:"Six sets. The credits were inevitable."},
+  big_spender:{id:'big_spender',name:'Big spender',icon:'💸',tier:'shop',rarity:'silver',cr:100,
+    desc:"3,000 credits out the door. Worth it."},
+  deep_pockets:{id:'deep_pockets',name:'Deep pockets',icon:'🏦',tier:'shop',rarity:'gold',cr:200,
+    desc:"5,000 credits spent. At this point you ARE the economy."},
+  premium_taste:{id:'premium_taste',name:'Premium taste',icon:'🥂',tier:'shop',rarity:'silver',cr:300,
+    desc:"First premium item. You have standards."},
+  im_legendary:{id:'im_legendary',name:'I am Legendary!',icon:'👑',tier:'shop',rarity:'diamond',cr:500,
+    desc:"First legendary item. Some people peak. You ascended."},
+  /* Rare / Special */
+  koby_crib:{id:'koby_crib',name:'Koby Crib',icon:'🐸',tier:'rare',rarity:'rare',cr:100,
+    desc:"You equipped Koby's Pond for the first time. He noticed."},
+  prism_colors:{id:'prism_colors',name:'Prism colors',icon:'💎',tier:'rare',rarity:'rare',cr:100,
+    desc:"Equipped Prism set. Light bends for you now."},
+  kobys_friend:{id:'kobys_friend',name:"Koby's friend",icon:'🎂',tier:'rare',rarity:'rare',cr:300,
+    desc:"You showed up on his special day. Koby will remember this."},
+  /* Rolling */
+  hero_month:{id:'hero_month',name:'Hero of the Month',icon:'🏆',tier:'rolling',rarity:'gold',cr:500,rolling:true,holdDays:30,
+    desc:"Top uploads, cleanest record, highest PI — all at once. The team carries, you lead."},
+  quarter_master:{id:'quarter_master',name:'Quarter Master',icon:'🗺️',tier:'rolling',rarity:'diamond',cr:1000,rolling:true,holdDays:90,
+    desc:"Best of the best for a full quarter. The scoreboard has a favourite."},
+  /* Exclusive */
+  volturi:{id:'volturi',name:'Volturi Membership',icon:'🩸',tier:'exclusive',rarity:'rare',cr:0,
+    desc:"You were chosen. Not everyone makes the cut. Those who know, know."},
+  master_of_all:{id:'master_of_all',name:'Master of All Paths',icon:'🌌',tier:'special',rarity:'diamond',cr:3000,
+    desc:"Every road. Every challenge. Every corner of this portal — conquered. You didn't just play the game. You finished it."}
+};
+
+/* Rarity glow styles */
+var ACH_RARITY={
+  gray:    {bg:'#2c2c2a',border:'#888780',glow:'#888780',color:'#888780'},
+  bronze:  {bg:'#2a1a0a',border:'#c87941',glow:'#c87941',color:'#c87941'},
+  silver:  {bg:'#141e28',border:'#9baab8',glow:'#c0d0e0',color:'#c0d0e0'},
+  gold:    {bg:'#1a1200',border:'#EF9F27',glow:'#EF9F27',color:'#EF9F27'},
+  diamond: {bg:'#0a0820',border:'#60b8ff',glow:'#a78bfa',color:'#60b8ff'},
+  rare:    {bg:'#1a0010',border:'#d4537e',glow:'#d4537e',color:'#d4537e'}
+};
+
+/* Anniversary tiers in order */
+var ANNIV_TIERS=['anniv_1','anniv_2','anniv_3','anniv_5','anniv_v'];
+function achGetAnnivTier(hireDate){
+  if(!hireDate)return null;
+  var parts=hireDate.split(' ');
+  var months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  var hire=new Date(parseInt(parts[2]),months[parts[1]],parseInt(parts[0]));
+  var now=new Date();
+  var years=(now-hire)/(365.25*24*3600*1000);
+  if(years>=6)return'anniv_v';
+  if(years>=5)return'anniv_5';
+  if(years>=3)return'anniv_3';
+  if(years>=2)return'anniv_2';
+  if(years>=1)return'anniv_1';
+  return null;
+}
+
+/* ── Achievement: Xbox-style notification ── */
+function achNotify(ach){
+  var r=ACH_RARITY[ach.rarity]||ACH_RARITY.gray;
+  var wrap=document.createElement('div');
+  wrap.style.cssText='position:fixed;top:20px;right:20px;z-index:99999;animation:ach-notif-in .45s cubic-bezier(.34,1.56,.64,1) forwards;';
+  var isAnniv=ach.tier==='anniversary';
+  var iconHtml=isAnniv
+    ?'<div style="font-size:22px;font-weight:800;font-family:monospace;color:'+r.color+'">'+ach.num+'</div>'
+    :'<div style="font-size:24px;line-height:1">'+ach.icon+'</div>';
+  wrap.innerHTML='<div style="background:#1a1a2e;border:1px solid '+r.border+';border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;width:290px;box-shadow:0 4px 24px rgba(0,0,0,.5),0 0 20px '+r.glow+'44;">'
+    +'<div style="width:48px;height:48px;border-radius:10px;background:'+r.bg+';border:1.5px solid '+r.border+';display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px '+r.glow+'66">'+iconHtml+'</div>'
+    +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:'+r.color+';margin-bottom:2px">Achievement unlocked</div>'
+      +'<div style="font-size:13px;font-weight:600;color:#e8eaf6;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ach.name+'</div>'
+      +'<div style="font-size:10px;color:#8892b0;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ach.desc+'</div>'
+      +(ach.cr>0?'<div style="font-size:10px;color:#f0c060;margin-top:3px;font-weight:600">+'+ach.cr+' cr awarded</div>':'')
+    +'</div>'
+  +'</div>';
+  document.body.appendChild(wrap);
+  setTimeout(function(){
+    wrap.style.animation='ach-notif-out .35s ease-in forwards';
+    setTimeout(function(){wrap.remove();},350);
+  },4000);
+}
+
+/* ── Achievement: Grant (write to Firestore, award cr, notify) ── */
+function achGrant(nick,achId,opts){
+  opts=opts||{};
+  var ach=ACHIEVEMENTS[achId];if(!ach||!fsDb())return;
+  var nickLc=nick.toLowerCase();
+  var docRef=gcDb().collection('achievements').doc(nickLc);
+  docRef.get().then(function(snap){
+    var data=snap.exists()?(snap.data()||{}):{};
+    /* For rolling achievements — always update, don't skip */
+    if(!ach.rolling&&data[achId]&&data[achId].granted){return;}
+    /* For anniversary — replace previous tier */
+    var update={};
+    if(ach.tier==='anniversary'){
+      ANNIV_TIERS.forEach(function(t){if(t!==achId&&data[t])update[t]=firebase.firestore.FieldValue.delete();});
+    }
+    update[achId]={granted:true,grantedAt:Date.now(),achId:achId};
+    if(ach.rolling){update[achId].holderSince=Date.now();}
+    docRef.set(update,{merge:true}).then(function(){
+      /* Award credits if any and not silent */
+      if(ach.cr>0&&!opts.silent){gcAwardCredit(nickLc,ach.cr);}
+      /* Notify only the current user */
+      if(cu&&cu.nickname===nick&&!opts.silent){
+        setTimeout(function(){achNotify(ach);},opts.delay||300);
+      }
+    }).catch(function(){});
+  }).catch(function(){});
+}
+
+/* ── Achievement: Revoke rolling achievement ── */
+function achRevoke(nick,achId){
+  if(!fsDb())return;
+  var nickLc=nick.toLowerCase();
+  gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
+    if(!snap.exists())return;
+    var update={};
+    update[achId]=firebase.firestore.FieldValue.delete();
+    gcDb().collection('achievements').doc(nickLc).update(update).catch(function(){});
+  }).catch(function(){});
+}
+
+/* ── Achievement CSS (injected once) ── */
+(function(){
+  if(document.getElementById('ach-styles'))return;
+  var s=document.createElement('style');
+  s.id='ach-styles';
+  s.textContent='@keyframes ach-notif-in{0%{transform:translateX(120%);opacity:0}100%{transform:translateX(0);opacity:1}}'
+    +'@keyframes ach-notif-out{0%{transform:translateX(0);opacity:1}100%{transform:translateX(120%);opacity:0}}'
+    +'@keyframes ach-glow-gray{0%,100%{box-shadow:0 0 6px #888780}50%{box-shadow:0 0 14px #888780}}'
+    +'@keyframes ach-glow-bronze{0%,100%{box-shadow:0 0 6px #c87941}50%{box-shadow:0 0 16px #c87941}}'
+    +'@keyframes ach-glow-silver{0%,100%{box-shadow:0 0 6px #9baab8}50%{box-shadow:0 0 18px #c0d0e0,0 0 30px #9baab8}}'
+    +'@keyframes ach-glow-gold{0%,100%{box-shadow:0 0 8px #EF9F27}50%{box-shadow:0 0 20px #EF9F27,0 0 36px #ffcc44}}'
+    +'@keyframes ach-glow-diamond{0%,100%{box-shadow:0 0 10px #60b8ff}50%{box-shadow:0 0 24px #60b8ff,0 0 40px #a78bfa}}'
+    +'@keyframes ach-glow-rare{0%,100%{box-shadow:0 0 8px #d4537e}50%{box-shadow:0 0 20px #d4537e,0 0 36px #a78bfa}}'
+    +'@keyframes ach-shimmer{0%{left:-80%}100%{left:120%}}'
+    +'.ach-icon-wrap{position:relative;overflow:hidden;}'
+    +'.ach-icon-wrap .ach-shine{position:absolute;top:0;left:-80%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);animation:ach-shimmer 3s ease-in-out infinite;pointer-events:none}';
+  document.head.appendChild(s);
+})();
+
+/* ── Make achIcon HTML element ── */
+function achMakeIcon(ach,size){
+  size=size||56;
+  var r=ACH_RARITY[ach.rarity]||ACH_RARITY.gray;
+  var anim='ach-glow-'+ach.rarity;
+  var inner=ach.tier==='anniversary'
+    ?'<span style="font-size:'+(size*0.38)+'px;font-weight:800;font-family:monospace;color:'+r.color+'">'+(ach.num||'?')+'</span>'
+    :'<span style="font-size:'+(size*0.42)+'px;line-height:1">'+(ach.icon||'🏅')+'</span>';
+  var d=document.createElement('div');
+  d.className='ach-icon-wrap';
+  d.style.cssText='width:'+size+'px;height:'+size+'px;border-radius:'+(size*0.22)+'px;background:'+r.bg+';border:1.5px solid '+r.border+';display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:'+anim+' 3s ease-in-out infinite;';
+  d.innerHTML='<div class="ach-shine"></div>'+inner;
+  return d;
+}
+
+
+/* ── Achievement: Login check (runs on every login) ── */
+function achLoginCheck(){
+  if(!cu||!fsDb())return;
+  var nick=cu.nickname;
+  var nickLc=nick.toLowerCase();
+  var dir=TEAM_DIR[nick]||{};
+
+  /* 1. Anniversary check */
+  var correctTier=achGetAnnivTier(dir.hireDate);
+  if(correctTier){
+    gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
+      var data=snap.exists()?(snap.data()||{}):{};
+      var currentTier=ANNIV_TIERS.find(function(t){return data[t]&&data[t].granted;});
+      if(currentTier!==correctTier){
+        /* Revoke old tier from Firestore */
+        if(currentTier){
+          var del={};
+          del[currentTier]=firebase.firestore.FieldValue.delete();
+          gcDb().collection('achievements').doc(nickLc).update(del).catch(function(){});
+        }
+        /* Grant correct tier — silent if first time setup (no delay needed) */
+        achGrant(nick,correctTier,{silent:!!currentTier,delay:1000});
+      }
+    }).catch(function(){});
+  }
+
+  /* 2. Ghost check — last active date */
+  var lastKey='lounge_lastactive_'+nickLc;
+  var lastActive=localStorage.getItem(lastKey);
+  if(lastActive){
+    var daysSince=(Date.now()-parseInt(lastActive))/(1000*60*60*24);
+    if(daysSince>=7){
+      achGrant(nick,'ghost',{delay:2000});
+    }
+  }
+  localStorage.setItem(lastKey,Date.now().toString());
+
+  /* 3. Koby's friend — May 8 */
+  var now=new Date();
+  if(now.getMonth()===4&&now.getDate()===8){
+    achGrant(nick,'kobys_friend',{delay:3000});
+  }
+
+  /* 4. Volturi — escalation members */
+  if(cu.role&&cu.role.toLowerCase()==='escalation'){
+    achGrant(nick,'volturi',{silent:true});
+  }
+
+  /* 5. Mood maestro tiers — check total mood checkins */
+  gcDb().collection('gc_awards').where('nick','==',nickLc).where('type','==','mood').get()
+    .then(function(snap){
+      var total=snap.size;
+      gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
+        var adata=aSnap.exists()?(aSnap.data()||{}):{};
+        if(total>=90&&!adata.mood_gold){achGrant(nick,'mood_gold',{delay:1500});}
+        else if(total>=60&&!adata.mood_silver&&!adata.mood_gold){achGrant(nick,'mood_silver',{delay:1500});}
+        else if(total>=30&&!adata.mood_bronze&&!adata.mood_silver&&!adata.mood_gold){achGrant(nick,'mood_bronze',{delay:1500});}
+      }).catch(function(){});
+    }).catch(function(){});
+
+  /* 6. Social butterfly — My Team tab opens tracked in localStorage */
+  var teamCount=parseInt(localStorage.getItem('lounge_team_opens_'+nickLc)||'0');
+  gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
+    var adata=aSnap.exists()?(aSnap.data()||{}):{};
+    if(teamCount>=35&&!adata.social_butterfly){achGrant(nick,'social_butterfly',{delay:2000});}
+
+    /* 7. Credit baron — accumulated game credits */
+    gcDb().collection('player_credits').doc(nickLc).get().then(function(cSnap){
+      var credits=cSnap.exists()?(cSnap.data().credits||0):0;
+      if(credits>=1000&&!adata.credit_baron){achGrant(nick,'credit_baron',{delay:2500});}
+    }).catch(function(){});
+
+    /* 8. Shop achievements — check owned items */
+    gcDb().collection('gc_inventory').doc(nickLc).get().then(function(iSnap){
+      if(!iSnap.exists())return;
+      var inv=iSnap.data()||{};
+      var owned=Object.keys(inv).filter(function(k){return inv[k]&&inv[k].active;});
+      var sets=owned.filter(function(k){return k.startsWith('set_');});
+      var totalSpent=parseInt(localStorage.getItem('lounge_spent_'+nickLc)||'0');
+      var hasPremium=owned.some(function(k){var item=(GC_SHOP_ITEMS||[]).find(function(i){return i.id===k;});return item&&item.tier==='premium';});
+      var hasLegendary=owned.some(function(k){var item=(GC_SHOP_ITEMS||[]).find(function(i){return i.id===k;});return item&&item.tier==='legendary';});
+      if(owned.length>0&&!adata.first_purchase){achGrant(nick,'first_purchase',{delay:500});}
+      if(sets.length>0&&!adata.trendsetter){achGrant(nick,'trendsetter',{delay:600});}
+      if(sets.length>=3&&!adata.collector){achGrant(nick,'collector',{delay:700});}
+      if(sets.length>=6&&!adata.inevitable){achGrant(nick,'inevitable',{delay:800});}
+      if(totalSpent>=3000&&!adata.big_spender){achGrant(nick,'big_spender',{delay:900});}
+      if(totalSpent>=5000&&!adata.deep_pockets){achGrant(nick,'deep_pockets',{delay:1000});}
+      if(hasPremium&&!adata.premium_taste){achGrant(nick,'premium_taste',{delay:1100});}
+      if(hasLegendary&&!adata.im_legendary){achGrant(nick,'im_legendary',{delay:1200});}
+      /* Set-specific */
+      if(owned.indexOf('set_koby')>-1&&!adata.koby_crib){achGrant(nick,'koby_crib',{delay:1300});}
+      if(owned.indexOf('set_prism')>-1&&!adata.prism_colors){achGrant(nick,'prism_colors',{delay:1400});}
+      /* Master of All Paths */
+      achCheckMasterOfAll(nick,adata);
+    }).catch(function(){});
+  }).catch(function(){});
+}
+
+/* ── Track My Team tab opens ── */
+function achTrackTeamOpen(){
+  if(!cu)return;
+  var key='lounge_team_opens_'+cu.nickname.toLowerCase();
+  var n=parseInt(localStorage.getItem(key)||'0')+1;
+  localStorage.setItem(key,n.toString());
+  if(n===35){achGrant(cu.nickname,'social_butterfly',{delay:500});}
+}
+
+/* ── Check Master of All Paths ── */
+function achCheckMasterOfAll(nick,adata){
+  var exclude=['volturi','master_of_all','hero_month','quarter_master'];
+  var allIds=Object.keys(ACHIEVEMENTS).filter(function(id){return exclude.indexOf(id)===-1;});
+  var hasAll=allIds.every(function(id){
+    /* Mood maestro: only need gold */
+    if(id==='mood_bronze'||id==='mood_silver')return true;
+    /* Anniversary: only need current tier */
+    if(id.startsWith('anniv_')&&id!==achGetAnnivTier(TEAM_DIR[nick]?(TEAM_DIR[nick].hireDate||''):null))return true;
+    return adata[id]&&adata[id].granted;
+  });
+  if(hasAll&&!adata.master_of_all){achGrant(nick,'master_of_all',{delay:5000});}
+}
+
+/* ── Track shop spend ── */
+function achTrackSpend(nick,amount){
+  if(!nick||!amount)return;
+  var key='lounge_spent_'+nick.toLowerCase();
+  var total=(parseInt(localStorage.getItem(key)||'0'))+amount;
+  localStorage.setItem(key,total.toString());
+  gcDb().collection('achievements').doc(nick.toLowerCase()).get().then(function(aSnap){
+    var adata=aSnap.exists()?(aSnap.data()||{}):{};
+    if(total>=3000&&!adata.big_spender){achGrant(nick,'big_spender');}
+    if(total>=5000&&!adata.deep_pockets){achGrant(nick,'deep_pockets');}
+  }).catch(function(){});
+}
+
+
+function achOpenHighlightSelector(nick,aData){
+  if(document.getElementById('ach-selector-modal'))return;
+  var currentHighlights=aData._highlights||[];
+  var selected=currentHighlights.slice();
+  var overlay=document.createElement('div');
+  overlay.id='ach-selector-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  var modal=document.createElement('div');
+  modal.style.cssText='background:var(--bg);border:1px solid var(--border);border-radius:14px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;padding:20px;';
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;';
+  hdr.innerHTML='<div style="font-size:14px;font-weight:600;color:var(--text);">Choose highlights</div>'
+    +'<button onclick="document.getElementById(\'ach-selector-modal\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);">&times;</button>';
+  modal.appendChild(hdr);
+  var sub=document.createElement('div');
+  sub.style.cssText='font-size:11px;color:var(--muted);margin-bottom:14px;';
+  sub.textContent='Pick up to 3 to show on your profile.';
+  modal.appendChild(sub);
+  var groups={anniversary:[],performance:[],general:[],game:[],shop:[],rare:[],rolling:[],special:[],exclusive:[]};
+  Object.keys(aData).forEach(function(id){
+    if(id.startsWith('_'))return;
+    var ach=ACHIEVEMENTS[id];
+    if(!ach||!aData[id]||!aData[id].granted)return;
+    if(groups[ach.tier])groups[ach.tier].push(id);
+  });
+  var tierLabels={anniversary:'Anniversary',performance:'Performance',general:'General',game:'Game Corner',shop:'Shop',rare:'Rare',rolling:'Rolling',special:'Special',exclusive:'Exclusive'};
+  var grid=document.createElement('div');
+  Object.keys(groups).forEach(function(tier){
+    if(!groups[tier].length)return;
+    var catLabel=document.createElement('div');
+    catLabel.style.cssText='font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:10px 0 6px;';
+    catLabel.textContent=tierLabels[tier]||tier;
+    grid.appendChild(catLabel);
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+    groups[tier].forEach(function(achId){
+      var ach=ACHIEVEMENTS[achId];if(!ach)return;
+      var r=ACH_RARITY[ach.rarity]||ACH_RARITY.gray;
+      var item=document.createElement('div');
+      item.dataset.achId=achId;
+      var isSel=selected.indexOf(achId)>-1;
+      item.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;border:0.5px solid '+(isSel?r.border:'var(--border)')+';background:'+(isSel?r.bg+'44':'var(--bg2)')+';cursor:pointer;font-size:11px;color:'+(isSel?r.color:'var(--text)')+';transition:all .15s;';
+      var iconSpan=document.createElement('span');
+      iconSpan.style.fontSize='14px';
+      iconSpan.textContent=ach.tier==='anniversary'?(ach.num||'?'):(ach.icon||'🏅');
+      item.appendChild(iconSpan);
+      item.appendChild(document.createTextNode(ach.name));
+      item.onclick=function(){
+        var idx=selected.indexOf(achId);
+        if(idx>-1){selected.splice(idx,1);item.style.border='0.5px solid var(--border)';item.style.background='var(--bg2)';item.style.color='var(--text)';}
+        else{if(selected.length>=3){gcToast('Max 3 highlights');return;}selected.push(achId);item.style.border='0.5px solid '+r.border;item.style.background=r.bg+'44';item.style.color=r.color;}
+        updateSlots();
+      };
+      row.appendChild(item);
+    });
+    grid.appendChild(row);
+  });
+  modal.appendChild(grid);
+  var footer=document.createElement('div');
+  footer.style.cssText='display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);';
+  var slotsWrap=document.createElement('div');
+  slotsWrap.style.cssText='display:flex;gap:8px;flex:1;';
+  function updateSlots(){
+    slotsWrap.innerHTML='';
+    for(var s=0;s<3;s++){
+      var slot=document.createElement('div');
+      var aId=selected[s];
+      if(aId&&ACHIEVEMENTS[aId]){var ach2=ACHIEVEMENTS[aId];var r2=ACH_RARITY[ach2.rarity]||ACH_RARITY.gray;slot.style.cssText='width:44px;height:44px;border-radius:10px;border:1.5px solid '+r2.border+';background:'+r2.bg+';display:flex;align-items:center;justify-content:center;font-size:20px;';slot.textContent=ach2.tier==='anniversary'?(ach2.num||'?'):(ach2.icon||'🏅');}
+      else{slot.style.cssText='width:44px;height:44px;border-radius:10px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--muted);';slot.textContent='+';}
+      slotsWrap.appendChild(slot);
+    }
+  }
+  updateSlots();
+  var saveBtn=document.createElement('button');
+  saveBtn.textContent='Save';
+  saveBtn.style.cssText='font-size:12px;padding:6px 16px;border-radius:8px;border:none;background:#7c3aed;color:#fff;cursor:pointer;';
+  saveBtn.onclick=function(){
+    if(!fsDb()||!window._fsSetDoc||!window._fsDoc)return;
+    window._fsSetDoc(window._fsDoc(fsDb(),'achievements',nick.toLowerCase()),{_highlights:selected},{merge:true})
+      .then(function(){gcToast('\u2726 Highlights saved');overlay.remove();openMemberProfile(nick);})
+      .catch(function(){gcToast('Save failed');});
+  };
+  footer.appendChild(slotsWrap);footer.appendChild(saveBtn);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+function achCheckPerformance(nick,monthData){
+  if(!nick||!monthData||!gcDb())return;
+  var nickLc=nick.toLowerCase();
+  gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
+    var a=snap.exists()?(snap.data()||{}):{};
+    if(monthData.totalUploads>=2000&&!a.upload_monster){achGrant(nick,'upload_monster');}
+    if(monthData.quality>=100&&!a.quality_vet){achGrant(nick,'quality_vet');}
+    if(monthData.defectDensity===0&&!a.defect_defender){achGrant(nick,'defect_defender');}
+    if(monthData.pi>=13.0&&!a.life_of_pi){achGrant(nick,'life_of_pi');}
+  }).catch(function(){});
+}
+function achCheckDailyGrind(nick,dailyPerfCredits){
+  if(!nick||!gcDb())return;
+  gcDb().collection('achievements').doc(nick.toLowerCase()).get().then(function(snap){
+    var a=snap.exists()?(snap.data()||{}):{};
+    if(dailyPerfCredits>=500&&!a.the_grind){achGrant(nick,'the_grind');}
+  }).catch(function(){});
+}
 function gcCleanLegacyItems(){
   /* Migration: members who bought individual banners/rings before the set system
      get the full matching set granted for free, then legacy items are removed.
@@ -10585,11 +11047,63 @@ function renderMemberProfileCosmetics(nick,inv){
       :'<span style="font-size:12px;color:var(--muted)">No badges yet.</span>';
     badgeEl.innerHTML=_sectionHd('Badges').replace('margin-bottom:8px','margin:12px 0 8px')+badgesHtml;
   }
-  /* ── Achievements (always render) ── */
+  /* ── Achievements ── */
   var achEl=G('member-profile-achievements');
   if(achEl){
-    achEl.innerHTML=_sectionHd('Achievements').replace('margin-bottom:8px','margin:12px 0 8px')
-      +'<span style="font-size:12px;color:var(--muted)">Coming soon.</span>';
+    achEl.innerHTML=_sectionHd('Achievements').replace('margin-bottom:8px','margin:12px 0 8px');
+    /* Load from Firestore */
+    if(fsDb()&&window._fsGetDoc&&window._fsDoc){
+      window._fsGetDoc(window._fsDoc(fsDb(),'achievements',nick.toLowerCase())).then(function(aSnap){
+        var aData=aSnap.exists()?(aSnap.data()||{}):{};
+        /* Get highlighted achievements */
+        var highlights=aData._highlights||[];
+        var isOwn=cu&&cu.nickname===nick;
+        /* Render highlight slots */
+        var hlWrap=document.createElement('div');
+        hlWrap.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;';
+        if(highlights.length>0){
+          highlights.forEach(function(achId){
+            var ach=ACHIEVEMENTS[achId];if(!ach)return;
+            var r=ACH_RARITY[ach.rarity]||ACH_RARITY.gray;
+            var slot=document.createElement('div');
+            slot.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;cursor:default;position:relative;';
+            slot.appendChild(achMakeIcon(ach,48));
+            var nameLbl=document.createElement('div');
+            nameLbl.style.cssText='font-size:9px;color:var(--muted);text-align:center;max-width:60px;line-height:1.3;';
+            nameLbl.textContent=ach.name;
+            slot.appendChild(nameLbl);
+            /* Tooltip on hover */
+            var tip=document.createElement('div');
+            tip.style.cssText='position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid '+r.border+';border-radius:8px;padding:8px 10px;width:150px;font-size:10px;color:#e8eaf6;line-height:1.5;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;text-align:left;';
+            tip.innerHTML='<strong style="color:'+r.color+';display:block;margin-bottom:3px;font-size:10px">'+ach.name+'</strong>'+ach.desc;
+            slot.appendChild(tip);
+            slot.onmouseenter=function(){tip.style.opacity='1';};
+            slot.onmouseleave=function(){tip.style.opacity='0';};
+            hlWrap.appendChild(slot);
+          });
+        } else {
+          var emptyMsg=document.createElement('span');
+          emptyMsg.style.cssText='font-size:12px;color:var(--muted);';
+          emptyMsg.textContent='No highlights set.';
+          hlWrap.appendChild(emptyMsg);
+        }
+        achEl.appendChild(hlWrap);
+        /* Highlight button — only for own profile */
+        if(isOwn){
+          var hlBtn=document.createElement('button');
+          hlBtn.textContent='✦ Edit highlights';
+          hlBtn.style.cssText='font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;margin-top:4px;';
+          hlBtn.onclick=function(){achOpenHighlightSelector(nick,aData);};
+          achEl.appendChild(hlBtn);
+        }
+      }).catch(function(){
+        var err=document.createElement('span');err.style.cssText='font-size:12px;color:var(--muted);';
+        err.textContent='Could not load achievements.';achEl.appendChild(err);
+      });
+    } else {
+      var msg=document.createElement('span');msg.style.cssText='font-size:12px;color:var(--muted);';
+      msg.textContent='Coming soon.';achEl.appendChild(msg);
+    }
   }
 }
 function memberProfileToggleShiftEdit(){
@@ -13739,6 +14253,37 @@ function gcSpendCredit(cost,cb){
   cb();
 }
 
+function achCheckGame(gameId,opts){
+  if(!cu||!fsDb())return;
+  var nick=cu.nickname;
+  opts=opts||{};
+  fsDb().collection('achievements').doc(nick.toLowerCase()).get().then(function(snap){
+    var a=snap.exists()?(snap.data()||{}):{};
+    if(gameId==='wordguess'&&opts.guesses<=2&&!a.word_nerd){achGrant(nick,'word_nerd',{delay:500});}
+    if(gameId==='minesweeper'&&opts.hard&&!a.bomb_expert){achGrant(nick,'bomb_expert',{delay:500});}
+    if(gameId==='chess'&&opts.beat_ai&&!a.carlsen_jr){achGrant(nick,'carlsen_jr',{delay:500});}
+    if(gameId==='dealornodeal'&&opts.jackpot&&!a.deal_breaker){achGrant(nick,'deal_breaker',{delay:500});}
+    if(gameId==='millionaire'&&opts.all15&&opts.no_lifelines&&!a.millionaire){achGrant(nick,'millionaire',{delay:500});}
+    /* Solitaire king — track wins */
+    if(gameId==='solitaire'){
+      var solKey='lounge_sol_wins_'+nick.toLowerCase();
+      var wins=parseInt(localStorage.getItem(solKey)||'0')+1;
+      localStorage.setItem(solKey,wins.toString());
+      if(wins>=35&&!a.solitaire_king){achGrant(nick,'solitaire_king',{delay:500});}
+    }
+    /* Game hoarder — track unique games played */
+    var gamesKey='lounge_games_played_'+nick.toLowerCase();
+    var played=JSON.parse(localStorage.getItem(gamesKey)||'[]');
+    if(played.indexOf(gameId)===-1){played.push(gameId);localStorage.setItem(gamesKey,JSON.stringify(played));}
+    var allGames=['minesweeper','wordguess','solitaire','millionaire','dealornodeal','chess','kbquiz'];
+    if(allGames.every(function(g){return played.indexOf(g)>-1;})&&!a.game_hoarder){achGrant(nick,'game_hoarder',{delay:800});}
+    /* Credit baron — checked on login but also on game win */
+    fsDb().collection('player_credits').doc(nick.toLowerCase()).get().then(function(cs){
+      var credits=cs.exists()?(cs.data().credits||0):0;
+      if(credits>=1000&&!a.credit_baron){achGrant(nick,'credit_baron',{delay:1000});}
+    }).catch(function(){});
+  }).catch(function(){});
+}
 function gcAwardGameCredit(nick,amount){
   if(gcIsManager()){gcAwardCredit(nick,amount);return;}
   var effective=gcCapAward(amount);
@@ -14096,6 +14641,10 @@ function gcBuyItem(itemId){
           }).catch(function(){});
         }
       } else {gcToast(item.icon+' '+item.name+' purchased!');}
+      /* Track spend for achievements */
+      if(typeof achTrackSpend==='function')achTrackSpend(cu.nickname,item.price);
+      /* Check shop achievements */
+      setTimeout(function(){if(typeof achLoginCheck==='function')achLoginCheck();},500);
       gcRenderShop();gcRenderBadges();
     }).catch(function(e){gcToast('Purchase error: '+e.message);});
   });
@@ -14887,6 +15436,7 @@ function gcGameWordGuess(C){
           done=true;SND_GC.win();gcSetScore(guesses.length+' tries');
           gcSaveScore('wordguess',guesses.length,false);
           gcAwardGameCredit(cu.nickname,2);
+          achCheckGame('wordguess',{guesses:guesses.length});
           gcToast('🎉 '+guesses.length+' tries! +2 credits');
         } else if(guesses.length>=MAX){
           done=true;SND_GC.wrong();gcSetScore('X / '+MAX);
@@ -15030,6 +15580,7 @@ function gcGameSolitaire(C){
             SND_GC.win();gcSetScore(moves+' moves');
             gcSaveScore('solitaire',moves,false);
             gcAwardGameCredit(cu.nickname,3);
+            achCheckGame('solitaire',{});
             gcToast('🎉 You won in '+moves+' moves! +3 credits');
           }
           render();
@@ -15082,6 +15633,7 @@ function gcGameSolitaire(C){
         SND_GC.win();gcSetScore(moves+' moves');
         gcSaveScore('solitaire',moves,false);
         gcAwardGameCredit(cu.nickname,3);
+        achCheckGame('solitaire',{});
         gcToast('🎉 You won! +3 credits');
       }
       render();
@@ -15156,7 +15708,7 @@ function gcGameMinesweeper(C){
             if(first){first=false;t0=Date.now();placeMines(rr,cc);}
             if(board[rr][cc]===-1){var d2=cfg();for(var i=0;i<d2.r;i++)for(var j=0;j<d2.c;j++)if(board[i][j]===-1)rev[i][j]=true;over=true;SND_GC.boom();render();gcSetScore('BOOM 💣');return;}
             SND_GC.reveal();flood(rr,cc);
-            if(checkWin()){over=true;var secs=Math.round((Date.now()-t0)/1000);SND_GC.win();gcSetScore(secs+'s');gcSaveScore('minesweeper',secs,false);gcAwardGameCredit(cu.nickname,2);gcToast('🎉 Cleared in '+secs+'s! +2 credits');}
+            if(checkWin()){over=true;var secs=Math.round((Date.now()-t0)/1000);SND_GC.win();gcSetScore(secs+'s');gcSaveScore('minesweeper',secs,false);gcAwardGameCredit(cu.nickname,2);achCheckGame('minesweeper',{hard:gcCurrentDifficulty==='hard'});gcToast('🎉 Cleared in '+secs+'s! +2 credits');}
             render();
           });
           cell.addEventListener('contextmenu',function(e){e.preventDefault();if(over||rev[rr][cc])return;flag[rr][cc]=!flag[rr][cc];SND_GC.flag();render();});
@@ -15406,6 +15958,7 @@ function gcGameDealOrNoDeal(C){
           var realOffer=Math.max(1,Math.round(offer*0.3));
           SND_GC.win();
           gcAwardGameCredit(cu.nickname,realOffer);
+          achCheckGame('dealornodeal',{jackpot:realOffer>5000});
           endDND(realOffer,offer,'Deal! You take the banker\'s offer.');
         };
         if(nd)nd.onclick=function(){
@@ -15728,7 +16281,7 @@ function gcGameMillionaire(C){
   function endGame(prize,msg){
     gameOver=true;
     var actualPrize=prize>0?Math.round(prize*0.01):0;
-    if(actualPrize>0)gcAwardGameCredit(cu.nickname,actualPrize);
+    if(actualPrize>0){gcAwardGameCredit(cu.nickname,actualPrize);achCheckGame('millionaire',{all15:_questionNum>=15,no_lifelines:!_usedLifeline});}
     C.innerHTML='';
     var wrap=document.createElement('div');
     wrap.style.cssText='font-family:var(--font-b);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
