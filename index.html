@@ -11062,7 +11062,7 @@ function renderMemberProfileCosmetics(nick,inv){
         var hlWrap=document.createElement('div');
         hlWrap.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;';
         if(highlights.length>0){
-          highlights.forEach(function(achId){
+          highlights.forEach(function(achId,slotIdx){
             var ach=ACHIEVEMENTS[achId];if(!ach)return;
             var r=ACH_RARITY[ach.rarity]||ACH_RARITY.gray;
             var slot=document.createElement('div');
@@ -11074,7 +11074,11 @@ function renderMemberProfileCosmetics(nick,inv){
             slot.appendChild(nameLbl);
             /* Tooltip on hover */
             var tip=document.createElement('div');
-            tip.style.cssText='position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid '+r.border+';border-radius:8px;padding:8px 10px;width:150px;font-size:10px;color:#e8eaf6;line-height:1.5;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;text-align:left;';
+            /* Position tooltip based on slot index to avoid clipping */
+            var tipLeft=slotIdx===0?'0':slotIdx===highlights.length-1?'auto':'50%';
+            var tipRight=slotIdx===highlights.length-1?'0':'auto';
+            var tipTransform=slotIdx===0||slotIdx===highlights.length-1?'none':'translateX(-50%)';
+            tip.style.cssText='position:absolute;bottom:calc(100% + 6px);left:'+tipLeft+';right:'+tipRight+';transform:'+tipTransform+';background:#1a1a2e;border:1px solid '+r.border+';border-radius:8px;padding:8px 10px;width:150px;font-size:10px;color:#e8eaf6;line-height:1.5;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;text-align:left;';
             tip.innerHTML='<strong style="color:'+r.color+';display:block;margin-bottom:3px;font-size:10px">'+ach.name+'</strong>'+ach.desc;
             slot.appendChild(tip);
             slot.onmouseenter=function(){tip.style.opacity='1';};
