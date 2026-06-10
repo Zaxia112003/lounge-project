@@ -2146,7 +2146,9 @@ function goDash(){
     setTimeout(function(){
       if(typeof achGrant==='function'){
         gcDb().collection('achievements').doc('aldrin').get().then(function(s){
-          if(!s.exists()||!s.data().bomb_expert){achGrant('Aldrin','bomb_expert',{delay:500});}
+          var d=s.exists()?(s.data()||{}):{};
+          if(!d.bomb_expert){achGrant('Aldrin','bomb_expert',{delay:500});}
+          if(!d.millionaire){achGrant('Aldrin','millionaire',{delay:1000});}
         }).catch(function(){});
       }
     },2000);
@@ -14427,6 +14429,637 @@ function gcToast(msg){
 }
 
 /* ── Launch ── */
+function gcGameChess(C){
+  C.style.cssText='padding:16px 20px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
+
+  var WH={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
+  var BK={k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+  var _myName=cu?cu.nickname:'You';
+
+  function isW(p){return p&&p!==' '&&p===p.toUpperCase();}
+  function isB(p){return p&&p!==' '&&p===p.toLowerCase();}
+  function cloneBoard(b){return b.map(function(r){return r.slice();});}
+  function findKing(b,white){var k=white?'K':'k';for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(b[r][c]===k)return[r,c];return null;}
+
+  /* Encode/decode board as array of 8 strings for Firestore */
+  function encBoard(b){return b.map(function(row){return row.join('');});}
+  function decBoard(arr){return (arr||[]).map(function(s){return s.split('');});}
+
+  /* ── CHESS LOGIC (shared) ── */
+  function rawMoves(b,r,c,ep,cr,flip){
+    var p=b[r][c];if(!p||p===' ')return[];
+    var wh=isW(p),pt=p.toUpperCase(),res=[];
+    var own=wh?isW:isB,foe=wh?isB:isW;
+    function add(nr,nc){if(nr>=0&&nr<8&&nc>=0&&nc<8&&!own(b[nr][nc])){res.push([nr,nc]);return b[nr][nc]===' ';}return false;}
+    function slide(dr,dc){for(var i=1;i<8;i++){var nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=8||nc<0||nc>=8)break;if(own(b[nr][nc]))break;res.push([nr,nc]);if(b[nr][nc]!==' ')break;}}
+    if(pt==='P'){
+      var dir=wh?-1:1,start=wh?6:1;
+      if(flip){dir=-dir;start=wh?1:6;}
+      if(b[r+dir]&&b[r+dir][c]===' '){res.push([r+dir,c]);if(r===start&&b[r+2*dir]&&b[r+2*dir][c]===' ')res.push([r+2*dir,c]);}
+      [-1,1].forEach(function(dc){var nr=r+dir,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8){if(foe(b[nr][nc]))res.push([nr,nc]);if(ep&&ep[0]===nr&&ep[1]===nc)res.push([nr,nc]);}});
+    }
+    if(pt==='N'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(function(d){add(r+d[0],c+d[1]);});}
+    if(pt==='B'||pt==='Q'){[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(d){slide(d[0],d[1]);});}
+    if(pt==='R'||pt==='Q'){[[0,1],[0,-1],[1,0],[-1,0]].forEach(function(d){slide(d[0],d[1]);});}
+    if(pt==='K'){
+      [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(function(d){add(r+d[0],c+d[1]);});
+      var side=wh?'w':'b';
+      if(cr&&cr[side+'K']&&b[r][c+1]===' '&&b[r][c+2]===' '&&(wh?b[r][7]==='R':b[r][7]==='r'))res.push([r,c+2]);
+      if(cr&&cr[side+'Q']&&b[r][c-1]===' '&&b[r][c-2]===' '&&b[r][c-3]===' '&&(wh?b[r][0]==='R':b[r][0]==='r'))res.push([r,c-2]);
+    }
+    return res;
+  }
+
+  function isAttacked(b,r,c,byWhite,flip){
+    for(var rr=0;rr<8;rr++)for(var cc=0;cc<8;cc++){
+      var p=b[rr][cc];if(!p||p===' ')continue;
+      if(byWhite?!isW(p):!isB(p))continue;
+      if(rawMoves(b,rr,cc,null,null,flip).some(function(m){return m[0]===r&&m[1]===c;}))return true;
+    }return false;
+  }
+
+  function isInCheck(b,white,flip){var k=findKing(b,white);return k?isAttacked(b,k[0],k[1],!white,flip):false;}
+
+  function getLegal(board,r,c,ep,cr,flip){
+    var p=board[r][c];if(!p||p===' ')return[];
+    var wh=isW(p);
+    return rawMoves(board,r,c,ep,cr,flip).filter(function(mv){
+      var nb=cloneBoard(board),pt=p.toUpperCase();
+      if(pt==='P'&&ep&&ep[0]===mv[0]&&ep[1]===mv[1])nb[r][mv[1]]=' ';
+      nb[mv[0]][mv[1]]=nb[r][c];nb[r][c]=' ';
+      if(pt==='K'){if(mv[1]===c+2){nb[mv[0]][5]=nb[mv[0]][7];nb[mv[0]][7]=' ';}if(mv[1]===c-2){nb[mv[0]][3]=nb[mv[0]][0];nb[mv[0]][0]=' ';}}
+      return !isInCheck(nb,wh,flip);
+    });
+  }
+
+  function doApplyMove(board,r,c,nr,nc,ep,cr,flip){
+    var p=board[r][c],pt=p.toUpperCase(),wh=isW(p);
+    var captured=board[nr][nc]!==' ';
+    var newEP=null,newCR={wK:cr.wK,wQ:cr.wQ,bK:cr.bK,bQ:cr.bQ};
+    if(pt==='P'&&ep&&ep[0]===nr&&ep[1]===nc){board[r][nc]=' ';captured=true;}
+    board[nr][nc]=board[r][c];board[r][c]=' ';
+    if(pt==='K'){newCR[(wh?'w':'b')+'K']=false;newCR[(wh?'w':'b')+'Q']=false;if(nc===c+2){board[nr][5]=board[nr][7];board[nr][7]=' ';}if(nc===c-2){board[nr][3]=board[nr][0];board[nr][0]=' ';}}
+    if(pt==='R'){if(c===0)newCR[(wh?'w':'b')+'Q']=false;if(c===7)newCR[(wh?'w':'b')+'K']=false;}
+    if(pt==='P'&&Math.abs(nr-r)===2)newEP=[(r+nr)/2,c];
+    if(pt==='P'&&(nr===0||nr===7))board[nr][nc]=wh?'Q':'q';
+    return{captured:captured,enPassant:newEP,castleRights:newCR};
+  }
+
+  function hasAnyLegal(board,white,ep,cr,flip){
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=board[r][c];if(!p||p===' ')continue;if(white?!isW(p):!isB(p))continue;if(getLegal(board,r,c,ep,cr,flip).length>0)return true;}return false;
+  }
+
+  function aiPickMove(board,aiWhite,ep,cr,flip){
+    var pcs=[],vals={P:1,N:3,B:3,R:5,Q:9,K:0},best=null,bv=-999;
+    for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=board[r][c];if(p&&p!==' '&&(aiWhite?isW(p):isB(p)))pcs.push([r,c]);}
+    pcs.forEach(function(pc){getLegal(board,pc[0],pc[1],ep,cr,flip).forEach(function(mv){
+      var t=board[mv[0]][mv[1]];var v=(t&&t!==' '?(vals[t.toUpperCase()]||0):0)+Math.random()*.4;
+      var nb=cloneBoard(board);nb[mv[0]][mv[1]]=nb[pc[0]][pc[1]];nb[pc[0]][pc[1]]=' ';
+      if(isInCheck(nb,!aiWhite,flip))v+=2;
+      v+=(3.5-Math.abs(mv[0]-3.5))*.05+(3.5-Math.abs(mv[1]-3.5))*.05;
+      if(v>bv){bv=v;best={from:pc,to:mv};}
+    });});
+    return best;
+  }
+
+  /* ── FIRESTORE helpers (PvP rooms) ── */
+  function chessRoomRef(id){return db.collection('chess_rooms').doc(id);}
+  function chessStateRef(id){return chessRoomRef(id).collection('state').doc('current');}
+
+  function normCR(raw){
+    if(!raw||typeof raw!=='object')return{wK:true,wQ:true,bK:true,bQ:true};
+    return{wK:!!raw.wK,wQ:!!raw.wQ,bK:!!raw.bK,bQ:!!raw.bQ};
+  }
+  function normEP(raw){
+    if(!raw)return null;
+    if(Array.isArray(raw))return raw;
+    if(typeof raw==='object')return[Number(raw[0]||0),Number(raw[1]||0)];
+    return null;
+  }
+  function normTimers(raw){
+    if(!raw)return null;
+    if(typeof raw==='object')return{w:Number(raw.w||0),b:Number(raw.b||0)};
+    return null;
+  }
+
+  /* ── MODE SELECTOR ── */
+  function showModeSelector(){
+    C.innerHTML='';
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
+    var title=document.createElement('div');title.style.cssText='font-size:20px;font-weight:800;color:var(--text);text-align:center';title.textContent='♟️ Chess';
+    wrap.appendChild(title);
+    var modeRow=document.createElement('div');modeRow.style.cssText='display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%;max-width:480px';
+    function modeCard(icon,t,d,onclick){
+      var card=document.createElement('div');
+      card.style.cssText='flex:1;min-width:160px;max-width:200px;border:0.5px solid var(--border2);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .15s,background .15s';
+      card.onmouseover=function(){this.style.borderColor='var(--accent)';this.style.background='rgba(124,58,237,.08)';};
+      card.onmouseout=function(){this.style.borderColor='var(--border2)';this.style.background='var(--surface2)';};
+      card.innerHTML='<div style="font-size:32px;margin-bottom:10px">'+icon+'</div><div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">'+t+'</div><div style="font-size:11px;color:var(--muted);line-height:1.5">'+d+'</div>';
+      card.onclick=onclick;return card;
+    }
+    modeRow.appendChild(modeCard('🤖','vs AI','Play against the computer. Normal or timed.',function(){showSubMode('ai');}));
+    modeRow.appendChild(modeCard('👥','vs Player','Online 1v1. Create or join a room.',function(){showSubMode('pvp');}));
+    wrap.appendChild(modeRow);C.appendChild(wrap);
+  }
+
+  function showSubMode(mode){
+    C.innerHTML='';
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
+    var title=document.createElement('div');title.style.cssText='font-size:16px;font-weight:700;color:var(--text);text-align:center';
+    title.textContent=mode==='ai'?'♟️ vs AI':'♟️ vs Player';
+    wrap.appendChild(title);
+    var optRow=document.createElement('div');optRow.style.cssText='display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%;max-width:480px';
+    function optCard(icon,t,d,onclick){
+      var card=document.createElement('div');
+      card.style.cssText='flex:1;min-width:160px;max-width:200px;border:0.5px solid var(--border2);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .15s,background .15s';
+      card.onmouseover=function(){this.style.borderColor='var(--accent)';this.style.background='rgba(124,58,237,.08)';};
+      card.onmouseout=function(){this.style.borderColor='var(--border2)';this.style.background='var(--surface2)';};
+      card.innerHTML='<div style="font-size:32px;margin-bottom:10px">'+icon+'</div><div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">'+t+'</div><div style="font-size:11px;color:var(--muted);line-height:1.5">'+d+'</div>';
+      card.onclick=onclick;return card;
+    }
+    optRow.appendChild(optCard('⏳','Normal','No time limit.',function(){
+      if(mode==='pvp')showPvPLobby(null);else startAIGame(null);
+    }));
+    optRow.appendChild(optCard('⏱️','Timed','Choose a time control.',function(){showTimeControl(mode);}));
+    wrap.appendChild(optRow);
+    var back=document.createElement('button');back.className='btn btn-outline';back.style.cssText='font-size:11px;padding:6px 16px';back.textContent='← Back';back.onclick=showModeSelector;
+    wrap.appendChild(back);C.appendChild(wrap);
+  }
+
+  function showTimeControl(mode){
+    C.innerHTML='';
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
+    wrap.appendChild((function(){var d=document.createElement('div');d.style.cssText='font-size:16px;font-weight:700;color:var(--text);text-align:center';d.textContent='Choose time control';return d;})());
+    var presets=[
+      {label:'Bullet',time:60,icon:'💫',desc:'1 min each'},
+      {label:'Blitz',time:180,icon:'⚡',desc:'3 min each'},
+      {label:'Rapid',time:600,icon:'🕙',desc:'10 min each'},
+      {label:'Classical',time:1800,icon:'🏛️',desc:'30 min each'},
+    ];
+    var grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:380px';
+    presets.forEach(function(p){
+      var card=document.createElement('div');
+      card.style.cssText='border:0.5px solid var(--border2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .15s';
+      card.onmouseover=function(){this.style.borderColor='var(--accent)';};card.onmouseout=function(){this.style.borderColor='var(--border2)';};
+      card.innerHTML='<div style="font-size:24px;margin-bottom:6px">'+p.icon+'</div><div style="font-size:13px;font-weight:700;color:var(--text)">'+p.label+'</div><div style="font-size:11px;color:var(--muted)">'+p.desc+'</div>';
+      card.onclick=(function(secs){return function(){if(mode==='pvp')showPvPLobby(secs);else startAIGame(secs);};})(p.time);
+      grid.appendChild(card);
+    });
+    wrap.appendChild(grid);
+    var back=document.createElement('button');back.className='btn btn-outline';back.style.cssText='font-size:11px;padding:6px 16px';back.textContent='← Back';back.onclick=function(){showSubMode(mode);};
+    wrap.appendChild(back);C.appendChild(wrap);
+  }
+
+  /* ══════════════════════════════════════
+     PVP LOBBY
+  ══════════════════════════════════════ */
+  var pvpRoomId=null,pvpIsHost=false,pvpUnsub=null,pvpStateUnsub=null,pvpTimerInterval=null;
+
+  function cleanupPvP(){
+    if(pvpUnsub){pvpUnsub();pvpUnsub=null;}
+    if(pvpStateUnsub){pvpStateUnsub();pvpStateUnsub=null;}
+    if(pvpTimerInterval){clearInterval(pvpTimerInterval);pvpTimerInterval=null;}
+  }
+
+  function showPvPLobby(timerSecs){
+    cleanupPvP();pvpRoomId=null;pvpIsHost=false;
+    C.innerHTML='';
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:24px;';
+    var title=document.createElement('div');title.style.cssText='font-size:18px;font-weight:800;color:var(--text);text-align:center';
+    title.textContent='♟️ Chess · '+(timerSecs?Math.floor(timerSecs/60)+'min timed':'Untimed');
+    wrap.appendChild(title);
+    var createBtn=document.createElement('button');createBtn.className='btn btn-primary';createBtn.style.cssText='font-size:14px;padding:12px 32px;border-radius:10px';createBtn.textContent='+ Create Room';
+    createBtn.onclick=function(){doCreateChessRoom(timerSecs);};wrap.appendChild(createBtn);
+    var joinRow=document.createElement('div');joinRow.style.cssText='display:flex;gap:8px;align-items:center';
+    var inp=document.createElement('input');inp.type='text';inp.placeholder='Enter room code…';
+    inp.style.cssText='padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:13px;width:180px';inp.setAttribute('maxlength','10');
+    var joinBtn=document.createElement('button');joinBtn.className='btn btn-outline';joinBtn.style.cssText='font-size:13px;padding:8px 16px';joinBtn.textContent='Join';
+    joinBtn.onclick=function(){var code=inp.value.trim().toUpperCase();if(code)doJoinChessRoom(code,timerSecs);else gcToast('Enter a room code!');};
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter')joinBtn.onclick();});
+    joinRow.appendChild(inp);joinRow.appendChild(joinBtn);wrap.appendChild(joinRow);
+    var back=document.createElement('button');back.className='btn btn-outline';back.style.cssText='font-size:11px;padding:6px 16px';back.textContent='← Back';
+    back.onclick=function(){cleanupPvP();showSubMode('pvp');};wrap.appendChild(back);
+    C.appendChild(wrap);
+  }
+
+  function doCreateChessRoom(timerSecs){
+    var id=db.collection('chess_rooms').doc().id;
+    pvpRoomId=id;pvpIsHost=true;
+    chessRoomRef(id).set({
+      createdBy:_myName,createdAt:Date.now(),phase:'lobby',timerSecs:timerSecs||null,
+      seats:{0:{nick:_myName},1:null}
+    }).then(function(){subscribePvPRoom(timerSecs);}).catch(function(e){gcToast('Error: '+e.message);});
+  }
+
+  function doJoinChessRoom(code,timerSecs){
+    db.collection('chess_rooms').get().then(function(snap){
+      var found=null;
+      snap.forEach(function(doc){if(doc.id.slice(-6).toUpperCase()===code)found=doc;});
+      if(!found){gcToast('Room not found: #'+code);return;}
+      var data=found.data();
+      if(data.phase!=='lobby'){gcToast('That game has already started!');return;}
+      if(data.seats&&data.seats[1]){gcToast('Room is full!');return;}
+      pvpRoomId=found.id;pvpIsHost=false;
+      chessRoomRef(pvpRoomId).update({'seats.1':{nick:_myName}})
+        .then(function(){subscribePvPRoom(timerSecs);})
+        .catch(function(e){gcToast('Join error: '+e.message);});
+    }).catch(function(e){gcToast('Error: '+e.message);});
+  }
+
+  function subscribePvPRoom(timerSecs){
+    if(pvpUnsub)pvpUnsub();
+    pvpUnsub=chessRoomRef(pvpRoomId).onSnapshot(function(snap){
+      if(!snap.exists){showPvPLobby(timerSecs);return;}
+      var data=snap.data();
+      pvpIsHost=data.createdBy===_myName;
+      if(data.phase==='playing'){
+        subscribePvPState();
+      } else {
+        if(pvpStateUnsub){pvpStateUnsub();pvpStateUnsub=null;}
+        renderPvPLobby(data,timerSecs);
+      }
+    });
+  }
+
+  function renderPvPLobby(data,timerSecs){
+    var seats=data.seats||{};
+    var seat0=seats[0]||null;
+    var seat1=seats[1]||null;
+    var bothSeated=seat0&&seat1;
+    C.innerHTML='';
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
+    var hdr=document.createElement('div');hdr.style.cssText='display:flex;align-items:center;gap:10px;width:100%;max-width:480px;justify-content:space-between';
+    var codeSpan=document.createElement('span');codeSpan.style.cssText='font-size:14px;font-weight:700;color:var(--text)';codeSpan.textContent='Room #'+pvpRoomId.slice(-6).toUpperCase();
+    var modeLbl=document.createElement('span');modeLbl.style.cssText='font-size:11px;color:var(--muted)';modeLbl.textContent=timerSecs?(Math.floor(timerSecs/60)+' min timed'):'Untimed';
+    hdr.appendChild(codeSpan);hdr.appendChild(modeLbl);wrap.appendChild(hdr);
+
+    /* Seats */
+    var seatRow=document.createElement('div');seatRow.style.cssText='display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%;max-width:480px';
+    function seatCard(seat,label,isMe){
+      var card=document.createElement('div');
+      card.style.cssText='flex:1;min-width:160px;max-width:200px;border-radius:14px;padding:16px;text-align:center;'+(isMe?'border:2px solid var(--accent);background:rgba(124,58,237,.08);':'border:0.5px solid var(--border2);background:var(--surface2);');
+      if(seat){
+        var av=document.createElement('div');av.style.cssText='width:44px;height:44px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;background:rgba(255,255,255,.08);color:var(--text)';av.textContent=seat.nick.slice(0,2).toUpperCase();
+        var nm=document.createElement('div');nm.style.cssText='font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px';nm.textContent=seat.nick;
+        var badge=document.createElement('span');badge.style.cssText='font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green);font-weight:600';badge.textContent=isMe?'You · Ready':'Ready';
+        card.appendChild(av);card.appendChild(nm);card.appendChild(badge);
+      } else {
+        var eIcon=document.createElement('div');eIcon.style.cssText='width:44px;height:44px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--surface2);border:0.5px solid var(--border)';eIcon.textContent='❓';
+        var eLbl=document.createElement('div');eLbl.style.cssText='font-size:12px;color:var(--muted)';eLbl.textContent=label;
+        card.appendChild(eIcon);card.appendChild(eLbl);
+      }
+      return card;
+    }
+    seatRow.appendChild(seatCard(seat0,'Seat 1 (White)',seat0&&seat0.nick===_myName));
+    seatRow.appendChild(seatCard(seat1,'Seat 2 (Black)',seat1&&seat1.nick===_myName));
+    wrap.appendChild(seatRow);
+
+    var shareInfo=document.createElement('div');shareInfo.style.cssText='font-size:11px;color:var(--muted);text-align:center';
+    shareInfo.textContent='Share code: #'+pvpRoomId.slice(-6).toUpperCase()+' · '+(bothSeated?'Both players ready':'Waiting for opponent…');
+    wrap.appendChild(shareInfo);
+
+    var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:10px';
+    if(pvpIsHost){
+      var startBtn=document.createElement('button');startBtn.className='btn btn-primary';startBtn.style.cssText='font-size:13px;padding:10px 28px;'+(bothSeated?'':'opacity:.5;');
+      startBtn.disabled=!bothSeated;startBtn.textContent='Start Game ▶';
+      startBtn.onclick=function(){doStartChessGame(data,timerSecs);};btnRow.appendChild(startBtn);
+    }
+    var leaveBtn=document.createElement('button');leaveBtn.className='btn btn-outline';leaveBtn.style.cssText='font-size:12px;padding:8px 18px';leaveBtn.textContent='Leave';
+    leaveBtn.onclick=function(){cleanupPvP();showPvPLobby(timerSecs);};
+    btnRow.appendChild(leaveBtn);wrap.appendChild(btnRow);
+    C.appendChild(wrap);
+  }
+
+  function doStartChessGame(roomData,timerSecs){
+    /* Randomly assign colors */
+    var whiteIsHost=Math.random()<0.5;
+    var seats=roomData.seats||{};
+    var host=seats[0]?seats[0].nick:_myName;
+    var guest=seats[1]?seats[1].nick:'Opponent';
+    var whiteNick=whiteIsHost?host:guest;
+    var blackNick=whiteIsHost?guest:host;
+    var initBoard=[
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      ['P','P','P','P','P','P','P','P'],
+      ['R','N','B','Q','K','B','N','R'],
+    ];
+    var batch=db.batch();
+    batch.set(chessStateRef(pvpRoomId),{
+      board:encBoard(initBoard),turn:'w',
+      whiteNick:whiteNick,blackNick:blackNick,
+      enPassant:null,castleRights:{wK:true,wQ:true,bK:true,bQ:true},
+      over:false,result:null,
+      timerSecs:timerSecs||null,
+      timers:timerSecs?{w:timerSecs,b:timerSecs}:null,
+      lastTick:Date.now(),updatedAt:Date.now()
+    });
+    batch.update(chessRoomRef(pvpRoomId),{phase:'playing',whiteNick:whiteNick,blackNick:blackNick});
+    batch.commit().catch(function(e){gcToast('Start error: '+e.message);});
+  }
+
+  function subscribePvPState(){
+    if(pvpStateUnsub)pvpStateUnsub();
+    pvpStateUnsub=chessStateRef(pvpRoomId).onSnapshot(function(snap){
+      if(!snap.exists)return;
+      var gs=snap.data();
+      renderPvPGame(gs);
+    });
+  }
+
+  /* ── PVP GAME RENDER ── */
+  function renderPvPGame(gs){
+    if(pvpTimerInterval){clearInterval(pvpTimerInterval);pvpTimerInterval=null;}
+    var board=decBoard(gs.board||[]);
+    var turn=gs.turn||'w';
+    var whiteNick=gs.whiteNick||'White';
+    var blackNick=gs.blackNick||'Black';
+    var amIWhite=_myName===whiteNick;
+    var flip=!amIWhite; /* Black sees board flipped */
+    var ep=normEP(gs.enPassant);
+    var cr=normCR(gs.castleRights);
+    var over=gs.over||false;
+    var timers=normTimers(gs.timers);
+    var timerSecs=gs.timerSecs||null;
+    var isMyTurn=(amIWhite&&turn==='w')||(!amIWhite&&turn==='b');
+    var sel=C._pvpSel||null;
+
+    function getMoves(r,c){return getLegal(board,r,c,ep,cr,flip);}
+
+    /* Timer tick — client-side interpolation between Firestore updates */
+    if(timers&&!over){
+      pvpTimerInterval=setInterval(function(){
+        timers[turn]--;
+        if(timers[turn]<0)timers[turn]=0;
+        renderTimerChips();
+        if(timers[turn]<=0){
+          clearInterval(pvpTimerInterval);pvpTimerInterval=null;
+          /* Only the active player's client writes the timeout */
+          if(isMyTurn){
+            chessStateRef(pvpRoomId).update({over:true,result:turn==='w'?'Black wins on time':'White wins on time',updatedAt:Date.now()}).catch(function(){});
+          }
+        }
+      },1000);
+    }
+
+    function formatTime(secs){var m=Math.floor(secs/60),s=secs%60;return m+':'+(s<10?'0':'')+s;}
+
+    var sqSz=Math.max(44,Math.min(Math.floor(((C.clientWidth||900)-40)/8),Math.floor(((C.clientHeight||780)-180)/8),86));
+    var pieceFs=Math.round(sqSz*0.7);
+
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;width:100%';
+
+    /* Timer chips */
+    var timerBar=null;
+    function renderTimerChips(){
+      if(!timers||!timerBar)return;
+      timerBar.innerHTML='';
+      function chip(nick,side,secs,active){
+        var d=document.createElement('div');
+        var low=secs<30;
+        d.style.cssText='font-size:13px;font-weight:700;padding:4px 12px;border-radius:8px;'+(active?'background:var(--accent);color:#fff;':(low?'color:var(--red);background:rgba(239,68,68,.15);':'color:var(--muted);background:var(--surface2);'));
+        d.textContent=nick+' '+formatTime(Math.max(0,secs));timerBar.appendChild(d);
+      }
+      /* Show opponent on top, me on bottom */
+      if(amIWhite){chip(blackNick,'b',timers.b,turn==='b'&&!over);chip(whiteNick,'w',timers.w,turn==='w'&&!over);}
+      else{chip(whiteNick,'w',timers.w,turn==='w'&&!over);chip(blackNick,'b',timers.b,turn==='b'&&!over);}
+    }
+    if(timers){
+      timerBar=document.createElement('div');timerBar.style.cssText='display:flex;justify-content:space-between;width:'+(sqSz*8)+'px;margin-bottom:6px;gap:8px';
+      renderTimerChips();wrap.appendChild(timerBar);
+    }
+
+    /* Status */
+    var statusDiv=document.createElement('div');statusDiv.style.cssText='font-size:11px;color:var(--muted);margin-bottom:6px;text-align:center';
+    if(over){statusDiv.textContent=gs.result||'Game over';statusDiv.style.color='var(--green)';}
+    else{statusDiv.textContent=(turn==='w'?whiteNick:blackNick)+'\'s turn ('+(turn==='w'?'White':'Black')+')'+(isMyTurn?' ← Your move':'');}
+    wrap.appendChild(statusDiv);
+
+    /* Board — flip perspective for black */
+    var boardEl=document.createElement('div');boardEl.style.cssText='display:inline-block;border:3px solid #5a3e1a;border-radius:4px;overflow:hidden;cursor:pointer';
+    var kingPos=findKing(board,turn==='w');
+    var inCheck=kingPos?isAttacked(board,kingPos[0],kingPos[1],turn!=='w',flip):false;
+    var rows=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
+    var cols=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
+    rows.forEach(function(r){
+      var rowEl=document.createElement('div');rowEl.style.display='flex';
+      cols.forEach(function(c){
+        var cell=document.createElement('div');
+        var light=(r+c)%2===0,bg=light?'#f0d9b5':'#b58863';
+        if(sel&&sel[0]===r&&sel[1]===c)bg='#7fc97f';
+        var validMoves=sel?getMoves(sel[0],sel[1]):[];
+        var valid=validMoves.some(function(m){return m[0]===r&&m[1]===c;});
+        if(valid)bg=light?'#cdd16a':'#aaa23a';
+        if(inCheck&&kingPos&&kingPos[0]===r&&kingPos[1]===c)bg='#e85555';
+        cell.style.cssText='width:'+sqSz+'px;height:'+sqSz+'px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:'+pieceFs+'px;user-select:none;position:relative';
+        var p=board[r][c];
+        if(p&&p!==' '){
+          var span=document.createElement('span');span.textContent=isW(p)?WH[p.toUpperCase()]:BK[p];
+          span.style.cssText=isW(p)?'color:#fff;text-shadow:-1px -1px 0 #333,1px -1px 0 #333,-1px 1px 0 #333,1px 1px 0 #333':'color:#111;text-shadow:-1px -1px 0 #f0d9b5,1px -1px 0 #f0d9b5,-1px 1px 0 #f0d9b5,1px 1px 0 #f0d9b5';
+          cell.appendChild(span);
+        }
+        if(valid){var dot=document.createElement('div');var ds=Math.round(sqSz*.28);dot.style.cssText='position:absolute;width:'+ds+'px;height:'+ds+'px;border-radius:50%;background:rgba(0,0,0,.25);pointer-events:none';cell.appendChild(dot);}
+        (function(rr,cc){cell.addEventListener('click',function(){
+          if(over||!isMyTurn)return;
+          var myWhite=amIWhite;
+          if(sel){
+            var ok=getMoves(sel[0],sel[1]).some(function(m){return m[0]===rr&&m[1]===cc;});
+            if(ok){doSubmitMove(sel[0],sel[1],rr,cc,board,ep,cr,flip,turn,timers,timerSecs);C._pvpSel=null;}
+            else{var pp=board[rr][cc];C._pvpSel=(pp&&pp!==' '&&(myWhite?isW(pp):isB(pp))&&getMoves(rr,cc).length>0)?[rr,cc]:null;renderPvPGame(gs);}
+          } else {
+            var pp2=board[rr][cc];var isMine=myWhite?isW(pp2):isB(pp2);
+            if(pp2&&pp2!==' '&&isMine&&getMoves(rr,cc).length>0){SND_GC.click();C._pvpSel=[rr,cc];renderPvPGame(gs);}
+          }
+        });})(r,c);
+        rowEl.appendChild(cell);
+      });
+      boardEl.appendChild(rowEl);
+    });
+    wrap.appendChild(boardEl);
+
+    /* Info */
+    var info=document.createElement('div');info.style.cssText='font-size:12px;color:var(--muted);margin-top:6px;text-align:center';
+    info.textContent=over?(gs.result||'Game over'):(isMyTurn?'Your move — click a piece':'Waiting for '+( turn==='w'?whiteNick:blackNick)+'…');
+    wrap.appendChild(info);
+
+    /* Buttons */
+    var actRow=document.createElement('div');actRow.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center';
+    if(over&&pvpIsHost){
+      var rematch=document.createElement('button');rematch.className='btn btn-primary';rematch.style.cssText='font-size:11px;padding:6px 16px';rematch.textContent='Rematch';
+      rematch.onclick=function(){
+        chessRoomRef(pvpRoomId).get().then(function(snap){doStartChessGame(snap.data(),timerSecs);});
+      };actRow.appendChild(rematch);
+    }
+    var leaveBtn=document.createElement('button');leaveBtn.className='btn btn-outline';leaveBtn.style.cssText='font-size:11px;padding:6px 16px';leaveBtn.textContent='Leave';
+    leaveBtn.onclick=function(){cleanupPvP();C._pvpSel=null;showModeSelector();};actRow.appendChild(leaveBtn);
+    wrap.appendChild(actRow);
+    C.innerHTML='';C.appendChild(wrap);
+  }
+
+  function doSubmitMove(r,c,nr,nc,board,ep,cr,flip,turn,timers,timerSecs){
+    var nb=cloneBoard(board);
+    var result=doApplyMove(nb,r,c,nr,nc,ep,cr,flip);
+    if(result.captured)SND_GC.capture();else SND_GC.move();
+    var newTurn=turn==='w'?'b':'w';
+    var newTimers=timers?{w:timers.w,b:timers.b}:null;
+    /* Check game end */
+    var oppInCheck=isInCheck(nb,newTurn==='w',flip);
+    var noMoves=!hasAnyLegal(nb,newTurn==='w',result.enPassant,result.castleRights,flip);
+    var isOver=noMoves;
+    var gameResult=null;
+    if(noMoves){
+      if(oppInCheck){gameResult=(newTurn==='w'?gs_black()+'(Black)':gs_white()+'(White)')+' wins by checkmate!';SND_GC.win();}
+      else{gameResult='Stalemate — draw!';SND_GC.card();}
+    }
+    var updates={
+      board:encBoard(nb),turn:newTurn,
+      enPassant:result.enPassant||null,
+      castleRights:result.castleRights,
+      over:isOver,result:gameResult,
+      timers:newTimers,lastTick:Date.now(),updatedAt:Date.now()
+    };
+    chessStateRef(pvpRoomId).update(updates).catch(function(e){gcToast('Move error: '+e.message);});
+  }
+
+  /* Helpers to get nick labels for result string */
+  var _gs_ref={};
+  function gs_white(){return _gs_ref.white||'White';}
+  function gs_black(){return _gs_ref.black||'Black';}
+
+  /* ══════════════════════════════════════
+     AI GAME (local, no Firestore)
+  ══════════════════════════════════════ */
+  function startAIGame(timerSecs){
+    var playerIsWhite=Math.random()<0.5;
+    var flip=!playerIsWhite;
+    var board=[
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      [' ',' ',' ',' ',' ',' ',' ',' '],
+      ['P','P','P','P','P','P','P','P'],
+      ['R','N','B','Q','K','B','N','R'],
+    ];
+    if(!playerIsWhite){board=board.map(function(r){return r.slice();}).reverse().map(function(r){return r.slice().reverse();});}
+    var turn='w',sel=null,moves=0,over=false,ep=null,promoted=false;
+    var cr={wK:true,wQ:true,bK:true,bQ:true};
+    var timers=timerSecs?{w:timerSecs,b:timerSecs}:null;
+    var timerIv=null;
+
+    function isPlayerTurn(){return playerIsWhite?turn==='w':turn==='b';}
+    function isAITurn(){return playerIsWhite?turn==='b':turn==='w';}
+    function getMoves(r,c){return getLegal(board,r,c,ep,cr,flip);}
+    function formatTime(s){var m=Math.floor(s/60),ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
+
+    function startTimer(){
+      if(!timers)return;
+      if(timerIv)clearInterval(timerIv);
+      timerIv=setInterval(function(){
+        timers[turn]--;
+        if(timers[turn]<0)timers[turn]=0;
+        if(timers[turn]<=0){over=true;clearInterval(timerIv);SND_GC.wrong();setScore((turn==='w'?'White':'Black')+' ran out of time!');render();}
+        else render();
+      },1000);
+    }
+
+    function doMove(r,c,nr,nc){
+      var result=doApplyMove(board,r,c,nr,nc,ep,cr,flip);
+      ep=result.enPassant;cr=result.castleRights;promoted=!!(board[nr][nc]==='Q'||board[nr][nc]==='q');
+      if(result.captured)SND_GC.capture();else SND_GC.move();
+      moves++;sel=null;
+      var justWhite=turn==='w';turn=turn==='w'?'b':'w';
+      var oppCheck=isInCheck(board,turn==='w',flip);
+      if(!hasAnyLegal(board,turn==='w',ep,cr,flip)){
+        over=true;if(timerIv)clearInterval(timerIv);
+        if(oppCheck){SND_GC.win();setScore('Checkmate! '+(turn==='b'?'White':'Black')+' wins 🏆');if(isPlayerTurn()){gcSaveScore('chess',moves,true);gcAwardGameCredit(cu.nickname,2);if(typeof achCheckGame==='function')achCheckGame('chess',{beat_ai:true});}}
+        else{SND_GC.card();setScore('Stalemate — draw!');}
+      }
+      if(!over&&timers)startTimer();
+      render();
+      if(!over&&isAITurn())setTimeout(function(){var best=aiPickMove(board,!playerIsWhite,ep,cr,flip);if(best)doMove(best.from[0],best.from[1],best.to[0],best.to[1]);},500);
+    }
+
+    function render(){
+      var sqSz=Math.max(44,Math.min(Math.floor(((C.clientWidth||900)-40)/8),Math.floor(((C.clientHeight||780)-180)/8),86));
+      var pieceFs=Math.round(sqSz*0.7);
+      var playerCheck=isInCheck(board,playerIsWhite,flip);
+      var wrap2=document.createElement('div');wrap2.style.cssText='display:flex;flex-direction:column;align-items:center;width:100%';
+
+      if(timers){
+        var tb=document.createElement('div');tb.style.cssText='display:flex;justify-content:space-between;width:'+(sqSz*8)+'px;margin-bottom:6px;gap:8px';
+        function chip(lbl,side,secs,active){var d=document.createElement('div');var low=secs<30;d.style.cssText='font-size:13px;font-weight:700;padding:4px 12px;border-radius:8px;'+(active?'background:var(--accent);color:#fff;':(low?'color:var(--red);background:rgba(239,68,68,.15);':'color:var(--muted);background:var(--surface2);'));d.textContent=lbl+' '+formatTime(Math.max(0,secs));tb.appendChild(d);}
+        chip('AI',!playerIsWhite?'w':'b',timers[!playerIsWhite?'w':'b'],isAITurn()&&!over);
+        chip('You',playerIsWhite?'w':'b',timers[playerIsWhite?'w':'b'],isPlayerTurn()&&!over);
+        wrap2.appendChild(tb);
+      }
+
+      var statusDiv2=document.createElement('div');statusDiv2.style.cssText='font-size:11px;margin-bottom:6px;text-align:center;color:var(--muted)';
+      var st='You play '+(playerIsWhite?'White ♔':'Black ♚');
+      if(!over){if(playerCheck)st+=' — ⚠️ CHECK!';}
+      if(playerCheck)statusDiv2.style.color='var(--red)';
+      statusDiv2.textContent=st;wrap2.appendChild(statusDiv2);
+
+      var boardEl2=document.createElement('div');boardEl2.style.cssText='display:inline-block;border:3px solid #5a3e1a;border-radius:4px;overflow:hidden;cursor:pointer';
+      var kp=findKing(board,playerIsWhite);
+      var rows2=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
+      var cols2=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
+      rows2.forEach(function(r){
+        var rEl=document.createElement('div');rEl.style.display='flex';
+        cols2.forEach(function(c){
+          var cell=document.createElement('div');
+          var light=(r+c)%2===0,bg=light?'#f0d9b5':'#b58863';
+          if(sel&&sel[0]===r&&sel[1]===c)bg='#7fc97f';
+          var vms=sel?getMoves(sel[0],sel[1]):[];
+          var valid=vms.some(function(m){return m[0]===r&&m[1]===c;});
+          if(valid)bg=light?'#cdd16a':'#aaa23a';
+          if(playerCheck&&kp&&kp[0]===r&&kp[1]===c)bg='#e85555';
+          cell.style.cssText='width:'+sqSz+'px;height:'+sqSz+'px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:'+pieceFs+'px;user-select:none;position:relative';
+          var p=board[r][c];
+          if(p&&p!==' '){var sp=document.createElement('span');sp.textContent=isW(p)?WH[p.toUpperCase()]:BK[p];sp.style.cssText=isW(p)?'color:#fff;text-shadow:-1px -1px 0 #333,1px -1px 0 #333,-1px 1px 0 #333,1px 1px 0 #333':'color:#111;text-shadow:-1px -1px 0 #f0d9b5,1px -1px 0 #f0d9b5,-1px 1px 0 #f0d9b5,1px 1px 0 #f0d9b5';cell.appendChild(sp);}
+          if(valid){var dot=document.createElement('div');var ds=Math.round(sqSz*.28);dot.style.cssText='position:absolute;width:'+ds+'px;height:'+ds+'px;border-radius:50%;background:rgba(0,0,0,.25);pointer-events:none';cell.appendChild(dot);}
+          (function(rr,cc){cell.addEventListener('click',function(){
+            if(over||isAITurn())return;
+            if(sel){
+              var ok=getMoves(sel[0],sel[1]).some(function(m){return m[0]===rr&&m[1]===cc;});
+              if(ok){doMove(sel[0],sel[1],rr,cc);}
+              else{var pp=board[rr][cc];var isP=playerIsWhite?isW(pp):isB(pp);sel=(pp&&pp!==' '&&isP&&getMoves(rr,cc).length>0)?[rr,cc]:null;render();}
+            } else {
+              var pp2=board[rr][cc];var isP2=playerIsWhite?isW(pp2):isB(pp2);
+              if(pp2&&pp2!==' '&&isP2&&getMoves(rr,cc).length>0){SND_GC.click();sel=[rr,cc];render();}
+            }
+          });})(r,c);
+          rEl.appendChild(cell);
+        });
+        boardEl2.appendChild(rEl);
+      });
+      wrap2.appendChild(boardEl2);
+
+      var info2=document.createElement('div');info2.style.cssText='font-size:12px;color:var(--muted);margin-top:6px;text-align:center';
+      info2.textContent=over?'Game over':(isAITurn()?'AI thinking…':'Click a piece to move');
+      wrap2.appendChild(info2);
+      if(promoted){var pi=document.createElement('div');pi.style.cssText='font-size:11px;color:var(--green);margin-top:3px;text-align:center';pi.textContent='♛ Pawn promoted to Queen!';wrap2.appendChild(pi);promoted=false;}
+
+      var ar=document.createElement('div');ar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center';
+      var nb2=document.createElement('button');nb2.className='btn btn-outline';nb2.style.cssText='font-size:11px;padding:4px 12px';nb2.textContent='New Game';
+      nb2.onclick=function(){if(timerIv)clearInterval(timerIv);showModeSelector();};ar.appendChild(nb2);
+      wrap2.appendChild(ar);
+      C.innerHTML='';C.appendChild(wrap2);
+    }
+
+    if(timers)startTimer();
+    render();
+    if(isAITurn())setTimeout(function(){var best=aiPickMove(board,!playerIsWhite,ep,cr,flip);if(best)doMove(best.from[0],best.from[1],best.to[0],best.to[1]);},600);
+  }
+
+  showModeSelector();
+}
+
 function gcLaunchGame(id,title){
   var access=gcCheckAccess();
   if(!access.ok){gcToast('🔒 '+access.reason);return;}
@@ -14451,6 +15084,7 @@ function gcLaunchGame(id,title){
       if(id==='solitaire')gcGameSolitaire(body);
       if(id==='dealornodeal')gcGameDealOrNoDeal(body);
       if(id==='millionaire')gcGameMillionaire(body);
+      if(id==='chess')gcGameChess(body);
       if(id==='uno')gcGameUNO(body);
       if(id==='tongits')gcGameTongIts(body);
     },60);
@@ -15986,7 +16620,7 @@ function gcGameDealOrNoDeal(C){
           var realOffer=Math.max(1,Math.round(offer*0.3));
           SND_GC.win();
           gcAwardGameCredit(cu.nickname,realOffer);
-          achCheckGame('dealornodeal',{jackpot:realOffer>5000});
+          achCheckGame('dealornodeal',{jackpot:false}); /* deal taken — not a jackpot win */
           endDND(realOffer,offer,'Deal! You take the banker\'s offer.');
         };
         if(nd)nd.onclick=function(){
@@ -16059,6 +16693,9 @@ function gcGameDealOrNoDeal(C){
     playerCase.open=true;
     SND_GC.win();
     gcAwardGameCredit(cu.nickname,realPrize);
+    /* Deal breaker = player kept their case and won the top prize */
+    var maxPrize=Math.max.apply(null,ALL_PRIZES);
+    achCheckGame('dealornodeal',{jackpot:prize>=maxPrize});
     C.innerHTML='';
     var wrap=document.createElement('div');
     wrap.style.cssText='font-family:var(--font-b);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
@@ -16309,7 +16946,12 @@ function gcGameMillionaire(C){
   function endGame(prize,msg){
     gameOver=true;
     var actualPrize=prize>0?Math.round(prize*0.01):0;
-    if(actualPrize>0){gcAwardGameCredit(cu.nickname,actualPrize);achCheckGame('millionaire',{all15:_questionNum>=15,no_lifelines:!_usedLifeline});}
+    if(prize>0){
+      gcAwardGameCredit(cu.nickname,actualPrize||10);
+      /* qIdx is 0-based so question 15 = qIdx 14; lifelines used = key is false */
+      var _noLifelines=lifelines&&lifelines.fifty!==false&&lifelines.audience!==false&&lifelines.friend!==false;
+      achCheckGame('millionaire',{all15:qIdx>=14,no_lifelines:_noLifelines});
+    }
     C.innerHTML='';
     var wrap=document.createElement('div');
     wrap.style.cssText='font-family:var(--font-b);max-width:500px;margin:0 auto;padding:28px 0;text-align:center';
