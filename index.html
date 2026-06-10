@@ -2184,22 +2184,34 @@ function openModal(id){
   });
 }
 function closeModal(id){G(id).classList.remove('open');}
-function avEl(nick,sz=30){
+function avEl(nick,sz=30,showTooltip=false){
   const key=nick.charAt(0).toUpperCase()+nick.slice(1).toLowerCase();
   const dir=TEAM_DIR[key]||TEAM_DIR[nick]||{};
   const fullName=dir.fullName||key;
-  /* Try all possible key variants in AVATARS */
   const avSrc=AVATARS[fullName]||AVATARS[key]||AVATARS[nick]
-    /* Try localStorage under all variants */
     ||(()=>{try{
       return localStorage.getItem('avatar_'+fullName)
         ||localStorage.getItem('avatar_'+key)
         ||localStorage.getItem('avatar_'+nick)
         ||null;
     }catch(e){return null;}})();
-  if(avSrc)return `<img src="${avSrc}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0" data-nick-av="${key}" alt="${nick}"/>`;
+  const titleAttr=`title="${fullName}"`;
+  const wrapStyle=`position:relative;display:inline-block;cursor:default;`;
+  const ttStyle=`position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);`+
+    `background:#1a1a2e;color:#e8eaf6;font-size:10px;font-weight:500;white-space:nowrap;`+
+    `padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.1);`+
+    `pointer-events:none;z-index:999;opacity:0;transition:opacity .15s;`;
+  const imgStyle=sz<=22
+    ?`width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0;`
+    :`width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;object-position:top;flex-shrink:0;`;
   const kobySvg='data:image/svg+xml,'+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐸</text></svg>");
-  return `<img src="${kobySvg}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg2)" data-nick-av="${key}" alt="${nick}"/>`;
+  const imgSrc=avSrc||kobySvg;
+  const bgStyle=avSrc?'':`background:var(--bg2);`;
+  /* Always include title for native browser tooltip, optionally wrap with custom tooltip */
+  const img=`<img src="${imgSrc}" style="${imgStyle}${bgStyle}" data-nick-av="${key}" alt="${fullName}" ${titleAttr}/>`;
+  if(!showTooltip)return img;
+  return `<span style="${wrapStyle}" onmouseenter="this.querySelector('.av-tt').style.opacity='1'" onmouseleave="this.querySelector('.av-tt').style.opacity='0'">`
+    +img+`<span class="av-tt" style="${ttStyle}">${fullName}</span></span>`;
 }
 function buildSidebar(){
   /* Show Add Article button to manager and Jelie */
@@ -5427,7 +5439,7 @@ function gcMakeSnowRunBannerSvg(){
   wrap.style.cssText='position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1;';
 
   var svg=document.createElementNS(ns,'svg');
-  svg.setAttribute('viewBox','0 0 500 100');
+  svg.setAttribute('viewBox','0 6 500 100');
   svg.setAttribute('preserveAspectRatio','xMidYMid slice');
   svg.style.cssText='position:absolute;inset:0;width:100%;height:100%;';
 
@@ -5504,22 +5516,46 @@ function gcMakeSnowRunBannerSvg(){
   }
 
   /* Mountain ridge — flat, bottom 15% */
-  h('path',{d:'M0 84 Q100 82 200 83 Q300 84 400 82 Q460 81 500 82 L500 100 L0 100Z',fill:s.mtn,opacity:'.45'},svg);
-  h('path',{d:'M0 92 Q30 91 60 90 Q90 89 120 88 Q150 87 180 86 Q210 85 230 84 Q242 83 250 82 Q258 83 270 84 Q290 85 320 86 Q350 87 380 88 Q410 89 440 90 Q470 91 500 92 L500 100 L0 100Z',fill:s.mtn2},svg);
+  /* Far haze ridge */
+  h('path',{d:'M0 78 Q100 75 200 77 Q300 79 400 76 Q460 74 500 75 L500 106 L0 106Z',fill:s.mtn,opacity:'.5'},svg);
+  /* Main ridge — gentle Lion King silhouette */
+  h('path',{d:'M0 86 Q25 85 50 84 Q75 83 100 82 Q125 81 150 80 Q175 79 200 78 Q220 77 235 76 Q245 75 250 74 Q255 75 265 76 Q280 77 300 78 Q325 79 350 80 Q375 81 400 82 Q425 83 450 84 Q475 85 500 86 L500 106 L0 106Z',fill:s.mtn2},svg);
+  /* Snow caps on ridge peak — white tips */
+  h('path',{d:'M220 76 Q235 72 250 70 Q265 72 280 76 Q265 74 250 73 Q235 74 220 76Z',fill:'#e8f0ff',opacity:'.7'},svg);
+  h('path',{d:'M100 81 Q110 78 118 77 Q126 78 135 81 Q126 79 118 78.5 Q110 79 100 81Z',fill:'#e8f0ff',opacity:'.4'},svg);
+  h('path',{d:'M365 80 Q375 77 383 76 Q391 77 400 80 Q391 78 383 77.5 Q375 78 365 80Z',fill:'#e8f0ff',opacity:'.4'},svg);
 
-  /* Pine silhouettes on ridge */
-  [50,100,155,210,250,290,345,400,448].forEach(function(tx,i){
-    var by=90-(i===4?8:i===3||i===5?6:i===2||i===6?4:2);
-    var th=7+i%3*2;
-    h('polygon',{points:tx+','+(by+4)+' '+(tx+3)+','+(by-th)+' '+(tx+6)+','+(by+4),fill:s.tree,opacity:'.7'},svg);
+  /* ── TREES — 3 depth layers ── */
+  /* Layer 1: Far/tiny trees on the ridge (silhouettes, high up) */
+  [[20,88,5,11],[45,87,5,13],[75,86,5,12],[108,85,5,14],[140,84,5,11],
+   [175,83,5,13],[215,82,5,15],[250,81,6,16],[285,82,5,15],[320,83,5,13],
+   [358,84,5,12],[395,85,5,11],[428,86,5,13],[462,87,5,11],[490,88,5,10]].forEach(function(t){
+    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+t[2]/2)+','+(t[1]-t[3])+' '+(t[0]+t[2])+','+t[1],fill:s.mtn,opacity:'.6'},svg);
   });
 
-  /* Fg trees */
-  [[0,95,7,76],[10,95,17,70],[20,95,27,78]].forEach(function(t){
-    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+6)+','+t[2]+' '+t[3]+','+t[1],fill:s.tree2},svg);
+  /* Layer 2: Mid trees — medium size, slightly in front of ridge */
+  [[30,92,8,22],[62,91,8,26],[95,90,8,24],[130,89,9,28],[165,88,9,26],
+   [200,89,8,24],[235,88,9,28],[265,88,9,30],[300,89,8,26],[335,90,8,24],
+   [368,91,8,22],[402,92,8,20],[435,91,9,24],[462,90,8,26],[490,92,8,20]].forEach(function(t){
+    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+t[2]/2)+','+(t[1]-t[3])+' '+(t[0]+t[2])+','+t[1],fill:s.tree,opacity:'.82'},svg);
+    /* trunk */
+    h('rect',{x:t[0]+t[2]/2-1,y:t[1],width:'2',height:'4',fill:s.tree,opacity:'.6'},svg);
   });
-  [[464,95,471,74],[474,95,481,68],[484,95,491,76],[494,95,500,72]].forEach(function(t){
-    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+6)+','+t[2]+' '+t[3]+','+t[1],fill:s.tree2},svg);
+
+  /* Layer 3: Foreground trees — big, dark, frame the scene */
+  /* Left cluster */
+  [[0,100,14,44],[8,100,12,38],[18,100,14,50],[28,100,12,36]].forEach(function(t){
+    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+t[2]/2)+','+(t[1]-t[3])+' '+(t[0]+t[2])+','+t[1],fill:s.tree2},svg);
+    h('rect',{x:t[0]+t[2]/2-1.5,y:t[1]-2,width:'3',height:'6',fill:s.tree2},svg);
+  });
+  /* Right cluster */
+  [[458,100,14,48],[468,100,12,40],[478,100,14,52],[488,100,12,38]].forEach(function(t){
+    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+t[2]/2)+','+(t[1]-t[3])+' '+(t[0]+t[2])+','+t[1],fill:s.tree2},svg);
+    h('rect',{x:t[0]+t[2]/2-1.5,y:t[1]-2,width:'3',height:'6',fill:s.tree2},svg);
+  });
+  /* Occasional mid-fg lone tall tree for variety */
+  [[112,100,10,40],[380,100,10,38]].forEach(function(t){
+    h('polygon',{points:t[0]+','+t[1]+' '+(t[0]+t[2]/2)+','+(t[1]-t[3])+' '+(t[0]+t[2])+','+t[1],fill:s.tree2,opacity:'.7'},svg);
   });
 
   /* Ground */
@@ -5555,33 +5591,76 @@ function gcMakeSnowRunBannerSvg(){
     h('ellipse',{cx:'-10',cy:'84',rx:'3',ry:'2',fill:'#e0d8c8',opacity:'.7'},dG);
   }
 
-  /* Birds */
+  /* Birds — glide in, hover/circle, glide out */
   if(s.birds){
+    /* Inject bird hover keyframe if not present */
+    if(!document.getElementById('sr-bird-kf')){
+      var bkf=document.createElement('style');bkf.id='sr-bird-kf';
+      bkf.textContent=
+        '@keyframes sr-bird-pass{0%{transform:translateX(550px) translateY(0)}'+
+        '35%{transform:translateX(300px) translateY(-8px)}'+
+        '50%{transform:translateX(220px) translateY(0)}'+
+        '65%{transform:translateX(180px) translateY(8px)}'+
+        '80%{transform:translateX(120px) translateY(2px)}'+
+        '100%{transform:translateX(-60px) translateY(0)}}'+
+        '@keyframes sr-bird-pass2{0%{transform:translateX(580px) translateY(4px)}'+
+        '40%{transform:translateX(310px) translateY(-4px)}'+
+        '55%{transform:translateX(240px) translateY(6px)}'+
+        '70%{transform:translateX(190px) translateY(-2px)}'+
+        '100%{transform:translateX(-80px) translateY(4px)}}'+
+        '@keyframes sr-bird-pass3{0%{transform:translateX(520px) translateY(-4px)}'+
+        '30%{transform:translateX(280px) translateY(6px)}'+
+        '50%{transform:translateX(200px) translateY(-6px)}'+
+        '75%{transform:translateX(140px) translateY(4px)}'+
+        '100%{transform:translateX(-40px) translateY(-4px)}}';
+      document.head.appendChild(bkf);
+    }
     var bG=h('g',{'clip-path':'url(#sr-sc)'},svg);
-    bG.style.cssText='animation:sr-birds 9s linear 0.3s infinite';
-    [[0,32,0],[22,26,0.35],[44,34,0.7]].forEach(function(b){
-      var bW=h('g',{transform:'translate('+b[0]+','+b[1]+')'},bG);
-      bW.style.cssText='animation:sr-flap '+(0.55)+'s ease-in-out '+b[2]+'s infinite';
-      h('path',{d:'M0 0 Q-8 -5 -16 0',fill:'none',stroke:s.tree2,'stroke-width':'1.4','stroke-linecap':'round'},bW);
-      h('path',{d:'M0 0 Q8 -5 16 0',fill:'none',stroke:s.tree2,'stroke-width':'1.4','stroke-linecap':'round'},bW);
-      h('circle',{cx:'0',cy:'0',r:'1.5',fill:s.tree2},bW);
+    [[28,0,'sr-bird-pass',11],[22,0.8,'sr-bird-pass2',13],[35,0.4,'sr-bird-pass3',9.5]].forEach(function(b){
+      var bW=h('g',{transform:'translate(0,'+b[0]+')'},bG);
+      bW.style.cssText='animation:'+b[2]+' '+b[3]+'s ease-in-out '+b[1]+'s infinite';
+      var fW=h('g',{},bW);
+      fW.style.cssText='animation:sr-flap 0.55s ease-in-out '+b[1]+'s infinite';
+      h('path',{d:'M0 0 Q-9 -5 -17 0',fill:'none',stroke:s.tree2,'stroke-width':'1.4','stroke-linecap':'round'},fW);
+      h('path',{d:'M0 0 Q9 -5 17 0',fill:'none',stroke:s.tree2,'stroke-width':'1.4','stroke-linecap':'round'},fW);
+      h('circle',{cx:'0',cy:'0',r:'1.8',fill:s.tree2},fW);
     });
   }
 
-  /* Wolves */
+  /* Wolf — one wolf sitting on the ridge howling at the moon */
   if(s.wolves){
-    var wG=h('g',{},svg);
-    wG.style.cssText='animation:sr-wolves 10s linear 0s infinite';
-    [[-60,87],[-34,85],[-8,87]].forEach(function(w){
-      var wg=h('g',{transform:'translate('+w[0]+','+w[1]+')'},wG);
-      h('ellipse',{cx:'0',cy:'0',rx:'11',ry:'4.5',fill:s.tree2,opacity:'.88'},wg);
-      h('ellipse',{cx:'10',cy:'-3.5',rx:'4.5',ry:'3.2',fill:s.tree2,opacity:'.88'},wg);
-      h('path',{d:'M14 -3.5 L19 -2.5',stroke:s.tree2,'stroke-width':'1.8','stroke-linecap':'round',fill:'none'},wg);
-      h('path',{d:'M9 -6.5 L11 -9.5 L13 -6.5',fill:s.tree2,opacity:'.88'},wg);
-      h('line',{x1:'4',y1:'4',x2:'6',y2:'11',stroke:s.tree2,'stroke-width':'1.6','stroke-linecap':'round'},wg);
-      h('line',{x1:'-3',y1:'4',x2:'-5',y2:'11',stroke:s.tree2,'stroke-width':'1.6','stroke-linecap':'round'},wg);
-      h('path',{d:'M-10 0 Q-16 -5 -12 -9',stroke:s.tree2,'stroke-width':'1.6',fill:'none','stroke-linecap':'round'},wg);
-    });
+    if(!document.getElementById('sr-wolf-kf')){
+      var wkf=document.createElement('style');wkf.id='sr-wolf-kf';
+      wkf.textContent=
+        '@keyframes sr-howl{0%,100%{transform:rotate(0deg)}'+
+        '20%{transform:rotate(-8deg)}'+
+        '40%{transform:rotate(-12deg)}'+
+        '60%{transform:rotate(-10deg)}'+
+        '80%{transform:rotate(-6deg)}}'+ /* head tilts back to howl */
+        '@keyframes sr-wolf-fade{0%,8%{opacity:0}15%{opacity:.9}85%{opacity:.9}95%,100%{opacity:0}}';
+      document.head.appendChild(wkf);
+    }
+    /* Position wolf on ridge centre, sitting upright */
+    var wG=h('g',{transform:'translate(248,84)'},svg);
+    wG.style.cssText='animation:sr-wolf-fade 12s ease-in-out 0s infinite';
+    /* Body — sitting */
+    h('ellipse',{cx:'0',cy:'0',rx:'8',ry:'6',fill:s.tree2,opacity:'.9'},wG);
+    /* Haunches */
+    h('ellipse',{cx:'-4',cy:'4',rx:'5',ry:'4',fill:s.tree2,opacity:'.9'},wG);
+    h('ellipse',{cx:'4',cy:'4',rx:'5',ry:'4',fill:s.tree2,opacity:'.9'},wG);
+    /* Tail curled around */
+    h('path',{d:'M8 2 Q16 8 12 14 Q8 18 4 14',stroke:s.tree2,'stroke-width':'2.5',fill:'none','stroke-linecap':'round'},wG);
+    /* Neck + head tilted back to howl */
+    var headG=h('g',{transform:'translate(0,-6)'},wG);
+    headG.style.cssText='animation:sr-howl 4s ease-in-out 1s infinite;transform-origin:0px 6px';
+    h('ellipse',{cx:'0',cy:'-8',rx:'5',ry:'4',fill:s.tree2,opacity:'.9'},headG);
+    /* Snout pointed up (howling) */
+    h('path',{d:'M0 -12 L-1 -17 L1 -17 Z',fill:s.tree2,opacity:'.9'},headG);
+    /* Ear */
+    h('path',{d:'M-3 -11 L-5 -15 L-1 -13Z',fill:s.tree2,opacity:'.9'},headG);
+    h('path',{d:'M3 -11 L5 -15 L1 -13Z',fill:s.tree2,opacity:'.9'},headG);
+    /* Howl line — thin arc going up toward moon */
+    h('path',{d:'M0 -17 Q-5 -35 -8 -50',stroke:s.tree2,'stroke-width':'0.6',fill:'none',opacity:'.25','stroke-linecap':'round','stroke-dasharray':'2 4'},wG);
   }
 
   wrap.appendChild(svg);
@@ -7552,7 +7631,7 @@ function renderAnnouncements(){
     var seenArr=window._annSeenCache&&window._annSeenCache[seenKey]?window._annSeenCache[seenKey]:[];
     var seenLine=isManager&&seenArr.length?'<div style="margin-top:6px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
       +'<span style="font-size:10px;color:var(--muted)">Seen by:</span>'
-      +seenArr.map(function(nick){return avEl(nick,18);}).join('')
+      +seenArr.map(function(nick){return avEl(nick,18,true);}).join('')
       +'</div>':'';
     var managerActions=isManager
       ?seenLine+'<div style="display:flex;gap:6px;margin-top:6px">'
@@ -14470,6 +14549,11 @@ document.addEventListener('DOMContentLoaded',function(){
 @keyframes sr-flap{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-4px) scaleY(-0.6)}}
 @keyframes sr-wolves{0%{transform:translateX(600px)}100%{transform:translateX(-100px)}}
 @keyframes sr-wind{0%{transform:translateX(0);opacity:.4}100%{transform:translateX(-60px);opacity:0}}
+@keyframes sr-bird-pass{0%{transform:translateX(550px) translateY(0)}35%{transform:translateX(300px) translateY(-8px)}50%{transform:translateX(220px) translateY(0)}65%{transform:translateX(180px) translateY(8px)}80%{transform:translateX(120px) translateY(2px)}100%{transform:translateX(-60px) translateY(0)}}
+@keyframes sr-bird-pass2{0%{transform:translateX(580px) translateY(4px)}40%{transform:translateX(310px) translateY(-4px)}55%{transform:translateX(240px) translateY(6px)}70%{transform:translateX(190px) translateY(-2px)}100%{transform:translateX(-80px) translateY(4px)}}
+@keyframes sr-bird-pass3{0%{transform:translateX(520px) translateY(-4px)}30%{transform:translateX(280px) translateY(6px)}50%{transform:translateX(200px) translateY(-6px)}75%{transform:translateX(140px) translateY(4px)}100%{transform:translateX(-40px) translateY(-4px)}}
+@keyframes sr-howl{0%,100%{transform:rotate(0deg)}20%{transform:rotate(-8deg)}40%{transform:rotate(-12deg)}60%{transform:rotate(-10deg)}80%{transform:rotate(-6deg)}}
+@keyframes sr-wolf-fade{0%,8%{opacity:0}15%{opacity:.9}85%{opacity:.9}95%,100%{opacity:0}}
 @keyframes sr-glow{0%,100%{opacity:.8}50%{opacity:1}}
 @keyframes sr-ring-glow{0%,100%{box-shadow:0 0 8px var(--sr-ring-color,#7aaee8),0 0 16px var(--sr-ring-color,#7aaee8)}50%{box-shadow:0 0 16px var(--sr-ring-color,#7aaee8),0 0 32px var(--sr-ring-color,#7aaee8)}}
 @keyframes koby-hop{
