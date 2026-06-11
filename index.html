@@ -5928,7 +5928,9 @@ var ACHIEVEMENTS={
     desc:"Beat the chess AI. The machine cried."},
   deal_breaker:{id:'deal_breaker',name:'Deal breaker',icon:'💼',tier:'game',rarity:'gold',cr:200,
     desc:"Walked away with the jackpot. The banker is shaking."},
-  lexicon:{id:'lexicon',name:'Lexicon',icon:'📚',tier:'game',rarity:'gold',cr:150,
+  speedtype_speedster:{id:'speedtype_speedster',name:'Speedtype Speedster',icon:'👑',tier:'game',rarity:'platinum',cr:300,rolling:true,
+    desc:"Fastest fingers in the portal. The crown is yours.. for now.."},
+    lexicon:{id:'lexicon',name:'Lexicon',icon:'📚',tier:'game',rarity:'gold',cr:150,
     desc:"35 word searches completed. You eat grids for breakfast."},
     word_nerd:{id:'word_nerd',name:'Word nerd',icon:'📖',tier:'game',rarity:'silver',cr:200,
     desc:"Won Word Guess in 2 guesses or less. Big brain energy."},
@@ -6105,6 +6107,52 @@ function achMakeIcon(ach,size){
     ?'<span style="font-size:'+(size*0.38)+'px;font-weight:800;font-family:monospace;color:'+r.color+'">'+(ach.num||'?')+'</span>'
     :'<span style="font-size:'+(size*0.42)+'px;line-height:1">'+(ach.icon||'🏅')+'</span>';
   var d=document.createElement('div');
+  /* Animated SVG icon for speedtype_speedster */
+  if(ach.id==='speedtype_speedster'){
+    var sz=size;
+    var wrap=document.createElement('div');
+    wrap.style.cssText='width:'+sz+'px;height:'+sz+'px;flex-shrink:0;animation:ach-float 3s ease-in-out infinite;';
+    if(!document.getElementById('ach-anim-kf')){
+      var akf=document.createElement('style');akf.id='ach-anim-kf';
+      akf.textContent=
+        '@keyframes ach-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}'+
+        '@keyframes ach-crown-glow{0%,100%{filter:drop-shadow(0 0 3px #a78bfa88)}50%{filter:drop-shadow(0 0 8px #a78bfadd)}}'+
+        '@keyframes ach-bolt{0%,100%{opacity:.6;transform:translateY(0)}50%{opacity:1;transform:translateY(-2px)}}'+
+        '@keyframes ach-dia{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg) scale(1.1)}}'+
+        '@keyframes ach-dia2{0%,100%{transform:rotate(6deg)}50%{transform:rotate(-6deg) scale(1.08)}}';
+      document.head.appendChild(akf);
+    }
+    var svgNS='http://www.w3.org/2000/svg';
+    function ie(tag,attrs,par){var e=document.createElementNS(svgNS,tag);Object.keys(attrs).forEach(function(k){e.setAttribute(k,attrs[k]);});if(par)par.appendChild(e);return e;}
+    var iSvg=ie('svg',{width:sz,height:sz,viewBox:'0 0 96 96'},null);
+    iSvg.style.cssText='animation:ach-crown-glow 2.5s ease-in-out infinite;';
+    var iDefs=ie('defs',{},iSvg);
+    var uid=sz+'_'+Date.now();
+    var iCg=ie('linearGradient',{id:'acg'+uid,x1:'0%',y1:'0%',x2:'0%',y2:'100%'},iDefs);
+    ie('stop',{'offset':'0%','stop-color':'#fde68a'},iCg);ie('stop',{'offset':'50%','stop-color':'#f59e0b'},iCg);ie('stop',{'offset':'100%','stop-color':'#d97706'},iCg);
+    var iDg=ie('linearGradient',{id:'adg'+uid,x1:'0%',y1:'0%',x2:'100%',y2:'100%'},iDefs);
+    ie('stop',{'offset':'0%','stop-color':'#e0f2fe'},iDg);ie('stop',{'offset':'50%','stop-color':'#a78bfa'},iDg);ie('stop',{'offset':'100%','stop-color':'#7c3aed'},iDg);
+    ie('circle',{cx:'48',cy:'48',r:'45',fill:'none',stroke:'#a78bfa','stroke-width':'2.5',opacity:'.7'},iSvg);
+    ie('circle',{cx:'48',cy:'48',r:'42',fill:'#1e1b4b',opacity:'.9'},iSvg);
+    var bL=ie('path',{d:'M22 24 L16 36 L21 36 L15 50 L26 34 L21 34Z',fill:'#fbbf24'},iSvg);
+    bL.style.animation='ach-bolt 1.8s ease-in-out infinite';
+    var bR=ie('path',{d:'M74 24 L80 36 L75 36 L81 50 L70 34 L75 34Z',fill:'#fbbf24'},iSvg);
+    bR.style.animation='ach-bolt 1.8s ease-in-out .4s infinite';
+    var cG=ie('g',{transform:'translate(48,55)'},iSvg);
+    ie('rect',{x:'-22',y:'6',width:'44',height:'8',rx:'2',fill:'url(#acg'+uid+')'},cG);
+    ie('path',{d:'M-22 14 L-22 0 L-10 10 L0 -14 L10 10 L22 0 L22 14Z',fill:'url(#acg'+uid+')'},cG);
+    ie('circle',{cx:'-12',cy:'10',r:'3',fill:'#ef4444',opacity:'.9'},cG);
+    ie('circle',{cx:'0',cy:'11',r:'3.5',fill:'#a78bfa',opacity:'.9'},cG);
+    ie('circle',{cx:'12',cy:'10',r:'3',fill:'#ef4444',opacity:'.9'},cG);
+    var d1=ie('g',{transform:'translate(31,26)'},iSvg);d1.style.animation='ach-dia 3s ease-in-out infinite';
+    ie('polygon',{points:'0,-7 5,0 0,7 -5,0',fill:'url(#adg'+uid+')'},d1);
+    var d2=ie('g',{transform:'translate(48,18)'},iSvg);d2.style.animation='ach-dia2 2.8s ease-in-out .3s infinite';
+    ie('polygon',{points:'0,-8 6,0 0,8 -6,0',fill:'url(#adg'+uid+')'},d2);
+    var d3=ie('g',{transform:'translate(65,26)'},iSvg);d3.style.animation='ach-dia 3.2s ease-in-out .6s infinite';
+    ie('polygon',{points:'0,-7 5,0 0,7 -5,0',fill:'url(#adg'+uid+')'},d3);
+    wrap.appendChild(iSvg);
+    return wrap;
+  }
   d.className='ach-icon-wrap';
   d.style.cssText='width:'+size+'px;height:'+size+'px;border-radius:'+(size*0.22)+'px;background:'+r.bg+';border:1.5px solid '+r.border+';display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:'+anim+' 3s ease-in-out infinite;';
   d.innerHTML='<div class="ach-shine"></div>'+inner;
@@ -14785,7 +14833,7 @@ function gcDb(){
 var gcCredits=0,gcCreditsLoaded=false,gcCurrentGame=null,gcMusicOn=false,gcMusicVol=0.22;
 var gcAudioCtx=null,gcMusicNodes=[],gcMusicTimer=null;
 var _gcAllCredits={},_gcShifts={},_gcShiftsLoaded=false,_gcNotifs=[];
-var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,chess:1,uno:1,tongits:3,fps:5,wordsearch:1};
+var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,chess:1,uno:1,tongits:3,fps:5,wordsearch:1,typingrace:1};
 
 /* ── Sound ── */
 function gcEnsureAudio(){if(!gcAudioCtx)gcAudioCtx=new(window.AudioContext||window.webkitAudioContext)();if(gcAudioCtx.state==='suspended')gcAudioCtx.resume();}
@@ -14851,7 +14899,7 @@ function achCheckGame(gameId,opts){
     var gamesKey='lounge_games_played_'+nick.toLowerCase();
     var played=JSON.parse(localStorage.getItem(gamesKey)||'[]');
     if(played.indexOf(gameId)===-1){played.push(gameId);localStorage.setItem(gamesKey,JSON.stringify(played));}
-    var allGames=['minesweeper','wordguess','wordsearch','solitaire','millionaire','dealornodeal','kbquiz'];
+    var allGames=['minesweeper','wordguess','wordsearch','typingrace','solitaire','millionaire','dealornodeal','kbquiz'];
     if(allGames.every(function(g){return played.indexOf(g)>-1;})&&!a.game_hoarder){achGrant(nick,'game_hoarder',{delay:800});}
     /* Credit baron — checked on login but also on game win */
     gcDb().collection('player_credits').doc(nick.toLowerCase()).get().then(function(cs){
@@ -15908,6 +15956,361 @@ function gcGameWordSearch(C){
 }
 
 
+function gcGameTypingRace(C){
+  C.style.cssText='padding:20px 24px;display:flex;flex-direction:column;align-items:center;gap:14px;font-family:var(--font-b);';
+
+  /* Inject keyframes once */
+  if(!document.getElementById('tr-kf')){
+    var kf=document.createElement('style');kf.id='tr-kf';
+    kf.textContent=
+      '@keyframes tr-bolt{0%,100%{opacity:.6;transform:translateY(0) scale(1)}50%{opacity:1;transform:translateY(-3px) scale(1.15)}}'+
+      '@keyframes tr-bolt2{0%,100%{opacity:.4;transform:translateY(0)}50%{opacity:.9;transform:translateY(-4px) scale(1.2)}}'+
+      '@keyframes tr-dia{0%,100%{transform:rotate(-8deg) scale(1)}50%{transform:rotate(8deg) scale(1.08)}}'+
+      '@keyframes tr-dia2{0%,100%{transform:rotate(6deg)}50%{transform:rotate(-6deg) scale(1.06)}}'+
+      '@keyframes tr-crown-pulse{0%,100%{filter:drop-shadow(0 0 4px #a78bfa88)}50%{filter:drop-shadow(0 0 10px #a78bfacc)}}'+
+      '@keyframes tr-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}';
+    document.head.appendChild(kf);
+  }
+
+  var PARAGRAPHS=[
+    "The way we communicate shapes everything around us. Words carry weight, silence carries meaning, and the space between the two is where understanding lives. In any team, the quality of a conversation often determines the quality of the outcome. When people feel heard, they contribute more freely. When they feel dismissed, they withdraw quietly and the loss is rarely noticed until it is too late. Building a culture where feedback flows in every direction is not a luxury. It is the foundation on which everything else is built.",
+    "Every morning begins with a choice: to approach the day with intention or to let the day happen to you. The difference between these two paths is not always visible in the moment, but over weeks and months it becomes undeniable. Those who set small, clear goals each day accumulate progress that compounds quietly in the background. Those who drift through without direction often find themselves wondering where the time went. Discipline is not about restriction. It is about deciding in advance what matters and protecting that decision.",
+    "Accuracy is not about perfection for its own sake. It is about respect. When you submit work with errors, you are asking someone else to spend their time finding and fixing what you missed. That cost is invisible to you but very real to them. Professionals who take ownership of quality at the source create ripple effects that make everyone around them more efficient. The smallest habit of double-checking before submitting is one of the most powerful practices a team member can develop.",
+    "Technology changes faster than most people can track, but the fundamentals of good work remain remarkably stable. Showing up consistently, communicating clearly, following through on commitments, asking questions when stuck rather than guessing, and taking ownership of mistakes without being asked. These behaviors have been the markers of reliable professionals for as long as organized work has existed. Tools and platforms will continue to evolve. The human qualities that make someone trustworthy will not.",
+    "The rain had been falling since before dawn, and by the time the city woke up, the streets were rivers and the sky was the color of old pewter. She stood at the window with her coffee growing cold in her hands, watching a leaf spin helplessly in the current flowing along the gutter. There was something meditative about it, the way the leaf had no say in where it went, no resistance, just motion. She had been feeling like that leaf for weeks now and had not yet decided whether that was a problem.",
+    "In the study of complex systems, one of the most counterintuitive findings is that small inputs can produce enormous outputs, while large efforts can sometimes produce almost nothing. This is because systems are not linear. They have thresholds, feedback loops, and tipping points. A single well-placed change can cascade through a network and alter everything downstream. This is why identifying leverage points matters more than working harder. The question is never simply how much effort you are applying but where that effort is landing.",
+    "He had spent twenty years building something he was proud of, and now he was being asked to describe it in three bullet points for a slide deck he would never see again. There was no malice in the request, just the compression that modern life demands of everything. He typed slowly, choosing each word with the care of someone packing a lifetime into a carry-on bag. Some things fit. Most things did not. He saved the file and closed the laptop and sat for a long moment in the particular silence of unfinished thoughts.",
+    "The concept of deep work refers to the ability to focus without distraction on cognitively demanding tasks. It is a skill that produces real value, advances your abilities, and is increasingly rare in a world optimized for interruption. Email, notifications, open-plan offices, and the constant pull of social media have made sustained concentration feel almost antisocial. Yet the people who protect time for deep work consistently outperform those who do not, regardless of raw intelligence or experience.",
+    "She had always believed that kindness was a strategy, not a sentiment. Not kindness as performance, the exaggerated warmth of someone who needs to be liked, but kindness as a quiet operating principle. The decision to assume good intent before assuming bad. The habit of leaving people better than you found them. The choice to be honest without being cruel. Over the years she had watched it work in ways that surprised even her, how a single generous act could break a logjam that no amount of pressure had moved.",
+    "The archive room smelled of paper and old decisions. Filing cabinets lined the walls in muted colors, each drawer labeled with years that felt both recent and impossibly distant. He pulled a folder at random and found a handwritten memo from a Thursday in October, detailing a problem that no longer existed in a format no one used anymore. Someone had cared enough to write it carefully, in ink, on paper, and now it was here, in a box, in a room, waiting for no one in particular. He put it back exactly where he found it."
+  ];
+
+  var sentence='',started=false,finished=false;
+  var startTime=null,timerIv=null;
+  var typed='',errors=0,totalTyped=0;
+  var record=null; /* {nick,wpm,displayName} */
+  var TIME_LIMIT=60;
+
+  /* Load record from Firestore */
+  function loadRecord(cb){
+    gcDb().collection('gc_config').doc('typing_race_record').get()
+      .then(function(snap){
+        record=snap.exists()?(snap.data()||null):null;
+        cb();
+      }).catch(function(){record=null;cb();});
+  }
+
+  function calcWPM(){
+    if(!startTime)return 0;
+    var mins=(Date.now()-startTime)/60000;
+    return mins>0?Math.round((totalTyped/5)/mins):0;
+  }
+  function calcAccuracy(){
+    if(totalTyped===0)return 100;
+    return Math.round(((totalTyped-errors)/totalTyped)*100);
+  }
+
+  function showLobby(){
+    C.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Loading record...</div>';
+    loadRecord(function(){renderLobby();});
+  }
+
+  function renderLobby(){
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:16px;width:100%;max-width:520px;';
+
+    /* Title */
+    var title=document.createElement('div');
+    title.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;';
+    title.innerHTML='<div style="font-size:18px;font-weight:700;color:var(--text)">⌨️ Typing Race</div>'
+      +'<div style="font-size:12px;color:var(--muted)">One mode. One crown. Beat the record to own it.</div>';
+    wrap.appendChild(title);
+
+    /* Champion card */
+    var champCard=document.createElement('div');
+    champCard.style.cssText='width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 20px;';
+    if(record&&record.nick){
+      var isYou=cu&&record.nick===cu.nickname.toLowerCase();
+      champCard.innerHTML='<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">👑 Current Champion</div>'
+        +'<div style="display:flex;align-items:center;gap:14px;">'
+        +'<div style="animation:tr-float 3s ease-in-out infinite">'+'<svg width="36" height="36" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" style="animation:tr-crown-pulse 2.5s ease-in-out infinite;flex-shrink:0">'
+    +'<defs>'
+    +'<linearGradient id="tr-cg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fde68a"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient>'
+    +'<linearGradient id="tr-dg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="50%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>'
+    +'</defs>'
+    +'<circle cx="48" cy="48" r="45" fill="none" stroke="#a78bfa" stroke-width="2.5" opacity=".7"/>'
+    +'<circle cx="48" cy="48" r="42" fill="#1e1b4b" opacity=".9"/>'
+    +'<path d="M22 24 L16 36 L21 36 L15 50 L26 34 L21 34Z" fill="#fbbf24" style="animation:tr-bolt 1.8s ease-in-out infinite"/>'
+    +'<path d="M74 24 L80 36 L75 36 L81 50 L70 34 L75 34Z" fill="#fbbf24" style="animation:tr-bolt2 1.8s ease-in-out .4s infinite"/>'
+    +'<g transform="translate(48,55)">'
+    +'<rect x="-22" y="6" width="44" height="8" rx="2" fill="url(#tr-cg)"/>'
+    +'<path d="M-22 14 L-22 0 L-10 10 L0 -14 L10 10 L22 0 L22 14Z" fill="url(#tr-cg)"/>'
+    +'<circle cx="-12" cy="10" r="3" fill="#ef4444" opacity=".9"/>'
+    +'<circle cx="0" cy="11" r="3.5" fill="#a78bfa" opacity=".9"/>'
+    +'<circle cx="12" cy="10" r="3" fill="#ef4444" opacity=".9"/>'
+    +'</g>'
+    +'<g transform="translate(31,26)" style="animation:tr-dia 3s ease-in-out infinite"><polygon points="0,-7 5,0 0,7 -5,0" fill="url(#tr-dg)"/></g>'
+    +'<g transform="translate(48,18)" style="animation:tr-dia2 2.8s ease-in-out .3s infinite"><polygon points="0,-8 6,0 0,8 -6,0" fill="url(#tr-dg)"/></g>'
+    +'<g transform="translate(65,26)" style="animation:tr-dia 3.2s ease-in-out .6s infinite"><polygon points="0,-7 5,0 0,7 -5,0" fill="url(#tr-dg)"/></g>'
+    +'</svg>'+'</div>'
+        +'<div style="flex:1">'
+        +'<div style="font-size:15px;font-weight:600;color:var(--text)">'+(record.displayName||record.nick)+'</div>'
+        +'<div style="font-size:11px;color:#a78bfa;font-weight:500">Speedtype Speedster</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+        +'<div style="font-size:28px;font-weight:800;color:#a78bfa;font-family:monospace">'+record.wpm+'</div>'
+        +'<div style="font-size:10px;color:var(--muted)">WPM</div>'
+        +'</div></div>'
+        +'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);text-align:center">'
+        +(isYou?'You hold the crown — defend it!':'Beat '+record.wpm+' WPM to claim the crown')
+        +'</div>';
+    } else {
+      champCard.innerHTML='<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">👑 Current Champion</div>'
+        +'<div style="font-size:13px;color:var(--muted);text-align:center;padding:8px 0">No record yet — be the first!</div>';
+    }
+    wrap.appendChild(champCard);
+
+    /* Start button */
+    var startBtn=document.createElement('button');
+    startBtn.className='btn btn-primary';
+    startBtn.style.cssText='padding:10px 32px;font-size:14px;font-weight:600;';
+    startBtn.textContent='Start typing';
+    startBtn.onclick=function(){startGame();};
+    wrap.appendChild(startBtn);
+
+    var hint=document.createElement('div');
+    hint.style.cssText='font-size:10px;color:var(--muted);text-align:center;';
+    hint.textContent='60 seconds · random paragraph · no minimum WPM — just beat the record';
+    wrap.appendChild(hint);
+
+    C.appendChild(wrap);
+  }
+
+  function startGame(){
+    /* Pick a paragraph, avoiding the last one played */
+    var pool=PARAGRAPHS.filter(function(p){return p!==sentence;});
+    sentence=pool[Math.floor(Math.random()*pool.length)];
+    typed='';errors=0;totalTyped=0;started=false;finished=false;startTime=null;
+    renderGame();
+  }
+
+  function renderGame(){
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-direction:column;gap:10px;width:100%;max-width:560px;';
+
+    /* Header */
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;';
+    var targetTxt=record&&record.wpm
+      ?('<span style="color:var(--muted);font-size:12px">Beat 👑 '+(record.displayName||record.nick)+'\'s </span>'
+        +'<span style="color:#a78bfa;font-weight:700;font-family:monospace;font-size:14px"> '+record.wpm+' WPM</span>')
+      :'<span style="font-size:12px;color:var(--muted)">No record yet — set the first one!</span>';
+    hdr.innerHTML='<div>'+targetTxt+'</div>'
+      +'<div id="tr-timer" style="font-size:14px;font-weight:700;font-family:monospace;color:var(--text)">'+TIME_LIMIT+'s</div>';
+    wrap.appendChild(hdr);
+
+    /* Stats */
+    var stats=document.createElement('div');
+    stats.id='tr-stats';
+    stats.style.cssText='display:flex;gap:16px;font-size:11px;color:var(--muted);';
+    stats.innerHTML='WPM: <strong id="tr-wpm" style="color:var(--text);font-family:monospace">—</strong>'
+      +' &nbsp; Accuracy: <strong id="tr-acc" style="color:#4caf50;font-family:monospace">100%</strong>'
+      +' &nbsp; Errors: <strong id="tr-err" style="color:#ef5350;font-family:monospace">0</strong>';
+    wrap.appendChild(stats);
+
+    /* Sentence display */
+    var sentWrap=document.createElement('div');
+    sentWrap.id='tr-sentence';
+    sentWrap.style.cssText='background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;'
+      +'font-size:13px;font-family:monospace;line-height:2;letter-spacing:.3px;min-height:80px;word-break:break-word;';
+    wrap.appendChild(sentWrap);
+
+    /* Input */
+    var inp=document.createElement('textarea');
+    inp.id='tr-input';
+    inp.placeholder='Start typing here…';
+    inp.rows=3;
+    inp.autocomplete='off';inp.autocorrect='off';inp.autocapitalize='off';inp.spellcheck=false;
+    inp.style.cssText='width:100%;padding:10px 14px;font-size:13px;font-family:monospace;resize:none;'
+      +'border:2px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s;line-height:1.7;';
+    inp.onfocus=function(){inp.style.borderColor='#a78bfa';};
+    inp.onblur=function(){inp.style.borderColor='var(--border)';};
+    wrap.appendChild(inp);
+
+    var back=document.createElement('button');
+    back.style.cssText='font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;align-self:flex-start;';
+    back.textContent='← Back';
+    back.onclick=function(){if(timerIv)clearInterval(timerIv);showLobby();};
+    wrap.appendChild(back);
+
+    C.appendChild(wrap);
+    updateSentenceDisplay();
+
+    inp.oninput=function(){
+      if(finished)return;
+      var val=inp.value;
+      if(!started&&val.length>0){
+        started=true;startTime=Date.now();
+        timerIv=setInterval(function(){
+          var elapsed=Math.floor((Date.now()-startTime)/1000);
+          var rem=TIME_LIMIT-elapsed;
+          var tel=document.getElementById('tr-timer');
+          if(tel){tel.textContent=Math.max(0,rem)+'s';tel.style.color=rem<=10?'#ef5350':rem<=20?'#ff9800':'var(--text)';}
+          if(rem<=0){timeUp();}
+          updateStats();
+        },200);
+      }
+      var newErr=0;
+      for(var k=0;k<val.length;k++){if(val[k]!==sentence[k])newErr++;}
+      errors=newErr;totalTyped=Math.max(totalTyped,val.length);
+      typed=val;
+      updateSentenceDisplay();
+      if(val===sentence)gameComplete();
+    };
+    setTimeout(function(){var el=document.getElementById('tr-input');if(el)el.focus();},100);
+  }
+
+  function updateSentenceDisplay(){
+    var el=document.getElementById('tr-sentence');if(!el)return;
+    var html='';
+    for(var k=0;k<sentence.length;k++){
+      var ch=sentence[k]==='<'?'&lt;':sentence[k]==='>'?'&gt;':sentence[k]==='&'?'&amp;':sentence[k];
+      if(k<typed.length){
+        html+=typed[k]===sentence[k]
+          ?'<span style="color:#4caf50">'+ch+'</span>'
+          :'<span style="color:#ef5350;text-decoration:underline">'+ch+'</span>';
+      } else if(k===typed.length){
+        html+='<span style="background:#a78bfa33;border-bottom:2px solid #a78bfa;border-radius:2px">'+ch+'</span>';
+      } else {
+        html+='<span style="color:var(--muted)">'+ch+'</span>';
+      }
+    }
+    el.innerHTML=html;
+  }
+
+  function updateStats(){
+    var wpm=calcWPM(),acc=calcAccuracy();
+    var w=document.getElementById('tr-wpm');if(w)w.textContent=wpm||'—';
+    var a=document.getElementById('tr-acc');if(a){a.textContent=acc+'%';a.style.color=acc>=95?'#4caf50':acc>=80?'#ff9800':'#ef5350';}
+    var e=document.getElementById('tr-err');if(e)e.textContent=errors;
+  }
+
+  function timeUp(){if(finished)return;finished=true;if(timerIv)clearInterval(timerIv);showResult(false);}
+  function gameComplete(){if(finished)return;finished=true;if(timerIv)clearInterval(timerIv);showResult(true);}
+
+  function showResult(completed){
+    var wpm=calcWPM(),acc=calcAccuracy();
+    var isNewRecord=wpm>0&&(!record||!record.wpm||wpm>record.wpm);
+    gcSaveScore('typingrace',wpm,completed);
+
+    /* Save record and transfer achievement if new record */
+    if(isNewRecord&&cu){
+      var oldNick=record?record.nick:null;
+      var newRecord={nick:cu.nickname.toLowerCase(),displayName:cu.nickname,wpm:wpm,date:Date.now()};
+      gcDb().collection('gc_config').doc('typing_race_record').set(newRecord).catch(function(){});
+      /* Grant achievement to new holder */
+      if(typeof achGrant==='function')achGrant(cu.nickname,'speedtype_speedster',{delay:800});
+      /* Revoke from old holder + notify them */
+      if(oldNick&&oldNick!==cu.nickname.toLowerCase()&&typeof achRevoke==='function'){
+        achRevoke(oldNick,'speedtype_speedster');
+        /* Push portal notification to old holder */
+        try{
+          gcDb().collection('portal_notifications').add({
+            targetNick:oldNick,
+            type:'crown_stolen',
+            msg:'👑 '+cu.nickname+' just beat your Typing Race record ('+wpm+' WPM) and took the Speedtype Speedster crown!',
+            from:cu.nickname,
+            timestamp:Date.now(),
+            read:false
+          });
+        }catch(e){}
+        /* Also remove from their highlights if pinned */
+        gcDb().collection('achievements').doc(oldNick).get().then(function(oldSnap){
+          if(!oldSnap.exists())return;
+          var oldData=oldSnap.data()||{};
+          var highlights=oldData._highlights||[];
+          var newHighlights=highlights.filter(function(h){return h!=='speedtype_speedster';});
+          if(newHighlights.length!==highlights.length){
+            gcDb().collection('achievements').doc(oldNick).update({_highlights:newHighlights}).catch(function(){});
+          }
+        }).catch(function(){});
+      }
+      record=newRecord;
+    }
+
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;max-width:520px;text-align:center;';
+
+    if(isNewRecord){
+      /* Crown transfer screen */
+      var crownWrap=document.createElement('div');
+      crownWrap.style.cssText='animation:tr-float 3s ease-in-out infinite;';
+      crownWrap.innerHTML='<svg width="72" height="72" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" style="animation:tr-crown-pulse 2.5s ease-in-out infinite;flex-shrink:0">'
+    +'<defs>'
+    +'<linearGradient id="tr-cg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#fde68a"/><stop offset="50%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient>'
+    +'<linearGradient id="tr-dg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="50%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>'
+    +'</defs>'
+    +'<circle cx="48" cy="48" r="45" fill="none" stroke="#a78bfa" stroke-width="2.5" opacity=".7"/>'
+    +'<circle cx="48" cy="48" r="42" fill="#1e1b4b" opacity=".9"/>'
+    +'<path d="M22 24 L16 36 L21 36 L15 50 L26 34 L21 34Z" fill="#fbbf24" style="animation:tr-bolt 1.8s ease-in-out infinite"/>'
+    +'<path d="M74 24 L80 36 L75 36 L81 50 L70 34 L75 34Z" fill="#fbbf24" style="animation:tr-bolt2 1.8s ease-in-out .4s infinite"/>'
+    +'<g transform="translate(48,55)">'
+    +'<rect x="-22" y="6" width="44" height="8" rx="2" fill="url(#tr-cg)"/>'
+    +'<path d="M-22 14 L-22 0 L-10 10 L0 -14 L10 10 L22 0 L22 14Z" fill="url(#tr-cg)"/>'
+    +'<circle cx="-12" cy="10" r="3" fill="#ef4444" opacity=".9"/>'
+    +'<circle cx="0" cy="11" r="3.5" fill="#a78bfa" opacity=".9"/>'
+    +'<circle cx="12" cy="10" r="3" fill="#ef4444" opacity=".9"/>'
+    +'</g>'
+    +'<g transform="translate(31,26)" style="animation:tr-dia 3s ease-in-out infinite"><polygon points="0,-7 5,0 0,7 -5,0" fill="url(#tr-dg)"/></g>'
+    +'<g transform="translate(48,18)" style="animation:tr-dia2 2.8s ease-in-out .3s infinite"><polygon points="0,-8 6,0 0,8 -6,0" fill="url(#tr-dg)"/></g>'
+    +'<g transform="translate(65,26)" style="animation:tr-dia 3.2s ease-in-out .6s infinite"><polygon points="0,-7 5,0 0,7 -5,0" fill="url(#tr-dg)"/></g>'
+    +'</svg>';
+      wrap.appendChild(crownWrap);
+      wrap.innerHTML+='<div style="font-size:18px;font-weight:700;color:var(--text)">New champion! 👑</div>'
+        +'<div style="font-size:13px;color:var(--muted)">'+(record&&record.nick!==cu.nickname.toLowerCase()?'You just took the crown from '+(record.displayName||record.nick):'You set the first record!')+'</div>';
+    } else {
+      var emoji=completed?(wpm>=(record?record.wpm:999)?'🏆':wpm>=60?'⚡':wpm>=40?'✅':'💪'):'⏰';
+      wrap.innerHTML='<div style="font-size:40px">'+emoji+'</div>'
+        +'<div style="font-size:16px;font-weight:600;color:var(--text)">'+(completed?'Finished!':'Time\'s up!')+'</div>';
+    }
+
+    /* Stats */
+    var statsDiv=document.createElement('div');
+    statsDiv.style.cssText='display:flex;gap:24px;justify-content:center;';
+    statsDiv.innerHTML='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#a78bfa;font-family:monospace">'+wpm+'</div><div style="font-size:11px;color:var(--muted)">WPM</div></div>'
+      +'<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:'+(acc>=95?'#4caf50':acc>=80?'#ff9800':'#ef5350')+';font-family:monospace">'+acc+'%</div><div style="font-size:11px;color:var(--muted)">Accuracy</div></div>'
+      +'<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#f59e0b;font-family:monospace">'+errors+'</div><div style="font-size:11px;color:var(--muted)">Errors</div></div>';
+    wrap.appendChild(statsDiv);
+
+    if(!isNewRecord&&record&&record.wpm){
+      var gap=record.wpm-wpm;
+      var gapDiv=document.createElement('div');
+      gapDiv.style.cssText='font-size:12px;color:var(--muted);background:var(--bg2);border-radius:8px;padding:8px 16px;';
+      gapDiv.textContent=gap>0?'You need '+(gap+1)+' more WPM to beat '+(record.displayName||record.nick)+'\'s record of '+record.wpm:'You matched the record — type faster to beat it!';
+      wrap.appendChild(gapDiv);
+    }
+
+    var btnRow=document.createElement('div');
+    btnRow.style.cssText='display:flex;gap:10px;';
+    var retry=document.createElement('button');
+    retry.className='btn btn-primary';retry.textContent='Try again';
+    retry.onclick=function(){startGame();};
+    var lobby=document.createElement('button');
+    lobby.className='btn btn-outline';lobby.textContent='Lobby';
+    lobby.onclick=showLobby;
+    btnRow.appendChild(retry);btnRow.appendChild(lobby);
+    wrap.appendChild(btnRow);
+    C.appendChild(wrap);
+    gcSetScore(wpm+' WPM · '+acc+'% acc');
+  }
+
+  showLobby();
+}
+
+
 function gcLaunchGame(id,title){
   var access=gcCheckAccess();
   if(!access.ok){gcToast('🔒 '+access.reason);return;}
@@ -15933,6 +16336,7 @@ function gcLaunchGame(id,title){
       if(id==='dealornodeal')gcGameDealOrNoDeal(body);
       if(id==='millionaire')gcGameMillionaire(body);
       if(id==='wordsearch')gcGameWordSearch(body);
+      if(id==='typingrace')gcGameTypingRace(body);
       if(id==='uno')gcGameUNO(body);
       if(id==='tongits')gcGameTongIts(body);
     },60);
@@ -15972,6 +16376,7 @@ function gcRenderGrid(_retries){
     {id:'dealornodeal',e:'💼',n:'Deal or No Deal',d:'Beat the banker · 5 credits'},
     {id:'millionaire',e:'💰',n:'Who Wants to Be a Millionaire',d:'15 questions to the top · 10 credits'},
     {id:'wordsearch',e:'🔍',n:'Word Search',d:'Find all hidden words · 1 credit'},
+    {id:'typingrace',e:'⌨️',n:'Typing Race',d:'Type fast, score high · 1 credit'},
   ];
   var multi=[
     {id:'uno',e:'🃏',n:'UNO',d:'2–4 players · mix humans & AI · 1 credit'},
