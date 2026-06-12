@@ -4041,7 +4041,7 @@ function renderMyDay(){
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">'
     +'<div style="padding:14px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;"><div id="md-widgets-carousel" style="flex:1;display:flex;flex-direction:column;"></div></div>'
     +'<div style="padding:14px 16px;display:flex;flex-direction:column;min-height:320px;"><div id="md-ann-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:600;color:var(--text)">📢 Announcements</span></div>'
-    +(isManager?'<button class="btn btn-sm" onclick="openArticleModal(\'ann\')">+ Post</button>':'')    +'</div><div class="ann-list" id="ann-list" style="overflow-y:auto;max-height:280px;"></div></div>'
+    +(isManager?'<button class="btn btn-sm" onclick="openAddArticleModal()">+ Post</button>':'')    +'</div><div class="ann-list" id="ann-list" style="overflow-y:auto;max-height:280px;"></div></div>'
     +'</div>'
     +'</div>'
 
