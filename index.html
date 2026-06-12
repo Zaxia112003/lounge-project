@@ -1317,7 +1317,7 @@ window.dispatchEvent(new Event('firebase-ready'));
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
 
-      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none!important;font-size:18px;align-items:center;justify-content:center;">🐸</div>
+      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none;font-size:18px;align-items:center;justify-content:center;">🐸</div>
 
       <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
         <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
@@ -2288,7 +2288,7 @@ function buildSidebar(){
 
   } else {
     var kobyRef=G('sb-koby-btn');
-    if(kobyRef)kobyRef.style.display='none'; /* game shortcuts now in widget carousel */
+    if(kobyRef)kobyRef.style.display='flex'; /* Koby AI chat for all members */
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='';
 
   }
@@ -4045,16 +4045,7 @@ function renderMyDay(){
     +'</div>'
     +'</div>'
 
-    /* legacy ann-board removed — ann-list now lives in split panel */
-    +'<div style="display:none" class="sect ann-board">'
-    +'<div class="sect-head">'
-    +'<div style="display:flex;align-items:center;gap:8px"><span class="sect-title">&#128226; Announcements</span>'
-    +'</div>'
-    +(isManager?'<button class="btn btn-outline btn-sm" onclick="openAddArticleModal(\'ann\')" style="font-size:11px">+ Post</button>':'')
-    +'</div>'
-    +'<div class="ann-list" id="ann-list"></div>'
-    +'</div>'
-
+        /* announcements rendered in split panel */
     /* Manager: KPI quick view */
     +(isManager?'<div id="mgr-kpi-card" class="sect" style="padding:0;margin-bottom:16px"></div>':'')
 
@@ -4543,6 +4534,8 @@ function gcOpenGameCornerPanel(){
       return;
     }
     renderGamesTab();
+    /* Ensure games pane is visible */
+    setTimeout(function(){if(typeof gcSwitchTab==='function')gcSwitchTab('games');},200);
   }
   _tryRender(0);
 }
