@@ -1317,7 +1317,7 @@ window.dispatchEvent(new Event('firebase-ready'));
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
 
-      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none;font-size:18px;align-items:center;justify-content:center;">🐸</div>
+      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none!important;font-size:18px;align-items:center;justify-content:center;">🐸</div>
 
       <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
         <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
@@ -2288,7 +2288,7 @@ function buildSidebar(){
 
   } else {
     var kobyRef=G('sb-koby-btn');
-    if(kobyRef)kobyRef.style.display='flex';
+    if(kobyRef)kobyRef.style.display='none'; /* game shortcuts now in widget carousel */
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='';
 
   }
@@ -4036,8 +4036,17 @@ function renderMyDay(){
     +'</div>'
     +'</div></div>'
 
-    /* Announcements — always visible, manager gets + Post button */
-    +'<div class="sect ann-board">'
+    /* ── Split panel: widgets carousel LEFT | announcements RIGHT ── */
+    +'<div class="sect" style="margin:0 0 16px;padding:0;overflow:hidden;">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">'
+    +'<div style="padding:14px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;"><div id="md-widgets-carousel" style="flex:1;display:flex;flex-direction:column;"></div></div>'
+    +'<div style="padding:14px 16px;display:flex;flex-direction:column;min-height:320px;"><div id="md-ann-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:13px;font-weight:600;color:var(--text)">📢 Announcements</span></div>'
+    +(isManager?'<button class="btn btn-sm" onclick="openArticleModal(\'ann\')">+ Post</button>':'')    +'</div><div class="ann-list" id="ann-list" style="overflow-y:auto;max-height:280px;"></div></div>'
+    +'</div>'
+    +'</div>'
+
+    /* legacy ann-board removed — ann-list now lives in split panel */
+    +'<div style="display:none" class="sect ann-board">'
     +'<div class="sect-head">'
     +'<div style="display:flex;align-items:center;gap:8px"><span class="sect-title">&#128226; Announcements</span>'
     +'</div>'
@@ -4083,6 +4092,8 @@ function renderMyDay(){
   var _prevAnnCount=mdAnnouncements.length;
   renderAnnouncements();
   if(mdAnnouncements.length>0&&_prevAnnCount===0){_playAnnouncementSound();}
+  /* Init widgets carousel after DOM is ready */
+  setTimeout(function(){initWidgetsCarousel();},100);
   if(isManager){
     renderMgrKpiCard();
     setTimeout(function(){renderMgrMoodOverview();renderMgrUploadTrend();renderMgrErrorTrend();},50);
@@ -6073,8 +6084,12 @@ function achRevoke(nick,achId){
   var nickLc=nick.toLowerCase();
   gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
     if(!snap.exists())return;
+    var data=snap.data()||{};
     var update={};
     update[achId]=firebase.firestore.FieldValue.delete();
+    /* Also remove from highlights if pinned */
+    var highlights=(data._highlights||[]).filter(function(h){return h!==achId;});
+    update._highlights=highlights;
     gcDb().collection('achievements').doc(nickLc).update(update).catch(function(){});
   }).catch(function(){});
 }
@@ -6114,7 +6129,7 @@ function achMakeIcon(ach,size){
     var d=document.createElement('div');
     d.className='ach-icon-wrap';
     d.style.cssText='width:'+size+'px;height:'+size+'px;border-radius:'+(size*0.22)+'px;'
-      +'background:'+pr.bg+';border:1.5px solid '+pr.border+';'
+      +'background:'+pr.bg+';border:2px solid '+pr.border+';'
       +'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
       +'position:relative;overflow:hidden;animation:ach-glow-platinum 3s ease-in-out infinite;';
     /* Shimmer */
@@ -6241,6 +6256,30 @@ function achLoginCheck(){
     /* Lexicon — word search completions tracked in localStorage */
     var wsTotal=parseInt(localStorage.getItem('lounge_ws_complete_'+nickLc)||'0');
     if(wsTotal>=35&&!adata.lexicon){achGrant(nick,'lexicon',{delay:2200});}
+    /* Speedtype Speedster — 1-week expiry: check if current holder has held it > 7 days */
+    gcDb().collection('gc_config').doc('typing_race_record').get().then(function(rSnap){
+      if(!rSnap.exists())return;
+      var rData=rSnap.data()||{};
+      var oneWeek=7*24*60*60*1000;
+      var expired=rData.date&&(Date.now()-rData.date)>oneWeek;
+      if(expired){
+        /* Reset record — revoke achievement from current holder */
+        var holder=rData.nick;
+        gcDb().collection('gc_config').doc('typing_race_record').delete().catch(function(){});
+        if(holder&&typeof achRevoke==='function'){
+          achRevoke(holder,'speedtype_speedster');
+          gcDb().collection('portal_notifications').add({
+            targetNick:holder,type:'crown_expired',
+            msg:'👑 Your Speedtype Speedster crown has expired after 1 week. The race is open again!',
+            timestamp:Date.now(),read:false
+          }).catch(function(){});
+        }
+      }
+      /* Fix: if current logged-in user has the trophy but is NOT the record holder, revoke it */
+      if(adata.speedtype_speedster&&rData.nick&&rData.nick!==nickLc){
+        achRevoke(nick,'speedtype_speedster');
+      }
+    }).catch(function(){});
 
     /* 7. Credit baron — accumulated game credits */
     gcDb().collection('player_credits').doc(nickLc).get().then(function(cSnap){
@@ -6469,7 +6508,7 @@ function gcMakeSnowRunSidebarSvg(){
   wrap.style.cssText='position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;opacity:.72;';
 
   var svg=document.createElementNS(ns,'svg');
-  svg.setAttribute('viewBox','0 0 52 100%');
+  svg.setAttribute('viewBox','0 0 52 800');
   svg.style.cssText='position:absolute;inset:0;width:100%;height:100%;';
 
   /* Use HTML canvas approach instead — pure CSS + divs for sidebar */
@@ -10456,7 +10495,6 @@ function openAI(){
   setTimeout(function(){
     if(!aiOpen)return;
     var m=G('ai-messages');if(!m)return;
-    m.innerHTML+=aiKobyBubble('On a break? Type <strong>game on</strong> to open the Game Corner 🎮 — type <strong>game off</strong> to come back.');
     m.scrollTop=m.scrollHeight;
   },800);
   setTimeout(function(){G('ai-input').focus();},300);
@@ -10526,19 +10564,6 @@ async function sendAIMessage(){
   }
 
   /* ── SHORTCUT: "game off" → return to The Lounge ── */
-  if(/^game\s+off$/i.test(text.trim())){
-    input.value='';input.style.height='auto';
-    var msgs=G('ai-messages');
-    document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
-    var lounge=G('the-lounge-panel');if(lounge)lounge.classList.add('active');
-    if(typeof renderLounge==='function')renderLounge();
-    closeAI();
-    if(msgs){
-      msgs.innerHTML+=aiKobyBubble('🏠 Back to The Lounge!');
-      msgs.scrollTop=msgs.scrollHeight;
-    }
-    return;
-  }
 
   /* KC/Quiz topic guard — detect copy-pasted quiz questions */
   var hasOptions=/\b[A-D]\.\s/.test(text);
@@ -14849,6 +14874,9 @@ function gcDb(){
 var gcCredits=0,gcCreditsLoaded=false,gcCurrentGame=null,gcMusicOn=false,gcMusicVol=0.22;
 var gcAudioCtx=null,gcMusicNodes=[],gcMusicTimer=null;
 var _gcAllCredits={},_gcShifts={},_gcShiftsLoaded=false,_gcNotifs=[];
+/* ── Widget API keys ── */
+var WIDGET_KEYS={weather:'5222dd774faba440a3de6558a79b806f',news:'45a555116c88c9ef53afaac4acb73d6d'};
+
 var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,chess:1,uno:1,tongits:3,fps:5,wordsearch:1,typingrace:1};
 
 /* ── Sound ── */
@@ -16326,6 +16354,365 @@ function gcGameTypingRace(C){
   showLobby();
 }
 
+
+
+/* ══════════════════════════════════════════════════
+   WIDGETS — Carousel (Notepad / Weather / Clock / News)
+══════════════════════════════════════════════════ */
+function initWidgetsCarousel(){
+  var el=document.getElementById('md-widgets-carousel');
+  if(!el)return;
+  el.innerHTML='';
+
+  var slides=['weather','notepad','games'];
+  var labels={weather:'🌤 Weather',notepad:'📝 My notepad',games:'🎮 Game shortcuts'};
+  var current=0;
+
+  /* Header row: title + dots + arrows */
+  var hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;';
+
+  var title=document.createElement('div');
+  title.id='widget-carousel-title';
+  title.style.cssText='font-size:13px;font-weight:600;color:var(--text);';
+  title.textContent=labels[slides[0]];
+
+  var nav=document.createElement('div');
+  nav.style.cssText='display:flex;align-items:center;gap:8px;';
+
+  var dots=document.createElement('div');
+  dots.id='widget-dots';
+  dots.style.cssText='display:flex;gap:4px;align-items:center;';
+  slides.forEach(function(_,i){
+    var dot=document.createElement('div');
+    dot.className='wd-dot';
+    dot.dataset.idx=i;
+    dot.style.cssText='width:'+(i===0?'20px':'6px')+';height:6px;border-radius:3px;background:'+(i===0?'var(--accent)':'var(--bg2, #e2e5f0)')+';cursor:pointer;transition:all .25s ease;';
+    dot.onclick=function(){goSlide(parseInt(dot.dataset.idx));};
+    dots.appendChild(dot);
+  });
+
+  var btnL=document.createElement('button');
+  btnL.innerHTML='&#8592;';
+  btnL.style.cssText='width:26px;height:26px;border-radius:50%;border:0.5px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .15s;';
+  btnL.onclick=function(){goSlide((current-1+slides.length)%slides.length);};
+
+  var btnR=document.createElement('button');
+  btnR.innerHTML='&#8594;';
+  btnR.style.cssText='width:26px;height:26px;border-radius:50%;border:0.5px solid var(--border);background:var(--bg2);color:var(--text);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .15s;';
+  btnR.onclick=function(){goSlide((current+1)%slides.length);};
+
+  nav.appendChild(dots);nav.appendChild(btnL);nav.appendChild(btnR);
+  hdr.appendChild(title);hdr.appendChild(nav);
+  el.appendChild(hdr);
+
+  /* Slide container */
+  var track=document.createElement('div');
+  track.id='widget-track';
+  track.style.cssText='position:relative;overflow:hidden;flex:1;min-height:200px;';
+  slides.forEach(function(id,i){
+    var pane=document.createElement('div');
+    pane.id='widget-pane-'+id;
+    pane.style.cssText='display:'+(i===0?'block':'none')+';';
+    track.appendChild(pane);
+  });
+  el.appendChild(track);
+
+  function updateDots(){
+    var allDots=document.querySelectorAll('.wd-dot');
+    allDots.forEach(function(d,i){
+      d.style.width=i===current?'16px':'6px';
+      d.style.background=i===current?'var(--accent)':'var(--border)';
+    });
+    var t=document.getElementById('widget-carousel-title');
+    if(t)t.textContent=labels[slides[current]];
+  }
+
+  function goSlide(idx){
+    var oldPane=document.getElementById('widget-pane-'+slides[current]);
+    if(oldPane)oldPane.style.display='none';
+    current=idx;
+    var newPane=document.getElementById('widget-pane-'+slides[current]);
+    if(newPane)newPane.style.display='block';
+    updateDots();
+    /* Lazy-init the slide on first view */
+    var paneEl=document.getElementById('widget-pane-'+slides[current]);
+    if(paneEl&&!paneEl.dataset.inited){
+      paneEl.dataset.inited='1';
+      if(slides[current]==='notepad')renderWidgetNotepad(paneEl);
+      if(slides[current]==='weather')renderWidgetWeather(paneEl);
+      if(slides[current]==='games')renderWidgetGames(paneEl);
+    }
+  }
+
+  /* Init first pane */
+  var firstPane=document.getElementById('widget-pane-weather');
+  if(firstPane){firstPane.dataset.inited='1';renderWidgetWeather(firstPane);}
+}
+
+/* ── NOTEPAD ── */
+function renderWidgetNotepad(el){
+  if(!el)return;
+  if(!cu||!gcDb()){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">Sign in to use notepad</div>';return;}
+  var nick=cu.nickname.toLowerCase();
+  var storageKey='lounge_notepad_'+nick;
+  var saveTimer=null;
+  var status=document.createElement('span');
+  status.id='notepad-status';
+  status.style.cssText='font-size:10px;color:var(--muted);';
+  status.textContent='Loading…';
+  el.appendChild(status);
+  var ta=document.createElement('textarea');
+  ta.rows=8;ta.placeholder='Jot something down…';
+  ta.style.cssText='width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);color:var(--text);resize:none;line-height:1.6;outline:none;font-family:inherit;margin-top:8px;display:block;transition:border-color .15s;';ta.onfocus=function(){ta.style.borderColor='var(--accent)'};ta.onblur=function(){ta.style.borderColor='var(--border)'};
+  el.appendChild(ta);
+  var clearBtn=document.createElement('button');
+  clearBtn.style.cssText='font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border);background:none;color:var(--muted);cursor:pointer;margin-top:6px;';
+  clearBtn.textContent='Clear';
+  clearBtn.onclick=function(){ta.value='';saveNote('');};
+  el.appendChild(clearBtn);
+
+  function saveNote(val){
+    localStorage.setItem(storageKey,val);
+    gcDb().collection('user_notes').doc(nick).set({note:val,updatedAt:Date.now()},{merge:true}).catch(function(){});
+    var d=new Date();status.textContent='Saved '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+  }
+  ta.oninput=function(){
+    status.textContent='Saving…';
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(function(){saveNote(ta.value);},1200);
+  };
+  var cached=localStorage.getItem(storageKey)||'';
+  ta.value=cached;status.textContent=cached?'Loaded':'Ready';
+  gcDb().collection('user_notes').doc(nick).get().then(function(snap){
+    if(snap.exists()&&snap.data().note!==undefined){
+      ta.value=snap.data().note;localStorage.setItem(storageKey,ta.value);status.textContent='Synced';
+    } else {status.textContent='Ready';}
+  }).catch(function(){status.textContent='Ready';});
+}
+
+/* ── WEATHER ── */
+var _wxCache=null,_wxCacheTime=0;
+var WX_ICONS={'01d':'☀️','01n':'🌙','02d':'🌤','02n':'🌤','03d':'☁️','03n':'☁️','04d':'☁️','04n':'☁️','09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧','11d':'⛈','11n':'⛈','13d':'❄️','13n':'❄️','50d':'🌫','50n':'🌫'};
+function renderWidgetWeather(el){
+  el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Loading weather…</div>';
+  if(_wxCache&&(Date.now()-_wxCacheTime)<600000){_renderWx(el,_wxCache);return;}
+  var key=WIDGET_KEYS.weather;
+  fetch('https://api.openweathermap.org/data/2.5/weather?q=Quezon+City,PH&appid='+key+'&units=metric')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.cod&&String(d.cod)!=='200'){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">Weather unavailable — API key may still be activating (up to 2hrs for new keys)</div>';return;}
+      _wxCache=d;_wxCacheTime=Date.now();_renderWx(el,d);
+      fetch('https://api.openweathermap.org/data/2.5/forecast?q=Quezon+City,PH&appid='+key+'&units=metric&cnt=4')
+        .then(function(r2){return r2.json();}).then(function(f){_renderWxForecast(f);}).catch(function(){});
+    }).catch(function(){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">Weather unavailable</div>';});
+}
+function _renderWx(el,d){
+  var icon=WX_ICONS[d.weather[0].icon]||'🌡';
+  var temp=Math.round(d.main.temp),feels=Math.round(d.main.feels_like);
+  var desc=d.weather[0].description.replace(/^\w/,function(s){return s.toUpperCase();});
+  el.innerHTML='<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">'
+    +'<div style="font-size:44px;line-height:1">'+icon+'</div>'
+    +'<div><div style="font-size:30px;font-weight:600;color:var(--text);line-height:1">'+temp+'°C</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+desc+'</div>'
+    +'<div style="font-size:10px;color:var(--muted)">Quezon City, PH</div></div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;border-top:0.5px solid var(--border);padding-top:8px;margin-bottom:8px">'
+    +'<div style="text-align:center"><div style="font-size:10px;color:var(--muted)">Humidity</div><div style="font-size:13px;font-weight:600;color:var(--text)">'+d.main.humidity+'%</div></div>'
+    +'<div style="text-align:center;border-left:0.5px solid var(--border)"><div style="font-size:10px;color:var(--muted)">Wind</div><div style="font-size:13px;font-weight:600;color:var(--text)">'+Math.round(d.wind.speed*3.6)+' km/h</div></div>'
+    +'<div style="text-align:center;border-left:0.5px solid var(--border)"><div style="font-size:10px;color:var(--muted)">Feels</div><div style="font-size:13px;font-weight:600;color:var(--text)">'+feels+'°C</div></div>'
+    +'</div>'
+    +'<div id="wx-forecast" style="display:flex;gap:6px;border-top:0.5px solid var(--border);padding-top:8px"></div>'
+    +'<div style="text-align:right;margin-top:8px"><button onclick="renderWidgetWeather(this.closest(\'[id^=widget-pane]\'))" style="font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border);background:none;color:var(--muted);cursor:pointer">↻ Refresh</button></div>';
+}
+function _renderWxForecast(f){
+  var el=document.getElementById('wx-forecast');if(!el||!f.list)return;
+  var days={};
+  f.list.forEach(function(item){
+    var day=new Date(item.dt*1000).toLocaleDateString('en-AU',{weekday:'short'});
+    if(!days[day])days[day]={icon:WX_ICONS[item.weather[0].icon]||'🌡',temps:[],day:day};
+    days[day].temps.push(Math.round(item.main.temp));
+  });
+  el.innerHTML='';
+  Object.values(days).slice(0,3).forEach(function(dy){
+    var avg=Math.round(dy.temps.reduce(function(a,b){return a+b;},0)/dy.temps.length);
+    el.innerHTML+='<div style="flex:1;text-align:center;font-size:10px;color:var(--muted)">'
+      +'<div>'+dy.icon+'</div><div>'+dy.day+'</div><div style="font-weight:600;color:var(--text)">'+avg+'°</div></div>';
+  });
+}
+
+/* ── WORLD CLOCK ── */
+var ALL_CLOCK_CITIES=[
+  {name:'Tokyo',tz:'Asia/Tokyo',flag:'🇯🇵'},{name:'London',tz:'Europe/London',flag:'🇬🇧'},
+  {name:'New York',tz:'America/New_York',flag:'🇺🇸'},{name:'Winnipeg',tz:'America/Winnipeg',flag:'🇨🇦'},
+  {name:'Dubai',tz:'Asia/Dubai',flag:'🇦🇪'},{name:'Singapore',tz:'Asia/Singapore',flag:'🇸🇬'},
+  {name:'Paris',tz:'Europe/Paris',flag:'🇫🇷'},{name:'Los Angeles',tz:'America/Los_Angeles',flag:'🇺🇸'},
+  {name:'Mumbai',tz:'Asia/Kolkata',flag:'🇮🇳'},{name:'Berlin',tz:'Europe/Berlin',flag:'🇩🇪'}
+];
+var _clockCities=[],_clockTimer=null;
+function renderWidgetClock(el){
+  if(!el)return;
+  if(cu){var s=localStorage.getItem('lounge_clock_'+cu.nickname.toLowerCase());if(s)try{_clockCities=JSON.parse(s);}catch(e){}}
+  _buildClock(el);
+  if(_clockTimer)clearInterval(_clockTimer);
+  _clockTimer=setInterval(function(){_buildClock(el);},30000);
+}
+function _clkT(tz){
+  var d=new Date();
+  return {time:d.toLocaleTimeString('en-AU',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:true}),day:d.toLocaleDateString('en-AU',{timeZone:tz,weekday:'short'})};
+}
+function _buildClock(el){
+  el.innerHTML='';
+  var fixed=document.createElement('div');
+  fixed.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:'+((_clockCities.length>0)?'8px':'0px')+';';
+  [['Asia/Manila','🇵🇭','Manila','home'],['Australia/Sydney','🇦🇺','Sydney','office']].forEach(function(p){
+    var t=_clkT(p[0]);
+    var d=document.createElement('div');
+    d.style.cssText='background:rgba(122,174,232,.1);border:1px solid rgba(122,174,232,.3);border-radius:10px;padding:12px 16px;';
+    d.innerHTML='<div style="font-size:10px;font-weight:600;color:var(--accent);display:flex;gap:5px;align-items:center">'+p[1]+' '+p[2]+' <span style="border:0.5px solid var(--accent);border-radius:4px;padding:1px 5px;font-size:9px">'+p[3]+'</span></div>'
+      +'<div style="font-size:22px;font-weight:700;color:var(--text);font-family:monospace;margin-top:2px">'+t.time+'</div>'
+      +'<div style="font-size:10px;color:var(--muted)">'+t.day+'</div>';
+    fixed.appendChild(d);
+  });
+  el.appendChild(fixed);
+  if(_clockCities.length>0){
+    var extras=document.createElement('div');
+    extras.style.cssText='display:grid;grid-template-columns:repeat('+Math.min(4,_clockCities.length)+',1fr);gap:6px;margin-bottom:8px;';
+    _clockCities.forEach(function(city){
+      var t=_clkT(city.tz);
+      var d=document.createElement('div');
+      d.style.cssText='background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:8px;text-align:center;position:relative;';
+      d.innerHTML='<div style="font-size:13px">'+city.flag+'</div>'
+        +'<div style="font-size:10px;font-weight:600;color:var(--muted)">'+city.name+'</div>'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text);font-family:monospace">'+t.time+'</div>'
+        +'<div style="font-size:10px;color:var(--muted)">'+t.day+'</div>'
+        +'<button onclick="(function(){_clockCities=_clockCities.filter(function(c){return c.name!==\''+city.name+'\';});if(cu)localStorage.setItem(\'lounge_clock_\'+cu.nickname.toLowerCase(),JSON.stringify(_clockCities));var p=this.closest(\'[id^=widget-pane]\');_buildClock(p)}).call(this)" style="position:absolute;top:3px;right:4px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:0;">×</button>';
+      extras.appendChild(d);
+    });
+    el.appendChild(extras);
+  }
+  /* Add city button */
+  var addRow=document.createElement('div');
+  addRow.style.cssText='display:flex;align-items:center;justify-content:flex-end;gap:6px;';
+  if(_clockCities.length<4){
+    var addBtn=document.createElement('button');
+    addBtn.style.cssText='font-size:10px;padding:2px 8px;border-radius:5px;border:0.5px solid var(--border);background:none;color:var(--muted);cursor:pointer;';
+    addBtn.textContent='+ Add city';
+    addBtn.onclick=function(){
+      var picker=document.getElementById('clock-city-picker');
+      if(picker){picker.style.display=picker.style.display==='none'?'block':'none';return;}
+      var p=document.createElement('div');p.id='clock-city-picker';
+      p.style.cssText='margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);';
+      p.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Choose a city (max 4)</div>';
+      var btnWrap=document.createElement('div');btnWrap.style.cssText='display:flex;flex-wrap:wrap;gap:5px;';
+      var avail=ALL_CLOCK_CITIES.filter(function(c){return !_clockCities.find(function(a){return a.name===c.name;});});
+      avail.forEach(function(city){
+        var b=document.createElement('button');
+        b.style.cssText='font-size:11px;padding:3px 9px;border-radius:6px;border:0.5px solid var(--border);background:none;color:var(--text);cursor:pointer;';
+        b.innerHTML=city.flag+' '+city.name;
+        b.onclick=function(){
+          if(_clockCities.length>=4)return;
+          _clockCities.push(city);
+          if(cu)localStorage.setItem('lounge_clock_'+cu.nickname.toLowerCase(),JSON.stringify(_clockCities));
+          _buildClock(el);
+        };
+        btnWrap.appendChild(b);
+      });
+      p.appendChild(btnWrap);el.appendChild(p);
+    };
+    addRow.appendChild(addBtn);
+  }
+  el.appendChild(addRow);
+}
+
+/* ── GAME SHORTCUTS ── */
+function renderWidgetGames(el){
+  if(!el)return;
+  var solo=typeof GC_SOLO_GAMES!=='undefined'?GC_SOLO_GAMES:
+    [{id:'minesweeper',e:'💣',n:'Minesweeper',d:'1 cr'},
+     {id:'wordguess',e:'📝',n:'Word Guess',d:'1 cr'},
+     {id:'wordsearch',e:'🔍',n:'Word Search',d:'1 cr'},
+     {id:'typingrace',e:'⌨️',n:'Typing Race',d:'1 cr'},
+     {id:'solitaire',e:'🂡',n:'Solitaire',d:'1 cr'},
+     {id:'millionaire',e:'💰',n:'Millionaire',d:'10 cr'}];
+  var grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;';
+  solo.slice(0,6).forEach(function(g){
+    var card=document.createElement('div');
+    card.style.cssText='background:var(--bg2);border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s;';
+    card.onmouseenter=function(){card.style.background='rgba(122,174,232,.1)';};
+    card.onmouseleave=function(){card.style.background='var(--bg2)';};
+    card.innerHTML='<span style="font-size:20px">'+g.e+'</span>'
+      +'<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+g.n+'</div>'
+      +'<div style="font-size:10px;color:var(--muted)">'+g.d+'</div></div>';
+    card.onclick=function(){
+      if(typeof gcLaunchGame==='function')gcLaunchGame(g.id,g.n);
+      else if(typeof openGameCorner==='function')openGameCorner();
+    };
+    grid.appendChild(card);
+  });
+  el.appendChild(grid);
+  var allBtn=document.createElement('div');
+  allBtn.style.cssText='text-align:right;margin-top:8px;';
+  allBtn.innerHTML='<a style="font-size:11px;color:var(--accent);cursor:pointer;text-decoration:none;" onclick="if(typeof openGameCorner===\'function\')openGameCorner();else if(typeof gcOpenGameCornerPanel===\'function\')gcOpenGameCornerPanel();">All games →</a>';
+  el.appendChild(allBtn);
+}
+
+/* ── NEWS ── */
+var _newsCache=null,_newsCacheTime=0,_newsCategory='ph';
+function renderWidgetNews(el){
+  if(!el)return;
+  el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:8px 0">Loading news…</div>';
+  _fetchNews(el);
+}
+function _fetchNews(el){
+  if(_newsCache&&_newsCacheTime&&(Date.now()-_newsCacheTime)<900000&&_newsCache._cat===_newsCategory){_renderNews(el,_newsCache);return;}
+  /* Use rss2json proxy — no CORS issues, works from any domain */
+  var RSS_FEEDS={
+    ph:'https://www.rappler.com/feed/',
+    au:'https://www.abc.net.au/news/feed/51120/rss.xml',
+    world:'https://feeds.bbci.co.uk/news/world/rss.xml'
+  };
+  var rssUrl=encodeURIComponent(RSS_FEEDS[_newsCategory]||RSS_FEEDS.ph);
+  var apiUrl='https://api.rss2json.com/v1/api.json?rss_url='+rssUrl+'&api_key=free&count=5';
+  fetch(apiUrl)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.items||!d.items.length){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">News unavailable</div>';return;}
+      /* Normalise to articles format */
+      var articles=d.items.map(function(item){
+        return {
+          title:item.title,
+          url:item.link,
+          publishedAt:item.pubDate,
+          source:{name:d.feed&&d.feed.title?d.feed.title:'News'}
+        };
+      });
+      var normalised={articles:articles,_cat:_newsCategory};
+      _newsCache=normalised;_newsCacheTime=Date.now();
+      _renderNews(el,normalised);
+    }).catch(function(){el.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">News unavailable — check connection</div>';});
+}
+function _renderNews(el,d){
+  /* Category tabs */
+  var tabs=['ph','au','world'];var tabLabels={ph:'🇵🇭 Philippines',au:'🇦🇺 Australia',world:'🌐 World'};
+  var tabRow='<div style="display:flex;gap:6px;margin-bottom:10px;">';
+  tabs.forEach(function(t){
+    tabRow+='<button onclick="_newsCategory=\''+t+'\';renderWidgetNews(document.getElementById(\'widget-pane-news\'))" '
+      +'style="font-size:10px;padding:3px 10px;border-radius:6px;border:0.5px solid var(--border);cursor:pointer;'
+      +(t===_newsCategory?'background:var(--accent);color:#fff;border-color:var(--accent);':'background:none;color:var(--muted);')+'">'+tabLabels[t]+'</button>';
+  });
+  tabRow+='</div>';
+  var articles='';
+  d.articles.slice(0,5).forEach(function(a){
+    var ago=Math.round((Date.now()-new Date(a.publishedAt).getTime())/60000);
+    var agoStr=ago<60?(ago+'m ago'):(Math.round(ago/60)+'h ago');
+    articles+='<div style="padding:8px 0;border-bottom:0.5px solid var(--border);cursor:pointer;" onclick="window.open(\''+a.url+'\',\'_blank\')">'
+      +'<div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4;margin-bottom:3px">'+a.title.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'
+      +'<div style="font-size:10px;color:var(--muted)">'+a.source.name+' · '+agoStr+'</div>'
+      +'</div>';
+  });
+  el.innerHTML=tabRow+'<div>'+articles+'</div>';
+}
 
 function gcLaunchGame(id,title){
   var access=gcCheckAccess();
