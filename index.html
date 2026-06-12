@@ -581,8 +581,9 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .ann-unread-badge{display:none;background:var(--pink,#f72b6e);color:#fff;font-size:9px;font-weight:700;font-family:var(--font-d);padding:2px 7px;border-radius:99px;letter-spacing:.3px;margin-left:auto;}
 .ann-unread-badge.show{display:inline-flex;align-items:center;}
 .ann-list{display:flex;flex-direction:column;max-height:260px;overflow-y:auto;}
-.ann-card{padding:14px 16px;border-bottom:1px solid var(--border);position:relative;transition:background .15s;}
-.ann-card:last-child{border-bottom:none;}
+.ann-card{padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;position:relative;transition:background .15s;}
+.ann-card:last-child{margin-bottom:0;}
+
 .ann-card.unread{background:rgba(139,45,255,.05);}
 .ann-card.unread::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:0 2px 2px 0;}
 .ann-card-title{font-family:var(--font-d);font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px;}
@@ -1313,24 +1314,27 @@ window.dispatchEvent(new Event('firebase-ready'));
     <div class="sb-divider"></div>
     <div class="nav-items-wrap" id="nav-items"></div>
     <div class="sb-settings-nav">
+      <!-- Settings always first -->
       <div class="sb-icon-btn" onclick="openSettings()" title="Settings" style="width:36px;height:36px;">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </div>
-
-      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none;font-size:18px;align-items:center;justify-content:center;">🐸</div>
-
+      <!-- Log icons injected here by buildSidebar -->
+      <!-- Manager bell (notif-bell-wrap) — always visible for manager -->
       <div id="notif-bell-wrap" style="display:none;position:relative;margin:0 auto;">
         <div class="sb-icon-btn" onclick="openNotifBell()" title="Notifications" style="width:36px;height:36px;">
           <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </div>
         <span id="notif-bell-badge" style="position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 3px;pointer-events:none;line-height:1"></span>
       </div>
+      <!-- Member bell — always visible for uploaders/escalation -->
       <div id="member-bell-wrap" style="display:none;position:relative;margin:0 auto;">
-        <div class="sb-icon-btn" onclick="memberBellClick()" title="Quality Remarks" style="width:36px;height:36px;">
+        <div class="sb-icon-btn" onclick="memberBellClick()" title="Notifications" style="width:36px;height:36px;">
           <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </div>
         <span id="member-bell-badge" style="position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 3px;pointer-events:none;line-height:1"></span>
       </div>
+      <!-- Koby always last -->
+      <div id="sb-koby-btn" onclick="openAI()" title="Ask Koby" class="sb-icon-btn" style="width:36px;height:36px;display:none;font-size:18px;align-items:center;justify-content:center;">🐸</div>
     </div>
     <div class="sb-bottom"></div>
   </div>
@@ -1768,7 +1772,7 @@ function fsStartRealtimeListeners(){
   if(!window._fsReady||!window._db)return;
   _unsubscribers.forEach(function(u){try{u();}catch(e){}});_unsubscribers=[];
   pwStartListeners();
-  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'mdAnnouncements'),function(snap){mdAnnouncements.length=0;snap.forEach(function(d){mdAnnouncements.push(Object.assign({_fsId:d.id},d.data()));});mdAnnouncements.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});if(G('ann-list'))renderAnnouncements();annUpdateBadge();}));
+  _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'mdAnnouncements'),function(snap){mdAnnouncements.length=0;snap.forEach(function(d){mdAnnouncements.push(Object.assign({_fsId:d.id},d.data()));});mdAnnouncements.sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});window._mdAnnLoaded=true;if(G('ann-list'))renderAnnouncements();annUpdateBadge();}));
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'callouts'),function(snap){
       var prevLen=callouts.length;
       callouts.length=0;snap.forEach(function(d){callouts.push(Object.assign({_fsId:d.id},d.data()));});
@@ -1975,7 +1979,7 @@ var annSeenIds=new Set();
 /* Immediately seed from localStorage so bell is correct before Firestore loads */
 (function(){
   try{
-    var cached=JSON.parse(localStorage.getItem('rta_ann_seen_v2')||'[]');
+    var cached=JSON.parse(localStorage.getItem('rta_ann_seen_'+(cu?cu.nickname.toLowerCase():'guest'))||'[]');
     cached.forEach(function(id){annSeenIds.add(id);});
   }catch(e){}
 })();
@@ -2102,6 +2106,12 @@ function handleLogin(){
 }
 
 function goDash(){
+  /* Reset annSeenIds for this user — prevent cross-user bleed on shared browsers */
+  annSeenIds=new Set();
+  try{
+    var cached=JSON.parse(localStorage.getItem('rta_ann_seen_'+(cu?cu.nickname.toLowerCase():'guest'))||'[]');
+    cached.forEach(function(id){annSeenIds.add(id);});
+  }catch(e){}
   G('pg-login').classList.remove('active');
   G('pg-dash').classList.add('active');
   /* Load persisted theme + accent per user — localStorage first (instant), Firestore as source of truth */
@@ -2268,6 +2278,7 @@ function buildSidebar(){
     if(settingsNav&&insertRef)settingsNav.insertBefore(dlBtn,insertRef);
     else if(settingsNav)settingsNav.appendChild(dlBtn);
     if(kobyRef)kobyRef.style.display='flex';
+    var mBellEsc=G('member-bell-wrap');if(mBellEsc)mBellEsc.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
 
   } else if(role==='manager'){
@@ -2284,13 +2295,15 @@ function buildSidebar(){
     if(settingsNav&&insertRef)settingsNav.insertBefore(mwBtn,insertRef);
     else if(settingsNav)settingsNav.appendChild(mwBtn);
     if(kobyRef)kobyRef.style.display='flex';
+    var nBellMgr=G('notif-bell-wrap');if(nBellMgr)nBellMgr.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='none';
 
   } else {
     var kobyRef=G('sb-koby-btn');
-    if(kobyRef)kobyRef.style.display='flex'; /* Koby AI chat for all members */
+    if(kobyRef)kobyRef.style.display='flex';
     var navWrap=G('nav-items');if(navWrap)navWrap.style.display='';
-
+    /* Show bell immediately — updateMemberBell will update badge count when data arrives */
+    var mBell=G('member-bell-wrap');if(mBell)mBell.style.display='flex';
   }
 
 
@@ -2941,7 +2954,8 @@ function updateMemberBell(){
   var itemNotifCount=(window._memberItemNotifs||[]).length;
   var total=myCallouts.length+annCount+itemNotifCount;
   var wrap=G('member-bell-wrap');var badge=G('member-bell-badge');
-  if(wrap)wrap.style.display=total>0?'flex':'none';
+  /* Bell always visible for non-managers — badge shows/hides based on unread count */
+  if(wrap)wrap.style.display='flex';
   if(badge){badge.textContent=total;badge.style.display=total>0?'flex':'none';}
 }
 function memberBellClick(){
@@ -4083,6 +4097,9 @@ function renderMyDay(){
   var _prevAnnCount=mdAnnouncements.length;
   renderAnnouncements();
   if(mdAnnouncements.length>0&&_prevAnnCount===0){_playAnnouncementSound();}
+  /* Update member bell badge after announcements are loaded */
+  if(typeof updateMemberBell==='function')updateMemberBell();
+  if(typeof updateNotifBell==='function')updateNotifBell();
   /* Init widgets carousel after DOM is ready */
   setTimeout(function(){initWidgetsCarousel();},100);
   if(isManager){
@@ -7744,6 +7761,7 @@ function renderAnnouncements(){
   }).join('');
   el.innerHTML=cards;
   annUpdateBadge();
+  if(typeof updateMemberBell==='function')setTimeout(updateMemberBell,300);
 }
 
 function openEditAnn(id){
@@ -7760,7 +7778,7 @@ function openEditAnn(id){
 }
 function annMarkSeen(id){
   annSeenIds.add(id);
-  try{localStorage.setItem('rta_ann_seen_v2',JSON.stringify(Array.from(annSeenIds)));}catch(e){}
+  try{localStorage.setItem('rta_ann_seen_'+(cu?cu.nickname.toLowerCase():'guest'),JSON.stringify(Array.from(annSeenIds)));}catch(e){}
   var card=document.querySelector('.ann-card[data-id="'+id+'"]');
   if(card){card.classList.remove('unread');var dot=card.querySelector('.ann-new-dot');if(dot)dot.remove();}
   annUpdateBadge();
@@ -7939,7 +7957,7 @@ function viewAnn(id){
   annSeenIds.add(a.id);
   if(a._fsId)annSeenIds.add(a._fsId);
   annSeenIds.add(id);
-  try{localStorage.setItem('rta_ann_seen_v2',JSON.stringify(Array.from(annSeenIds)));}catch(e){}
+  try{localStorage.setItem('rta_ann_seen_'+(cu?cu.nickname.toLowerCase():'guest'),JSON.stringify(Array.from(annSeenIds)));}catch(e){}
   if(fsDb()&&cu&&a._fsId){
     var seenRef=window._fsDoc(fsDb(),'ann_seen',a._fsId);
     window._fsGetDoc(seenRef).then(function(snap){
