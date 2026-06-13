@@ -401,7 +401,7 @@ body.theme-whatsapp #last-sync-label{color:rgba(255,255,255,.5)!important;}
 body.theme-whatsapp .main-brand-header .btn-outline{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;}
 body.theme-whatsapp .main-brand-header .btn-outline:hover{background:rgba(255,255,255,.25);}
 /* ── Lounge tabs (green header bar) ── */
-body.theme-whatsapp .lounge-tabs{background:#075e54;border-bottom-color:rgba(0,0,0,.1);padding:0 20px;margin:-28px -32px 20px;}
+body.theme-whatsapp .lounge-tabs{background:#075e54;border-bottom-color:rgba(0,0,0,.1);padding:0 20px;margin:0;}
 body.theme-whatsapp .lounge-tab{color:rgba(255,255,255,.65);}
 body.theme-whatsapp .lounge-tab:hover{color:#fff;}
 body.theme-whatsapp .lounge-tab.active{color:#fff;border-bottom-color:#25d366;}
@@ -646,7 +646,7 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .space-ann-card-meta{font-size:10px;color:var(--muted2);margin-top:6px;}
 
 /* ── THE LOUNGE ── */
-.lounge-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 28px;margin:-28px -32px 24px;}
+.lounge-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--bg2);padding:0 28px;margin:0;}
 .lounge-tab{padding:13px 18px;font-size:13px;font-weight:600;font-family:var(--font-d);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .18s;white-space:nowrap;background:none;border-top:none;border-left:none;border-right:none;}
 .lounge-tab:hover{color:var(--text);}
 .lounge-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
@@ -1349,6 +1349,7 @@ window.dispatchEvent(new Event('firebase-ready'));
     </div>
     <!-- Cosmetic banner strip — populated from gc_inventory -->
     <div id="cosmetic-banner-strip" style="display:none;height:6px;flex-shrink:0;"></div>
+    <div id="lounge-tab-bar" style="display:none;flex-shrink:0;position:sticky;top:0;z-index:90;background:var(--bg2);"></div>
     <div class="main-content" id="main-content" style="max-width:none;flex:1;overflow-y:auto"></div>
   </div>
 </div>
@@ -3337,15 +3338,10 @@ function buildMain(){
 /* ── UPLOADER DOM ── */
 function buildUploaderDOM(){
   const sh=SHIFTS[cu.nickname];const shLabel=sh?`Shift: ${sh.start}:00–${sh.end}:00 AEST`:'';
+  var _tb=document.getElementById('lounge-tab-bar');
+  if(_tb){_tb.style.display='block';_tb.innerHTML='<div class="lounge-tabs"><button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab(\'my-day\',this)">My Day</button><button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab(\'the-hub\',this)">My Hub</button><button class="lounge-tab" data-tab="my-team" onclick="if(typeof achTrackTeamOpen===\'function\')achTrackTeamOpen();switchLoungeTab(\'my-team\',this)">My Team</button><button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab(\'my-space\',this)">My Space</button></div>';}
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
-    <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="if(typeof achTrackTeamOpen==='function')achTrackTeamOpen();switchLoungeTab('my-team',this)">My Team</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">My Space</button>
-      
-    </div>
     <div class="kc-banner" id="kc-banner">
       <span>🧠 <strong>Knowledge Check due this week</strong> — complete it before Friday EOD</span>
       <span class="kc-banner-link" onclick="document.querySelector('.lounge-tab[data-tab=my-day]').click();setTimeout(function(){var el=G('kc-tile-body');if(el)el.scrollIntoView({behavior:'smooth'});},300)">Take it now →</span>
@@ -3459,15 +3455,10 @@ function buildUploaderDOM(){
 /* ── ESCALATION DOM ── */
 function buildEscalationDOM(){
   G('qscore-upl').innerHTML=TEAM.filter(m=>m.role==='uploader').map(m=>`<option value="${m.nickname}">${m.fullName}</option>`).join('');
+  var _tb=document.getElementById('lounge-tab-bar');
+  if(_tb){_tb.style.display='block';_tb.innerHTML='<div class="lounge-tabs"><button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab(\'my-day\',this)">My Day</button><button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab(\'the-hub\',this)">My Hub</button><button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab(\'my-team\',this)">My Team</button><button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab(\'my-space\',this)">My Space</button></div>';}
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
-    <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">My Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">My Team</button>
-      <button class="lounge-tab" data-tab="my-space" onclick="switchLoungeTab('my-space',this)">My Space</button>
-      
-    </div>
     <div class="kc-banner" id="kc-banner">
       <span>🧠 <strong>Knowledge Check due this week</strong> — complete it before Friday EOD</span>
       <span class="kc-banner-link" onclick="document.querySelector('.lounge-tab[data-tab=my-day]').click();setTimeout(function(){var el=G('kc-tile-body');if(el)el.scrollIntoView({behavior:'smooth'});},300)">Take it now →</span>
@@ -3497,14 +3488,10 @@ function buildManagerDOM(){
   const allM=TEAM.filter(m=>m.role&&m.role.toLowerCase()!=='manager');
   const opts=allM.map(m=>`<option value="${m.nickname}">${m.fullName}</option>`).join('');
   G('qesc-upl').innerHTML=opts;G('qscore-upl').innerHTML=opts;
+  var _tb=document.getElementById('lounge-tab-bar');
+  if(_tb){_tb.style.display='block';_tb.innerHTML='<div class="lounge-tabs"><button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab(\'my-day\',this)">My Day</button><button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab(\'the-hub\',this)">Hub</button><button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab(\'my-team\',this)">My Team</button></div>';}
   G('main-content').innerHTML=`
   <div class="dash-panel active" id="the-lounge-panel">
-    <div class="lounge-tabs">
-      <button class="lounge-tab active" data-tab="my-day" onclick="switchLoungeTab('my-day',this)">My Day</button>
-      <button class="lounge-tab" data-tab="the-hub" onclick="switchLoungeTab('the-hub',this)">Hub</button>
-      <button class="lounge-tab" data-tab="my-team" onclick="switchLoungeTab('my-team',this)">My Team</button>
-      
-    </div>
     <div class="kc-banner" id="kc-banner">
       <span>🧠 <strong>Knowledge Check due this week</strong> — complete it before Friday EOD</span>
       <span class="kc-banner-link" onclick="document.querySelector('.lounge-tab[data-tab=my-day]').click();setTimeout(function(){var el=G('kc-tile-body');if(el)el.scrollIntoView({behavior:'smooth'});},300)">Take it now →</span>
@@ -4525,6 +4512,7 @@ function gcOpenGameCornerPanel(){
   /* Hide all panels, show games panel */
   document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
   if(gcPanel)gcPanel.classList.add('active');
+  var _tb=G('lounge-tab-bar');if(_tb)_tb.style.display='none';
   /* Wait for Firebase to be ready before rendering — fixes blank panel on first load */
   function _tryRender(attempts){
     if(typeof renderGamesTab!=='function'){
@@ -13267,6 +13255,7 @@ function goLounge(){
   switchLoungeTab('my-day', document.querySelector('.lounge-tab[data-tab="my-day"]'));
   document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
   var lp=G('the-lounge-panel');if(lp)lp.classList.add('active');
+  var _tb=G('lounge-tab-bar');if(_tb)_tb.style.display='block';
 }
 
 /* ── TEMPLATE FUNCTIONS ── */
@@ -18567,6 +18556,7 @@ function injectGamesTab(){gcOpenGameCornerPanel();}
 function removeGamesTab(){
   document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
   var lounge=G('the-lounge-panel');if(lounge)lounge.classList.add('active');
+  var _tb=G('lounge-tab-bar');if(_tb)_tb.style.display='block';
   if(typeof renderLounge==='function')renderLounge();
 }
 
