@@ -12384,11 +12384,12 @@ function openMgrWrite(){
   var today=new Date().toISOString().split('T')[0];
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
   var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
-  var uplOpts='<option value="">Select uploader...</option>'+uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
-  var escOpts='<option value="">Select escalation member...</option>'+escMembers.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
-  ['mw-err-upl','mw-qesc-upl'].forEach(function(id){var el=G(id);if(el)el.innerHTML=uplOpts;});
-  var allMOpts='<option value="">Select member...</option>'+TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+' ('+m.role+')</option>';}).join('');
-  var qescUplEl=G('mw-qesc-upl');if(qescUplEl)qescUplEl.innerHTML=allMOpts;
+  /* Log Error dropdown: uploaders + escalation, names only */
+  var errMembers=uploaders.concat(escMembers);
+  var errMemberOpts='<option value="">Select member...</option>'+errMembers.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
+  var errUplEl=G('mw-err-upl');if(errUplEl)errUplEl.innerHTML=errMemberOpts;
+  var escOpts='';
+  var qescUplEl=G('mw-qesc-upl');if(qescUplEl)qescUplEl.innerHTML='';
   var qescEsc=G('mw-qesc-esc');if(qescEsc)qescEsc.innerHTML=escOpts;
   var allOpts='<option value="">— None —</option>'+TEAM.filter(function(m){return m.role&&m.role.toLowerCase()!=='manager';}).map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   ['mw-hero-1','mw-hero-2','mw-hero-3','mw-qm-1','mw-qm-2','mw-qm-3','mw-qc-1','mw-qc-2','mw-qc-3','mw-um-1','mw-um-2','mw-um-3'].forEach(function(id){var el=G(id);if(el)el.innerHTML=allOpts;});
@@ -12635,7 +12636,8 @@ async function mwSubmitQEsc(){
   var co=isEsc
     ?Object.assign({},meta,{id:nextId++,type:'qesc_esc',uploader:member,escalationMember:member,status:'Pending',insight:'',escThread:true,category:mwQescCat||'Others'})
     :Object.assign({},meta,{id:nextId++,type:'qesc',uploader:member,escalationMember:'',status:'Pending',insight:'',category:mwQescCat||'Others'});
-  callouts.push(co);fsSaveCallout(co);
+  /* Do NOT push to local array — onSnapshot will add it when Firestore confirms */
+  await fsSaveCallout(co);
   if(typeof sendManagerDirectNotif==='function')sendManagerDirectNotif(co);
   updateMemberBell();
   pushNotif('🚨','Critical escalation logged for '+mem.fullName+' at "'+addr+'".','qesc');
@@ -12678,13 +12680,17 @@ function mwSubmitAwards(){
 /* ── DAILY LOG OVERLAY ── */
 function openDailyLog(){
   var uploaders=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='uploader';});
-  var uplOpts=uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
+  var escMembers=TEAM.filter(function(m){return m.role&&m.role.toLowerCase()==='escalation';});
+  /* Log Error dropdown: uploaders + escalation (esc team now uploads too) */
+  var errMemberOpts='<option value="">Select member...</option>'+
+    uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('')+
+    (escMembers.length?'<optgroup label="Escalation">'+escMembers.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('')+'</optgroup>':'');
   var todayVal=new Date().toISOString().split('T')[0];
   /* Populate uploader dropdowns */
   var upl2=G('qscore-upl2');
-  if(upl2)upl2.innerHTML='<option value="">Select uploader...</option>'+uplOpts;
+  if(upl2)upl2.innerHTML=errMemberOpts;
   var escUpl=G('esc-log-uploader');
-  if(escUpl)escUpl.innerHTML='<option value="">Select uploader...</option>'+uplOpts;
+  if(escUpl)escUpl.innerHTML='<option value="">Select uploader...</option>'+uploaders.map(function(m){return '<option value="'+m.nickname+'">'+m.fullName+'</option>';}).join('');
   var escDate=G('esc-log-date');if(escDate)escDate.value=todayVal;
   var dateEl=G('qscore-date2');if(dateEl)dateEl.value=todayVal;
   /* Reset Log Error fields */
@@ -14238,7 +14244,7 @@ document.addEventListener('DOMContentLoaded',function(){
     }
     if(e.key==='Enter'&&!inInput){
       var submitMap=[
-        {overlay:'mgr-write-overlay',fn:function(){var t=document.querySelector('#mgr-write-overlay .dl-tab.active');if(!t)return;var tab=t.dataset.tab;if(tab==='mw-error')mwSubmitError();else if(tab==='mw-detail')mwDetailConfirm();else if(tab==='mw-qesc')mwSubmitQEsc();else if(tab==='mw-sla')mwSLAConfirm();else if(tab==='mw-awards')mwSubmitAwards();}},
+        {overlay:'mgr-write-overlay',fn:function(){var t=document.querySelector('#mgr-write-overlay .dl-tab.active');if(!t)return;var tab=t.dataset.tab;if(tab==='mw-error')mwSubmitError();else if(tab==='mw-detail')mwDetailConfirm();else if(tab==='mw-sla')mwSLAConfirm();}},
         {overlay:'daily-log-overlay',fn:function(){var t=document.querySelector('#daily-log-overlay .dl-tab.active');if(!t)return;var tab=t.dataset.tab;if(tab==='error')submitQScoreFromOverlay();else if(tab==='detail')dlConfirmSave();}},
         {overlay:'modal-add-member',fn:submitAddMember},
         {overlay:'add-article-modal',fn:submitAddArticle},
@@ -14327,8 +14333,6 @@ document.addEventListener('DOMContentLoaded',function(){
         <button class="dl-tab active" data-tab="mw-detail" onclick="switchMgrWriteTab('mw-detail',this)">&#128196; Log Daily Detail</button>
         <button class="dl-tab" data-tab="mw-sla" onclick="switchMgrWriteTab('mw-sla',this)">&#128202; Log SLA</button>
         <button class="dl-tab" data-tab="mw-error" onclick="switchMgrWriteTab('mw-error',this)">&#9997;&#65039; Log Error</button>
-        <button class="dl-tab" data-tab="mw-qesc" onclick="switchMgrWriteTab('mw-qesc',this)">&#128680; Log Escalation</button>
-        <button class="dl-tab" data-tab="mw-awards" onclick="switchMgrWriteTab('mw-awards',this)">&#127942; Log Awards</button>
       </div>
       <div class="dl-pane">
 
