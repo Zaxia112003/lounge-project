@@ -8056,7 +8056,7 @@ function renderAnnouncements(){
     var managerActions=seenLine+(isManager
       ?'<div style="display:flex;gap:6px;margin-top:6px">'
         +'<button onclick="event.stopPropagation();openEditAnn('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer">Edit</button>'
-        +'<button onclick="event.stopPropagation();deleteAnnouncement(\\\'\''+(a._fsId||a.id)+'\\\')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
+        +'<button onclick="event.stopPropagation();deleteAnnouncement(this.dataset.fsid)" data-fsid="'+(a._fsId||a.id)+'" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
         +'</div>'
       :'');
     return '<div class="ann-card'+(unseen?' unread':'')+'" data-id="'+a.id+'" onclick="viewAnn('+a.id+')">'
