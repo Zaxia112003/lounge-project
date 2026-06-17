@@ -18373,54 +18373,115 @@ function gcGameWordGuess(C){
 ════════════════════════════════════════════════════════ */
 function gcGameSolitaire(C){
   C.style.cssText='padding:12px 16px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;background:var(--bg)';
+
+  // ── Proper Fisher-Yates shuffle ──
+  function shuffle(arr){
+    var a=arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      // Extra entropy: mix in timestamp bits to break Math.random() patterns
+      var j=Math.floor((Math.random()*0.7+Math.random()*0.3)*(i+1));
+      var t=a[i];a[i]=a[j];a[j]=t;
+    }
+    // Second pass with different index formula
+    for(var i=0;i<a.length-1;i++){
+      var j=i+1+Math.floor(Math.random()*(a.length-i-1));
+      if(j<a.length){var t=a[i];a[i]=a[j];a[j]=t;}
+    }
+    return a;
+  }
+
+  var currentMode=null; // 'klondike' or 'spider'
+
+  // ── MODE SELECT ──
+  function showModeSelect(){
+    currentMode=null;
+    C.innerHTML='';
+    var wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:24px;padding:32px 16px;width:100%';
+    var title=document.createElement('div');
+    title.style.cssText='font-size:18px;font-weight:700;color:var(--txt);letter-spacing:1px';
+    title.textContent='🃏 Select Game Mode';
+    wrap.appendChild(title);
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;gap:20px;flex-wrap:wrap;justify-content:center';
+    var modes=[
+      {id:'klondike',icon:'♠',name:'Klondike',desc:'Classic solitaire. Build 4 foundation piles from Ace to King. Draw from stock to waste.',badge:'Classic'},
+      {id:'spider', icon:'🕷️',name:'Spider',  desc:'Build 8 sequences from King to Ace in the tableau. Complete sequences are removed. 1-suit to start.',badge:'Challenge'},
+    ];
+    modes.forEach(function(m){
+      var card=document.createElement('div');
+      card.style.cssText='width:200px;background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:20px 16px;cursor:pointer;transition:border-color 0.15s,transform 0.15s;text-align:center';
+      card.innerHTML='<div style="font-size:36px;margin-bottom:8px">'+m.icon+'</div>'
+        +'<div style="font-size:15px;font-weight:700;color:var(--txt);margin-bottom:4px">'+m.name+'</div>'
+        +'<div style="font-size:10px;color:var(--accent);font-weight:600;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase">'+m.badge+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);line-height:1.5">'+m.desc+'</div>';
+      card.onmouseenter=function(){this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';};
+      card.onmouseleave=function(){this.style.borderColor='var(--border)';this.style.transform='';};
+      card.onclick=function(){
+        if(m.id==='klondike')startKlondike();
+        else startSpider();
+      };
+      row.appendChild(card);
+    });
+    wrap.appendChild(row);
+    C.appendChild(wrap);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  KLONDIKE
+  // ═══════════════════════════════════════════════════════
   var SUITS=['♠','♥','♦','♣'],VALS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
   var RED=['♥','♦'];
   function isRed(s){return RED.includes(s);}
   function vi(v){return VALS.indexOf(v);}
   function canStack(c,on){return on?isRed(c.s)!==isRed(on.s)&&vi(c.v)===vi(on.v)-1:vi(c.v)===12;}
   function canFound(c,f){return f.length?f[f.length-1].s===c.s&&vi(c.v)===vi(f[f.length-1].v)+1:c.v==='A';}
-  var deck=[],stock=[],waste=[],found=[[],[],[],[]],tab=[[],[],[],[],[],[],[]],moves=0,sel=null;
-  function deal(){
-    deck=[];
-    SUITS.forEach(function(s){VALS.forEach(function(v){deck.push({s:s,v:v,up:false});});});
-    deck.sort(function(){return Math.random()-.5;});
-    found=[[],[],[],[]];tab=[[],[],[],[],[],[],[]];
-    for(var i=0;i<7;i++){tab[i]=deck.splice(0,i+1);tab[i][i].up=true;}
-    stock=deck.slice();deck=[];waste=[];moves=0;sel=null;
+  var kdeck=[],kstock=[],kwaste=[],kfound=[[],[],[],[]],ktab=[[],[],[],[],[],[],[]],kmoves=0,ksel=null;
+
+  function startKlondike(){
+    currentMode='klondike';
+    kdeck=[];
+    SUITS.forEach(function(s){VALS.forEach(function(v){kdeck.push({s:s,v:v,up:false});});});
+    kdeck=shuffle(kdeck);
+    kfound=[[],[],[],[]];ktab=[[],[],[],[],[],[],[]];
+    for(var i=0;i<7;i++){ktab[i]=kdeck.splice(0,i+1);ktab[i][i].up=true;}
+    kstock=kdeck.slice();kdeck=[];kwaste=[];kmoves=0;ksel=null;
+    renderKlondike();
   }
-  function selCards(){
-    if(!sel)return null;
-    if(sel.src==='waste')return waste.length?[waste[waste.length-1]]:null;
-    return tab[sel.ti].slice(sel.ci);
+
+  function kSelCards(){
+    if(!ksel)return null;
+    if(ksel.src==='waste')return kwaste.length?[kwaste[kwaste.length-1]]:null;
+    return ktab[ksel.ti].slice(ksel.ci);
   }
-  function moveToTab(ti){
-    var cards=selCards();if(!cards||!cards.length)return false;
-    var pile=tab[ti];var pTop=pile.length?pile[pile.length-1]:null;
+  function kMoveToTab(ti){
+    var cards=kSelCards();if(!cards||!cards.length)return false;
+    var pile=ktab[ti];var pTop=pile.length?pile[pile.length-1]:null;
     if(!canStack(cards[0],pTop))return false;
-    if(sel.src==='waste'){waste.pop();pile.push(cards[0]);}
-    else{var fp=tab[sel.ti];fp.splice(sel.ci).forEach(function(c){pile.push(c);});if(fp.length&&!fp[fp.length-1].up)fp[fp.length-1].up=true;}
-    moves++;SND_GC.card();sel=null;return true;
+    if(ksel.src==='waste'){kwaste.pop();pile.push(cards[0]);}
+    else{var fp=ktab[ksel.ti];fp.splice(ksel.ci).forEach(function(c){pile.push(c);});if(fp.length&&!fp[fp.length-1].up)fp[fp.length-1].up=true;}
+    kmoves++;SND_GC.card();ksel=null;return true;
   }
-  function moveToFound(fi){
-    var cards=selCards();if(!cards||cards.length!==1)return false;
-    var c=cards[0];if(!canFound(c,found[fi]))return false;
-    if(sel.src==='waste'){waste.pop();}
-    else{var fp=tab[sel.ti];fp.pop();if(fp.length&&!fp[fp.length-1].up)fp[fp.length-1].up=true;}
-    found[fi].push(c);moves++;SND_GC.card();sel=null;return true;
+  function kMoveToFound(fi){
+    var cards=kSelCards();if(!cards||cards.length!==1)return false;
+    var c=cards[0];if(!canFound(c,kfound[fi]))return false;
+    if(ksel.src==='waste'){kwaste.pop();}
+    else{var fp=ktab[ksel.ti];fp.pop();if(fp.length&&!fp[fp.length-1].up)fp[fp.length-1].up=true;}
+    kfound[fi].push(c);kmoves++;SND_GC.card();ksel=null;return true;
   }
-  function autoFound(){
+  function kAutoFound(){
     var again=true;
     while(again){
       again=false;
-      if(waste.length){var w=waste[waste.length-1];var fi=found.findIndex(function(f){return canFound(w,f);});if(fi>=0){found[fi].push(waste.pop());moves++;again=true;SND_GC.card();continue;}}
+      if(kwaste.length){var w=kwaste[kwaste.length-1];var fi=kfound.findIndex(function(f){return canFound(w,f);});if(fi>=0){kfound[fi].push(kwaste.pop());kmoves++;again=true;SND_GC.card();continue;}}
       for(var i=0;i<7;i++){
-        if(!tab[i].length)continue;
-        var tc=tab[i][tab[i].length-1];if(!tc.up)continue;
-        var fi2=found.findIndex(function(f){return canFound(tc,f);});
-        if(fi2>=0){found[fi2].push(tab[i].pop());if(tab[i].length)tab[i][tab[i].length-1].up=true;moves++;again=true;SND_GC.card();break;}
+        if(!ktab[i].length)continue;var tc=ktab[i][ktab[i].length-1];if(!tc.up)continue;
+        var fi2=kfound.findIndex(function(f){return canFound(tc,f);});
+        if(fi2>=0){kfound[fi2].push(ktab[i].pop());if(ktab[i].length)ktab[i][ktab[i].length-1].up=true;kmoves++;again=true;SND_GC.card();break;}
       }
     }
   }
+
   function solCardSize(){
     var availW=(C.clientWidth||960)-24;
     var cw=Math.max(54,Math.min(Math.floor((availW-6*8)/7),90));
@@ -18428,10 +18489,7 @@ function gcGameSolitaire(C){
   }
   function mkCard(c,w,h){
     var d=document.createElement('div');
-    if(!c.up){
-      d.style.cssText='width:'+w+'px;height:'+h+'px;background:linear-gradient(135deg,#3a3d6a,#1e2035);border:1px solid #5a5d8a;border-radius:6px;flex-shrink:0;cursor:default';
-      return d;
-    }
+    if(!c.up){d.style.cssText='width:'+w+'px;height:'+h+'px;background:linear-gradient(135deg,#3a3d6a,#1e2035);border:1px solid #5a5d8a;border-radius:6px;flex-shrink:0;cursor:default';return d;}
     var fs=Math.max(10,Math.round(w*0.18));
     d.style.cssText='width:'+w+'px;height:'+h+'px;background:#fff;border:1px solid #ccc;border-radius:6px;'
       +'display:flex;flex-direction:column;justify-content:space-between;padding:3px 4px;'
@@ -18446,87 +18504,78 @@ function gcGameSolitaire(C){
     d.style.cssText='width:'+w+'px;height:'+h+'px;border:2px dashed var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--muted);cursor:pointer';
     if(label)d.textContent=label;return d;
   }
-  function render(){
+
+  function renderKlondike(){
     var CS=solCardSize();
     var wrap=document.createElement('div');wrap.style.cssText='width:100%;max-width:700px';
-    /* Top row */
+    // Back button
+    var backBtn=document.createElement('button');backBtn.className='gc-btn gc-btn-outline';
+    backBtn.style.cssText='font-size:10px;padding:2px 10px;margin-bottom:10px';backBtn.textContent='← Modes';
+    backBtn.onclick=showModeSelect;wrap.appendChild(backBtn);
+    // Top row
     var topRow=document.createElement('div');topRow.style.cssText='display:flex;gap:8px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap';
-    /* Stock */
     var sEl=document.createElement('div');sEl.style.cursor='pointer';
-    sEl.appendChild(stock.length?mkCard({up:false},CS.w,CS.h):mkEmpty(CS.w,CS.h,'↺'));
+    sEl.appendChild(kstock.length?mkCard({up:false},CS.w,CS.h):mkEmpty(CS.w,CS.h,'↺'));
     sEl.onclick=function(){
-      sel=null;SND_GC.card();
-      if(!stock.length){waste.slice().reverse().forEach(function(c){c.up=false;stock.push(c);});waste=[];}
-      else{var c=stock.pop();c.up=true;waste.push(c);}
-      moves++;render();
+      ksel=null;SND_GC.card();
+      if(!kstock.length){kwaste.slice().reverse().forEach(function(c){c.up=false;kstock.push(c);});kwaste=[];}
+      else{var c=kstock.pop();c.up=true;kwaste.push(c);}
+      kmoves++;renderKlondike();
     };
     topRow.appendChild(sEl);
-    /* Waste */
     var wEl=document.createElement('div');wEl.style.cssText='position:relative;width:'+CS.w+'px;height:'+CS.h+'px;cursor:pointer';
-    if(waste.length){
-      var wc=waste[waste.length-1];var wcEl=mkCard(wc,CS.w,CS.h);
-      var isWasteSel=sel&&sel.src==='waste';
+    if(kwaste.length){
+      var wc=kwaste[kwaste.length-1];var wcEl=mkCard(wc,CS.w,CS.h);
       wcEl.style.cssText+=';position:absolute;inset:0;width:100%;height:100%';
-      if(isWasteSel)wcEl.style.boxShadow='0 0 0 2px #7c3aed';
+      if(ksel&&ksel.src==='waste')wcEl.style.boxShadow='0 0 0 2px #7c3aed';
       wEl.appendChild(wcEl);
     } else {wEl.appendChild(mkEmpty(54,76));}
-    wEl.onclick=function(e){
-      e.stopPropagation();if(!waste.length)return;
-      if(sel&&sel.src==='waste'){sel=null;render();return;}
-      sel={src:'waste'};render();
-    };
+    wEl.onclick=function(e){e.stopPropagation();if(!kwaste.length)return;if(ksel&&ksel.src==='waste'){ksel=null;renderKlondike();return;}ksel={src:'waste'};renderKlondike();};
     topRow.appendChild(wEl);
-    /* Gap */
     var gap=document.createElement('div');gap.style.width='20px';topRow.appendChild(gap);
-    /* Foundations */
-    found.forEach(function(f,fi){
+    kfound.forEach(function(f,fi){
       var fEl=document.createElement('div');fEl.style.cssText='width:'+CS.w+'px;height:'+CS.h+'px;cursor:pointer;position:relative';
       var fCard=f.length?mkCard(f[f.length-1],CS.w,CS.h):mkEmpty(CS.w,CS.h,SUITS[fi]);
       fCard.style.cssText+=(f.length?';position:absolute;inset:0;width:100%;height:100%':'');
       fEl.appendChild(fCard);
       fEl.onclick=function(e){
-        e.stopPropagation();if(!sel)return;
-        if(moveToFound(fi)){
-          autoFound();
-          if(found.every(function(ff){return ff.length===13;})){
-            SND_GC.win();gcSetScore(moves+' moves');
-            gcSaveScore('solitaire',moves,false);
-            gcAwardGameCredit(cu.nickname,3);
-            achCheckGame('solitaire',{});
-            gcToast('🎉 You won in '+moves+' moves! +3 credits');
+        e.stopPropagation();if(!ksel)return;
+        if(kMoveToFound(fi)){
+          kAutoFound();
+          if(kfound.every(function(ff){return ff.length===13;})){
+            SND_GC.win();gcSetScore(kmoves+' moves');gcSaveScore('solitaire',kmoves,false);gcAwardGameCredit(cu.nickname,3);achCheckGame('solitaire',{});gcToast('🎉 You won in '+kmoves+' moves! +3 credits');
           }
-          render();
-        } else{sel=null;render();}
+          renderKlondike();
+        } else{ksel=null;renderKlondike();}
       };
       topRow.appendChild(fEl);
     });
     wrap.appendChild(topRow);
-    /* Tableau */
+    // Tableau
     var tabRow=document.createElement('div');tabRow.style.cssText='display:flex;gap:7px;align-items:flex-start;overflow-x:auto';
-    tab.forEach(function(pile,ti){
+    ktab.forEach(function(pile,ti){
       var col=document.createElement('div');col.style.cssText='position:relative;width:'+CS.w+'px;flex-shrink:0';
       if(!pile.length){
         var emp=mkEmpty(CS.w,CS.h);
-        emp.onclick=function(e){e.stopPropagation();if(sel){if(moveToTab(ti)){render();}else{sel=null;render();}}};
+        emp.onclick=function(e){e.stopPropagation();if(ksel){if(kMoveToTab(ti)){renderKlondike();}else{ksel=null;renderKlondike();}}};
         col.style.minHeight='56px';col.appendChild(emp);
       } else {
         var overlap=Math.max(18,Math.round(CS.h*0.28));col.style.height=(pile.length*overlap+CS.h+8)+'px';
         pile.forEach(function(c,ci){
-          var isTop=ci===pile.length-1;
-          var isSel=sel&&sel.src==='tab'&&sel.ti===ti&&ci>=sel.ci;
+          var isTop=ci===pile.length-1;var isSel=ksel&&ksel.src==='tab'&&ksel.ti===ti&&ci>=ksel.ci;
           var ce=mkCard(c,CS.w,CS.h);
           ce.style.cssText+=';position:absolute;top:'+(ci*overlap)+'px;left:0;z-index:'+(ci+1);
           if(isSel)ce.style.boxShadow='0 0 0 2px #7c3aed';
           (function(card,colIdx,cardIdx,isTopCard){
             ce.onclick=function(e){
               e.stopPropagation();
-              if(!card.up){if(isTopCard){card.up=true;moves++;SND_GC.card();sel=null;render();}return;}
-              if(sel){
-                if(sel.src==='tab'&&sel.ti===colIdx&&cardIdx>=sel.ci){sel=null;render();return;}
-                if(moveToTab(colIdx)){render();return;}
-                sel={src:'tab',ti:colIdx,ci:cardIdx};render();return;
+              if(!card.up){if(isTopCard){card.up=true;kmoves++;SND_GC.card();ksel=null;renderKlondike();}return;}
+              if(ksel){
+                if(ksel.src==='tab'&&ksel.ti===colIdx&&cardIdx>=ksel.ci){ksel=null;renderKlondike();return;}
+                if(kMoveToTab(colIdx)){renderKlondike();return;}
+                ksel={src:'tab',ti:colIdx,ci:cardIdx};renderKlondike();return;
               }
-              sel={src:'tab',ti:colIdx,ci:cardIdx};render();
+              ksel={src:'tab',ti:colIdx,ci:cardIdx};renderKlondike();
             };
           })(c,ti,ci,isTop);
           col.appendChild(ce);
@@ -18535,29 +18584,216 @@ function gcGameSolitaire(C){
       tabRow.appendChild(col);
     });
     wrap.appendChild(tabRow);
-    /* Footer */
+    // Footer
     var footer=document.createElement('div');footer.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11px;color:var(--muted)';
-    footer.textContent='Moves: '+moves+'  ';
+    footer.textContent='Moves: '+kmoves+'  ';
     var abtn=document.createElement('button');abtn.className='gc-btn gc-btn-outline';abtn.style.cssText='font-size:10px;padding:3px 10px';abtn.textContent='Auto-finish';
     abtn.onclick=function(){
-      autoFound();
-      if(found.every(function(f){return f.length===13;})){
-        SND_GC.win();gcSetScore(moves+' moves');
-        gcSaveScore('solitaire',moves,false);
-        gcAwardGameCredit(cu.nickname,3);
-        achCheckGame('solitaire',{});
-        gcToast('🎉 You won! +3 credits');
-      }
-      render();
+      kAutoFound();
+      if(kfound.every(function(f){return f.length===13;})){SND_GC.win();gcSetScore(kmoves+' moves');gcSaveScore('solitaire',kmoves,false);gcAwardGameCredit(cu.nickname,3);achCheckGame('solitaire',{});gcToast('🎉 You won! +3 credits');}
+      renderKlondike();
     };
     footer.appendChild(abtn);
     var nbtn=document.createElement('button');nbtn.className='gc-btn gc-btn-outline';nbtn.style.cssText='font-size:11px;padding:4px 12px';nbtn.textContent='New Game';
-    nbtn.onclick=function(){deal();SND_GC.card();render();};
+    nbtn.onclick=function(){startKlondike();SND_GC.card();};
     footer.appendChild(nbtn);
     wrap.appendChild(footer);
     C.innerHTML='';C.appendChild(wrap);
   }
-  deal();render();
+
+  // ═══════════════════════════════════════════════════════
+  //  SPIDER SOLITAIRE (1-suit)
+  // ═══════════════════════════════════════════════════════
+  var spTab=[],spStock=[],spCompleted=0,spMoves=0,spSel=null;
+  var SP_COLS=10;
+
+  function startSpider(){
+    currentMode='spider';
+    // 2 decks of spades only (1-suit = 104 spades)
+    var raw=[];
+    for(var d=0;d<8;d++){VALS.forEach(function(v){raw.push({s:'♠',v:v,up:false});});}
+    raw=shuffle(raw);
+    spTab=[];
+    // cols 0-3 get 6 cards, cols 4-9 get 5 cards
+    for(var i=0;i<SP_COLS;i++){
+      var n=(i<4)?6:5;
+      spTab.push(raw.splice(0,n));
+      spTab[i][spTab[i].length-1].up=true;
+    }
+    // remaining 50 cards form stock (10 deals of 10)
+    spStock=[];
+    while(raw.length>=10)spStock.push(raw.splice(0,10));
+    spCompleted=0;spMoves=0;spSel=null;
+    renderSpider();
+  }
+
+  function spCanMove(card,onto){
+    // Can always place on empty col; otherwise must be one rank higher (same suit optional in 1-suit)
+    if(!onto)return true;
+    return vi(card.v)===vi(onto.v)-1;
+  }
+
+  function spGetSeq(pile,ci){
+    // Returns the movable sequence starting at ci — must be same suit, consecutive descending
+    var seq=pile.slice(ci);
+    for(var i=0;i<seq.length-1;i++){
+      if(!seq[i].up||!seq[i+1].up)return null;
+      if(seq[i].s!==seq[i+1].s)return null;
+      if(vi(seq[i].v)!==vi(seq[i+1].v)+1)return null;
+    }
+    return seq[0].up?seq:null;
+  }
+
+  function spCheckComplete(pile){
+    // Check if top 13 cards form K→A sequence of same suit
+    if(pile.length<13)return false;
+    var top=pile.slice(pile.length-13);
+    for(var i=0;i<13;i++){
+      if(top[i].s!==top[0].s)return false;
+      if(vi(top[i].v)!==12-i)return false; // K=12 down to A=0
+    }
+    return true;
+  }
+
+  function spDeal(){
+    if(!spStock.length)return;
+    // Can't deal if any column is empty
+    for(var i=0;i<SP_COLS;i++){if(!spTab[i].length){gcToast('Fill empty columns before dealing');return;}}
+    var deal=spStock.pop();
+    for(var i=0;i<SP_COLS;i++){deal[i].up=true;spTab[i].push(deal[i]);}
+    spMoves++;SND_GC.card();
+    // Check for new completions
+    for(var i=0;i<SP_COLS;i++){if(spCheckComplete(spTab[i])){spTab[i].splice(spTab[i].length-13,13);spCompleted++;SND_GC.win();gcToast('♠ Sequence complete! ('+spCompleted+'/8)');}}
+    // Flip newly exposed top cards
+    for(var i=0;i<SP_COLS;i++){if(spTab[i].length&&!spTab[i][spTab[i].length-1].up)spTab[i][spTab[i].length-1].up=true;}
+    renderSpider();
+  }
+
+  function spCardSize(){
+    var availW=(C.clientWidth||960)-24;
+    var cw=Math.max(44,Math.min(Math.floor((availW-9*6)/10),80));
+    return{w:cw,h:Math.round(cw*1.4)};
+  }
+
+  function renderSpider(){
+    var CS=spCardSize();
+    var wrap=document.createElement('div');wrap.style.cssText='width:100%;max-width:900px';
+    // Back button
+    var backBtn=document.createElement('button');backBtn.className='gc-btn gc-btn-outline';
+    backBtn.style.cssText='font-size:10px;padding:2px 10px;margin-bottom:10px';backBtn.textContent='← Modes';
+    backBtn.onclick=showModeSelect;wrap.appendChild(backBtn);
+    // Top bar
+    var topBar=document.createElement('div');topBar.style.cssText='display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap';
+    // Stock piles (show count of remaining deals)
+    var stockEl=document.createElement('div');stockEl.style.cssText='display:flex;gap:4px;align-items:center;cursor:pointer;margin-right:12px';
+    for(var d=0;d<spStock.length;d++){
+      var sd=document.createElement('div');
+      sd.style.cssText='width:'+(CS.w*0.6)+'px;height:'+(CS.h*0.6)+'px;background:linear-gradient(135deg,#3a3d6a,#1e2035);border:1px solid #5a5d8a;border-radius:4px;margin-left:'+(d>0?'-'+(CS.w*0.45)+'px':'0')+'px';
+      stockEl.appendChild(sd);
+    }
+    if(!spStock.length){var sd=document.createElement('div');sd.style.cssText='width:'+(CS.w*0.6)+'px;height:'+(CS.h*0.6)+'px;border:2px dashed var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)';sd.textContent='—';stockEl.appendChild(sd);}
+    stockEl.title='Deal 10 cards ('+spStock.length+' deals left)';
+    stockEl.onclick=spDeal;
+    topBar.appendChild(stockEl);
+    // Stats
+    var stats=document.createElement('div');stats.style.cssText='font-size:11px;color:var(--muted);display:flex;gap:12px;margin-left:auto';
+    stats.innerHTML='<span>Moves: <b>'+spMoves+'</b></span><span>Complete: <b>'+spCompleted+'/8</b></span><span>Deals left: <b>'+spStock.length+'</b></span>';
+    topBar.appendChild(stats);
+    wrap.appendChild(topBar);
+    // Tableau
+    var tabRow=document.createElement('div');tabRow.style.cssText='display:flex;gap:6px;align-items:flex-start;overflow-x:auto;width:100%';
+    spTab.forEach(function(pile,ti){
+      var col=document.createElement('div');col.style.cssText='position:relative;width:'+CS.w+'px;flex-shrink:0;min-height:'+(CS.h+8)+'px';
+      if(!pile.length){
+        var emp=mkEmpty(CS.w,CS.h,'');
+        emp.onclick=function(e){
+          e.stopPropagation();
+          if(!spSel)return;
+          spMoveSeq(ti);
+        };
+        col.appendChild(emp);
+      } else {
+        var faceDown=pile.filter(function(c){return!c.up;}).length;
+        var faceUp=pile.filter(function(c){return c.up;}).length;
+        var downH=Math.max(6,Math.min(14,Math.round(CS.h*0.12)));
+        var upOverlap=Math.max(16,Math.round(CS.h*0.26));
+        var totalH=faceDown*downH+faceUp*upOverlap+CS.h-upOverlap+8;
+        col.style.height=totalH+'px';
+        var yPos=0;
+        pile.forEach(function(c,ci){
+          var isUp=c.up;
+          var ce;
+          if(!isUp){
+            ce=mkCard(c,CS.w,Math.max(downH+2,CS.h*0.18));
+            ce.style.cssText+=';position:absolute;top:'+yPos+'px;left:0;z-index:'+(ci+1);
+            yPos+=downH;
+          } else {
+            var isTop=ci===pile.length-1;
+            var isSel=spSel&&spSel.ti===ti&&ci>=spSel.ci;
+            ce=mkCard(c,CS.w,CS.h);
+            ce.style.cssText+=';position:absolute;top:'+yPos+'px;left:0;z-index:'+(ci+1);
+            if(isSel)ce.style.boxShadow='0 0 0 2px #f59e0b,0 0 8px rgba(245,158,11,0.4)';
+            (function(card,colIdx,cardIdx){
+              ce.onclick=function(e){
+                e.stopPropagation();
+                if(spSel){
+                  if(spSel.ti===colIdx&&cardIdx>=spSel.ci){spSel=null;renderSpider();return;}
+                  spMoveSeq(colIdx);return;
+                }
+                var seq=spGetSeq(pile,cardIdx);
+                if(seq)spSel={ti:colIdx,ci:cardIdx};
+                renderSpider();
+              };
+            })(c,ti,ci);
+            yPos+=isTop?0:upOverlap;
+          }
+          col.appendChild(ce);
+        });
+      }
+      tabRow.appendChild(col);
+    });
+    wrap.appendChild(tabRow);
+    // Footer
+    var footer=document.createElement('div');footer.style.cssText='display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11px;color:var(--muted)';
+    var dealBtn=document.createElement('button');dealBtn.className='gc-btn gc-btn-outline';dealBtn.style.cssText='font-size:11px;padding:4px 14px';dealBtn.textContent='Deal 10 Cards';dealBtn.onclick=spDeal;
+    footer.appendChild(dealBtn);
+    var nbtn=document.createElement('button');nbtn.className='gc-btn gc-btn-outline';nbtn.style.cssText='font-size:11px;padding:4px 12px';nbtn.textContent='New Game';
+    nbtn.onclick=function(){startSpider();};footer.appendChild(nbtn);
+    if(spCompleted===8){
+      var winMsg=document.createElement('span');winMsg.style.cssText='color:#22c55e;font-weight:700;margin-left:8px';winMsg.textContent='🏆 You won!';footer.appendChild(winMsg);
+      gcSetScore(spMoves+' moves');gcSaveScore('solitaire_spider',spMoves,false);gcAwardGameCredit(cu.nickname,5);achCheckGame('solitaire',{});
+    }
+    wrap.appendChild(footer);
+    C.innerHTML='';C.appendChild(wrap);
+  }
+
+  function spMoveSeq(toCol){
+    if(!spSel)return;
+    var fromPile=spTab[spSel.ti];
+    var seq=spGetSeq(fromPile,spSel.ci);
+    if(!seq){spSel=null;renderSpider();return;}
+    var toPile=spTab[toCol];
+    var pTop=toPile.length?toPile[toPile.length-1]:null;
+    if(!spCanMove(seq[0],pTop)){spSel=null;renderSpider();return;}
+    // Move
+    fromPile.splice(spSel.ci,seq.length);
+    seq.forEach(function(c){toPile.push(c);});
+    if(fromPile.length&&!fromPile[fromPile.length-1].up)fromPile[fromPile.length-1].up=true;
+    spMoves++;SND_GC.card();spSel=null;
+    // Check for completed sequences
+    for(var i=0;i<SP_COLS;i++){
+      if(spCheckComplete(spTab[i])){
+        spTab[i].splice(spTab[i].length-13,13);spCompleted++;SND_GC.win();
+        if(spTab[i].length&&!spTab[i][spTab[i].length-1].up)spTab[i][spTab[i].length-1].up=true;
+        gcToast('♠ Sequence complete! ('+spCompleted+'/8)');
+      }
+    }
+    if(spCompleted===8){gcToast('🏆 Spider Solitaire complete! +5 credits');}
+    renderSpider();
+  }
+
+  // Start with mode select
+  showModeSelect();
 }
 
 /* ════════════════════════════════════════════════════════
