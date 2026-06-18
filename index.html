@@ -4425,6 +4425,7 @@ function openGame(){gcOpenGameCornerPanel();}
 function openGameCorner(){gcOpenGameCornerPanel();}
 function gcOpenGameCornerPanel(){
   try{var _sKey='gc_session_end_'+(cu?cu.nickname:'x');localStorage.removeItem(_sKey);localStorage.removeItem('gc_sess_el_'+(cu?cu.nickname:'x'));localStorage.removeItem('gc_sess_ext_'+(cu?cu.nickname:'x'));}catch(ex){}
+  achBackfillGameHoarder();
   /* Re-attach panel to main-content if it was displaced */
   var gcPanel=G('games-panel');var mc=G('main-content');
   if(gcPanel&&mc&&!mc.contains(gcPanel))mc.appendChild(gcPanel);
@@ -6147,8 +6148,6 @@ var ACHIEVEMENTS={
   /* Game Corner */
   bomb_expert:{id:'bomb_expert',name:'Bomb expert',icon:'💣',tier:'game',rarity:'bronze',cr:150,
     desc:"Cleared Minesweeper on hard. You don't fear consequences."},
-  carlsen_jr:{id:'carlsen_jr',name:'Carlsen Jr',icon:'♟️',tier:'game',rarity:'silver',cr:150,
-    desc:"Beat the chess AI. The machine cried."},
   deal_breaker:{id:'deal_breaker',name:'Deal breaker',icon:'💼',tier:'game',rarity:'gold',cr:200,
     desc:"Walked away with the jackpot. The banker is shaking."},
   speedtype_speedster:{id:'speedtype_speedster',name:'Speedtype Speedster',icon:'👑',tier:'game',rarity:'platinum',cr:300,rolling:true,
@@ -6417,6 +6416,20 @@ function achLoginCheck(){
   var nickLc=nick.toLowerCase();
   var dir=TEAM_DIR[nick]||{};
 
+  /* One-time manual correction: Aldrin's My Team open count never durably reached
+     35 under the old localStorage counter (it kept resetting across browsers/devices),
+     even though the real count was well past it. Grants once, then never runs again. */
+  if(nickLc==='aldrin'&&gcDb()){
+    var _sbFixKey='lounge_sb_manual_grant_aldrin';
+    if(!localStorage.getItem(_sbFixKey)){
+      localStorage.setItem(_sbFixKey,'1');
+      gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
+        var adata=snap.exists()?(snap.data()||{}):{};
+        if(!adata.social_butterfly)achGrant(nick,'social_butterfly',{delay:1000});
+      }).catch(function(){});
+    }
+  }
+
   /* 1. Anniversary check */
   var correctTier=achGetAnnivTier(dir.hireDate);
   if(correctTier){
@@ -6453,8 +6466,8 @@ function achLoginCheck(){
     achGrant(nick,'kobys_friend',{delay:3000});
   }
 
-  /* 4. Volturi — escalation members */
-  if(cu.role&&cu.role.toLowerCase()==='escalation'){
+  /* 4. Volturi — escalation members, and managers (they oversee escalation) */
+  if(cu.role&&(cu.role.toLowerCase()==='escalation'||cu.role.toLowerCase()==='manager')){
     achGrant(nick,'volturi',{silent:true});
   }
 
@@ -6470,11 +6483,16 @@ function achLoginCheck(){
       }).catch(function(){});
     }).catch(function(){});
 
-  /* 6. Social butterfly — My Team tab opens tracked in localStorage */
-  var teamCount=parseInt(localStorage.getItem('lounge_team_opens_'+nickLc)||'0');
+  /* 6. Social butterfly — My Team tab opens, now tracked server-side (gc_config/team_opens_<nick>) */
+  gcDb().collection('gc_config').doc('team_opens_'+nickLc).get().then(function(tcSnap){
+    var teamCount=tcSnap.exists()?(tcSnap.data().count||0):0;
+    gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
+      var adata=aSnap.exists()?(aSnap.data()||{}):{};
+      if(teamCount>=35&&!adata.social_butterfly){achGrant(nick,'social_butterfly',{delay:2000});}
+    }).catch(function(){});
+  }).catch(function(){});
   gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
     var adata=aSnap.exists()?(aSnap.data()||{}):{};
-    if(teamCount>=35&&!adata.social_butterfly){achGrant(nick,'social_butterfly',{delay:2000});}
     /* Lexicon — word search completions tracked in localStorage */
     var wsTotal=parseInt(localStorage.getItem('lounge_ws_complete_'+nickLc)||'0');
     if(wsTotal>=35&&!adata.lexicon){achGrant(nick,'lexicon',{delay:2200});}
@@ -6557,13 +6575,24 @@ function achLoginCheck(){
   }).catch(function(){});
 }
 
-/* ── Track My Team tab opens ── */
+/* ── Track My Team tab opens ──
+   Counter lives in Firestore (gc_config/team_opens_<nick>), not localStorage —
+   localStorage was getting wiped by browser/device switches, so the count
+   never reliably reached the threshold for people who use multiple devices. */
 function achTrackTeamOpen(){
-  if(!cu)return;
-  var key='lounge_team_opens_'+cu.nickname.toLowerCase();
-  var n=parseInt(localStorage.getItem(key)||'0')+1;
-  localStorage.setItem(key,n.toString());
-  if(n===35){achGrant(cu.nickname,'social_butterfly',{delay:500});}
+  if(!cu||!gcDb())return;
+  var nickLc=cu.nickname.toLowerCase();
+  var docId='team_opens_'+nickLc;
+  gcDb().collection('gc_config').doc(docId).get().then(function(snap){
+    var n=(snap.exists()?(snap.data().count||0):0)+1;
+    gcDb().collection('gc_config').doc(docId).set({count:n},{merge:true});
+    if(n>=35){
+      gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
+        var adata=aSnap.exists()?(aSnap.data()||{}):{};
+        if(!adata.social_butterfly)achGrant(cu.nickname,'social_butterfly',{delay:500});
+      }).catch(function(){});
+    }
+  }).catch(function(){});
 }
 
 /* ── Check Master of All Paths ── */
@@ -7027,44 +7056,6 @@ function applyMemberCosmetics(nick,cardEl){
       }
     }
   }).catch(function(e){console.warn('applyMemberCosmetics:',e);});
-}
-
-/* Apply cosmetics to a My Team member card element */
-function applyMemberCosmetics(nick,cardEl){
-  if(!fsDb()||!nick||!cardEl)return;
-  var nickLc=nick.toLowerCase();
-  fsDb().collection('gc_inventory').doc(nickLc).get().then(function(snap){
-    if(!snap.exists)return;
-    var inv=snap.data()||{};
-    var equipped=inv.equipped||{};
-    /* Banner strip on card */
-    var bannerKey=Object.keys(equipped).find(function(k){return k.startsWith('banner_')&&equipped[k];});
-    var existingBanner=cardEl.querySelector('.member-cosmetic-banner');if(existingBanner)existingBanner.remove();
-    if(bannerKey&&BANNER_THEMES[bannerKey]){
-      var bt=BANNER_THEMES[bannerKey];
-      var bannerEl=document.createElement('div');bannerEl.className='member-cosmetic-banner';
-      bannerEl.style.cssText='height:20px;border-radius:8px 8px 0 0;background:'+bt.bg+';margin:-12px -12px 8px -12px;';
-      cardEl.insertBefore(bannerEl,cardEl.firstChild);
-    }
-    /* Ring */
-    var avWrap=cardEl.querySelector('.av-wrap,.member-av-wrap');
-    if(avWrap){
-      var exR=avWrap.querySelector('.portal-av-ring');if(exR)exR.remove();
-      var ringKey=Object.keys(equipped).find(function(k){return k.startsWith('ring_')&&equipped[k];});
-      if(ringKey&&RING_COLORS[ringKey]){
-        var ringEl=document.createElement('div');ringEl.className='portal-av-ring';
-        ringEl.style.cssText='position:absolute;inset:-3px;border-radius:50%;border:3px solid '+RING_COLORS[ringKey]+';pointer-events:none;';
-        avWrap.style.position='relative';avWrap.appendChild(ringEl);
-      }
-    }
-    /* Flair */
-    if(equipped.flair){
-      var nameEl=cardEl.querySelector('.member-name,.av-name');
-      if(nameEl&&!nameEl.querySelector('.gc-flair')){
-        var fl=document.createElement('span');fl.className='gc-flair';fl.style.cssText='font-size:12px;margin-left:4px;';fl.textContent='✨';nameEl.appendChild(fl);
-      }
-    }
-  }).catch(function(){});
 }
 
 /* ── GAME CORNER BADGE REQUEST NOTIFICATIONS (manager only) ── */
@@ -11445,7 +11436,7 @@ function renderMyTeam(){
       ?'<button class="team-card-x" data-remove="'+nick+'" title="Remove member">&#x2715;</button>'
       :'';
     return '<div class="team-card-wrap">'
-      +'<div class="team-card" data-nick="'+nick+'" onclick="openMemberProfile(\''+nick+'\')" style="cursor:pointer">'
+      +'<div class="team-card" data-nick="'+nick+'" style="cursor:pointer">'
       +'<div class="av-wrap" style="position:relative;display:inline-block;width:52px;height:52px;overflow:visible">'+avEl(nick,52)+'</div>'
       +'<div class="team-card-name" style="display:flex;align-items:center;gap:5px">'
       +'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+({online:'#1dd17a',break:'#ffb830',focus:'#ff3d3d',offline:'rgba(232,234,246,.2)'}[_statusCache[nick]||'online']||'#1dd17a')+'"></span>'
@@ -12089,6 +12080,7 @@ function renderMemberProfileCosmetics(nick,inv){
           emptyMsg.textContent='No highlights set.';
           hlWrap.appendChild(emptyMsg);
         }
+        achEl.innerHTML=_sectionHd('Achievements').replace('margin-bottom:8px','margin:12px 0 8px');
         achEl.appendChild(hlWrap);
         /* Highlight button — only for own profile */
         if(isOwn){
@@ -12573,37 +12565,6 @@ async function mwSubmitQEsc(){
   closeMgrWrite();
 }
 
-
-function mwSubmitAwards(){
-  var syd=getSydneyDate();
-  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var mon=months[syd.getMonth()];var yr=syd.getFullYear();
-  var weekNum=Math.ceil(syd.getDate()/7);var weekLabel='Week '+weekNum;
-  var q='Q'+(Math.floor(syd.getMonth()/3)+1)+' '+yr;
-  var medals=['🥇','🥈','🥉'];
-  function gv(id){var el=G(id);return el?el.value:'';}
-  function buildTop(nicks,scores){var top=[];nicks.forEach(function(nick,i){if(nick)top.push({nick:nick,score:scores?scores[i]:null});});return top.length?{top:top}:null;}
-  function saveAward(key,topData,award,emoji,label){
-    mdAwards[key]=topData;
-    if(topData&&topData.top){topData.top.forEach(function(p,i){var entry={nick:p.nick,award:award,emoji:emoji,label:label+' '+medals[i],score:p.score,adu:p.adu,qs:p.qs,esc:p.esc,date:syd.toISOString()};awardHistory.push(entry);fsSaveAwardHistory(entry);});}
-  }
-  var qcTop=buildTop([gv('mw-qc-1'),gv('mw-qc-2'),gv('mw-qc-3')],[gv('mw-qc-1-score'),gv('mw-qc-2-score'),gv('mw-qc-3-score')]);
-  var umTop=buildTop([gv('mw-um-1'),gv('mw-um-2'),gv('mw-um-3')],[gv('mw-um-1-score'),gv('mw-um-2-score'),gv('mw-um-3-score')]);
-  var heroNicks=[gv('mw-hero-1'),gv('mw-hero-2'),gv('mw-hero-3')];
-  var heroTop=buildTop(heroNicks,null);
-  if(heroTop&&heroTop.top){heroTop.top.forEach(function(p,i){var n=i+1;p.adu=gv('mw-hero-'+n+'-adu');p.qs=gv('mw-hero-'+n+'-qs');p.esc=gv('mw-hero-'+n+'-esc');});}
-  var qmNicks=[gv('mw-qm-1'),gv('mw-qm-2'),gv('mw-qm-3')];
-  var qmTop=buildTop(qmNicks,null);
-  if(qmTop&&qmTop.top){qmTop.top.forEach(function(p,i){var n=i+1;p.adu=gv('mw-qm-'+n+'-adu');p.qs=gv('mw-qm-'+n+'-qs');p.esc=gv('mw-qm-'+n+'-esc');});}
-  saveAward('quality',qcTop,'Quality Champion','🏆',mon+', '+weekLabel+' — '+yr);
-  saveAward('uploads',umTop,'Uploading Monster','👾',mon+', '+weekLabel+' — '+yr);
-  saveAward('hero',heroTop,'Hero of the Month','🦸',mon+', '+weekLabel+' — '+yr);
-  saveAward('quarter',qmTop,'Quarter Master','⭐',q);
-  fsSaveAwards();
-  pushNotif('🏆','Awards updated by '+cu.fullName+'.','awards');
-  if(typeof renderAwards==='function')renderAwards();
-  closeMgrWrite();
-}
 
 /* ── DAILY LOG OVERLAY ── */
 function openDailyLog(){
@@ -15358,6 +15319,25 @@ function gcSpendCredit(cost,cb){
   cb();
 }
 
+/* ── One-time backfill: grant Game Hoarder to anyone who already qualifies
+      under the current game list, without requiring them to play another game.
+      Guarded by a local flag so it only ever runs once per browser/person. ── */
+function achBackfillGameHoarder(){
+  if(!cu||!gcDb())return;
+  var nick=cu.nickname;
+  var doneKey='lounge_gh_backfill_done_'+nick.toLowerCase();
+  if(localStorage.getItem(doneKey))return;
+  localStorage.setItem(doneKey,'1'); /* set first so a slow/failed request can't loop-retry every open */
+  gcDb().collection('achievements').doc(nick.toLowerCase()).get().then(function(snap){
+    var a=snap.exists()?(snap.data()||{}):{};
+    if(a.game_hoarder)return;
+    var gamesKey='lounge_games_played_'+nick.toLowerCase();
+    var played=JSON.parse(localStorage.getItem(gamesKey)||'[]');
+    var allGames=['minesweeper','wordguess','wordsearch','typingrace','solitaire','millionaire','dealornodeal','kbquiz','spellwizard'];
+    if(allGames.every(function(g){return played.indexOf(g)>-1;})){achGrant(nick,'game_hoarder',{delay:800});}
+  }).catch(function(){});
+}
+
 function achCheckGame(gameId,opts){
   if(!cu||!gcDb())return;
   var nick=cu.nickname;
@@ -15366,7 +15346,6 @@ function achCheckGame(gameId,opts){
     var a=snap.exists()?(snap.data()||{}):{};
     if(gameId==='wordguess'&&opts.guesses<=2&&!a.word_nerd){achGrant(nick,'word_nerd',{delay:500});}
     if(gameId==='minesweeper'&&opts.hard&&!a.bomb_expert){achGrant(nick,'bomb_expert',{delay:500});}
-    if(gameId==='chess'&&opts.beat_ai&&!a.carlsen_jr){achGrant(nick,'carlsen_jr',{delay:500});}
     if(gameId==='dealornodeal'&&opts.jackpot&&!a.deal_breaker){achGrant(nick,'deal_breaker',{delay:500});}
     if(gameId==='millionaire'&&opts.all15&&opts.no_lifelines&&!a.millionaire){achGrant(nick,'millionaire',{delay:500});}
     /* Solitaire king — track wins */
