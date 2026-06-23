@@ -4475,6 +4475,11 @@ function gamesScrollRight(){var r=G('games-scroll-row');if(r)r.scrollBy({left:20
 
 function moodTodayKey(){return getSydneyDate().toISOString().slice(0,10);}
 
+/* ── Mood scale (5-point, indices 0-4 — matches mood_0…mood_4 in moodSaveToday) ── */
+var MOOD_EMOJIS=['😞','😕','😐','🙂','😄'];
+var MOOD_LABELS=['Bad','Meh','Okay','Good','Great'];
+var MOOD_COLORS=['var(--red)','var(--orange)','var(--amber)','var(--teal)','var(--green)'];
+
 function moodLoadAggregate(cb){
   if(!fsDb()){cb(null);return;}
   var todayKey=moodTodayKey();
@@ -8678,11 +8683,24 @@ function viewArticle(id){
 
 
 function renderHubInLounge(){
-  /* Show the-hub-panel as the active panel instead of duplicating its HTML */
+  /* #the-hub-panel holds the real dashboard markup (kpi-grid, daily-tbl, the
+     calendar trigger, etc.) but used to live as a SIBLING .dash-panel to
+     #the-lounge-panel — not nested inside it. The old approach toggled
+     'active' across ALL .dash-panel elements, which also stripped 'active'
+     off #the-lounge-panel itself (since it's a .dash-panel too), hiding the
+     entire lounge — tab bar's panes included — with nothing to ever restore
+     it short of a full page refresh. That's the tab-freeze bug.
+     Fix: move #the-hub-panel to live inside the lounge's own
+     #lounge-pane-the-hub pane (once), so its visibility is governed purely
+     by the normal .lounge-pane/.active system that My Day, My Team, and My
+     Space already use correctly — no more cross-system class fighting. */
   var hub=G('the-hub-panel');
   if(!hub){return;}
-  document.querySelectorAll('.dash-panel').forEach(function(p){p.classList.remove('active');});
-  hub.classList.add('active');
+  var pane=G('lounge-pane-the-hub');
+  if(pane&&hub.parentNode!==pane){
+    pane.appendChild(hub);
+    hub.classList.add('active'); /* always-on now; #lounge-pane-the-hub's own active class controls real visibility */
+  }
   renderDashboard();
 }
 
@@ -8690,8 +8708,17 @@ function renderHubInLounge(){
 var _rcals={};
 
 function rcalCreate(id,onRange){
+  /* Idempotency guard: if this picker is already wired up, just refresh the
+     callback (it may close over newer state/vars) instead of re-binding
+     listeners on the trigger/document every time the host re-renders.
+     Without this, repeated renders (e.g. rapid tab switching) stack up
+     duplicate click/document listeners and redundant DOM churn. */
+  if(_rcals[id]&&_rcals[id]._inited){
+    _rcals[id].onRange=onRange;
+    return;
+  }
   var now=getSydneyDate();
-  var state={year:now.getFullYear(),month:now.getMonth(),start:null,end:null,picking:'start'};
+  var state={year:now.getFullYear(),month:now.getMonth(),start:null,end:null,picking:'start',onRange:onRange,_inited:true};
   _rcals[id]=state;
 
   function fmt(d){return d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'):null;}
@@ -8748,7 +8775,7 @@ function rcalCreate(id,onRange){
           if(d<state.start){state.end=state.start;state.start=d;}
           else{state.end=d;}
           state.picking='start';
-          if(state.start&&state.end){onRange(fmt(state.start),fmt(state.end));popup.classList.remove('open');}
+          if(state.start&&state.end){state.onRange(fmt(state.start),fmt(state.end));popup.classList.remove('open');}
         }
         updateTrigger();render();
       });
@@ -9924,7 +9951,7 @@ function switchMgrHubTab(tab,btn){
     });
   },50);}
   else if(tab==='performance'){mgrHubDateFilter='today';renderMgrHubPerformance();setTimeout(function(){
-    if(G('rcal-mgr-perf-trigger')&&!G('rcal-mgr-perf-trigger')._rcalInit)rcalCreate('rcal-mgr-perf',function(from,to){
+    if(G('rcal-mgr-perf-trigger'))rcalCreate('rcal-mgr-perf',function(from,to){
       mgrHubCustomRange={from:from,to:to};mgrHubDateFilter='custom';
       document.querySelectorAll('#mgr-hub-pane-performance .filter-pill').forEach(function(p){p.classList.remove('active');});
       renderMgrHubPerformance();
@@ -13576,12 +13603,10 @@ function renderDashboard(){
     </div>`;
   }
   renderDailyTbl(nick,range);
-  /* Re-init custom range calendar after render (DOM re-clones) */
+  /* Init/refresh custom range calendar — rcalCreate is idempotent, so this
+     is safe to call on every render without rebuilding the trigger node. */
   setTimeout(function(){
-    var trig=G('rcal-upl-perf-trigger');
-    if(trig){
-      var fresh=trig.cloneNode(true);
-      trig.parentNode.replaceChild(fresh,trig);
+    if(G('rcal-upl-perf-trigger')){
       rcalCreate('rcal-upl-perf',function(from,to){
         customRange={from:from,to:to};
         activeDateFilter='custom';
