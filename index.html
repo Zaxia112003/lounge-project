@@ -1640,13 +1640,11 @@ async function fsWriteDoc(colName,data){
     var blocked=['perfData','attendanceLog','kc_results','moodLog','timerSessions','player_credits','slaLog'];
     if(blocked.indexOf(colName)>-1)return;
   }
-  try{
-    var db=fsDb();
-    var payload=Object.assign({},data);
-    var id=payload._fsId;delete payload._fsId;
-    if(id){await window._fsSetDoc(window._fsDoc(db,colName,String(id)),payload,{merge:true});}
-    else{var ref=await window._fsAddDoc(window._fsColl(db,colName),payload);return ref.id;}
-  }catch(e){console.warn('fsWrite '+colName,e);}
+  var db=fsDb();
+  var payload=Object.assign({},data);
+  var id=payload._fsId;delete payload._fsId;
+  if(id){await window._fsSetDoc(window._fsDoc(db,colName,String(id)),payload,{merge:true});return id;}
+  else{var ref=await window._fsAddDoc(window._fsColl(db,colName),payload);return ref.id;}
 }
 
 async function fsDeleteDoc(colName,fsId){
@@ -1820,7 +1818,7 @@ function fsStopListeners(){
 function fsSavePerfData(nick){
   if(!fsDb())return;
   if(_testModeGuard())return; /* test mode: no real data writes */
-  fsWriteDoc('perfData',Object.assign({_fsId:nick},perfData[nick]||{}));
+  fsWriteDoc('perfData',Object.assign({_fsId:nick},perfData[nick]||{})).catch(function(e){console.warn('fsWrite perfData',e);});
   /* ── Award performance credits for today ── */
   try{
     var today=todayStr(); /* portal's todayStr() returns YYYY-MM-DD in Sydney time */
@@ -1864,8 +1862,8 @@ function fsDeleteCallout(fsId){
 }
 
 function fsSaveAnnouncement(a){
-  if(!fsDb())return;
-  fsWriteDoc('mdAnnouncements',a);
+  if(!fsDb())return Promise.reject(new Error('No database connection'));
+  return fsWriteDoc('mdAnnouncements',a);
 }
 
 function fsDeleteAnnouncement(fsId){
@@ -1880,17 +1878,17 @@ function fsSaveAwards(){
 
 function fsSaveSLAEntry(entry){
   if(!fsDb())return;
-  fsWriteDoc('slaLog',entry);
+  fsWriteDoc('slaLog',entry).catch(function(e){console.warn('fsWrite slaLog',e);});
 }
 
 function fsSaveTimerSession(session){
   if(!fsDb())return;
-  fsWriteDoc('timerSessions',session);
+  fsWriteDoc('timerSessions',session).catch(function(e){console.warn('fsWrite timerSessions',e);});
 }
 
 function fsSaveAttendance(entry){
   if(!fsDb())return;
-  fsWriteDoc('attendanceLog',entry);
+  fsWriteDoc('attendanceLog',entry).catch(function(e){console.warn('fsWrite attendanceLog',e);});
 }
 
 function fsDeleteAttendance(nick,date){
@@ -1919,7 +1917,7 @@ function fsDeleteTeamMember(nick){
 
 function fsSaveAwardHistory(entry){
   if(!fsDb())return;
-  fsWriteDoc('awardHistory',entry);
+  fsWriteDoc('awardHistory',entry).catch(function(e){console.warn('fsWrite awardHistory',e);});
 }
 
 function fsSaveChatThread(thread){
@@ -8670,7 +8668,17 @@ function submitAddArticle(){
     if(editAid.startsWith('ann-')){
       var annRaw=editAid.replace('ann-','');
       var item=mdAnnouncements.find(function(a){return a._fsId===annRaw||String(a.id)===annRaw;});
-      if(item){item.title=title;item.body=body;fsSaveAnnouncement(item);}
+      if(item){
+        if(body.length>900000){G('add-article-err').textContent='This content is too large to save (likely a pasted image) — try a smaller image or fewer images.';return;}
+        var prevTitle=item.title,prevBody=item.body;
+        item.title=title;item.body=body;
+        fsSaveAnnouncement(item).catch(function(e){
+          console.warn('Announcement edit save failed',e);
+          item.title=prevTitle;item.body=prevBody;
+          renderAnnouncements();
+          G('add-article-err').textContent='Could not save changes — please try again. ('+(e&&e.message?e.message:'connection error')+')';
+        });
+      }
     } else if(editAid.startsWith('kb-')){
       var id=parseInt(editAid.replace('kb-',''));
       var item=KB_ARTICLES.find(function(a){return a.id===id;});
@@ -8688,15 +8696,26 @@ function submitAddArticle(){
       }
     }
   } else {
-    var newId=nextId++;
     if(type==='ann'){
+      var existingAnnIds=mdAnnouncements.map(function(a){return parseInt(a.id)||0;});
+      var newId=Math.max.apply(null,[0].concat(existingAnnIds))+1;
+      if(body.length>900000){G('add-article-err').textContent='This content is too large to save (likely a pasted image) — try a smaller image or fewer images.';return;}
       var expiresAt=window._annExpiresAt||(Date.now()+(7*24*60*60*1000));
       var newAnn={id:newId,title:title,body:body,author:cu.fullName,postedAt:Date.now(),audience:'both',expiresAt:expiresAt};
       mdAnnouncements.unshift(newAnn);
-      fsSaveAnnouncement(newAnn);
       renderAnnouncements();
       annUpdateBadge();
       pushNotif('📢','New announcement from '+cu.fullName+': "'+title+'"','ann');
+      fsSaveAnnouncement(newAnn).then(function(fsId){
+        if(fsId)newAnn._fsId=fsId;
+      }).catch(function(e){
+        console.warn('Announcement save failed',e);
+        var idx=mdAnnouncements.indexOf(newAnn);
+        if(idx>-1)mdAnnouncements.splice(idx,1);
+        renderAnnouncements();
+        annUpdateBadge();
+        alert('That announcement could not be saved ('+(e&&e.message?e.message:'connection error')+') — it has been removed from the list. Please try posting it again.');
+      });
     } else if(type==='kb'||type==='tmpl'||type==='faq'){
       /* Save to Firestore articles collection */
       var artId='art_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6));
