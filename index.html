@@ -820,6 +820,17 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .fmt-link-popover .fp-row button{font-size:11px;padding:5px 12px;border-radius:6px;cursor:pointer;border:1px solid var(--border);}
 .fmt-link-popover .fp-insert{background:var(--accent);color:#fff;border-color:var(--accent);}
 .fmt-link-popover .fp-cancel{background:none;color:var(--muted);}
+/* Restore visible bullets/numbers — the global *{padding:0} reset strips the space ul/ol
+   need to render their marker, both in the editor and in the read-only announcement view. */
+.form-input[contenteditable] ul,.ann-modal-body ul{list-style:disc;padding-left:22px;margin:6px 0;}
+.form-input[contenteditable] ol,.ann-modal-body ol{list-style:decimal;padding-left:22px;margin:6px 0;}
+.form-input[contenteditable] li,.ann-modal-body li{margin:2px 0;}
+.fmt-color-popover{position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;width:auto;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none;}
+.fmt-color-popover.open{display:block;}
+.fmt-swatch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.fmt-swatch{width:24px;height:24px;border-radius:6px;border:1px solid var(--border);cursor:pointer;padding:0;transition:transform .12s;}
+.fmt-swatch:hover{transform:scale(1.12);border-color:var(--text);}
+.fmt-swatch-none{background:var(--bg3);color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;}
 .fmt-body-wrap .form-input{border-radius:0 0 8px 8px !important;}
 .kb-modal-body table{border-spacing:0;border-collapse:collapse;width:100%;margin-bottom:16px;font-size:11px;}
 .kb-modal-body td,.kb-modal-body th{border:1px solid var(--border);padding:5px 7px;vertical-align:top;color:var(--text);}
@@ -4152,22 +4163,57 @@ function fmtSetTarget(el){_fmtTarget=el;}
 function fmtDo(cmd){
   var el=_fmtTarget||document.activeElement;
   if(el&&el.isContentEditable){el.focus();}
-  if(cmd==='highlight'){
-    document.execCommand('styleWithCSS',false,true);
-    document.execCommand('hiliteColor',false,'rgba(255,220,0,.4)');
-  } else if(cmd==='redtext'){
-    document.execCommand('styleWithCSS',false,true);
-    document.execCommand('foreColor',false,'#ef4444');
-  } else {
-    document.execCommand(cmd,false,null);
-  }
+  document.execCommand(cmd,false,null);
   fmtUpdateState();
 }
 function fmtUpdateState(){
   var toolbar=G('fmt-toolbar-main');if(!toolbar)return;
   var btns=toolbar.querySelectorAll('button');
-  var states={0:document.queryCommandState('bold'),1:document.queryCommandState('italic'),2:document.queryCommandState('underline')};
-  btns.forEach(function(b,i){if(i<3)b.classList.toggle('active',!!states[i]);});
+  var states={0:document.queryCommandState('bold'),1:document.queryCommandState('italic'),2:document.queryCommandState('underline'),3:document.queryCommandState('insertUnorderedList')};
+  btns.forEach(function(b,i){if(i<4)b.classList.toggle('active',!!states[i]);});
+}
+function closeFmtColorPopovers(){
+  var c=G('fmt-color-pop');if(c)c.classList.remove('open');
+  var h=G('fmt-highlight-pop');if(h)h.classList.remove('open');
+}
+function fmtPositionPopover(pop,btn){
+  var rect=btn.getBoundingClientRect();
+  pop.style.top=(rect.bottom+6)+'px';
+  pop.style.left=Math.min(rect.left, window.innerWidth-150)+'px';
+}
+function fmtColorOpen(evt){
+  evt.preventDefault();
+  var wasOpen=G('fmt-color-pop')&&G('fmt-color-pop').classList.contains('open');
+  closeFmtColorPopovers();
+  if(wasOpen)return;
+  var pop=G('fmt-color-pop');if(!pop)return;
+  fmtPositionPopover(pop,evt.currentTarget);
+  pop.classList.add('open');
+}
+function fmtHighlightOpen(evt){
+  evt.preventDefault();
+  var wasOpen=G('fmt-highlight-pop')&&G('fmt-highlight-pop').classList.contains('open');
+  closeFmtColorPopovers();
+  if(wasOpen)return;
+  var pop=G('fmt-highlight-pop');if(!pop)return;
+  fmtPositionPopover(pop,evt.currentTarget);
+  pop.classList.add('open');
+}
+function fmtApplyColor(color){
+  var el=_fmtTarget||document.activeElement;
+  if(el&&el.isContentEditable)el.focus();
+  document.execCommand('styleWithCSS',false,true);
+  document.execCommand('foreColor',false,color);
+  closeFmtColorPopovers();
+  fmtUpdateState();
+}
+function fmtApplyHighlight(color){
+  var el=_fmtTarget||document.activeElement;
+  if(el&&el.isContentEditable)el.focus();
+  document.execCommand('styleWithCSS',false,true);
+  document.execCommand('hiliteColor',false,color);
+  closeFmtColorPopovers();
+  fmtUpdateState();
 }
 var _fmtLinkSel=null,_fmtLinkRange=null;
 function fmtLinkOpen(evt){
@@ -4221,6 +4267,10 @@ function fmtLinkInsert(){
 document.addEventListener('click',function(e){
   var pop=G('fmt-link-pop');
   if(pop&&pop.classList.contains('open')&&!pop.contains(e.target)&&!e.target.closest('[onclick*="fmtLinkOpen"]'))fmtLinkClose();
+  var cpop=G('fmt-color-pop');
+  if(cpop&&cpop.classList.contains('open')&&!cpop.contains(e.target)&&!e.target.closest('[onclick*="fmtColorOpen"]'))cpop.classList.remove('open');
+  var hpop=G('fmt-highlight-pop');
+  if(hpop&&hpop.classList.contains('open')&&!hpop.contains(e.target)&&!e.target.closest('[onclick*="fmtHighlightOpen"]'))hpop.classList.remove('open');
 });
 function handleArticlePaste(event, el){
   var items=event.clipboardData&&event.clipboardData.items;
@@ -14786,8 +14836,10 @@ document.addEventListener('DOMContentLoaded',function(){
           <button title="Italic" onclick="fmtDo('italic')" onmousedown="event.preventDefault()"><i>I</i></button>
           <button title="Underline" onclick="fmtDo('underline')" onmousedown="event.preventDefault()"><u>U</u></button>
           <div class="fmt-sep"></div>
-          <button title="Highlight" onclick="fmtDo('highlight')" onmousedown="event.preventDefault()" style="background:rgba(255,220,0,.3)">&#9632; Highlight</button>
-          <button title="Red text" onclick="fmtDo('redtext')" onmousedown="event.preventDefault()" style="color:#ef4444">&#9632; Red</button>
+          <button title="Toggle bullet list" onclick="fmtDo('insertUnorderedList')" onmousedown="event.preventDefault()">&#8226; List</button>
+          <div class="fmt-sep"></div>
+          <button title="Text color" onclick="fmtColorOpen(event)" onmousedown="event.preventDefault()">A<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ef4444;vertical-align:middle;margin-left:3px"></span></button>
+          <button title="Highlight color" onclick="fmtHighlightOpen(event)" onmousedown="event.preventDefault()">&#9632;<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(255,220,0,.6);vertical-align:middle;margin-left:3px"></span></button>
           <div class="fmt-sep"></div>
           <button title="Clear formatting" onclick="fmtDo('removeFormat')" onmousedown="event.preventDefault()">&#10005; Clear</button>
           <div class="fmt-sep"></div>
@@ -14802,6 +14854,31 @@ document.addEventListener('DOMContentLoaded',function(){
           <div class="fp-row">
             <button class="fp-cancel" onclick="fmtLinkClose()">Cancel</button>
             <button class="fp-insert" onclick="fmtLinkInsert()">Insert Link</button>
+          </div>
+        </div>
+        <!-- Text color popover -->
+        <div class="fmt-color-popover" id="fmt-color-pop">
+          <div class="fmt-swatch-grid">
+            <button class="fmt-swatch" style="background:#e5e7eb" onclick="fmtApplyColor('#1f2937')" title="Default"></button>
+            <button class="fmt-swatch" style="background:#ef4444" onclick="fmtApplyColor('#ef4444')" title="Red"></button>
+            <button class="fmt-swatch" style="background:#f97316" onclick="fmtApplyColor('#f97316')" title="Orange"></button>
+            <button class="fmt-swatch" style="background:#f59e0b" onclick="fmtApplyColor('#f59e0b')" title="Amber"></button>
+            <button class="fmt-swatch" style="background:#22c55e" onclick="fmtApplyColor('#22c55e')" title="Green"></button>
+            <button class="fmt-swatch" style="background:#3b82f6" onclick="fmtApplyColor('#3b82f6')" title="Blue"></button>
+            <button class="fmt-swatch" style="background:#8b2dff" onclick="fmtApplyColor('#8b2dff')" title="Purple"></button>
+            <button class="fmt-swatch" style="background:#ec4899" onclick="fmtApplyColor('#ec4899')" title="Pink"></button>
+          </div>
+        </div>
+        <!-- Highlight color popover -->
+        <div class="fmt-color-popover" id="fmt-highlight-pop">
+          <div class="fmt-swatch-grid">
+            <button class="fmt-swatch fmt-swatch-none" onclick="fmtApplyHighlight('transparent')" title="No highlight">&#10005;</button>
+            <button class="fmt-swatch" style="background:rgba(255,220,0,.55)" onclick="fmtApplyHighlight('rgba(255,220,0,.4)')" title="Yellow"></button>
+            <button class="fmt-swatch" style="background:rgba(34,197,94,.55)" onclick="fmtApplyHighlight('rgba(34,197,94,.35)')" title="Green"></button>
+            <button class="fmt-swatch" style="background:rgba(59,130,246,.55)" onclick="fmtApplyHighlight('rgba(59,130,246,.3)')" title="Blue"></button>
+            <button class="fmt-swatch" style="background:rgba(249,115,22,.55)" onclick="fmtApplyHighlight('rgba(249,115,22,.35)')" title="Orange"></button>
+            <button class="fmt-swatch" style="background:rgba(236,72,153,.55)" onclick="fmtApplyHighlight('rgba(236,72,153,.3)')" title="Pink"></button>
+            <button class="fmt-swatch" style="background:rgba(168,85,247,.55)" onclick="fmtApplyHighlight('rgba(168,85,247,.3)')" title="Purple"></button>
           </div>
         </div>
         <div class="form-input" id="add-article-body-inp" contenteditable="true" data-placeholder="Write your content here... (Ctrl+V to paste images)" style="min-height:120px;max-height:300px;overflow-y:auto;white-space:pre-wrap;line-height:1.6;cursor:text;outline:none;border-radius:0 0 8px 8px" onpaste="handleArticlePaste(event,this)" onfocus="fmtSetTarget(this)" onkeyup="fmtUpdateState()" onmouseup="fmtUpdateState()" onkeydown="event.stopPropagation()"></div>
