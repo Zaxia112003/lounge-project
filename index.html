@@ -5786,33 +5786,32 @@ function gcApplySet(setId){
     /* ── Retro Arcade banner overlays ── */
     /* Compute positions as % of actual banner size so they work at any width */
     var raBw=hdr.offsetWidth||900,raBh=hdr.offsetHeight||160;
-    /* 1. Bowling alley lights — ~18% from left, ~11% from top */
+    /* 1. Ambient light grain — small multi-color specks scattered across the banner, gently fading in and out to imply arcade lighting */
     var raOldBowl=hdr.querySelector('#ra-bowling-group');if(raOldBowl)raOldBowl.remove();
+    var raOldGrain=hdr.querySelector('#ra-light-grain');if(raOldGrain)raOldGrain.remove();
     if(!document.getElementById('ra-kf')){
       var rakf2=document.createElement('style');rakf2.id='ra-kf';
       rakf2.textContent=
-        '@keyframes ra-bowl-flash{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.4)}}'+
         '@keyframes ra-hotspot-pulse{0%,100%{opacity:.6}50%{opacity:1}}'+
         '@keyframes ra-sparkle-fade{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(.2) translateY(6px)}}'+
         '@keyframes ra-shape-fade{0%,100%{opacity:0}20%,80%{opacity:.85}}'+'@keyframes ra-spin-cw{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}'+'@keyframes ra-spin-ccw{0%{transform:rotate(0deg)}100%{transform:rotate(-360deg)}}';
       document.head.appendChild(rakf2);
     }
-    /* Bowling lights */
-    var raBowl=document.createElement('div');raBowl.id='ra-bowling-group';
-    raBowl.style.cssText='position:absolute;left:'+Math.round(raBw*0.18)+'px;top:'+Math.round(raBh*0.11)+'px;z-index:3;pointer-events:none;';
-    var row1Data=[[0,'#ff3d7f',0],[11.5,'#00e5ff',.15],[23,'#ffd76a',.3],[34.6,'#9d6bff',.45],[46.1,'#39ff8f',.6],[57.6,'#ff3d7f',.75],[69.1,'#00e5ff',.9],[80.6,'#ffd76a',1.05]];
-    var row2Data=[[5.8,'#9d6bff',.2],[20.2,'#39ff8f',.5],[34.6,'#ff3d7f',.8],[49,'#00e5ff',1.1],[63.4,'#ffd76a',1.3]];
-    [row1Data,row2Data].forEach(function(rd,ri){
-      var row=document.createElement('div');
-      row.style.cssText='position:relative;width:112px;height:0;'+(ri===1?'top:18px;':'');
-      rd.forEach(function(d){
-        var dot=document.createElement('div');
-        dot.style.cssText='position:absolute;top:0;left:'+d[0]+'px;width:4px;height:4px;border-radius:50%;background:'+d[1]+';box-shadow:0 0 6px 2px '+d[1]+';animation:ra-bowl-flash 1.4s ease-in-out infinite '+d[2]+'s;';
-        row.appendChild(dot);
-      });
-      raBowl.appendChild(row);
+    /* Light grain */
+    var raGrain=document.createElement('div');raGrain.id='ra-light-grain';
+    raGrain.style.cssText='position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;';
+    var grainPalette=['#ff3d7f','#00e5ff','#ffd76a','#9d6bff','#39ff8f'];
+    var grainSpots=[[4,14],[9,62],[15,35],[22,80],[29,20],[35,55],[41,10],[48,70],[54,30],[60,50],[66,15],[72,75],[78,40],[84,60],[90,22],[95,45]];
+    grainSpots.forEach(function(pos,i){
+      var speck=document.createElement('div');
+      var col=grainPalette[i%grainPalette.length];
+      var sz=2+Math.round(Math.random());
+      var dur=(2.6+Math.random()*2.2).toFixed(1);
+      var delay=(-Math.random()*dur).toFixed(1);
+      speck.style.cssText='position:absolute;left:'+pos[0]+'%;top:'+pos[1]+'%;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+col+';box-shadow:0 0 4px 1px '+col+';animation:ra-shape-fade '+dur+'s ease-in-out '+delay+'s infinite;';
+      raGrain.appendChild(speck);
     });
-    hdr.appendChild(raBowl);
+    hdr.appendChild(raGrain);
 
     /* 2. Pac-Man screen hotspot — tuned position, locked in */
     var raOldHot=hdr.querySelector('#ra-hotspot');if(raOldHot)raOldHot.remove();
@@ -6322,6 +6321,7 @@ function gcUnequipSet(){
   var oldCFsb=document.querySelector('#cf-sidebar-embers');if(oldCFsb)oldCFsb.remove();
   /* Retro Arcade cleanup */
   var oldRaBowl=document.querySelector('#ra-bowling-group');if(oldRaBowl)oldRaBowl.remove();
+  var oldRaGrain=document.querySelector('#ra-light-grain');if(oldRaGrain)oldRaGrain.remove();
   var oldRaHot=document.querySelector('#ra-hotspot');if(oldRaHot)oldRaHot.remove();
   var oldRaSb=document.querySelector('#ra-sidebar-shapes');if(oldRaSb)oldRaSb.remove();
   var raSbEl=document.querySelector('.sidebar');if(raSbEl&&window._raSbOrigBg!==undefined){raSbEl.style.background=window._raSbOrigBg;window._raSbOrigBg=undefined;}
@@ -8430,8 +8430,16 @@ function convertAnnToKB(id){
   if(!window.mdArticles)window.mdArticles=[];
   window.mdArticles.push(newArt);
   if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',artId),newArt,{merge:true});}catch(e){console.warn('convertAnnToKB save',e);}}
+  /* Remove the original announcement — the KB copy now supersedes it */
+  var annFsId=ann._fsId||ann.id;
+  var idx=mdAnnouncements.findIndex(function(a){return a._fsId===String(annFsId)||String(a.id)===String(annFsId);});
+  if(idx>-1)mdAnnouncements.splice(idx,1);
+  if(fsDb()&&annFsId){
+    try{window._fsDeleteDoc(window._fsDoc(fsDb(),'mdAnnouncements',String(annFsId))).catch(function(){});}catch(e){}
+  }
+  renderAnnouncements();
   if(typeof renderArticles==='function')renderArticles();
-  gcToast('📚 Saved to Knowledge Base — review and adjust below if needed.');
+  gcToast('📚 Saved to Knowledge Base and removed the announcement.');
   openAddArticleModal('kb',newArt,artId);
 }
 function openEditAnn(id){
