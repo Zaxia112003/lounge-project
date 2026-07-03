@@ -1783,6 +1783,7 @@ function fsStartRealtimeListeners(){
       /* Only play sound if a genuinely new callout arrived (not initial load) */
       if(window._calloutsReady&&callouts.length>prevLen&&typeof _playNotifSound==='function')_playNotifSound();
       window._calloutsReady=true;
+      if(typeof achSyncErrorCredits==='function')achSyncErrorCredits();
       if(typeof updateMemberBell==='function')updateMemberBell();if(G('qp-list'))renderQualityPortal();if(G('esc-qp-list'))renderEscQuality();if(G('mgr-hub-pane-quality')&&G('mgr-hub-pane-quality').classList.contains('active'))renderMgrHubQuality();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('daily-tbl'))renderDailyTbl();if(G('lounge-pane-my-team')&&G('lounge-pane-my-team').classList.contains('active'))renderMyTeam();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();if(G('my-day-errors-card'))renderMyDayErrors();if(loungeTab==='the-hub'&&cu&&cu.role==='escalation'){var _eh=G('lounge-pane-the-hub');if(_eh&&_eh.classList.contains('active'))renderEscalationHub();}}));
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'perfData'),function(snap){if(window._perfDataSaving)return;snap.forEach(function(d){if(!perfData[d.id])perfData[d.id]={};var raw=d.data();Object.keys(raw).forEach(function(dk){var rec=raw[dk];if(rec&&typeof rec==='object'){if(rec.uploadsTotal==null&&rec.uploadsByHour!=null){var byH=rec.uploadsByHour;rec.uploadsTotal=Object.keys(byH).reduce(function(s,h){return s+(byH[h]||0);},0);}if(rec.uploadsInShift==null&&rec.uploadsTotal!=null)rec.uploadsInShift=rec.uploadsTotal;if(rec.uploadsOffShift==null)rec.uploadsOffShift=0;if(rec.uploadsByHourInShift==null&&rec.uploadsByHour!=null)rec.uploadsByHourInShift=rec.uploadsByHour;}});Object.assign(perfData[d.id],raw);});if(G('kpi-grid'))renderDashboard();if(G('team-tbl'))renderTeamOverview();if(G('mgr-kpi-card'))renderMgrKpiCard();if(G('mgr-hub-pane-performance')&&G('mgr-hub-pane-performance').classList.contains('active'))renderMgrHubPerformance();if(G('mgr-upload-trend'))renderMgrUploadTrend();if(G('mgr-error-trend'))renderMgrErrorTrend();if(G('my-day-trend-card'))renderMyDayTrend();if(G('my-day-stats-strip'))renderMyDayStatsStrip();}));
   _unsubscribers.push(window._fsOnSnapshot(window._fsColl(window._db,'avatars'),function(snap){if(!window.AVATARS)window.AVATARS={};snap.forEach(function(d){var data=d.data();if(data.fullName&&data.dataUrl){AVATARS[data.fullName]=data.dataUrl;try{localStorage.setItem('avatar_'+data.fullName,data.dataUrl);}catch(ex){}}
@@ -6697,15 +6698,15 @@ var ACHIEVEMENTS={
     desc:"Five years. The portal basically runs on your energy.",years:5},
   anniv_v:{id:'anniv_v',name:'Veteran',icon:null,num:'5+',tier:'anniversary',rarity:'diamond',cr:1000,
     desc:"You've outlasted trends, managers, and probably several coffee machines.",years:6},
-  /* Performance */
+  /* Performance — monthly, re-earnable every qualifying month via period_achievements ledger */
   upload_monster:{id:'upload_monster',name:'Upload monster',icon:'📦',tier:'performance',rarity:'gold',cr:200,
-    desc:"2,000+ contracts in a month. Your fingers deserve a trophy."},
+    desc:"2,000+ contracts in a month, and the most of anyone who hit it. Your fingers deserve a trophy."},
   quality_vet:{id:'quality_vet',name:'Quality veteran',icon:'🎯',tier:'performance',rarity:'gold',cr:200,
-    desc:"100% quality all month. Not a scratch. Not a dent."},
+    desc:"No quality escalation for the whole month. Not one."},
   defect_defender:{id:'defect_defender',name:'Defect Defender',icon:'🛡️',tier:'performance',rarity:'gold',cr:200,
-    desc:"Zero defects for a whole month. Untouchable."},
+    desc:"Zero contract errors for a whole month. Untouchable."},
   life_of_pi:{id:'life_of_pi',name:'Life of PI',icon:'🧮',tier:'performance',rarity:'gold',cr:200,
-    desc:"PI of 13.0+ in a single month. The math did not have to go that hard."},
+    desc:"PI of 13.0+ in a month, and the highest of anyone who hit it. The math did not have to go that hard."},
   the_grind:{id:'the_grind',name:'The Grind',icon:'⚙️',tier:'performance',rarity:'rare',cr:300,
     desc:"500 performance credits in a single day. Machine mode: activated."},
   legend_ach:{id:'legend_ach',name:'Legend',icon:'🏅',tier:'performance',rarity:'rare',cr:500,
@@ -6777,10 +6778,15 @@ var ACHIEVEMENTS={
   kobys_friend:{id:'kobys_friend',name:"Koby's friend",icon:'🎂',tier:'rare',rarity:'rare',cr:300,
     desc:"You showed up on his special day. Koby will remember this."},
   /* Rolling */
-  hero_month:{id:'hero_month',name:'Hero of the Month',icon:'🏆',tier:'rolling',rarity:'gold',cr:500,rolling:true,holdDays:30,
-    desc:"Top uploads, cleanest record, highest PI — all at once. The team carries, you lead."},
-  quarter_master:{id:'quarter_master',name:'Quarter Master',icon:'🗺️',tier:'rolling',rarity:'diamond',cr:1000,rolling:true,holdDays:90,
-    desc:"Best of the best for a full quarter. The scoreboard has a favourite."},
+  /* Position-based, one quarter's worth of visibility — see achIsPeriodBadgeVisible */
+  hero_month_1:{id:'hero_month_1',name:'Hero of the Month I',icon:'🏆',tier:'rolling',rarity:'gold',cr:500,
+    desc:"Swept Upload Monster, Life of PI, Defect Defender, and Quality Veteran — the full set, first month of the quarter."},
+  hero_month_2:{id:'hero_month_2',name:'Hero of the Month II',icon:'🏆',tier:'rolling',rarity:'gold',cr:500,
+    desc:"Swept Upload Monster, Life of PI, Defect Defender, and Quality Veteran — the full set, second month of the quarter."},
+  hero_month_3:{id:'hero_month_3',name:'Hero of the Month III',icon:'🏆',tier:'rolling',rarity:'gold',cr:500,
+    desc:"Swept Upload Monster, Life of PI, Defect Defender, and Quality Veteran — the full set, third month of the quarter."},
+  quarter_master:{id:'quarter_master',name:'Quarter Master',icon:'🎖️',tier:'rolling',rarity:'diamond',cr:1000,
+    desc:"Held Hero of the Month all three months of the quarter. The full set, every time."},
   /* Exclusive */
   volturi:{id:'volturi',name:'Volturi Membership',icon:'🩸',tier:'exclusive',rarity:'rare',cr:0,
     desc:"You were chosen. Not everyone makes the cut. Those who know, know."},
@@ -6999,6 +7005,14 @@ function achLoginCheck(){
   var nickLc=nick.toLowerCase();
   var dir=TEAM_DIR[nick]||{};
 
+  /* 0. Monthly/quarterly performance rollups — manager-gated internally,
+     catches up any completed periods that were never evaluated. */
+  if(typeof achCheckMonthlyRollups==='function'){
+    achCheckMonthlyRollups().then(function(){
+      if(typeof achCheckQuarterlyRollups==='function')achCheckQuarterlyRollups();
+    });
+  }
+
   /* One-time manual correction: Aldrin's My Team open count never durably reached
      35 under the old localStorage counter (it kept resetting across browsers/devices),
      even though the real count was well past it. Grants once, then never runs again. */
@@ -7208,10 +7222,33 @@ function achTrackSpend(nick,amount){
 
 function achOpenHighlightSelector(nick,aData){
   if(document.getElementById('ach-selector-modal'))return;
+  var periodAchIds={hero_month_1:1,hero_month_2:1,hero_month_3:1,quarter_master:1};
+  var hasAnyPeriod=Object.keys(aData).some(function(id){return periodAchIds[id]&&aData[id]&&aData[id].granted;});
+  var lookupP=(hasAnyPeriod&&gcDb())
+    ? gcDb().collection('period_achievements').where('nick','==',nick).get().then(function(snap){
+        var latest={};
+        snap.forEach(function(d){
+          var v=d.data();
+          if(!periodAchIds[v.achId])return;
+          if(!latest[v.achId]||v.periodKey>latest[v.achId].periodKey)latest[v.achId]=v;
+        });
+        return latest;
+      }).catch(function(){return {};})
+    : Promise.resolve({});
+  lookupP.then(function(periodLookup){achOpenHighlightSelectorImpl(nick,aData,periodLookup,periodAchIds);});
+}
+function achOpenHighlightSelectorImpl(nick,aData,periodLookup,periodAchIds){
+  if(document.getElementById('ach-selector-modal'))return;
   var currentHighlights=aData._highlights||[];
-  /* Filter out any highlighted achievements the user no longer owns */
+  /* Filter out any highlighted achievements the user no longer owns, or
+     that are period-based badges whose display window has passed. */
   var selected=currentHighlights.filter(function(achId){
-    return achId&&aData[achId]&&typeof ACHIEVEMENTS!=='undefined'&&ACHIEVEMENTS[achId];
+    if(!achId||!aData[achId]||typeof ACHIEVEMENTS==='undefined'||!ACHIEVEMENTS[achId])return false;
+    if(periodAchIds&&periodAchIds[achId]){
+      var entry=periodLookup&&periodLookup[achId];
+      if(entry&&!achIsPeriodBadgeVisible(achId,entry.periodKey))return false;
+    }
+    return true;
   });
   var overlay=document.createElement('div');
   overlay.id='ach-selector-modal';
@@ -7233,6 +7270,10 @@ function achOpenHighlightSelector(nick,aData){
     if(id.startsWith('_'))return;
     var ach=ACHIEVEMENTS[id];
     if(!ach||!aData[id]||!aData[id].granted)return;
+    if(periodAchIds&&periodAchIds[id]){
+      var entry=periodLookup&&periodLookup[id];
+      if(entry&&!achIsPeriodBadgeVisible(id,entry.periodKey))return; /* expired — not selectable */
+    }
     if(groups[ach.tier])groups[ach.tier].push(id);
   });
   var tierLabels={anniversary:'Anniversary',performance:'Performance',general:'General',game:'Game Corner',shop:'Shop',rare:'Rare',rolling:'Rolling',special:'Special',exclusive:'Exclusive'};
@@ -7297,15 +7338,253 @@ function achOpenHighlightSelector(nick,aData){
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 }
-function achCheckPerformance(nick,monthData){
-  if(!nick||!monthData||!gcDb())return;
+/* ══════════ Ledger-based monthly/quarterly achievements ══════════
+   Everything below is derived purely from the gc_awards credit ledger
+   (upload_hour + error_deduction entries) — independent of, and unaware
+   of, the Performance Hub's perfData/callouts-based calculations. This is
+   deliberately a separate computation path scoped only to Game Corner
+   achievements, per the agreed design. */
+
+var MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function achMonthRange(year,month){ /* month is 1-indexed */
+  var mm=String(month).length<2?'0'+month:String(month);
+  var fromD=year+'-'+mm+'-01';
+  var lastDay=new Date(year,month,0).getDate();
+  var toD=year+'-'+mm+'-'+(String(lastDay).length<2?'0'+lastDay:lastDay);
+  return {fromD:fromD,toD:toD};
+}
+function achQuarterKeyOf(year,month){ return year+'-Q'+(Math.floor((month-1)/3)+1); }
+function achCurrentQuarterKey(){ var n=new Date(); return achQuarterKeyOf(n.getFullYear(),n.getMonth()+1); }
+function achNextQuarterKey(qKey){ var p=qKey.split('-Q');var y=parseInt(p[0]),q=parseInt(p[1])+1;if(q>4){q=1;y+=1;}return y+'-Q'+q; }
+function achPositionInQuarter(month){ return ((month-1)%3)+1; } /* 1,2,3 */
+
+/* Profile-card visibility. Hero of the Month only shows during its own
+   quarter; Quarter Master shows from whenever it's granted through the
+   end of the quarter right after the one it represents — always exactly
+   one full quarter of runway, whether or not a new one follows it. Every
+   other achievement (including the other three period ones) is visible
+   permanently once earned, same as the existing badge system. */
+function achIsPeriodBadgeVisible(achId,periodKey){
+  if(achId==='hero_month_1'||achId==='hero_month_2'||achId==='hero_month_3'){
+    var p=periodKey.split('-');
+    return achQuarterKeyOf(parseInt(p[0]),parseInt(p[1]))===achCurrentQuarterKey();
+  }
+  if(achId==='quarter_master'){
+    var cur=achCurrentQuarterKey();
+    return periodKey===cur||achNextQuarterKey(periodKey)===cur;
+  }
+  return true;
+}
+
+/* Pull one person's ledger totals for a date range. PI uses a fixed
+   7.5hr/day divisor (net of lunch/break) — independent of, and not
+   read by, the Performance Hub's own active-hours PI calculation. */
+function achGetLedgerTotals(nick,fromD,toD){
+  var q1=gcDb().collection('gc_awards').where('nick','==',nick).where('type','==','upload_hour').get();
+  var q2=gcDb().collection('gc_awards').where('nick','==',nick).where('type','==','error_deduction').get();
+  return Promise.all([q1,q2]).then(function(results){
+    var totalCredits=0,daysActive={},qscoreCount=0,qescCount=0;
+    results[0].forEach(function(d){
+      var v=d.data();
+      if(v.date&&v.date>=fromD&&v.date<=toD){totalCredits+=(v.contracts||0);daysActive[v.date]=true;}
+    });
+    results[1].forEach(function(d){
+      var v=d.data();
+      if(v.date&&v.date>=fromD&&v.date<=toD){
+        if(v.calloutType==='qscore')qscoreCount++;
+        else if(v.calloutType==='qesc'||v.calloutType==='qesc_esc')qescCount++;
+      }
+    });
+    var dayCount=Object.keys(daysActive).length;
+    var pi=dayCount>0?(totalCredits/(dayCount*7.5)):0;
+    return {totalCredits:totalCredits,dayCount:dayCount,pi:pi,qscoreCount:qscoreCount,qescCount:qescCount};
+  }).catch(function(){return {totalCredits:0,dayCount:0,pi:0,qscoreCount:0,qescCount:0};});
+}
+
+/* Idempotent, repeatable-per-period grant. Writes a period_achievements
+   ledger entry (source of truth for "did X earn Y in period Z", and what
+   drives credit-awarding + profile visibility), awards credit every
+   qualifying period regardless of prior wins, and unlocks the permanent
+   badge flag on achievements/{nick} the first time only (so the existing
+   profile-card badge display works for these without any changes there). */
+function achGrantPeriodic(nick,achId,periodKey,periodLabel){
+  if(!fsDb()||!gcDb()||!nick)return Promise.resolve(false);
   var nickLc=nick.toLowerCase();
-  gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
-    var a=snap.exists()?(snap.data()||{}):{};
-    if(monthData.totalUploads>=2000&&!a.upload_monster){achGrant(nick,'upload_monster');}
-    if(monthData.quality>=100&&!a.quality_vet){achGrant(nick,'quality_vet');}
-    if(monthData.defectDensity===0&&!a.defect_defender){achGrant(nick,'defect_defender');}
-    if(monthData.pi>=13.0&&!a.life_of_pi){achGrant(nick,'life_of_pi');}
+  var docId=nickLc+'_'+achId+'_'+periodKey;
+  return gcDb().collection('period_achievements').doc(docId).get().then(function(snap){
+    if(snap.exists())return false;
+    var ach=ACHIEVEMENTS[achId];
+    var cr=ach&&ach.cr?ach.cr:0;
+    gcDb().collection('period_achievements').doc(docId).set({nick:nick,achId:achId,periodKey:periodKey,periodLabel:periodLabel,grantedAt:Date.now()});
+    if(cr>0)gcAwardCredit(nickLc,cr);
+    gcDb().collection('achievements').doc(nickLc).get().then(function(aSnap){
+      var a=aSnap.exists()?(aSnap.data()||{}):{};
+      if(!a[achId]||!a[achId].granted){
+        var upd={};upd[achId]={granted:true,date:Date.now(),firstPeriod:periodKey};
+        gcDb().collection('achievements').doc(nickLc).set(upd,{merge:true}).catch(function(){});
+      }
+    }).catch(function(){});
+    if(ach&&typeof pushNotif==='function')pushNotif(ach.icon||'🏆',nick+' earned '+ach.name+' — '+periodLabel+'!','achievement');
+    return true;
+  }).catch(function(){return false;});
+}
+
+/* One month's worth of category + Hero of the Month checks. Upload Monster
+   and Life of PI require crossing the threshold AND being the top scorer
+   among everyone who did (ties all win). Defect Defender and Quality
+   Veteran have no single-winner cap — everyone with zero of that
+   deduction type wins. Hero of the Month N goes to anyone who won all
+   four category badges in this specific month. */
+function achRunLedgerMonthCheck(year,month,resultsLog){
+  var r=achMonthRange(year,month);
+  var periodKey=year+'-'+(String(month).length<2?'0'+month:month);
+  var periodLabel=MONTH_NAMES[month-1]+' '+year;
+  var uploaders=(typeof TEAM!=='undefined'?TEAM:[]).filter(function(t){return t.role&&t.role.toLowerCase()==='uploader';});
+  if(!uploaders.length)return Promise.resolve();
+  return Promise.all(uploaders.map(function(t){
+    return achGetLedgerTotals(t.nickname,r.fromD,r.toD).then(function(totals){return {t:t,totals:totals};});
+  })).then(function(rows){
+    var items=[];
+    var defectWinners=[],qualWinners=[],uploadCandidates=[],piCandidates=[];
+    rows.forEach(function(row){
+      if(row.totals.dayCount===0)return; /* inactive this month */
+      if(row.totals.qscoreCount===0)defectWinners.push(row.t);
+      if(row.totals.qescCount===0)qualWinners.push(row.t);
+      if(row.totals.totalCredits>=2000)uploadCandidates.push(row);
+      if(row.totals.pi>=13.0)piCandidates.push(row);
+    });
+    var uploadWinners=[],piWinners=[];
+    if(uploadCandidates.length){
+      var maxUpl=Math.max.apply(null,uploadCandidates.map(function(rr){return rr.totals.totalCredits;}));
+      uploadWinners=uploadCandidates.filter(function(rr){return rr.totals.totalCredits===maxUpl;}).map(function(rr){return rr.t;});
+    }
+    if(piCandidates.length){
+      var maxPi=Math.max.apply(null,piCandidates.map(function(rr){return rr.totals.pi;}));
+      piWinners=piCandidates.filter(function(rr){return rr.totals.pi===maxPi;}).map(function(rr){return rr.t;});
+    }
+    var grants=[];
+    defectWinners.forEach(function(t){grants.push(achGrantPeriodic(t.nickname,'defect_defender',periodKey,periodLabel).then(function(isNew){if(isNew)items.push(t.fullName+' — 🛡️ Defect Defender');}));});
+    qualWinners.forEach(function(t){grants.push(achGrantPeriodic(t.nickname,'quality_vet',periodKey,periodLabel).then(function(isNew){if(isNew)items.push(t.fullName+' — 🎯 Quality Veteran');}));});
+    uploadWinners.forEach(function(t){
+      var row=uploadCandidates.filter(function(rr){return rr.t===t;})[0];
+      grants.push(achGrantPeriodic(t.nickname,'upload_monster',periodKey,periodLabel).then(function(isNew){if(isNew)items.push(t.fullName+' — 📦 Upload Monster ('+row.totals.totalCredits+' uploads)');}));
+    });
+    piWinners.forEach(function(t){
+      var row=piCandidates.filter(function(rr){return rr.t===t;})[0];
+      grants.push(achGrantPeriodic(t.nickname,'life_of_pi',periodKey,periodLabel).then(function(isNew){if(isNew)items.push(t.fullName+' — 🧮 Life of PI ('+row.totals.pi.toFixed(1)+')');}));
+    });
+    return Promise.all(grants).then(function(){
+      var heroes=defectWinners.filter(function(t){
+        return qualWinners.indexOf(t)!==-1&&uploadWinners.indexOf(t)!==-1&&piWinners.indexOf(t)!==-1;
+      });
+      var heroAchId='hero_month_'+achPositionInQuarter(month);
+      return Promise.all(heroes.map(function(t){
+        return achGrantPeriodic(t.nickname,heroAchId,periodKey,periodLabel).then(function(isNew){
+          if(isNew)items.push(t.fullName+' — '+ACHIEVEMENTS[heroAchId].icon+' '+ACHIEVEMENTS[heroAchId].name);
+        });
+      })).then(function(){
+        if(resultsLog)resultsLog.push({period:periodLabel,items:items});
+      });
+    });
+  });
+}
+
+/* One quarter's Quarter Master check — anyone who holds Hero of the Month
+   I, II, AND III (same person, all three) for this specific quarter. Only
+   meaningful to run after all three of that quarter's months have already
+   been evaluated by achRunLedgerMonthCheck. */
+function achRunLedgerQuarterCheck(year,q,resultsLog){
+  var qKey=year+'-Q'+q;
+  var periodLabel='Q'+q+' '+year;
+  var startMonth=(q-1)*3+1;
+  var monthKeys=[0,1,2].map(function(i){var m=startMonth+i;return year+'-'+(String(m).length<2?'0'+m:m);});
+  return Promise.all(monthKeys.map(function(mk){
+    return gcDb().collection('period_achievements').where('periodKey','==',mk).get().then(function(snap){
+      var winners=[];
+      snap.forEach(function(d){var v=d.data();if(v.achId&&v.achId.indexOf('hero_month_')===0)winners.push(v.nick);});
+      return winners;
+    }).catch(function(){return [];});
+  })).then(function(monthWinnerLists){
+    var counts={},names={};
+    monthWinnerLists.forEach(function(list){
+      var seen={};
+      list.forEach(function(nick){
+        var key=nick.toLowerCase();
+        if(seen[key])return;seen[key]=true;
+        counts[key]=(counts[key]||0)+1;names[key]=nick;
+      });
+    });
+    var sweepers=Object.keys(counts).filter(function(k){return counts[k]===3;});
+    var items=[];
+    return Promise.all(sweepers.map(function(k){
+      return achGrantPeriodic(names[k],'quarter_master',qKey,periodLabel).then(function(isNew){
+        if(isNew)items.push(names[k]+' — 🎖️ Quarter Master');
+      });
+    })).then(function(){
+      if(resultsLog)resultsLog.push({period:periodLabel,items:items});
+    });
+  });
+}
+
+/* Catches up any completed months/quarters never evaluated, then stays
+   current going forward. Manager-only, safe to re-run anytime — every
+   grant underneath is idempotent per period. */
+function achCheckMonthlyRollups(resultsLog,forceFrom){
+  if(!cu||!cu.role||cu.role.toLowerCase()!=='manager'||!fsDb()||!gcDb())return Promise.resolve();
+  return gcDb().collection('gc_config').doc('ach_monthly_rollup_v2').get().then(function(snap){
+    var data=snap.exists()?(snap.data()||{}):{};
+    var now=new Date();var curY=now.getFullYear(),curM=now.getMonth()+1;
+    var y,m;
+    if(forceFrom){y=forceFrom.y;m=forceFrom.m;}
+    else if(data.lastMonth){
+      var p=data.lastMonth.split('-');y=parseInt(p[0]);m=parseInt(p[1])+1;
+      if(m>12){m=1;y+=1;}
+    } else { var d=new Date(curY,now.getMonth()-3,1);y=d.getFullYear();m=d.getMonth()+1; }
+    var periods=[];
+    while(y<curY||(y===curY&&m<curM)){
+      periods.push({y:y,m:m});
+      m+=1;if(m>12){m=1;y+=1;}
+      if(periods.length>36)break;
+    }
+    if(!periods.length)return;
+    var chain=Promise.resolve();
+    periods.forEach(function(p){chain=chain.then(function(){return achRunLedgerMonthCheck(p.y,p.m,resultsLog);});});
+    return chain.then(function(){
+      var lastP=periods[periods.length-1];
+      var lastLabel=lastP.y+'-'+(String(lastP.m).length<2?'0'+lastP.m:lastP.m);
+      if(!forceFrom||!data.lastMonth||lastLabel>data.lastMonth){
+        gcDb().collection('gc_config').doc('ach_monthly_rollup_v2').set({lastMonth:lastLabel},{merge:true}).catch(function(){});
+      }
+    });
+  }).catch(function(){});
+}
+function achCheckQuarterlyRollups(resultsLog,forceFrom){
+  if(!cu||!cu.role||cu.role.toLowerCase()!=='manager'||!fsDb()||!gcDb())return Promise.resolve();
+  return gcDb().collection('gc_config').doc('ach_quarterly_rollup_v2').get().then(function(snap){
+    var data=snap.exists()?(snap.data()||{}):{};
+    var now=new Date();var curY=now.getFullYear(),curQ=Math.floor(now.getMonth()/3)+1;
+    var y,q;
+    if(forceFrom){y=forceFrom.y;q=forceFrom.q;}
+    else if(data.lastQuarter){
+      var p=data.lastQuarter.split('-Q');y=parseInt(p[0]);q=parseInt(p[1])+1;
+      if(q>4){q=1;y+=1;}
+    } else { var totalQ=curY*4+(curQ-1)-2;y=Math.floor(totalQ/4);q=(totalQ%4)+1; }
+    var periods=[];
+    while(y<curY||(y===curY&&q<curQ)){
+      periods.push({y:y,q:q});
+      q+=1;if(q>4){q=1;y+=1;}
+      if(periods.length>12)break;
+    }
+    if(!periods.length)return;
+    var chain=Promise.resolve();
+    periods.forEach(function(p){chain=chain.then(function(){return achRunLedgerQuarterCheck(p.y,p.q,resultsLog);});});
+    return chain.then(function(){
+      var lastP=periods[periods.length-1];
+      var lastLabel=lastP.y+'-Q'+lastP.q;
+      if(!forceFrom||!data.lastQuarter||lastLabel>data.lastQuarter){
+        gcDb().collection('gc_config').doc('ach_quarterly_rollup_v2').set({lastQuarter:lastLabel},{merge:true}).catch(function(){});
+      }
+    });
   }).catch(function(){});
 }
 function achCheckDailyGrind(nick,dailyPerfCredits){
@@ -7315,6 +7594,42 @@ function achCheckDailyGrind(nick,dailyPerfCredits){
     if(dailyPerfCredits>=500&&!a.the_grind){achGrant(nick,'the_grind');}
   }).catch(function(){});
 }
+/* Manual "run it now" entry point for managers. Monthly rollup runs to
+   completion first (Quarter Master depends on that month data existing),
+   then quarterly. Safe to click repeatedly — every grant is idempotent. */
+function achManualRunCheck(){
+  if(!cu||!cu.role||cu.role.toLowerCase()!=='manager'){gcToast('Managers only.');return;}
+  gcToast('🏆 Checking completed months and quarters…');
+  var resultsLog=[];
+  achCheckMonthlyRollups(resultsLog).then(function(){
+    return achCheckQuarterlyRollups(resultsLog);
+  }).then(function(){
+    achShowRollupResults(resultsLog);
+  });
+}
+function achShowRollupResults(resultsLog){
+  var overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  var modal=document.createElement('div');
+  modal.style.cssText='background:var(--bg2,#181a2a);border:1px solid var(--border,#333);border-radius:14px;padding:22px;max-width:440px;width:92%;max-height:80vh;overflow-y:auto;color:var(--text,#eee);';
+  var html='<div style="font-weight:700;font-size:15px;margin-bottom:14px">🏆 Achievement check results</div>';
+  var any=false;
+  (resultsLog||[]).forEach(function(p){
+    if(!p.items.length)return;
+    any=true;
+    html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted,#888);margin:14px 0 6px">'+p.period+'</div>';
+    p.items.forEach(function(i){html+='<div style="font-size:13px;padding:6px 0;border-bottom:1px solid var(--border,#2a2a3a)">'+i+'</div>';});
+  });
+  if(!any){
+    html+='<div style="font-size:13px;color:var(--muted,#888);padding:10px 0">No completed period had anyone hit a threshold, or everything was already awarded.</div>';
+  }
+  html+='<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="margin-top:16px;width:100%;padding:10px;border-radius:8px;border:none;background:var(--accent,#00e5ff);color:#0a0a12;font-weight:700;cursor:pointer">Close</button>';
+  modal.innerHTML=html;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
 function gcCleanLegacyItems(){
   /* Migration: members who bought individual banners/rings before the set system
      get the full matching set granted for free, then legacy items are removed.
@@ -12645,8 +12960,28 @@ function renderMemberProfileCosmetics(nick,inv){
       window._fsGetDoc(window._fsDoc(fsDb(),'achievements',nick.toLowerCase())).then(function(aSnap){
         var aData=aSnap.exists()?(aSnap.data()||{}):{};
         /* Get highlighted achievements */
-        var highlights=aData._highlights||[];
+        var rawHighlights=aData._highlights||[];
         var isOwn=cu&&cu.nickname===nick;
+        var periodAchIds={hero_month_1:1,hero_month_2:1,hero_month_3:1,quarter_master:1};
+        var hasPeriodHighlight=rawHighlights.some(function(id){return periodAchIds[id];});
+        var periodLookupP=hasPeriodHighlight&&gcDb()
+          ? gcDb().collection('period_achievements').where('nick','==',nick).get().then(function(snap){
+              var latest={};
+              snap.forEach(function(d){
+                var v=d.data();
+                if(!periodAchIds[v.achId])return;
+                if(!latest[v.achId]||v.periodKey>latest[v.achId].periodKey)latest[v.achId]=v;
+              });
+              return latest;
+            }).catch(function(){return {};})
+          : Promise.resolve({});
+        periodLookupP.then(function(periodLookup){
+        var highlights=rawHighlights.filter(function(achId){
+          if(!periodAchIds[achId])return true; /* not a period-based badge — always keep */
+          var entry=periodLookup[achId];
+          if(!entry)return true; /* no ledger record yet (legacy data) — don't hide by default */
+          return achIsPeriodBadgeVisible(achId,entry.periodKey);
+        });
         /* Render highlight slots */
         var hlWrap=document.createElement('div');
         hlWrap.style.cssText='display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;';
@@ -12654,6 +12989,7 @@ function renderMemberProfileCosmetics(nick,inv){
           highlights.forEach(function(achId,slotIdx){
             var ach=ACHIEVEMENTS[achId];if(!ach)return;
             var r=ACH_RARITY[ach.rarity]||ACH_RARITY.gray;
+            var periodEntry=periodLookup[achId];
             var slot=document.createElement('div');
             slot.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;cursor:default;position:relative;';
             slot.appendChild(achMakeIcon(ach,48));
@@ -12670,7 +13006,8 @@ function renderMemberProfileCosmetics(nick,inv){
             else if(slotIdx===highlights.length-1){tipStyle+='right:0;';}
             else{tipStyle+='left:50%;transform:translateX(-30%);';}
             tip.style.cssText=tipStyle;
-            tip.innerHTML='<strong style="color:'+r.color+';display:block;margin-bottom:3px;font-size:10px">'+ach.name+'</strong>'+ach.desc;
+            var tipDesc=ach.desc+(periodEntry?' <span style="color:'+r.color+'">('+periodEntry.periodLabel+')</span>':'');
+            tip.innerHTML='<strong style="color:'+r.color+';display:block;margin-bottom:3px;font-size:10px">'+ach.name+'</strong>'+tipDesc;
             slot.appendChild(tip);
             slot.onmouseenter=function(){tip.style.opacity='1';};
             slot.onmouseleave=function(){tip.style.opacity='0';};
@@ -12692,6 +13029,7 @@ function renderMemberProfileCosmetics(nick,inv){
           hlBtn.onclick=function(){achOpenHighlightSelector(nick,aData);};
           achEl.appendChild(hlBtn);
         }
+        });
       }).catch(function(){
         var err=document.createElement('span');err.style.cssText='font-size:12px;color:var(--muted);';
         err.textContent='Could not load achievements.';achEl.appendChild(err);
@@ -18663,6 +19001,45 @@ function gcAwardUploadCredits(nick,date,byHourInShift){
   });
 }
 window.gcAwardUploadCredits=gcAwardUploadCredits;
+
+/* ── Error credit deductions ──
+   Contract Error (qscore): -25 credits. Quality Escalation (qesc/qesc_esc): -100 credits.
+   Applied once an error is CONFIRMED — using the exact same rule already used
+   everywhere else in this file to decide whether an error "counts"
+   (status !== 'pending_review' && status !== 'discarded'). If a confirmed
+   error is later discarded, the deduction is automatically refunded.
+   Idempotent via a ledger doc per callout in gc_awards (same collection the
+   other credit events already use), so it's safe to re-run repeatedly.
+   Manager sessions only, so two open browsers can't race to double-write
+   the same ledger entry. Balances are allowed to go negative — no floor. */
+window._errCreditSeen=window._errCreditSeen||{};
+function achSyncErrorCredits(){
+  if(!gcIsManager()||!gcDb())return;
+  (callouts||[]).forEach(function(co){
+    if(co.type!=='qscore'&&co.type!=='qesc'&&co.type!=='qesc_esc')return;
+    var calloutKey=co._fsId||String(co.id);
+    if(!calloutKey||!co.uploader)return;
+    if(window._errCreditSeen[calloutKey]===co.status)return; /* unchanged since last pass */
+    var shouldCount=co.status!=='pending_review'&&co.status!=='discarded';
+    var nickLc=co.uploader.toLowerCase();
+    var docKey=nickLc+'_err_'+calloutKey;
+    gcDb().collection('gc_awards').doc(docKey).get().then(function(snap){
+      var already=snap.exists();
+      if(shouldCount&&!already){
+        var amt=co.type==='qscore'?-25:-100;
+        gcAwardCredit(nickLc,amt);
+        gcDb().collection('gc_awards').doc(docKey).set({nick:co.uploader,type:'error_deduction',calloutType:co.type,calloutId:calloutKey,amount:amt,date:co.date||null,appliedAt:Date.now()});
+        if(typeof pushNotif==='function')pushNotif('⚠️',co.uploader+' was deducted '+Math.abs(amt)+' credits for a confirmed '+(co.type==='qscore'?'contract error':'quality escalation')+'.','credit');
+      } else if(!shouldCount&&already){
+        var prevAmt=(snap.data()||{}).amount||0;
+        if(prevAmt)gcAwardCredit(nickLc,-prevAmt);
+        gcDb().collection('gc_awards').doc(docKey).delete();
+      }
+      window._errCreditSeen[calloutKey]=co.status;
+    }).catch(function(){});
+  });
+}
+window.achSyncErrorCredits=achSyncErrorCredits;
 
 /* ── Streak detection — called after each perf data save ── */
 function gcCheckStreaks(nick){
