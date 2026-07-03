@@ -7591,17 +7591,19 @@ function renderMgrHubQuality(){
   /* Gather error data from callouts */
   var _qMF=window.mgrQMemberFilter||'';
   var uploaders=TEAM.filter(function(t){return t.role==='uploader'&&(!_qMF||t.nickname===_qMF);});
+  var allQMembers=TEAM.filter(function(t){return (t.role==='uploader'||t.role==='escalation')&&(!_qMF||t.nickname===_qMF);});
   var errTypes={};
   (typeof ERROR_CATEGORIES!=='undefined'?ERROR_CATEGORIES:[]).forEach(function(c){errTypes[c]=0;});
   var memberErrors={};
 
-  uploaders.forEach(function(t){
+  allQMembers.forEach(function(t){
     var nick=t.nickname;
     memberErrors[nick]=0;
     (callouts||[]).forEach(function(c){
-      if(c.uploader!==nick)return;
+      if(c.type!=='qscore'&&c.type!=='qesc'&&c.type!=='qesc_esc')return;
+      var belongsToMember=c.type==='qesc_esc'?(c.escalationMember===nick):(c.uploader===nick);
+      if(!belongsToMember)return;
       if(!inRange((c.date||'').slice(0,10)))return;
-      if(c.type!=='qscore'&&c.type!=='qesc')return;
       if(c.status==='pending_review'||c.status==='discarded')return;
       memberErrors[nick]++;
       var cat=c.category||'Others';
@@ -7609,7 +7611,7 @@ function renderMgrHubQuality(){
     });
   });
 
-  /* Total uploads in range */
+  /* Total uploads in range (uploaders only — quality % is an upload-quality metric) */
   var totalUpl=0,totalErrs=0;
   uploaders.forEach(function(t){
     var nick=t.nickname;
@@ -7617,23 +7619,24 @@ function renderMgrHubQuality(){
       if(!inRange(d))return;
       totalUpl+=(perfData[nick][d].uploadsTotal||0);
     });
-    totalErrs+=memberErrors[nick];
   });
+  allQMembers.forEach(function(t){totalErrs+=memberErrors[t.nickname]||0;});
 
   var qualPct=totalUpl>0?((totalUpl-totalErrs)/totalUpl*100):null;
   var worstMember=Object.keys(memberErrors).reduce(function(a,b){return memberErrors[a]>=memberErrors[b]?a:b;},'');
-  var totalEscs=(callouts||[]).filter(function(c){return c.type==='qesc'&&inRange((c.date||'').slice(0,10));}).length;
+  var totalEscs=(callouts||[]).filter(function(c){return (c.type==='qesc'||c.type==='qesc_esc')&&inRange((c.date||'').slice(0,10));}).length;
 
   /* Last month comparison */
   var prevFrom=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,10);
   var prevTo=new Date(now.getFullYear(),now.getMonth(),0).toISOString().slice(0,10);
   function inPrev(d){return d>=prevFrom&&d<=prevTo;}
   var prevErrs=0;
-  uploaders.forEach(function(t){
+  allQMembers.forEach(function(t){
     (callouts||[]).forEach(function(c){
-      if(c.uploader!==t.nickname)return;
+      if(c.type!=='qscore'&&c.type!=='qesc'&&c.type!=='qesc_esc')return;
+      var belongsToMember=c.type==='qesc_esc'?(c.escalationMember===t.nickname):(c.uploader===t.nickname);
+      if(!belongsToMember)return;
       if(!inPrev((c.date||'').slice(0,10)))return;
-      if(c.type!=='qscore'&&c.type!=='qesc')return;
       if(c.status==='pending_review'||c.status==='discarded')return;
       prevErrs++;
     });
@@ -7646,9 +7649,9 @@ function renderMgrHubQuality(){
     :'<span style="color:var(--muted)">No previous data</span>';
 
   /* Bar chart */
-  var maxErr=Math.max(1,Math.max.apply(null,uploaders.map(function(t){return memberErrors[t.nickname]||0;})));
+  var maxErr=Math.max(1,Math.max.apply(null,allQMembers.map(function(t){return memberErrors[t.nickname]||0;})));
   var barColors=['#f09595','#f09595','#f09595','#ef9f27','#97c459','#97c459','#97c459'];
-  var sortedMembers=uploaders.slice().sort(function(a,b){return (memberErrors[b.nickname]||0)-(memberErrors[a.nickname]||0);});
+  var sortedMembers=allQMembers.slice().sort(function(a,b){return (memberErrors[b.nickname]||0)-(memberErrors[a.nickname]||0);});
   var barHTML=sortedMembers.map(function(t,i){
     var errs=memberErrors[t.nickname]||0;
     var pct=Math.round((errs/maxErr)*100);
@@ -8402,6 +8405,7 @@ function renderAnnouncements(){
     var managerActions=seenLine+(isManager
       ?'<div style="display:flex;gap:6px;margin-top:6px">'
         +'<button onclick="event.stopPropagation();openEditAnn('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer">Edit</button>'
+        +'<button onclick="event.stopPropagation();convertAnnToKB('+a.id+')" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer">&#128218; Save to KB</button>'
         +'<button onclick="event.stopPropagation();deleteAnnouncement(this.dataset.fsid)" data-fsid="'+(a._fsId||a.id)+'" style="font-size:10px;padding:2px 8px;border-radius:6px;border:1px solid var(--red,#ef4444);background:none;color:var(--red,#ef4444);cursor:pointer">Remove</button>'
         +'</div>'
       :'');
@@ -8417,6 +8421,19 @@ function renderAnnouncements(){
   if(typeof updateMemberBell==='function')setTimeout(updateMemberBell,300);
 }
 
+function convertAnnToKB(id){
+  var ann=mdAnnouncements.find(function(a){return String(a.id)===String(id);});
+  if(!ann){gcToast('Announcement not found.');return;}
+  var artId='art_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6));
+  var newArt={id:artId,title:ann.title,body:ann.body,category:'kb',role:'both',
+              createdBy:cu.fullName,createdAt:new Date().toISOString(),_convertedFromAnn:ann._fsId||String(ann.id)};
+  if(!window.mdArticles)window.mdArticles=[];
+  window.mdArticles.push(newArt);
+  if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',artId),newArt,{merge:true});}catch(e){console.warn('convertAnnToKB save',e);}}
+  if(typeof renderArticles==='function')renderArticles();
+  gcToast('📚 Saved to Knowledge Base — review and adjust below if needed.');
+  openAddArticleModal('kb',newArt,artId);
+}
 function openEditAnn(id){
   var a=mdAnnouncements.find(function(x){return x.id===id;});
   if(!a)return;
@@ -10981,6 +10998,7 @@ function mgrQInRange(dateStr){
 
 function openQualMemberErrors(nick,fullName){
   var mqdFilter=window.mgrQDateFilter||'month';
+  var mqdCustom=window.mgrQCustomRange||{from:'',to:''};
   var now=getSydneyDate();
   var fromD,toD=now.toISOString().slice(0,10);
   if(mqdFilter==='today'){fromD=toD;}
@@ -10988,10 +11006,13 @@ function openQualMemberErrors(nick,fullName){
   else if(mqdFilter==='month'){fromD=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);}
   else if(mqdFilter==='quarter'){fromD=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1).toISOString().slice(0,10);}
   else if(mqdFilter==='year'){fromD=new Date(now.getFullYear(),0,1).toISOString().slice(0,10);}
+  else if(mqdFilter==='custom'&&mqdCustom.from){fromD=mqdCustom.from;toD=mqdCustom.to||toD;}
   else{fromD=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);}
   function inR(d){return d>=fromD&&d<=toD;}
   var errs=(callouts||[]).filter(function(c){
-    return c.uploader===nick&&(c.type==='qscore'||c.type==='qesc')
+    if(c.type!=='qscore'&&c.type!=='qesc'&&c.type!=='qesc_esc')return false;
+    var belongsToMember=c.type==='qesc_esc'?(c.escalationMember===nick):(c.uploader===nick);
+    return belongsToMember
       &&inR((c.date||'').slice(0,10))
       &&c.status!=='pending_review'&&c.status!=='discarded';
   });
@@ -14320,7 +14341,10 @@ async function submitQEsc(){
   const ss=G('qesc-file').files[0]?await uploadScreenshot(G('qesc-file').files[0]):null;
   const uplMem=TEAM.find(m=>m.nickname===upl);
   var qescCat=G('qesc-cat')?G('qesc-cat').value:'Others';
-  var qescCo={id:nextId++,type:'qesc',uploader:upl,address:addr,date:date,feedback:fb,category:qescCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
+  var isEscTarget=uplMem&&uplMem.role&&uplMem.role.toLowerCase()==='escalation';
+  var qescCo=isEscTarget
+    ?{id:nextId++,type:'qesc_esc',uploader:upl,escalationMember:upl,address:addr,date:date,feedback:fb,category:qescCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:'',escThread:true}
+    :{id:nextId++,type:'qesc',uploader:upl,address:addr,date:date,feedback:fb,category:qescCat||'Others',screenshot:ss,loggedBy:cu.nickname,loggedAt:new Date().toISOString(),status:'Pending',insight:''};
   /* Do NOT push locally — onSnapshot handles it */
   await fsSaveCallout(qescCo);
   closeModal('modal-qesc');
