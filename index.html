@@ -6773,6 +6773,10 @@ var ACHIEVEMENTS={
     desc:"Walked away with the jackpot. The banker is shaking."},
   speedtype_speedster:{id:'speedtype_speedster',name:'Speedtype Speedster',icon:'👑',tier:'game',rarity:'platinum',cr:300,rolling:true,
     desc:"Fastest fingers in the portal. The crown is yours.. for now.."},
+  god_of_tetris:{id:'god_of_tetris',name:'God of Tetris',icon:'🟧',tier:'game',rarity:'platinum',cr:300,rolling:true,
+    desc:"Holds the highest Tetris score in the portal. All hail."},
+  spin_master:{id:'spin_master',name:'Spin Master',icon:'🌀',tier:'game',rarity:'gold',cr:200,
+    desc:"Performed 100 T-spins. The corners fear you."},
     lexicon:{id:'lexicon',name:'Lexicon',icon:'📚',tier:'game',rarity:'gold',cr:150,
     desc:"35 word searches completed. You eat grids for breakfast."},
     word_nerd:{id:'word_nerd',name:'Word nerd',icon:'📖',tier:'game',rarity:'silver',cr:200,
@@ -16346,7 +16350,7 @@ var _gcAllCredits={},_gcShifts={},_gcShiftsLoaded=false,_gcNotifs=[];
 /* ── Widget API keys ── */
 var WIDGET_KEYS={weather:'5222dd774faba440a3de6558a79b806f',news:'45a555116c88c9ef53afaac4acb73d6d'};
 
-var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,fps:5,wordsearch:1,typingrace:1,spellwizard:1};
+var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,fps:5,wordsearch:1,typingrace:1,spellwizard:1,tetris:1};
 
 /* ── Sound ── */
 function gcEnsureAudio(){if(!gcAudioCtx)gcAudioCtx=new(window.AudioContext||window.webkitAudioContext)();if(gcAudioCtx.state==='suspended')gcAudioCtx.resume();}
@@ -16404,7 +16408,7 @@ function achBackfillGameHoarder(){
     if(a.game_hoarder)return;
     var gamesKey='lounge_games_played_'+nick.toLowerCase();
     var played=JSON.parse(localStorage.getItem(gamesKey)||'[]');
-    var allGames=['minesweeper','wordguess','wordsearch','typingrace','solitaire','millionaire','dealornodeal','kbquiz','spellwizard'];
+    var allGames=['minesweeper','wordguess','wordsearch','typingrace','solitaire','millionaire','dealornodeal','kbquiz','spellwizard','tetris'];
     if(allGames.every(function(g){return played.indexOf(g)>-1;})){achGrant(nick,'game_hoarder',{delay:800});}
   }).catch(function(){});
 }
@@ -16430,7 +16434,7 @@ function achCheckGame(gameId,opts){
     var gamesKey='lounge_games_played_'+nick.toLowerCase();
     var played=JSON.parse(localStorage.getItem(gamesKey)||'[]');
     if(played.indexOf(gameId)===-1){played.push(gameId);localStorage.setItem(gamesKey,JSON.stringify(played));}
-    var allGames=['minesweeper','wordguess','wordsearch','typingrace','solitaire','millionaire','dealornodeal','kbquiz','spellwizard'];
+    var allGames=['minesweeper','wordguess','wordsearch','typingrace','solitaire','millionaire','dealornodeal','kbquiz','spellwizard','tetris'];
     if(allGames.every(function(g){return played.indexOf(g)>-1;})&&!a.game_hoarder){achGrant(nick,'game_hoarder',{delay:800});}
     /* Credit baron — checked on login but also on game win */
     gcDb().collection('player_credits').doc(nick.toLowerCase()).get().then(function(cs){
@@ -17521,6 +17525,7 @@ function gcLaunchGame(id,title){
       if(id==='wordsearch')gcGameWordSearch(body);
       if(id==='typingrace')gcGameTypingRace(body);
       if(id==='spellwizard')gcGameSpellWizard(body);
+      if(id==='tetris')gcGameTetris(body);
     },60);
   });
 }
@@ -17560,6 +17565,7 @@ function gcRenderGrid(_retries){
     {id:'wordsearch',e:'🔍',n:'Word Search',d:'Find all hidden words · 1 credit'},
     {id:'typingrace',e:'⌨️',n:'Typing Race',d:'Type fast, score high · 1 credit'},
     {id:'spellwizard',e:'🧙',n:'Spell Wizard',d:'Type words to vanquish the horde · 1 credit'},
+    {id:'tetris',e:'🧱',n:'Tetris',d:'Clear lines, chase the high score · 1 credit'},
   ];
   var allGames=solo;
   var playCounts={};
@@ -19047,6 +19053,364 @@ function gcGameSolitaire(C){
   }
 
   showModeSelect();
+}
+
+/* ════════════════════════════════════════════════════════
+   ══ TETRIS ══
+════════════════════════════════════════════════════════ */
+var TET_SHAPES = {
+  I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  O:[[1,1],[1,1]],
+  T:[[0,1,0],[1,1,1],[0,0,0]],
+  S:[[0,1,1],[1,1,0],[0,0,0]],
+  Z:[[1,1,0],[0,1,1],[0,0,0]],
+  J:[[1,0,0],[1,1,1],[0,0,0]],
+  L:[[0,0,1],[1,1,1],[0,0,0]]
+};
+var TET_COLOR = {I:'#00e5ff',O:'#ffd700',T:'#a742f5',S:'#4caf50',Z:'#f44336',J:'#3f51b5',L:'#ff9800'};
+var TET_ROT_STATES = ['0','R','2','L'];
+function tetRotateMatrix(m){
+  var n=m.length;
+  var out=Array.from({length:n},function(){return new Array(n).fill(0);});
+  for(var r=0;r<n;r++)for(var c=0;c<n;c++)out[c][n-1-r]=m[r][c];
+  return out;
+}
+var TET_ROTATIONS={};
+Object.keys(TET_SHAPES).forEach(function(p){
+  var states=[TET_SHAPES[p]];
+  for(var i=1;i<4;i++)states.push(tetRotateMatrix(states[i-1]));
+  TET_ROTATIONS[p]=states;
+});
+var TET_JLSTZ_KICKS = {
+  '0-R':[[0,0],[-1,0],[-1,-1],[0,2],[-1,2]], 'R-0':[[0,0],[1,0],[1,1],[0,-2],[1,-2]],
+  'R-2':[[0,0],[1,0],[1,1],[0,-2],[1,-2]],   '2-R':[[0,0],[-1,0],[-1,-1],[0,2],[-1,2]],
+  '2-L':[[0,0],[1,0],[1,-1],[0,2],[1,2]],    'L-2':[[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
+  'L-0':[[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],'0-L':[[0,0],[1,0],[1,-1],[0,2],[1,2]]
+};
+var TET_I_KICKS = {
+  '0-R':[[0,0],[-2,0],[1,0],[-2,1],[1,-2]], 'R-0':[[0,0],[2,0],[-1,0],[2,-1],[-1,2]],
+  'R-2':[[0,0],[-1,0],[2,0],[-1,-2],[2,1]], '2-R':[[0,0],[1,0],[-2,0],[1,2],[-2,-1]],
+  '2-L':[[0,0],[2,0],[-1,0],[2,-1],[-1,2]], 'L-2':[[0,0],[-2,0],[1,0],[-2,1],[1,-2]],
+  'L-0':[[0,0],[1,0],[-2,0],[1,2],[-2,-1]], '0-L':[[0,0],[-1,0],[2,0],[-1,-2],[2,1]]
+};
+var TET_T_FRONT_PAIR={0:'top',1:'right',2:'bottom',3:'left'};
+function tetNewBoard(){return Array.from({length:20},function(){return new Array(10).fill(0);});}
+function tetCollides(board,shape,row,col){
+  for(var r=0;r<shape.length;r++)for(var c=0;c<shape.length;c++){
+    if(!shape[r][c])continue;
+    var br=row+r,bc=col+c;
+    if(bc<0||bc>=10||br>=20)return true;
+    if(br>=0&&board[br][bc])return true;
+  }
+  return false;
+}
+function tetTryRotate(board,piece,rotFrom,rotTo,row,col){
+  var newShape=TET_ROTATIONS[piece][rotTo];
+  if(piece==='O'){if(!tetCollides(board,newShape,row,col))return{ok:true,row:row,col:col,kickIndex:0};return{ok:false};}
+  var table=piece==='I'?TET_I_KICKS:TET_JLSTZ_KICKS;
+  var kicks=table[TET_ROT_STATES[rotFrom]+'-'+TET_ROT_STATES[rotTo]];
+  for(var i=0;i<kicks.length;i++){
+    var nr=row+kicks[i][1],nc=col+kicks[i][0];
+    if(!tetCollides(board,newShape,nr,nc))return{ok:true,row:nr,col:nc,kickIndex:i};
+  }
+  return{ok:false};
+}
+function tetCheckTSpinCorners(board,row,col){
+  function filled(r,c){if(c<0||c>=10||r>=20)return true;if(r<0)return false;return !!board[r][c];}
+  var TL=filled(row,col),TR=filled(row,col+2),BL=filled(row+2,col),BR=filled(row+2,col+2);
+  if([TL,TR,BL,BR].filter(Boolean).length<3)return null;
+  return {TL:TL,TR:TR,BL:BL,BR:BR};
+}
+function tetClassifyTSpin(corners,frontPair,kickIndex){
+  if(!corners)return null;
+  if(kickIndex===4)return 'full';
+  var frontFilled=frontPair==='top'?(corners.TL&&corners.TR):frontPair==='bottom'?(corners.BL&&corners.BR):frontPair==='left'?(corners.TL&&corners.BL):(corners.TR&&corners.BR);
+  return frontFilled?'full':'mini';
+}
+function tetClearLines(board){
+  var cleared=0;
+  for(var r=19;r>=0;r--){
+    if(board[r].every(function(v){return v!==0;})){board.splice(r,1);board.unshift(new Array(10).fill(0));cleared++;r++;}
+  }
+  return cleared;
+}
+function tetComputeScore(lines,tspin,level,b2b){
+  var base=0;
+  if(tspin==='mini')base=lines===0?100:lines===1?200:400;
+  else if(tspin==='full')base=lines===0?400:lines===1?800:lines===2?1200:1600;
+  else base=lines===1?100:lines===2?300:lines===3?500:lines===4?800:0;
+  var isB2BMove=(tspin||lines===4)&&lines>0;
+  var score=base*level;
+  if(b2b&&isB2BMove)score=Math.floor(score*1.5);
+  return {score:score,isB2BMove:isB2BMove};
+}
+function tetNewBag(){
+  var bag=['I','O','T','S','Z','J','L'];
+  for(var i=bag.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=bag[i];bag[i]=bag[j];bag[j]=t;}
+  return bag;
+}
+function tetSpawnPos(piece){return piece==='I'?{row:-1,col:3}:piece==='O'?{row:-1,col:4}:{row:-1,col:3};}
+function tetGravityMs(level){return Math.max(80,Math.round(1000*Math.pow(0.8,level-1)));}
+
+function gcGameTetris(C){
+  C.style.cssText='padding:14px;overflow:hidden;display:flex;flex-direction:column;align-items:center;background:#0d0e1a;';
+  var CELL=22;
+  var board,bag,bagIdx,curPiece,curRot,curRow,curCol,holdPiece,canHold,score,level,linesTotal,combo,b2b,over,lastWasRotation,lastKickIndex,tick,dropTimer,softDrop,tspinCountThisGame,paused;
+
+  function nextFromBag(){
+    if(!bag||bagIdx>=bag.length){bag=tetNewBag();bagIdx=0;}
+    return bag[bagIdx++];
+  }
+  function peekNext(){
+    if(!bag||bagIdx>=bag.length)return tetNewBag()[0];
+    return bag[bagIdx];
+  }
+  function spawnPiece(){
+    curPiece=nextFromBag();
+    curRot=0;
+    var sp=tetSpawnPos(curPiece);curRow=sp.row;curCol=sp.col;
+    lastWasRotation=false;lastKickIndex=-1;canHold=true;
+    if(tetCollides(board,TET_ROTATIONS[curPiece][0],curRow,curCol)){endGame();return false;}
+    return true;
+  }
+  function newGame(){
+    board=tetNewBoard();bag=null;bagIdx=0;holdPiece=null;canHold=true;
+    score=0;level=1;linesTotal=0;combo=-1;b2b=false;over=false;paused=false;tspinCountThisGame=0;
+    spawnPiece();
+    startLoop();
+    render();
+    gcSetScore('0');
+  }
+  function startLoop(){
+    if(dropTimer)clearInterval(dropTimer);
+    dropTimer=setInterval(function(){
+      if(gcCurrentGame!=='tetris'){clearInterval(dropTimer);return;}
+      if(!over&&!paused)softDropTick();
+    },tetGravityMs(level));
+  }
+  function currentShape(){return TET_ROTATIONS[curPiece][curRot];}
+  function tryMove(dr,dc){
+    if(over||paused)return false;
+    var nr=curRow+dr,nc=curCol+dc;
+    if(tetCollides(board,currentShape(),nr,nc))return false;
+    curRow=nr;curCol=nc;lastWasRotation=false;render();return true;
+  }
+  function tryRotateDir(dir){ // dir: 1=CW, -1=CCW
+    if(over||paused||curPiece==='O')return;
+    var nextRot=(curRot+dir+4)%4;
+    var res=tetTryRotate(board,curPiece,curRot,nextRot,curRow,curCol);
+    if(res.ok){curRow=res.row;curCol=res.col;curRot=nextRot;lastWasRotation=true;lastKickIndex=res.kickIndex;render();}
+  }
+  function softDropTick(){
+    if(!tryMove(1,0)){lockPiece();}
+  }
+  function hardDrop(){
+    if(over||paused)return;
+    var dist=0;
+    while(!tetCollides(board,currentShape(),curRow+1,curCol)){curRow++;dist++;}
+    score+=dist*2;
+    lastWasRotation=false;
+    lockPiece();
+  }
+  function holdSwap(){
+    if(over||paused||!canHold)return;
+    var shape=currentShape();
+    if(!holdPiece){
+      holdPiece=curPiece;
+      spawnPiece();
+    } else {
+      var tmp=holdPiece;holdPiece=curPiece;
+      curPiece=tmp;curRot=0;
+      var sp=tetSpawnPos(curPiece);curRow=sp.row;curCol=sp.col;
+      lastWasRotation=false;lastKickIndex=-1;
+    }
+    canHold=false;
+    render();
+  }
+  function lockPiece(){
+    var shape=currentShape();
+    // T-spin check BEFORE placing into board (corners reference empty cell at piece position)
+    var tspin=null;
+    if(curPiece==='T'&&lastWasRotation){
+      var corners=tetCheckTSpinCorners(board,curRow,curCol);
+      tspin=tetClassifyTSpin(corners,TET_T_FRONT_PAIR[curRot],lastKickIndex);
+    }
+    for(var r=0;r<shape.length;r++)for(var c=0;c<shape.length;c++){
+      if(shape[r][c]&&curRow+r>=0)board[curRow+r][curCol+c]=curPiece;
+    }
+    var cleared=tetClearLines(board);
+    if(cleared>0||tspin){
+      var result=tetComputeScore(cleared,tspin,level,b2b);
+      score+=result.score;
+      b2b=result.isB2BMove;
+      combo=cleared>0?combo+1:-1;
+      if(combo>0)score+=combo*50*level;
+    } else {
+      combo=-1;
+    }
+    if(tspin){
+      tspinCountThisGame++;
+      trackLifetimeTSpin();
+    }
+    if(cleared>0){
+      linesTotal+=cleared;
+      var newLevel=Math.floor(linesTotal/10)+1;
+      if(newLevel!==level){level=newLevel;startLoop();}
+    }
+    if(SND_GC){if(tspin)SND_GC.win();else if(cleared>0)SND_GC.win();else SND_GC.card();}
+    gcSetScore(String(score));
+    if(!over){if(!spawnPiece())return;}
+    render();
+  }
+  function trackLifetimeTSpin(){
+    if(!cu||!gcDb())return;
+    var nickLc=cu.nickname.toLowerCase();
+    gcDb().collection('achievements').doc(nickLc).get().then(function(snap){
+      var a=snap.exists()?(snap.data()||{}):{};
+      var count=(a.tspinCount||0)+1;
+      gcDb().collection('achievements').doc(nickLc).set({tspinCount:count},{merge:true}).catch(function(){});
+      if(count>=100&&!(a.spin_master&&a.spin_master.granted)){
+        if(typeof achGrant==='function')achGrant(cu.nickname,'spin_master',{delay:500});
+      }
+    }).catch(function(){});
+  }
+  function endGame(){
+    over=true;
+    if(dropTimer)clearInterval(dropTimer);
+    gcSaveScore('tetris',score,true);
+    var creditAward=Math.min(50,Math.floor(score/500));
+    if(creditAward>0)gcAwardGameCredit(cu.nickname,creditAward);
+    if(typeof achCheckGame==='function')achCheckGame('tetris',{score:score});
+    checkGodOfTetris();
+    render();
+    gcToast('Game over — score '+score+(creditAward>0?' (+'+creditAward+' credits)':''));
+  }
+  function checkGodOfTetris(){
+    if(!cu||!gcDb())return;
+    gcDb().collection('gc_config').doc('tetris_high_score').get().then(function(snap){
+      var record=snap.exists()?snap.data():null;
+      var isNewRecord=score>0&&(!record||!record.score||score>record.score);
+      if(!isNewRecord)return;
+      var oldNick=record?record.nick:null;
+      var newRecord={nick:cu.nickname.toLowerCase(),displayName:cu.nickname,score:score,date:Date.now()};
+      gcDb().collection('gc_config').doc('tetris_high_score').set(newRecord).catch(function(){});
+      if(typeof achGrant==='function')achGrant(cu.nickname,'god_of_tetris',{delay:800});
+      if(oldNick&&oldNick!==cu.nickname.toLowerCase()&&typeof achRevoke==='function'){
+        achRevoke(oldNick,'god_of_tetris');
+        try{
+          gcDb().collection('portal_notifications').add({
+            targetNick:oldNick,type:'crown_stolen',
+            msg:'🟧 '+cu.nickname+' just beat your Tetris high score ('+score+') and took the God of Tetris crown!',
+            from:cu.nickname,timestamp:Date.now(),read:false
+          });
+        }catch(e){}
+        gcDb().collection('achievements').doc(oldNick).get().then(function(oldSnap){
+          if(!oldSnap.exists())return;
+          var oldData=oldSnap.data()||{};
+          var highlights=oldData._highlights||[];
+          var newHighlights=highlights.filter(function(h){return h!=='god_of_tetris';});
+          if(newHighlights.length!==highlights.length){
+            gcDb().collection('achievements').doc(oldNick).update({_highlights:newHighlights}).catch(function(){});
+          }
+        }).catch(function(){});
+      }
+    }).catch(function(){});
+  }
+
+  /* ── Rendering ── */
+  function miniGrid(piece,size){
+    var wrap=document.createElement('div');
+    wrap.style.cssText='display:grid;grid-template-columns:repeat(4,'+size+'px);grid-template-rows:repeat(2,'+size+'px);gap:1px;';
+    if(!piece){for(var i=0;i<8;i++){var cell=document.createElement('div');cell.style.cssText='width:'+size+'px;height:'+size+'px;';wrap.appendChild(cell);}return wrap;}
+    var shape=TET_SHAPES[piece];
+    var offsetR=piece==='I'?0:0, offsetC=0;
+    var grid=Array.from({length:2},function(){return new Array(4).fill(0);});
+    for(var r=0;r<shape.length&&r<2;r++)for(var c=0;c<shape.length&&c<4;c++)if(shape[r][c])grid[r][c]=1;
+    for(var r=0;r<2;r++)for(var c=0;c<4;c++){
+      var cell=document.createElement('div');
+      cell.style.cssText='width:'+size+'px;height:'+size+'px;border-radius:2px;background:'+(grid[r][c]?TET_COLOR[piece]:'transparent')+';';
+      wrap.appendChild(cell);
+    }
+    return wrap;
+  }
+  function render(){
+    C.innerHTML='';
+    var wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:16px;align-items:flex-start;';
+
+    /* Side panel: hold + next + stats */
+    var side=document.createElement('div');side.style.cssText='display:flex;flex-direction:column;gap:12px;width:100px;';
+    var holdBox=document.createElement('div');
+    holdBox.style.cssText='background:#181a2a;border:1px solid #3a3d5a;border-radius:8px;padding:8px;text-align:center;';
+    holdBox.innerHTML='<div style="font-size:10px;color:#999;margin-bottom:6px">HOLD</div>';
+    holdBox.appendChild(miniGrid(holdPiece,16));
+    side.appendChild(holdBox);
+
+    var nextBox=document.createElement('div');
+    nextBox.style.cssText='background:#181a2a;border:1px solid #3a3d5a;border-radius:8px;padding:8px;text-align:center;';
+    nextBox.innerHTML='<div style="font-size:10px;color:#999;margin-bottom:6px">NEXT</div>';
+    nextBox.appendChild(miniGrid(peekNext(),16));
+    side.appendChild(nextBox);
+
+    var stats=document.createElement('div');
+    stats.style.cssText='background:#181a2a;border:1px solid #3a3d5a;border-radius:8px;padding:8px;font-size:11px;color:#eee;line-height:1.8;';
+    stats.innerHTML='Score<br><b style="font-size:15px;color:#00e5ff">'+score+'</b><br>Level '+level+'<br>Lines '+linesTotal;
+    side.appendChild(stats);
+    wrap.appendChild(side);
+
+    /* Board */
+    var boardEl=document.createElement('div');
+    boardEl.style.cssText='display:grid;grid-template-columns:repeat(10,'+CELL+'px);grid-template-rows:repeat(20,'+CELL+'px);gap:1px;background:#050610;border:2px solid #3a3d5a;border-radius:4px;position:relative;';
+    var display=board.map(function(row){return row.slice();});
+    if(!over){
+      var shape=currentShape();
+      for(var r=0;r<shape.length;r++)for(var c=0;c<shape.length;c++){
+        if(shape[r][c]){var br=curRow+r,bc=curCol+c;if(br>=0&&br<20&&bc>=0&&bc<10)display[br][bc]=curPiece+'_live';}
+      }
+    }
+    for(var r=0;r<20;r++)for(var c=0;c<10;c++){
+      var cell=document.createElement('div');
+      var v=display[r][c];
+      var isLive=typeof v==='string'&&v.indexOf('_live')>-1;
+      var pieceKey=isLive?v.replace('_live',''):v;
+      cell.style.cssText='width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:'+(pieceKey?TET_COLOR[pieceKey]:'#12142080')+';'+(isLive?'box-shadow:inset 0 0 4px rgba(255,255,255,.5);':'');
+      boardEl.appendChild(cell);
+    }
+    if(over){
+      var overlay=document.createElement('div');
+      overlay.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;gap:10px;border-radius:4px;';
+      overlay.innerHTML='<div style="font-size:16px">GAME OVER</div><div style="font-size:13px;color:#00e5ff">Score: '+score+'</div>';
+      var again=document.createElement('button');again.className='gc-btn gc-btn-primary';again.style.cssText='font-size:12px;padding:6px 16px;';again.textContent='Play Again';
+      again.onclick=newGame;overlay.appendChild(again);
+      boardEl.appendChild(overlay);
+    }
+    wrap.appendChild(boardEl);
+
+    var controls=document.createElement('div');
+    controls.style.cssText='display:flex;flex-direction:column;gap:6px;font-size:10px;color:#999;width:100px;';
+    controls.innerHTML='<b style="color:#eee;font-size:11px">Controls</b>← → Move<br>↓ Soft drop<br>Space Hard drop<br>↑ / X Rotate CW<br>Z Rotate CCW<br>C / Shift Hold';
+    wrap.appendChild(controls);
+
+    C.appendChild(wrap);
+  }
+
+  function keyHandler(e){
+    if(over){if(e.key==='Enter'||e.key===' ')newGame();return;}
+    switch(e.key){
+      case 'ArrowLeft':tryMove(0,-1);e.preventDefault();break;
+      case 'ArrowRight':tryMove(0,1);e.preventDefault();break;
+      case 'ArrowDown':softDropTick();score+=1;gcSetScore(String(score));e.preventDefault();break;
+      case 'ArrowUp':case 'x':case 'X':tryRotateDir(1);e.preventDefault();break;
+      case 'z':case 'Z':tryRotateDir(-1);e.preventDefault();break;
+      case ' ':hardDrop();e.preventDefault();break;
+      case 'c':case 'C':case 'Shift':holdSwap();e.preventDefault();break;
+    }
+  }
+  document.addEventListener('keydown',function tetKbd(e){
+    if(gcCurrentGame!=='tetris'){document.removeEventListener('keydown',tetKbd);return;}
+    keyHandler(e);
+  });
+
+  newGame();
 }
 
 /* ════════════════════════════════════════════════════════
