@@ -5758,6 +5758,21 @@ function kobyOnStageChange(st){
 }
 
 
+/* Retro Arcade hotspot math — shared by gcApplySet and the tuner panel.
+   Pure functions: convert between on-screen pixels and a fraction of the
+   353x174 native artwork, accounting for background-size:cover's actual
+   scale+crop against the banner's current width/height. */
+var RA_NATIVE_W=353,RA_NATIVE_H=174;
+function raPixelToNative(px,py,pw,ph,bw,bh){
+  var scale=Math.max(bw/RA_NATIVE_W,bh/RA_NATIVE_H);
+  var cropTop=(RA_NATIVE_H*scale-bh)/2;
+  return {nx:px/scale,ny:(py+cropTop)/scale,nw:pw/scale,nh:ph/scale};
+}
+function raHotspotRect(nx,ny,nw,nh,bw,bh){
+  var scale=Math.max(bw/RA_NATIVE_W,bh/RA_NATIVE_H);
+  var cropTop=(RA_NATIVE_H*scale-bh)/2;
+  return {left:nx*scale,top:ny*scale-cropTop,width:nw*scale,height:nh*scale};
+}
 function gcApplySet(setId){
   if(!setId||typeof GC_SETS==='undefined'||!GC_SETS[setId])return;
   var set=GC_SETS[setId];
@@ -5806,11 +5821,30 @@ function gcApplySet(setId){
     });
     hdr.appendChild(raGrain);
 
-    /* 2. Pac-Man screen hotspot — tuned position, locked in */
+    /* 2. Pac-Man screen hotspot — tuned position, now resize-aware AND
+       manager-tunable. The banner uses background-size:cover against a
+       353x174 source image with a fixed 160px height, so as width
+       changes the visible crop shifts — pixel positions alone drift.
+       Position is stored as a fraction of the native artwork (immune to
+       resize), with a manager-only slider tool to (re)calibrate it live
+       and persist the result to Firestore. */
     var raOldHot=hdr.querySelector('#ra-hotspot');if(raOldHot)raOldHot.remove();
+    if(window._raHotResize){window.removeEventListener('resize',window._raHotResize);window._raHotResize=null;}
+    var _raDefL=680,_raDefT=29,_raDefW=134,_raDefH=87,_raDefR=17,_raDefSk=-14;
+    var raNativeRef;
+    if(window._raTunedNative){
+      raNativeRef=window._raTunedNative;
+    } else {
+      var _raDef=raPixelToNative(_raDefL,_raDefT,_raDefW,_raDefH,raBw,raBh);
+      raNativeRef={nx:_raDef.nx,ny:_raDef.ny,nw:_raDef.nw,nh:_raDef.nh,rot:_raDefR,skew:_raDefSk};
+    }
     var raHot=document.createElement('div');raHot.id='ra-hotspot';
-    var _raL=680,_raT=29,_raW=134,_raH=87,_raR=17,_raSk=-14;
-    raHot.style.cssText='position:absolute;left:'+_raL+'px;top:'+_raT+'px;width:'+_raW+'px;height:'+_raH+'px;z-index:5;cursor:pointer;transform:rotate('+_raR+'deg) skewY('+_raSk+'deg);transform-origin:center;';
+    function raApplyHotspotStyle(){
+      var bw=hdr.offsetWidth||raBw,bh=hdr.offsetHeight||raBh;
+      var r=raHotspotRect(raNativeRef.nx,raNativeRef.ny,raNativeRef.nw,raNativeRef.nh,bw,bh);
+      raHot.style.cssText='position:absolute;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px;z-index:5;cursor:pointer;transform:rotate('+raNativeRef.rot+'deg) skewY('+raNativeRef.skew+'deg);transform-origin:center;';
+    }
+    raApplyHotspotStyle();
     var raGlow=document.createElement('div');
     raGlow.style.cssText='position:absolute;inset:-6px;border-radius:6px;box-shadow:0 0 14px 4px rgba(0,229,255,0.55),0 0 28px 10px rgba(0,229,255,0.25);animation:ra-hotspot-pulse 1.5s ease-in-out infinite;pointer-events:none;';
     var raGlass=document.createElement('div');
@@ -5821,6 +5855,25 @@ function gcApplySet(setId){
     raHot.appendChild(raGlow);raHot.appendChild(raGlass);raHot.appendChild(raLabel);
     raHot.addEventListener('click',function(){gcArcadeOpenPanel();});
     hdr.appendChild(raHot);
+    window._raHotResize=function(){raApplyHotspotStyle();};
+    window.addEventListener('resize',window._raHotResize);
+
+    /* Load any previously-saved tuned position (once per session) */
+    if(!window._raTunedNative&&!window._raTunedFetching&&gcDb()){
+      window._raTunedFetching=true;
+      gcDb().collection('gc_config').doc('ra_hotspot_position').get().then(function(snap){
+        window._raTunedFetching=false;
+        if(snap.exists()){
+          var d=snap.data();
+          if(d&&typeof d.nx==='number'){
+            window._raTunedNative={nx:d.nx,ny:d.ny,nw:d.nw,nh:d.nh,rot:d.rot,skew:d.skew};
+            raNativeRef=window._raTunedNative;
+            raApplyHotspotStyle();
+          }
+        }
+      }).catch(function(){window._raTunedFetching=false;});
+    }
+
 
     /* ── Retro Arcade sidebar — dark bg + floating shapes ── */
     var raSb=document.querySelector('.sidebar');
@@ -6315,12 +6368,11 @@ function gcUnequipSet(){
   /* Retro Arcade cleanup */
   var oldRaBowl=document.querySelector('#ra-bowling-group');if(oldRaBowl)oldRaBowl.remove();
   var oldRaGrain=document.querySelector('#ra-light-grain');if(oldRaGrain)oldRaGrain.remove();
+  if(window._raHotResize){window.removeEventListener('resize',window._raHotResize);window._raHotResize=null;}
   var oldRaHot=document.querySelector('#ra-hotspot');if(oldRaHot)oldRaHot.remove();
   var oldRaSb=document.querySelector('#ra-sidebar-shapes');if(oldRaSb)oldRaSb.remove();
   var raSbEl=document.querySelector('.sidebar');if(raSbEl&&window._raSbOrigBg!==undefined){raSbEl.style.background=window._raSbOrigBg;window._raSbOrigBg=undefined;}
   var oldRaBg=document.querySelector('#ra-sidebar-bg');if(oldRaBg)oldRaBg.remove();
-  var oldRaTuneBtn=document.getElementById('ra-tune-btn');if(oldRaTuneBtn)oldRaTuneBtn.remove();
-  var oldRaTunerPanel=document.getElementById('ra-tuner-panel');if(oldRaTunerPanel)oldRaTunerPanel.remove();
   var oldRaPanel=document.getElementById('ra-select-panel');if(oldRaPanel){if(oldRaPanel._raKbFn)document.removeEventListener('keydown',oldRaPanel._raKbFn);oldRaPanel.remove();}
   var oldRaRing=document.querySelector('#ra-ring-svg');if(oldRaRing)oldRaRing.remove();
   if(window._raSpawnTimer){clearInterval(window._raSpawnTimer);window._raSpawnTimer=null;}
