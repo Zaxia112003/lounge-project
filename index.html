@@ -791,14 +791,6 @@ body.theme-lavender{--bg:#f5f0ff;--bg2:#ffffff;--bg3:#ede8ff;--text:#2d1b6e;--mu
 .ms-diff-hard{background:rgba(239,68,68,.12);color:var(--red);}
 .game-tile.tile-soon{opacity:.65;cursor:default;}
 .game-tile.tile-soon:hover{border-color:var(--border);transform:none;}
-/* Chess board */
-.chess-board{display:grid;grid-template-columns:repeat(8,1fr);border:2px solid var(--border2);border-radius:4px;overflow:hidden;max-width:320px;margin:0 auto;}
-.chess-sq{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;position:relative;transition:background .1s;}
-.chess-sq.light{background:#f0d9b5;}
-.chess-sq.dark{background:#b58863;}
-.chess-sq.selected{background:#f6f669!important;outline:2px inset rgba(0,0,0,.2);}
-.chess-sq.legal{background:#cdd16f!important;}
-.chess-sq.last-move{background:rgba(205,210,106,.6)!important;}
 /* Multiplayer section */
 .mp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0;}
 .mp-tile{border:1px solid var(--border);border-radius:12px;padding:12px;position:relative;overflow:hidden;background:var(--bg2);}
@@ -8181,6 +8173,28 @@ var KB_QUESTIONS=[
   {id:94,cat:"Process",q:"What is the maximum file size that can be uploaded to the system?",opts:["145MB","153MB","157MB","200MB"],ans:2,exp:"The maximum file size is 157MB. Files under this threshold can be uploaded."},
   {id:99,cat:"Process",q:"A vendor has a nickname (e.g., submission says Rob but contract says Robbie). What is the process?",opts:["Do not upload — names don't match.","Upload only if the escalation team approves first.","Upload and then flag to escalation.","Flag to escalation only, do not upload."],ans:2,exp:"Nicknames: upload first, then flag to escalation."},
   {id:100,cat:"Process",q:"Which is the complete and correct process for handling a submission with missing key pages?",opts:["Upload the partial document, flag to escalation, and leave a note.","DO NOT UPLOAD. Flag to escalation. Escalation team will contact the agent.","Contact the agent directly and wait for the corrected file.","Upload, contact the agent, and log the issue."],ans:1,exp:"Missing key pages: DO NOT UPLOAD. Flag to escalation. The escalation team handles agent communication."},
+  {id:101,cat:"Buxton",q:"Effective immediately, what must be included in the Contract of Sale for all Buxton-branded office submissions?",opts:["A Section 32 disclosure only","A Privacy Collection Notice","A signed vendor statement","A separate agency agreement"],ans:1,exp:"All Buxton-branded office contracts must include a Privacy Collection Notice as part of the Contract of Sale."},
+  {id:102,cat:"Buxton",q:"If a Buxton contract is missing the Privacy Collection Notice, what should you do?",opts:["Upload anyway and note it for tagging","Contact the agent directly by phone","Do not proceed — flag and notify","Reject the submission permanently"],ans:2,exp:"Missing Privacy Collection Notice follows the same process as a missing S32: do not proceed, flag, and notify the submitter via email."},
+  {id:105,cat:"Dashboard Notes",q:"As of June 25, 2026, what did Tagging and Testing advise regarding Dashboard Notes?",opts:["They are now optional for updated contracts","They are now mandatory on every upload","They only apply to Buxton submissions","They are being phased out entirely"],ans:1,exp:"Tagging and Testing advised that Dashboard Notes are now mandatory on every upload and will be used in their checking process."},
+  {id:106,cat:"Dashboard Notes",q:"Why did the Uploading Team begin including Listing Agent Name and Email Address in Dashboard Notes starting April 2026?",opts:["To speed up escalation response times","To mitigate a Listing Agent email bug","Per a new government regulation","To reduce the number of pre-listings created"],ans:1,exp:"This was introduced in April 2026 to help mitigate a bug affecting Listing Agent email addresses."},
+  {id:107,cat:"Dashboard Notes",q:"For a New Contract Submission, which Dashboard Notes are required?",opts:["Only the Ticket Number","Agency Note, Listing Agent info, and Special Notes","Only the Listing Agent Name","Agency Note only"],ans:1,exp:"New Contract Submissions require an Agency Note, Listing Agent Name and Email Address, and Submission/Special Notes if applicable."},
+  {id:109,cat:"Dashboard Notes",q:"For an Updated Contract with Updated Information, if the Agency Note and Listing Agent details haven't actually changed, what should you do?",opts:["Leave the dashboard notes blank","Follow the Updated Contract Only procedure","Delete the previous dashboard notes","Escalate to the agent for clarification"],ans:1,exp:"If there are no changes to Agency Note or Listing Agent information, follow the Updated Contract Only procedure instead."},
+  {id:110,cat:"Dashboard Notes",q:"What may happen if Dashboard Notes are missing, incomplete, or incorrect?",opts:["Nothing, they are just a best practice","It may be flagged and cause an error callout","The contract is automatically rejected","The listing is deleted from the portal"],ans:1,exp:"Failure to leave proper Dashboard Notes may be flagged by the Tagging Team and could result in an error callout."},
+  {id:111,cat:"Listing Creation",q:"If no listing exists on the portal at all for the submission address, what should you do?",opts:["Wait for escalation to create it","Create a new listing from the submission address","Use the nearest matching CRM listing","Flag to escalation without creating anything"],ans:1,exp:"When no listing exists at all, create a new listing using the address from the submission."},
+  {id:112,cat:"Listing Creation",q:"If only a pre-listing exists on the portal for the submission address, which listing should you use?",opts:["Create a brand new listing instead","Use the pre-listing, if details match","Escalate before proceeding","Use whichever listing was created first"],ans:1,exp:"Use the pre-listing and follow its address, provided the details match."},
+  {id:113,cat:"Listing Creation",q:"If both a CRM listing and a pre-listing exist for the same submission address, which one should you use?",opts:["The pre-listing, since it was created first","The CRM listing","Whichever has more complete details","Create a third, new listing"],ans:1,exp:"When both a CRM listing and a pre-listing exist, use the CRM listing."},
+  {id:114,cat:"Listing Creation",q:"If two or more CRM listings exist on the portal for the same address, which one should you use?",opts:["The oldest CRM listing","The most recently created CRM listing","Whichever listing has an auction date","The one used previously, regardless of age"],ans:1,exp:"Use the most recently created CRM listing based on creation date."},
+  {id:115,cat:"Listing Creation",q:"If the original upload was loaded to an older CRM listing and a new updated submission comes in with a newer CRM listing now available, what should you do?",opts:["Continue uploading to the older CRM listing","Upload to the newer CRM listing instead","Merge both CRM listings manually","Flag to escalation before choosing either"],ans:1,exp:"Upload the updated submission to the newer CRM listing, not the one previously used."},
+  {id:116,cat:"Listing Issues",q:"When a brand-new contract was submitted as an updated submission, under what condition should you flag it to escalation?",opts:["If a parent ticket exists in the AU queue","If it doesn't exist under both PS and AUC","If the agent used the wrong ticket number","Anytime the contract type is Auction"],ans:1,exp:"Flag to escalation if the listing is non-existent under both PS (Private Sale) and AUC (Auction)."},
+  {id:117,cat:"Listing Issues",q:"What is the first step when handling a brand-new contract that was mistakenly submitted as an updated submission?",opts:["Upload it directly as a new listing","Search Zendesk for parent tickets","Contact the agent to resend the submission","Move the listing from PS to AUC"],ans:1,exp:"The first step is to search Zendesk for parent tickets, checking notes about address format, initial contract type, etc."},
+  {id:118,cat:"Listing Issues",q:"For the 'Contracts Not Enabled' issue, what must be verified via the agency portal after confirming the listing exists?",opts:["The agent's phone number","Authorities Enabled and Contracts Enabled are active","The listing's auction date","The number of listing agents on file"],ans:1,exp:"You must verify that both Authorities Enabled and Contracts Enabled are marked as active."},
+  {id:119,cat:"Listing Issues",q:"According to the Contracts Not Enabled procedure, what should you never do without approval?",opts:["Flag to escalation","Use an equivalent or affiliated agency","Check the agency portal","Verify the listing address"],ans:1,exp:"Do not proceed with an equivalent or affiliated agency without approval."},
+  {id:120,cat:"Listing Issues",q:"If a listing was moved from PS to Auctions but has no auction date, what should you do?",opts:["Flag to escalation without acting","Move it back to PS and upload","Leave the listing under Auctions and wait","Reject the submission"],ans:1,exp:"If there is no auction date, move the listing back to PS and proceed with the upload, then flag to escalation afterward."},
+  {id:121,cat:"Listing Issues",q:"If a contract submission has a passed auction date, what is the correct action?",opts:["Reject the submission outright","Proceed with the upload","Wait for the agent to confirm before uploading","Escalate before uploading"],ans:1,exp:"Proceed with the upload — the listing is most likely automatically moved to sales. Flag to escalation afterward to confirm next steps."},
+  {id:122,cat:"Listing Issues",q:"If a contract's status shows 'Tagged' instead of 'Uploaded' after uploading, what should you do?",opts:["Re-upload the contract from scratch","Click 'Remove Tags' on the Contracts Dashboard","Flag to escalation immediately","Contact IT support"],ans:1,exp:"Use the 'Remove Tags' button next to the Upload Contract button on the Contracts Dashboard to ensure tags are placed correctly."},
+  {id:123,cat:"Listing Agent",q:"What is the key reminder in the Listing Agent Update regarding pre-existing listing agents on a listing?",opts:["Always keep the pre-existing listing agent information","Do not rely on pre-existing listing agents","Only update listing agents if the agent requests it","Pre-existing listing agents override submission details"],ans:1,exp:"Do not rely on pre-existing listing agents. Follow the listing agents provided in the submission, even if it means removing pre-existing info."},
+  {id:124,cat:"Listing Agent",q:"True or False: Incorrect listing price is one of the common errors the Listing Agent Update aims to prevent.",opts:["True","False"],ans:1,exp:"False. The listed errors are incorrect number of listing agents, incorrect order, incorrect email/domain, and incorrect listing agent — not listing price."},
+  {id:125,cat:"Listing Agent",q:"If the listing agent's email address isn't appearing on the dashboard or in the portal, what should you do?",opts:["Leave it blank and proceed","Flag to escalation","Use a generic company email instead","Contact the agent directly for a new email address"],ans:1,exp:"Flag to escalation — the agent details might need to be added under the agency office first."},
 ];
 
 /* ══════════════════════════════════════════════════
@@ -9330,6 +9344,12 @@ function annHighlightExpBtn(activeId){
   });
 }
 
+function checkArticleSizeOk(body){
+  if(body.length>900000){
+    return confirm("This article is quite large — most likely due to one or more attached images — and may be slow to save, or could fail if it exceeds the database's size limit.\n\nClick OK to save it anyway (the images may be important), or Cancel to go back and edit/trim the article first.");
+  }
+  return true;
+}
 function submitAddArticle(){
   var type=G('add-article-type').value;
   var title=G('add-article-title-inp').value.trim();
@@ -9343,7 +9363,7 @@ function submitAddArticle(){
       var annRaw=editAid.replace('ann-','');
       var item=mdAnnouncements.find(function(a){return a._fsId===annRaw||String(a.id)===annRaw;});
       if(item){
-        if(body.length>900000){G('add-article-err').textContent='This content is too large to save (likely a pasted image) — try a smaller image or fewer images.';return;}
+        if(!checkArticleSizeOk(body))return;
         var prevTitle=item.title,prevBody=item.body;
         item.title=title;item.body=body;
         fsSaveAnnouncement(item).catch(function(e){
@@ -9365,15 +9385,30 @@ function submitAddArticle(){
       /* Firestore article - update in mdArticles and Firestore */
       var fsItem=(window.mdArticles||[]).find(function(a){return String(a.id)===String(editAid);});
       if(fsItem){
+        if(!checkArticleSizeOk(body))return;
+        var prevTitle2=fsItem.title,prevBody2=fsItem.body;
         fsItem.title=title;fsItem.body=body;
-        if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',String(editAid)),fsItem,{merge:true});}catch(e){}}
+        if(fsDb()){
+          try{
+            window._fsSetDoc(window._fsDoc(fsDb(),'articles',String(editAid)),fsItem,{merge:true})
+              .catch(function(e){
+                console.warn('Article edit save failed',e);
+                fsItem.title=prevTitle2;fsItem.body=prevBody2;
+                renderArticles();
+                alert('That article could not be saved ('+(e&&e.message?e.message:'connection error')+'). Please try again with a smaller image if the issue persists.');
+              });
+          }catch(e){
+            fsItem.title=prevTitle2;fsItem.body=prevBody2;
+            alert('That article could not be saved ('+(e&&e.message?e.message:'connection error')+').');
+          }
+        }
       }
     }
   } else {
     if(type==='ann'){
       var existingAnnIds=mdAnnouncements.map(function(a){return parseInt(a.id)||0;});
       var newId=Math.max.apply(null,[0].concat(existingAnnIds))+1;
-      if(body.length>900000){G('add-article-err').textContent='This content is too large to save (likely a pasted image) — try a smaller image or fewer images.';return;}
+      if(!checkArticleSizeOk(body))return;
       var expiresAt=window._annExpiresAt||(Date.now()+(7*24*60*60*1000));
       var newAnn={id:newId,title:title,body:body,author:cu.fullName,postedAt:Date.now(),audience:'both',expiresAt:expiresAt};
       mdAnnouncements.unshift(newAnn);
@@ -9391,6 +9426,7 @@ function submitAddArticle(){
         alert('That announcement could not be saved ('+(e&&e.message?e.message:'connection error')+') — it has been removed from the list. Please try posting it again.');
       });
     } else if(type==='kb'||type==='tmpl'||type==='faq'){
+      if(!checkArticleSizeOk(body))return;
       /* Save to Firestore articles collection */
       var artId='art_'+Date.now()+'_'+(Math.random().toString(36).slice(2,6));
       var saveCategory=type==='tmpl'?'template':type==='faq'?'kb':type;
@@ -9398,7 +9434,19 @@ function submitAddArticle(){
                   createdBy:cu.fullName,createdAt:new Date().toISOString()};
       if(!window.mdArticles)window.mdArticles=[];
       window.mdArticles.push(newArt);
-      if(fsDb()){try{window._fsSetDoc(window._fsDoc(fsDb(),'articles',artId),newArt,{merge:true});}catch(e){console.warn('save article',e);}}
+      renderArticles();
+      if(fsDb()){
+        try{
+          window._fsSetDoc(window._fsDoc(fsDb(),'articles',artId),newArt,{merge:true})
+            .catch(function(e){
+              console.warn('save article',e);
+              var idx=window.mdArticles.indexOf(newArt);
+              if(idx>-1)window.mdArticles.splice(idx,1);
+              renderArticles();
+              alert('That article could not be saved ('+(e&&e.message?e.message:'connection error')+') — it has been removed from the list. Please try again with a smaller image if the issue persists.');
+            });
+        }catch(e){console.warn('save article',e);}
+      }
     }
   }
   G('add-article-modal').classList.remove('open');
@@ -16246,7 +16294,7 @@ var _gcAllCredits={},_gcShifts={},_gcShiftsLoaded=false,_gcNotifs=[];
 /* ── Widget API keys ── */
 var WIDGET_KEYS={weather:'5222dd774faba440a3de6558a79b806f',news:'45a555116c88c9ef53afaac4acb73d6d'};
 
-var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,chess:1,fps:5,wordsearch:1,typingrace:1,spellwizard:1};
+var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,fps:5,wordsearch:1,typingrace:1,spellwizard:1};
 
 /* ── Sound ── */
 function gcEnsureAudio(){if(!gcAudioCtx)gcAudioCtx=new(window.AudioContext||window.webkitAudioContext)();if(gcAudioCtx.state==='suspended')gcAudioCtx.resume();}
@@ -16454,714 +16502,6 @@ function gcToast(msg){
 }
 
 /* ── Launch ── */
-function gcGameChess(C){
-  C.style.cssText='padding:16px 20px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;';
-
-  var WH={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙'};
-  var BK={k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
-  var _myName=cu?cu.nickname:'You';
-
-  function isW(p){return p&&p!==' '&&p===p.toUpperCase();}
-  function isB(p){return p&&p!==' '&&p===p.toLowerCase();}
-  function cloneBoard(b){return b.map(function(r){return r.slice();});}
-  function findKing(b,white){var k=white?'K':'k';for(var r=0;r<8;r++)for(var c=0;c<8;c++)if(b[r][c]===k)return[r,c];return null;}
-
-  /* Encode/decode board as array of 8 strings for Firestore */
-  function encBoard(b){return b.map(function(row){return row.join('');});}
-  function decBoard(arr){return (arr||[]).map(function(s){return s.split('');});}
-
-  /* ── CHESS LOGIC (shared) ── */
-  function rawMoves(b,r,c,ep,cr,flip){
-    var p=b[r][c];if(!p||p===' ')return[];
-    var wh=isW(p),pt=p.toUpperCase(),res=[];
-    var own=wh?isW:isB,foe=wh?isB:isW;
-    function add(nr,nc){if(nr>=0&&nr<8&&nc>=0&&nc<8&&!own(b[nr][nc])){res.push([nr,nc]);return b[nr][nc]===' ';}return false;}
-    function slide(dr,dc){for(var i=1;i<8;i++){var nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=8||nc<0||nc>=8)break;if(own(b[nr][nc]))break;res.push([nr,nc]);if(b[nr][nc]!==' ')break;}}
-    if(pt==='P'){
-      var dir=wh?-1:1,start=wh?6:1;
-      /* flip is visual only — pawn direction based on piece color only */
-      if(b[r+dir]&&b[r+dir][c]===' '){res.push([r+dir,c]);if(r===start&&b[r+2*dir]&&b[r+2*dir][c]===' ')res.push([r+2*dir,c]);}
-      [-1,1].forEach(function(dc){var nr=r+dir,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8){if(foe(b[nr][nc]))res.push([nr,nc]);if(ep&&ep[0]===nr&&ep[1]===nc)res.push([nr,nc]);}});
-    }
-    if(pt==='N'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(function(d){add(r+d[0],c+d[1]);});}
-    if(pt==='B'||pt==='Q'){[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(function(d){slide(d[0],d[1]);});}
-    if(pt==='R'||pt==='Q'){[[0,1],[0,-1],[1,0],[-1,0]].forEach(function(d){slide(d[0],d[1]);});}
-    if(pt==='K'){
-      [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(function(d){add(r+d[0],c+d[1]);});
-      var side=wh?'w':'b';
-      if(cr&&cr[side+'K']&&b[r][c+1]===' '&&b[r][c+2]===' '&&(wh?b[r][7]==='R':b[r][7]==='r'))res.push([r,c+2]);
-      if(cr&&cr[side+'Q']&&b[r][c-1]===' '&&b[r][c-2]===' '&&b[r][c-3]===' '&&(wh?b[r][0]==='R':b[r][0]==='r'))res.push([r,c-2]);
-    }
-    return res;
-  }
-
-  function isAttacked(b,r,c,byWhite,flip){
-    for(var rr=0;rr<8;rr++)for(var cc=0;cc<8;cc++){
-      var p=b[rr][cc];if(!p||p===' ')continue;
-      if(byWhite?!isW(p):!isB(p))continue;
-      if(rawMoves(b,rr,cc,null,null,flip).some(function(m){return m[0]===r&&m[1]===c;}))return true;
-    }return false;
-  }
-
-  function isInCheck(b,white,flip){var k=findKing(b,white);return k?isAttacked(b,k[0],k[1],!white,flip):false;}
-
-  function getLegal(board,r,c,ep,cr,flip){
-    var p=board[r][c];if(!p||p===' ')return[];
-    var wh=isW(p);
-    var raw=rawMoves(board,r,c,ep,cr,false);
-    var pt=p.toUpperCase();
-    return raw.filter(function(mv){
-      /* Apply move inline without full clone where possible */
-      var savedFrom=board[r][c],savedTo=board[mv[0]][mv[1]];
-      var savedEP=' ';
-      if(pt==='P'&&ep&&ep[0]===mv[0]&&ep[1]===mv[1]){savedEP=board[r][mv[1]];board[r][mv[1]]=' ';}
-      board[mv[0]][mv[1]]=p;board[r][c]=' ';
-      /* Castle rook */
-      var rookFrom=-1,rookTo=-1,savedRook=' ';
-      if(pt==='K'){
-        if(mv[1]===c+2){rookFrom=7;rookTo=5;}
-        else if(mv[1]===c-2){rookFrom=0;rookTo=3;}
-        if(rookFrom>=0){savedRook=board[mv[0]][rookFrom];board[mv[0]][rookTo]=board[mv[0]][rookFrom];board[mv[0]][rookFrom]=' ';}
-      }
-      var safe=!isInCheck(board,wh,false);
-      /* Undo move */
-      board[r][c]=savedFrom;board[mv[0]][mv[1]]=savedTo;
-      if(pt==='P'&&ep&&ep[0]===mv[0]&&ep[1]===mv[1])board[r][mv[1]]=savedEP;
-      if(rookFrom>=0){board[mv[0]][rookFrom]=savedRook;board[mv[0]][rookTo]=' ';}
-      return safe;
-    });
-  }
-
-  function doApplyMove(board,r,c,nr,nc,ep,cr,flip){
-    var p=board[r][c],pt=p.toUpperCase(),wh=isW(p);
-    var captured=board[nr][nc]!==' ';
-    var newEP=null,newCR={wK:cr.wK,wQ:cr.wQ,bK:cr.bK,bQ:cr.bQ};
-    if(pt==='P'&&ep&&ep[0]===nr&&ep[1]===nc){board[r][nc]=' ';captured=true;}
-    board[nr][nc]=board[r][c];board[r][c]=' ';
-    if(pt==='K'){newCR[(wh?'w':'b')+'K']=false;newCR[(wh?'w':'b')+'Q']=false;if(nc===c+2){board[nr][5]=board[nr][7];board[nr][7]=' ';}if(nc===c-2){board[nr][3]=board[nr][0];board[nr][0]=' ';}}
-    if(pt==='R'){if(c===0)newCR[(wh?'w':'b')+'Q']=false;if(c===7)newCR[(wh?'w':'b')+'K']=false;}
-    if(pt==='P'&&Math.abs(nr-r)===2)newEP=[(r+nr)/2,c];
-    if(pt==='P'&&(nr===0||nr===7))board[nr][nc]=wh?'Q':'q';
-    return{captured:captured,enPassant:newEP,castleRights:newCR};
-  }
-
-  function hasAnyLegal(board,white,ep,cr,flip){
-    for(var r=0;r<8;r++)for(var c=0;c<8;c++){var p=board[r][c];if(!p||p===' ')continue;if(white?!isW(p):!isB(p))continue;if(getLegal(board,r,c,ep,cr,flip).length>0)return true;}return false;
-  }
-
-  /* Opening book — first 3 moves for white and black */
-  var AI_OPENING_W=[[[6,4],[4,4]],[[7,6],[5,5]],[[7,5],[4,2]]]; /* e4, Nf3, Bc4 */
-  var AI_OPENING_B=[[[1,4],[3,4]],[[0,6],[2,5]],[[0,5],[2,3]]]; /* e5, Nf6, Bc5 */
-  var aiMoveCount=0;aiThinking=false;
-
-  function aiPickMove(board,aiWhite,ep,cr,flip){
-    /* Opening book */
-    var book=aiWhite?AI_OPENING_W:AI_OPENING_B;
-    if(aiMoveCount<book.length){
-      var ob=book[aiMoveCount];
-      var fromR=ob[0][0],fromC=ob[0][1],toR=ob[1][0],toC=ob[1][1];
-      var p=board[fromR][fromC];
-      /* Only use book move if piece is still there and move is legal */
-      if(p&&p!==' '&&(aiWhite?isW(p):isB(p))){
-        var legal=getLegal(board,fromR,fromC,ep,cr,false);
-        if(legal.some(function(m){return m[0]===toR&&m[1]===toC;})){
-          aiMoveCount++;
-          return{from:[fromR,fromC],to:[toR,toC]};
-        }
-      }
-    }
-    aiMoveCount++;
-    var pcs=[],vals={P:1,N:3,B:3,R:5,Q:9,K:0},best=null,bv=-999;
-    var deadline=Date.now()+800; /* 800ms max think time */
-    for(var r=0;r<8;r++)for(var cc=0;cc<8;cc++){
-      var p=board[r][cc];
-      if(p&&p!==' '&&(aiWhite?isW(p):isB(p)))pcs.push([r,cc]);
-    }
-    /* Shuffle pieces for variety */
-    for(var si=pcs.length-1;si>0;si--){var sj=Math.floor(Math.random()*(si+1));var st=pcs[si];pcs[si]=pcs[sj];pcs[sj]=st;}
-    for(var pi=0;pi<pcs.length;pi++){
-      if(Date.now()>deadline)break; /* timeout — use best found so far */
-      var pc=pcs[pi];
-      var moves=getLegal(board,pc[0],pc[1],ep,cr,false);
-      for(var mi=0;mi<moves.length;mi++){
-        var mv=moves[mi];
-        var t=board[mv[0]][mv[1]];
-        var v=(t&&t!==' '?(vals[t.toUpperCase()]||0):0)+Math.random()*.4;
-        var nb=cloneBoard(board);nb[mv[0]][mv[1]]=nb[pc[0]][pc[1]];nb[pc[0]][pc[1]]=' ';
-        try{if(isInCheck(nb,!aiWhite,false))v+=2;}catch(e){}
-        v+=(3.5-Math.abs(mv[0]-3.5))*.05+(3.5-Math.abs(mv[1]-3.5))*.05;
-        if(v>bv){bv=v;best={from:pc,to:mv};}
-      }
-    }
-    return best;
-  }
-
-  /* ── FIRESTORE helpers (PvP rooms) ── */
-  function chessRoomRef(id){return db.collection('chess_rooms').doc(id);}
-  function chessStateRef(id){return chessRoomRef(id).collection('state').doc('current');}
-
-  function normCR(raw){
-    if(!raw||typeof raw!=='object')return{wK:true,wQ:true,bK:true,bQ:true};
-    return{wK:!!raw.wK,wQ:!!raw.wQ,bK:!!raw.bK,bQ:!!raw.bQ};
-  }
-  function normEP(raw){
-    if(!raw)return null;
-    if(Array.isArray(raw))return raw;
-    if(typeof raw==='object')return[Number(raw[0]||0),Number(raw[1]||0)];
-    return null;
-  }
-  function normTimers(raw){
-    if(!raw)return null;
-    if(typeof raw==='object')return{w:Number(raw.w||0),b:Number(raw.b||0)};
-    return null;
-  }
-
-  /* ── MODE SELECTOR ── */
-  function showModeSelector(){
-    C.innerHTML='';
-    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
-    var title=document.createElement('div');title.style.cssText='font-size:20px;font-weight:800;color:var(--text);text-align:center';title.textContent='♟️ Chess';
-    wrap.appendChild(title);
-    var modeRow=document.createElement('div');modeRow.style.cssText='display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%;max-width:480px';
-    function modeCard(icon,t,d,onclick){
-      var card=document.createElement('div');
-      card.style.cssText='flex:1;min-width:160px;max-width:200px;border:0.5px solid var(--border2);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .15s,background .15s';
-      card.onmouseover=function(){this.style.borderColor='var(--accent)';this.style.background='rgba(124,58,237,.08)';};
-      card.onmouseout=function(){this.style.borderColor='var(--border2)';this.style.background='var(--surface2)';};
-      card.innerHTML='<div style="font-size:32px;margin-bottom:10px">'+icon+'</div><div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">'+t+'</div><div style="font-size:11px;color:var(--muted);line-height:1.5">'+d+'</div>';
-      card.onclick=onclick;return card;
-    }
-    modeRow.appendChild(modeCard('🤖','vs AI','Play against the computer. Normal or timed.',function(){showSubMode('ai');}));
-    modeRow.appendChild(modeCard('👥','vs Player','Online 1v1. Create or join a room.',function(){showSubMode('pvp');}));
-    wrap.appendChild(modeRow);C.appendChild(wrap);
-  }
-
-  function showSubMode(mode){
-    C.innerHTML='';
-    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
-    var title=document.createElement('div');title.style.cssText='font-size:16px;font-weight:700;color:var(--text);text-align:center';
-    title.textContent=mode==='ai'?'♟️ vs AI':'♟️ vs Player';
-    wrap.appendChild(title);
-    var optRow=document.createElement('div');optRow.style.cssText='display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%;max-width:480px';
-    function optCard(icon,t,d,onclick){
-      var card=document.createElement('div');
-      card.style.cssText='flex:1;min-width:160px;max-width:200px;border:0.5px solid var(--border2);border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .15s,background .15s';
-      card.onmouseover=function(){this.style.borderColor='var(--accent)';this.style.background='rgba(124,58,237,.08)';};
-      card.onmouseout=function(){this.style.borderColor='var(--border2)';this.style.background='var(--surface2)';};
-      card.innerHTML='<div style="font-size:32px;margin-bottom:10px">'+icon+'</div><div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">'+t+'</div><div style="font-size:11px;color:var(--muted);line-height:1.5">'+d+'</div>';
-      card.onclick=onclick;return card;
-    }
-    optRow.appendChild(optCard('⏳','Normal','No time limit.',function(){
-      if(mode==='pvp')showPvPLobby(null);else startAIGame(null);
-    }));
-    optRow.appendChild(optCard('⏱️','Timed','Choose a time control.',function(){showTimeControl(mode);}));
-    wrap.appendChild(optRow);
-    var back=document.createElement('button');back.className='btn btn-outline';back.style.cssText='font-size:11px;padding:6px 16px';back.textContent='← Back';back.onclick=showModeSelector;
-    wrap.appendChild(back);C.appendChild(wrap);
-  }
-
-  function showTimeControl(mode){
-    C.innerHTML='';
-    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
-    wrap.appendChild((function(){var d=document.createElement('div');d.style.cssText='font-size:16px;font-weight:700;color:var(--text);text-align:center';d.textContent='Choose time control';return d;})());
-    var presets=[
-      {label:'Bullet',time:60,icon:'💫',desc:'1 min each'},
-      {label:'Blitz',time:180,icon:'⚡',desc:'3 min each'},
-      {label:'Rapid',time:600,icon:'🕙',desc:'10 min each'},
-      {label:'Classical',time:1800,icon:'🏛️',desc:'30 min each'},
-    ];
-    var grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:380px';
-    presets.forEach(function(p){
-      var card=document.createElement('div');
-      card.style.cssText='border:0.5px solid var(--border2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;background:var(--surface2);transition:border-color .15s';
-      card.onmouseover=function(){this.style.borderColor='var(--accent)';};card.onmouseout=function(){this.style.borderColor='var(--border2)';};
-      card.innerHTML='<div style="font-size:24px;margin-bottom:6px">'+p.icon+'</div><div style="font-size:13px;font-weight:700;color:var(--text)">'+p.label+'</div><div style="font-size:11px;color:var(--muted)">'+p.desc+'</div>';
-      card.onclick=(function(secs){return function(){if(mode==='pvp')showPvPLobby(secs);else startAIGame(secs);};})(p.time);
-      grid.appendChild(card);
-    });
-    wrap.appendChild(grid);
-    var back=document.createElement('button');back.className='btn btn-outline';back.style.cssText='font-size:11px;padding:6px 16px';back.textContent='← Back';back.onclick=function(){showSubMode(mode);};
-    wrap.appendChild(back);C.appendChild(wrap);
-  }
-
-  /* ══════════════════════════════════════
-     PVP LOBBY
-  ══════════════════════════════════════ */
-  var pvpRoomId=null,pvpIsHost=false,pvpUnsub=null,pvpStateUnsub=null,pvpTimerInterval=null;
-
-  function cleanupPvP(){
-    if(pvpUnsub){pvpUnsub();pvpUnsub=null;}
-    if(pvpStateUnsub){pvpStateUnsub();pvpStateUnsub=null;}
-    if(pvpTimerInterval){clearInterval(pvpTimerInterval);pvpTimerInterval=null;}
-  }
-
-  function showPvPLobby(timerSecs){
-    cleanupPvP();pvpRoomId=null;pvpIsHost=false;
-    C.innerHTML='';
-    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:24px;';
-    var title=document.createElement('div');title.style.cssText='font-size:18px;font-weight:800;color:var(--text);text-align:center';
-    title.textContent='♟️ Chess · '+(timerSecs?Math.floor(timerSecs/60)+'min timed':'Untimed');
-    wrap.appendChild(title);
-    var createBtn=document.createElement('button');createBtn.className='btn btn-primary';createBtn.style.cssText='font-size:14px;padding:12px 32px;border-radius:10px';createBtn.textContent='+ Create Room';
-    createBtn.onclick=function(){doCreateChessRoom(timerSecs);};wrap.appendChild(createBtn);
-    var joinRow=document.createElement('div');joinRow.style.cssText='display:flex;gap:8px;align-items:center';
-    var inp=document.createElement('input');inp.type='text';inp.placeholder='Enter room code…';
-    inp.style.cssText='padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font-size:13px;width:180px';inp.setAttribute('maxlength','10');
-    var joinBtn=document.createElement('button');joinBtn.className='btn btn-outline';joinBtn.style.cssText='font-size:13px;padding:8px 16px';joinBtn.textContent='Join';
-    joinBtn.onclick=function(){var code=inp.value.trim().toUpperCase();if(code)doJoinChessRoom(code,timerSecs);else gcToast('Enter a room code!');};
-    inp.addEventListener('keydown',function(e){if(e.key==='Enter')joinBtn.onclick();});
-    joinRow.appendChild(inp);joinRow.appendChild(joinBtn);wrap.appendChild(joinRow);
-    var back=document.createElement('button');back.className='btn btn-outline';back.style.cssText='font-size:11px;padding:6px 16px';back.textContent='← Back';
-    back.onclick=function(){cleanupPvP();showSubMode('pvp');};wrap.appendChild(back);
-    C.appendChild(wrap);
-  }
-
-  function doCreateChessRoom(timerSecs){
-    var id=db.collection('chess_rooms').doc().id;
-    pvpRoomId=id;pvpIsHost=true;
-    chessRoomRef(id).set({
-      createdBy:_myName,createdAt:Date.now(),phase:'lobby',timerSecs:timerSecs||null,
-      seats:{0:{nick:_myName},1:null}
-    }).then(function(){subscribePvPRoom(timerSecs);}).catch(function(e){gcToast('Error: '+e.message);});
-  }
-
-  function doJoinChessRoom(code,timerSecs){
-    db.collection('chess_rooms').get().then(function(snap){
-      var found=null;
-      snap.forEach(function(doc){if(doc.id.slice(-6).toUpperCase()===code)found=doc;});
-      if(!found){gcToast('Room not found: #'+code);return;}
-      var data=found.data();
-      if(data.phase!=='lobby'){gcToast('That game has already started!');return;}
-      if(data.seats&&data.seats[1]){gcToast('Room is full!');return;}
-      pvpRoomId=found.id;pvpIsHost=false;
-      chessRoomRef(pvpRoomId).update({'seats.1':{nick:_myName}})
-        .then(function(){subscribePvPRoom(timerSecs);})
-        .catch(function(e){gcToast('Join error: '+e.message);});
-    }).catch(function(e){gcToast('Error: '+e.message);});
-  }
-
-  function subscribePvPRoom(timerSecs){
-    if(pvpUnsub)pvpUnsub();
-    pvpUnsub=chessRoomRef(pvpRoomId).onSnapshot(function(snap){
-      if(!snap.exists){showPvPLobby(timerSecs);return;}
-      var data=snap.data();
-      pvpIsHost=data.createdBy===_myName;
-      if(data.phase==='playing'){
-        subscribePvPState();
-      } else {
-        if(pvpStateUnsub){pvpStateUnsub();pvpStateUnsub=null;}
-        renderPvPLobby(data,timerSecs);
-      }
-    });
-  }
-
-  function renderPvPLobby(data,timerSecs){
-    var seats=data.seats||{};
-    var seat0=seats[0]||null;
-    var seat1=seats[1]||null;
-    var bothSeated=seat0&&seat1;
-    C.innerHTML='';
-    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:20px;';
-    var hdr=document.createElement('div');hdr.style.cssText='display:flex;align-items:center;gap:10px;width:100%;max-width:480px;justify-content:space-between';
-    var codeSpan=document.createElement('span');codeSpan.style.cssText='font-size:14px;font-weight:700;color:var(--text)';codeSpan.textContent='Room #'+pvpRoomId.slice(-6).toUpperCase();
-    var modeLbl=document.createElement('span');modeLbl.style.cssText='font-size:11px;color:var(--muted)';modeLbl.textContent=timerSecs?(Math.floor(timerSecs/60)+' min timed'):'Untimed';
-    hdr.appendChild(codeSpan);hdr.appendChild(modeLbl);wrap.appendChild(hdr);
-
-    /* Seats */
-    var seatRow=document.createElement('div');seatRow.style.cssText='display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%;max-width:480px';
-    function seatCard(seat,label,isMe){
-      var card=document.createElement('div');
-      card.style.cssText='flex:1;min-width:160px;max-width:200px;border-radius:14px;padding:16px;text-align:center;'+(isMe?'border:2px solid var(--accent);background:rgba(124,58,237,.08);':'border:0.5px solid var(--border2);background:var(--surface2);');
-      if(seat){
-        var av=document.createElement('div');av.style.cssText='width:44px;height:44px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;background:rgba(255,255,255,.08);color:var(--text)';av.textContent=seat.nick.slice(0,2).toUpperCase();
-        var nm=document.createElement('div');nm.style.cssText='font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px';nm.textContent=seat.nick;
-        var badge=document.createElement('span');badge.style.cssText='font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,.12);color:var(--green);font-weight:600';badge.textContent=isMe?'You · Ready':'Ready';
-        card.appendChild(av);card.appendChild(nm);card.appendChild(badge);
-      } else {
-        var eIcon=document.createElement('div');eIcon.style.cssText='width:44px;height:44px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--surface2);border:0.5px solid var(--border)';eIcon.textContent='❓';
-        var eLbl=document.createElement('div');eLbl.style.cssText='font-size:12px;color:var(--muted)';eLbl.textContent=label;
-        card.appendChild(eIcon);card.appendChild(eLbl);
-      }
-      return card;
-    }
-    seatRow.appendChild(seatCard(seat0,'Seat 1 (White)',seat0&&seat0.nick===_myName));
-    seatRow.appendChild(seatCard(seat1,'Seat 2 (Black)',seat1&&seat1.nick===_myName));
-    wrap.appendChild(seatRow);
-
-    var shareInfo=document.createElement('div');shareInfo.style.cssText='font-size:11px;color:var(--muted);text-align:center';
-    shareInfo.textContent='Share code: #'+pvpRoomId.slice(-6).toUpperCase()+' · '+(bothSeated?'Both players ready':'Waiting for opponent…');
-    wrap.appendChild(shareInfo);
-
-    var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:10px';
-    if(pvpIsHost){
-      var startBtn=document.createElement('button');startBtn.className='btn btn-primary';startBtn.style.cssText='font-size:13px;padding:10px 28px;'+(bothSeated?'':'opacity:.5;');
-      startBtn.disabled=!bothSeated;startBtn.textContent='Start Game ▶';
-      startBtn.onclick=function(){doStartChessGame(data,timerSecs);};btnRow.appendChild(startBtn);
-    }
-    var leaveBtn=document.createElement('button');leaveBtn.className='btn btn-outline';leaveBtn.style.cssText='font-size:12px;padding:8px 18px';leaveBtn.textContent='Leave';
-    leaveBtn.onclick=function(){cleanupPvP();showPvPLobby(timerSecs);};
-    btnRow.appendChild(leaveBtn);wrap.appendChild(btnRow);
-    C.appendChild(wrap);
-  }
-
-  function doStartChessGame(roomData,timerSecs){
-    /* Randomly assign colors */
-    var whiteIsHost=Math.random()<0.5;
-    var seats=roomData.seats||{};
-    var host=seats[0]?seats[0].nick:_myName;
-    var guest=seats[1]?seats[1].nick:'Opponent';
-    var whiteNick=whiteIsHost?host:guest;
-    var blackNick=whiteIsHost?guest:host;
-    var initBoard=[
-      ['r','n','b','q','k','b','n','r'],
-      ['p','p','p','p','p','p','p','p'],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      ['P','P','P','P','P','P','P','P'],
-      ['R','N','B','Q','K','B','N','R'],
-    ];
-    var batch=db.batch();
-    batch.set(chessStateRef(pvpRoomId),{
-      board:encBoard(initBoard),turn:'w',
-      whiteNick:whiteNick,blackNick:blackNick,
-      enPassant:null,castleRights:{wK:true,wQ:true,bK:true,bQ:true},
-      over:false,result:null,
-      timerSecs:timerSecs||null,
-      timers:timerSecs?{w:timerSecs,b:timerSecs}:null,
-      lastTick:Date.now(),updatedAt:Date.now()
-    });
-    batch.update(chessRoomRef(pvpRoomId),{phase:'playing',whiteNick:whiteNick,blackNick:blackNick});
-    batch.commit().catch(function(e){gcToast('Start error: '+e.message);});
-  }
-
-  function subscribePvPState(){
-    if(pvpStateUnsub)pvpStateUnsub();
-    pvpStateUnsub=chessStateRef(pvpRoomId).onSnapshot(function(snap){
-      if(!snap.exists)return;
-      var gs=snap.data();
-      renderPvPGame(gs);
-    });
-  }
-
-  /* ── PVP GAME RENDER ── */
-  function renderPvPGame(gs){
-    if(pvpTimerInterval){clearInterval(pvpTimerInterval);pvpTimerInterval=null;}
-    var board=decBoard(gs.board||[]);
-    var turn=gs.turn||'w';
-    var whiteNick=gs.whiteNick||'White';
-    var blackNick=gs.blackNick||'Black';
-    var amIWhite=_myName===whiteNick;
-    var flip=!amIWhite; /* Black sees board flipped */
-    var ep=normEP(gs.enPassant);
-    var cr=normCR(gs.castleRights);
-    var over=gs.over||false;
-    var timers=normTimers(gs.timers);
-    var timerSecs=gs.timerSecs||null;
-    var isMyTurn=(amIWhite&&turn==='w')||(!amIWhite&&turn==='b');
-    var sel=C._pvpSel||null;
-
-    function getMoves(r,c){return getLegal(board,r,c,ep,cr,false);}
-
-    /* Timer tick — client-side interpolation between Firestore updates */
-    if(timers&&!over){
-      pvpTimerInterval=setInterval(function(){
-        timers[turn]--;
-        if(timers[turn]<0)timers[turn]=0;
-        renderTimerChips();
-        if(timers[turn]<=0){
-          clearInterval(pvpTimerInterval);pvpTimerInterval=null;
-          /* Only the active player's client writes the timeout */
-          if(isMyTurn){
-            chessStateRef(pvpRoomId).update({over:true,result:turn==='w'?'Black wins on time':'White wins on time',updatedAt:Date.now()}).catch(function(){});
-          }
-        }
-      },1000);
-    }
-
-    function formatTime(secs){var m=Math.floor(secs/60),s=secs%60;return m+':'+(s<10?'0':'')+s;}
-
-    var sqSz=Math.max(44,Math.min(Math.floor(((C.clientWidth||900)-40)/8),Math.floor(((C.clientHeight||780)-180)/8),86));
-    var pieceFs=Math.round(sqSz*0.7);
-
-    var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;width:100%';
-
-    /* Timer chips */
-    var timerBar=null;
-    function renderTimerChips(){
-      if(!timers||!timerBar)return;
-      timerBar.innerHTML='';
-      function chip(nick,side,secs,active){
-        var d=document.createElement('div');
-        var low=secs<30;
-        d.style.cssText='font-size:13px;font-weight:700;padding:4px 12px;border-radius:8px;'+(active?'background:var(--accent);color:#fff;':(low?'color:var(--red);background:rgba(239,68,68,.15);':'color:var(--muted);background:var(--surface2);'));
-        d.textContent=nick+' '+formatTime(Math.max(0,secs));timerBar.appendChild(d);
-      }
-      /* Show opponent on top, me on bottom */
-      if(amIWhite){chip(blackNick,'b',timers.b,turn==='b'&&!over);chip(whiteNick,'w',timers.w,turn==='w'&&!over);}
-      else{chip(whiteNick,'w',timers.w,turn==='w'&&!over);chip(blackNick,'b',timers.b,turn==='b'&&!over);}
-    }
-    if(timers){
-      timerBar=document.createElement('div');timerBar.style.cssText='display:flex;justify-content:space-between;width:'+(sqSz*8)+'px;margin-bottom:6px;gap:8px';
-      renderTimerChips();wrap.appendChild(timerBar);
-    }
-
-    /* Status */
-    var statusDiv=document.createElement('div');statusDiv.style.cssText='font-size:11px;color:var(--muted);margin-bottom:6px;text-align:center';
-    if(over){statusDiv.textContent=gs.result||'Game over';statusDiv.style.color='var(--green)';}
-    else{statusDiv.textContent=(turn==='w'?whiteNick:blackNick)+'\'s turn ('+(turn==='w'?'White':'Black')+')'+(isMyTurn?' ← Your move':'');}
-    wrap.appendChild(statusDiv);
-
-    /* Board — flip perspective for black */
-    var boardEl=document.createElement('div');boardEl.style.cssText='display:inline-block;border:3px solid #5a3e1a;border-radius:4px;overflow:hidden;cursor:pointer';
-    var kingPos=findKing(board,turn==='w');
-    var inCheck=kingPos?isAttacked(board,kingPos[0],kingPos[1],turn!=='w',flip):false;
-    var rows=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
-    var cols=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
-    rows.forEach(function(r){
-      var rowEl=document.createElement('div');rowEl.style.display='flex';
-      cols.forEach(function(c){
-        var cell=document.createElement('div');
-        var light=(r+c)%2===0,bg=light?'#f0d9b5':'#b58863';
-        if(sel&&sel[0]===r&&sel[1]===c)bg='#7fc97f';
-        var validMoves=sel?getMoves(sel[0],sel[1]):[];
-        var valid=validMoves.some(function(m){return m[0]===r&&m[1]===c;});
-        if(valid)bg=light?'#cdd16a':'#aaa23a';
-        if(inCheck&&kingPos&&kingPos[0]===r&&kingPos[1]===c)bg='#e85555';
-        cell.style.cssText='width:'+sqSz+'px;height:'+sqSz+'px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:'+pieceFs+'px;user-select:none;position:relative';
-        var p=board[r][c];
-        if(p&&p!==' '){
-          var span=document.createElement('span');span.textContent=isW(p)?WH[p.toUpperCase()]:BK[p];
-          span.style.cssText=isW(p)?'color:#fff;text-shadow:-1px -1px 0 #333,1px -1px 0 #333,-1px 1px 0 #333,1px 1px 0 #333':'color:#111;text-shadow:-1px -1px 0 #f0d9b5,1px -1px 0 #f0d9b5,-1px 1px 0 #f0d9b5,1px 1px 0 #f0d9b5';
-          cell.appendChild(span);
-        }
-        if(valid){var dot=document.createElement('div');var ds=Math.round(sqSz*.28);dot.style.cssText='position:absolute;width:'+ds+'px;height:'+ds+'px;border-radius:50%;background:rgba(0,0,0,.25);pointer-events:none';cell.appendChild(dot);}
-        (function(rr,cc){cell.addEventListener('click',function(){
-          if(over||!isMyTurn)return;
-          var myWhite=amIWhite;
-          if(sel){
-            var ok=getMoves(sel[0],sel[1]).some(function(m){return m[0]===rr&&m[1]===cc;});
-            if(ok){doSubmitMove(sel[0],sel[1],rr,cc,board,ep,cr,flip,turn,timers,timerSecs);C._pvpSel=null;}
-            else{var pp=board[rr][cc];C._pvpSel=(pp&&pp!==' '&&(myWhite?isW(pp):isB(pp))&&getMoves(rr,cc).length>0)?[rr,cc]:null;renderPvPGame(gs);}
-          } else {
-            var pp2=board[rr][cc];var isMine=myWhite?isW(pp2):isB(pp2);
-            if(pp2&&pp2!==' '&&isMine&&getMoves(rr,cc).length>0){SND_GC.click();C._pvpSel=[rr,cc];renderPvPGame(gs);}
-          }
-        });})(r,c);
-        rowEl.appendChild(cell);
-      });
-      boardEl.appendChild(rowEl);
-    });
-    wrap.appendChild(boardEl);
-
-    /* Info */
-    var info=document.createElement('div');info.style.cssText='font-size:12px;color:var(--muted);margin-top:6px;text-align:center';
-    info.textContent=over?(gs.result||'Game over'):(isMyTurn?'Your move — click a piece':'Waiting for '+( turn==='w'?whiteNick:blackNick)+'…');
-    wrap.appendChild(info);
-
-    /* Buttons */
-    var actRow=document.createElement('div');actRow.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center';
-    if(over&&pvpIsHost){
-      var rematch=document.createElement('button');rematch.className='btn btn-primary';rematch.style.cssText='font-size:11px;padding:6px 16px';rematch.textContent='Rematch';
-      rematch.onclick=function(){
-        chessRoomRef(pvpRoomId).get().then(function(snap){doStartChessGame(snap.data(),timerSecs);});
-      };actRow.appendChild(rematch);
-    }
-    var leaveBtn=document.createElement('button');leaveBtn.className='btn btn-outline';leaveBtn.style.cssText='font-size:11px;padding:6px 16px';leaveBtn.textContent='Leave';
-    leaveBtn.onclick=function(){cleanupPvP();C._pvpSel=null;showModeSelector();};actRow.appendChild(leaveBtn);
-    wrap.appendChild(actRow);
-    C.innerHTML='';C.appendChild(wrap);
-  }
-
-  function doSubmitMove(r,c,nr,nc,board,ep,cr,flip,turn,timers,timerSecs){
-    var nb=cloneBoard(board);
-    var result=doApplyMove(nb,r,c,nr,nc,ep,cr,flip);
-    if(result.captured)SND_GC.capture();else SND_GC.move();
-    var newTurn=turn==='w'?'b':'w';
-    var newTimers=timers?{w:timers.w,b:timers.b}:null;
-    /* Check game end */
-    var oppInCheck=isInCheck(nb,newTurn==='w',flip);
-    var noMoves=!hasAnyLegal(nb,newTurn==='w',result.enPassant,result.castleRights,flip);
-    var isOver=noMoves;
-    var gameResult=null;
-    if(noMoves){
-      if(oppInCheck){gameResult=(newTurn==='w'?gs_black()+'(Black)':gs_white()+'(White)')+' wins by checkmate!';SND_GC.win();}
-      else{gameResult='Stalemate — draw!';SND_GC.card();}
-    }
-    var updates={
-      board:encBoard(nb),turn:newTurn,
-      enPassant:result.enPassant||null,
-      castleRights:result.castleRights,
-      over:isOver,result:gameResult,
-      timers:newTimers,lastTick:Date.now(),updatedAt:Date.now()
-    };
-    chessStateRef(pvpRoomId).update(updates).catch(function(e){gcToast('Move error: '+e.message);});
-  }
-
-  /* Helpers to get nick labels for result string */
-  var _gs_ref={};
-  function gs_white(){return _gs_ref.white||'White';}
-  function gs_black(){return _gs_ref.black||'Black';}
-
-  /* ══════════════════════════════════════
-     AI GAME (local, no Firestore)
-  ══════════════════════════════════════ */
-  function startAIGame(timerSecs){
-    aiMoveCount=0;
-    var playerIsWhite=Math.random()<0.5;
-    var flip=!playerIsWhite;
-    var board=[
-      ['r','n','b','q','k','b','n','r'],
-      ['p','p','p','p','p','p','p','p'],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      [' ',' ',' ',' ',' ',' ',' ',' '],
-      ['P','P','P','P','P','P','P','P'],
-      ['R','N','B','Q','K','B','N','R'],
-    ];
-    /* Board data stays in standard orientation; flip variable handles visual rendering */
-    var turn='w',sel=null,moves=0,over=false,ep=null,promoted=false;
-    var cr={wK:true,wQ:true,bK:true,bQ:true};
-    var timers=timerSecs?{w:timerSecs,b:timerSecs}:null;
-    var timerIv=null;
-
-    function isPlayerTurn(){return playerIsWhite?turn==='w':turn==='b';}
-    function isAITurn(){return playerIsWhite?turn==='b':turn==='w';}
-    function getMoves(r,c){return getLegal(board,r,c,ep,cr,flip);}
-    function formatTime(s){var m=Math.floor(s/60),ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
-
-    function startTimer(){
-      if(!timers)return;
-      if(timerIv)clearInterval(timerIv);
-      timerIv=setInterval(function(){
-        timers[turn]--;
-        if(timers[turn]<0)timers[turn]=0;
-        if(timers[turn]<=0){over=true;clearInterval(timerIv);SND_GC.wrong();setScore((turn==='w'?'White':'Black')+' ran out of time!');render();}
-        else render();
-      },1000);
-    }
-
-    function doMove(r,c,nr,nc){
-      var _movingPiece=board[r][c]; /* capture before doApplyMove clears it */
-      var result=doApplyMove(board,r,c,nr,nc,ep,cr,flip);
-      ep=result.enPassant;cr=result.castleRights;
-      promoted=!!(_movingPiece&&_movingPiece.toUpperCase()==='P'&&(nr===0||nr===7));
-      if(result.captured)SND_GC.capture();else SND_GC.move();
-      moves++;sel=null;
-      var justWhite=turn==='w';turn=turn==='w'?'b':'w';
-      var oppCheck=isInCheck(board,turn==='w',false);
-      if(!hasAnyLegal(board,turn==='w',ep,cr,false)){
-        over=true;if(timerIv)clearInterval(timerIv);
-        if(oppCheck){SND_GC.win();setScore('Checkmate! '+(turn==='b'?'White':'Black')+' wins 🏆');if(isPlayerTurn()){gcSaveScore('chess',moves,true);gcAwardGameCredit(cu.nickname,2);if(typeof achCheckGame==='function')achCheckGame('chess',{beat_ai:true});}}
-        else{SND_GC.card();setScore('Stalemate — draw!');}
-      }
-      if(!over&&timers)startTimer();
-      render();
-      if(!over&&isAITurn()){aiThinking=true;setTimeout(function(){
-        var best=null;
-        try{best=aiPickMove(board,!playerIsWhite,ep,cr,false);}catch(e){best=null;}
-        aiThinking=false;
-        if(best){
-          doMove(best.from[0],best.from[1],best.to[0],best.to[1]);
-        } else {
-          /* AI has no legal moves — checkmate or stalemate */
-          over=true;if(timerIv)clearInterval(timerIv);
-          var aiInCheck=isInCheck(board,!playerIsWhite,false);
-          if(aiInCheck){
-            SND_GC.win();
-            setScore('Checkmate! '+(playerIsWhite?'White':'Black')+' wins 🏆');
-            gcSaveScore('chess',moves,true);
-            gcAwardGameCredit(cu.nickname,2);
-            if(typeof achCheckGame==='function')achCheckGame('chess',{beat_ai:true});
-          } else {
-            SND_GC.card();setScore('Stalemate — draw!');
-          }
-          render();
-        }
-      },500);}
-    }
-
-    function render(){
-      var sqSz=Math.max(44,Math.min(Math.floor(((C.clientWidth||900)-40)/8),Math.floor(((C.clientHeight||780)-180)/8),86));
-      var pieceFs=Math.round(sqSz*0.7);
-      var playerCheck=isInCheck(board,playerIsWhite,false);
-      var wrap2=document.createElement('div');wrap2.style.cssText='display:flex;flex-direction:column;align-items:center;width:100%';
-
-      if(timers){
-        var tb=document.createElement('div');tb.style.cssText='display:flex;justify-content:space-between;width:'+(sqSz*8)+'px;margin-bottom:6px;gap:8px';
-        function chip(lbl,side,secs,active){var d=document.createElement('div');var low=secs<30;d.style.cssText='font-size:13px;font-weight:700;padding:4px 12px;border-radius:8px;'+(active?'background:var(--accent);color:#fff;':(low?'color:var(--red);background:rgba(239,68,68,.15);':'color:var(--muted);background:var(--surface2);'));d.textContent=lbl+' '+formatTime(Math.max(0,secs));tb.appendChild(d);}
-        chip('AI',!playerIsWhite?'w':'b',timers[!playerIsWhite?'w':'b'],isAITurn()&&!over);
-        chip('You',playerIsWhite?'w':'b',timers[playerIsWhite?'w':'b'],isPlayerTurn()&&!over);
-        wrap2.appendChild(tb);
-      }
-
-      var statusDiv2=document.createElement('div');statusDiv2.style.cssText='font-size:11px;margin-bottom:6px;text-align:center;color:var(--muted)';
-      var st='You play '+(playerIsWhite?'White ♔':'Black ♚');
-      if(!over){if(playerCheck)st+=' — ⚠️ CHECK!';}
-      if(playerCheck)statusDiv2.style.color='var(--red)';
-      statusDiv2.textContent=st;wrap2.appendChild(statusDiv2);
-
-      var boardEl2=document.createElement('div');boardEl2.style.cssText='display:inline-block;border:3px solid #5a3e1a;border-radius:4px;overflow:hidden;cursor:pointer';
-      var kp=findKing(board,playerIsWhite);
-      var rows2=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
-      var cols2=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
-      rows2.forEach(function(r){
-        var rEl=document.createElement('div');rEl.style.display='flex';
-        cols2.forEach(function(c){
-          var cell=document.createElement('div');
-          var light=(r+c)%2===0,bg=light?'#f0d9b5':'#b58863';
-          var dr2=flip?7-r:r, dc2=flip?7-c:c;
-          if(sel&&sel[0]===dr2&&sel[1]===dc2)bg='#7fc97f';
-          var vms=sel?getMoves(sel[0],sel[1]).map(function(m){return flip?[7-m[0],7-m[1]]:m;}):[];
-          var valid=vms.some(function(m){return m[0]===r&&m[1]===c;});
-          if(valid)bg=light?'#cdd16a':'#aaa23a';
-          if(playerCheck&&kp&&kp[0]===r&&kp[1]===c)bg='#e85555';
-          cell.style.cssText='width:'+sqSz+'px;height:'+sqSz+'px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:'+pieceFs+'px;user-select:none;position:relative';
-          var p=board[r][c];
-          if(p&&p!==' '){var sp=document.createElement('span');sp.textContent=isW(p)?WH[p.toUpperCase()]:BK[p];sp.style.cssText=isW(p)?'color:#fff;text-shadow:-1px -1px 0 #333,1px -1px 0 #333,-1px 1px 0 #333,1px 1px 0 #333':'color:#111;text-shadow:-1px -1px 0 #f0d9b5,1px -1px 0 #f0d9b5,-1px 1px 0 #f0d9b5,1px 1px 0 #f0d9b5';cell.appendChild(sp);}
-          if(valid){var dot=document.createElement('div');var ds=Math.round(sqSz*.28);dot.style.cssText='position:absolute;width:'+ds+'px;height:'+ds+'px;border-radius:50%;background:rgba(0,0,0,.25);pointer-events:none';cell.appendChild(dot);}
-          (function(rr,cc){cell.addEventListener('click',function(){
-            if(over||isAITurn()||aiThinking)return;
-            /* Translate visual coords to data coords when board is flipped */
-            var dr=flip?7-rr:rr, dc=flip?7-cc:cc;
-            if(sel){
-              var selDr=flip?7-sel[0]:sel[0], selDc=flip?7-sel[1]:sel[1];
-              /* sel stores data coords; check against translated target */
-              var ok=getMoves(sel[0],sel[1]).some(function(m){return m[0]===dr&&m[1]===dc;});
-              if(ok){doMove(sel[0],sel[1],dr,dc);}
-              else{var pp=board[dr][dc];var isP=playerIsWhite?isW(pp):isB(pp);sel=(pp&&pp!==' '&&isP&&getMoves(dr,dc).length>0)?[dr,dc]:null;render();}
-            } else {
-              var pp2=board[dr][dc];var isP2=playerIsWhite?isW(pp2):isB(pp2);
-              if(pp2&&pp2!==' '&&isP2&&getMoves(dr,dc).length>0){SND_GC.click();sel=[dr,dc];render();}
-            }
-          });})(r,c);
-          rEl.appendChild(cell);
-        });
-        boardEl2.appendChild(rEl);
-      });
-      wrap2.appendChild(boardEl2);
-
-      var info2=document.createElement('div');info2.style.cssText='font-size:12px;color:var(--muted);margin-top:6px;text-align:center';
-      info2.textContent=over?'Game over':(isAITurn()?'AI thinking…':'Click a piece to move');
-      wrap2.appendChild(info2);
-      if(promoted){var pi=document.createElement('div');pi.style.cssText='font-size:11px;color:var(--green);margin-top:3px;text-align:center';pi.textContent='♛ Pawn promoted to Queen!';wrap2.appendChild(pi);promoted=false;}
-
-      var ar=document.createElement('div');ar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center';
-      var nb2=document.createElement('button');nb2.className='btn btn-outline';nb2.style.cssText='font-size:11px;padding:4px 12px';nb2.textContent='New Game';
-      nb2.onclick=function(){if(timerIv)clearInterval(timerIv);showModeSelector();};ar.appendChild(nb2);
-      wrap2.appendChild(ar);
-      C.innerHTML='';C.appendChild(wrap2);
-    }
-
-    if(timers)startTimer();
-    render();
-  }
-
-  showModeSelector();
-}
-
 function gcGameWordSearch(C){
   C.style.cssText='padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:10px;';
 
@@ -17265,7 +16605,7 @@ function gcGameWordSearch(C){
         SND_GC.win();
         if(found.length===WORDS.length){
           gameOver=true;
-          var credits=3+Math.floor(WORDS.length/4);
+          var credits=15;
           gcAwardGameCredit(cu.nickname,credits);
           gcSaveScore('wordsearch',WORDS.length,true);
           achCheckGame('wordsearch',{allFound:true});
@@ -18989,14 +18329,18 @@ window.gcAwardPerformanceCredits=gcAwardPerformanceCredits;
 function gcAwardUploadCredits(nick,date,byHourInShift){
   if(!gcDb()||!nick||!byHourInShift)return;
   var nickLc=nick.toLowerCase();
+  var dir=TEAM_DIR[nick]||{};
+  var isEscalation=(dir.role||'').toLowerCase()==='escalation';
+  var creditMultiplier=isEscalation?2:1; /* escalation only uploads half the day — 2 credits per contract to keep it fair */
   Object.keys(byHourInShift).forEach(function(hour){
     var count=byHourInShift[hour]||0;
     if(count<=0)return;
     var docKey=nickLc+'_upl_'+date+'_'+hour;
     gcDb().collection('gc_awards').doc(docKey).get().then(function(snap){
       if(snap.exists())return; /* already credited this hour */
-      gcAwardCredit(nickLc,count);
-      gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'upload_hour',date:date,hour:parseInt(hour),contracts:count,awardedAt:Date.now()});
+      var creditsAwarded=count*creditMultiplier;
+      gcAwardCredit(nickLc,creditsAwarded);
+      gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'upload_hour',date:date,hour:parseInt(hour),contracts:count,creditsAwarded:creditsAwarded,creditMultiplier:creditMultiplier,awardedAt:Date.now()});
     }).catch(function(){});
   });
 }
@@ -19202,7 +18546,7 @@ function gcGameSpellWizard(C){
 
 function gcGameWordGuess(C){
   C.style.cssText='padding:16px 20px;overflow-y:auto;align-items:center;display:flex;flex-direction:column;background:var(--bg)';
-  var WORDS=['AUDIT','CLAIM','DRAFT','LEASE','LEGAL','TITLE','BUYER','OFFER','PRICE','AGENT','LODGE','LOANS','RATES','BONDS','TRUST','YIELD','GRANT','QUOTE','DEBIT','ESCROW','VENDOR','ZONING','PROXY','LIEN','DEED'];
+  var WORDS=['AUDIT','CLAIM','DRAFT','LEASE','LEGAL','TITLE','BUYER','OFFER','PRICE','AGENT','LODGE','LOANS','RATES','BONDS','TRUST','YIELD','GRANT','QUOTE','DEBIT','ESCROW','VENDOR','ZONING','PROXY','LIEN','DEED','MANOR','CONDO','VILLA','CABIN','RANCH','TAXES','FUNDS','ASSET','SHARE','STOCK','BYLAW','WAIVE','AMEND','PROOF','ANNEX','ADMIN','CLERK','OWNER','STAFF','GUEST','RENEW','CLOSE','TRACK','MERGE','SPLIT'];
   var ans=WORDS[Math.floor(Math.random()*WORDS.length)];
   var guesses=[],cur='',MAX=6,done=false;
   function render(){
@@ -19273,9 +18617,9 @@ function gcGameWordGuess(C){
         if(cur===ans){
           done=true;SND_GC.win();gcSetScore(guesses.length+' tries');
           gcSaveScore('wordguess',guesses.length,false);
-          gcAwardGameCredit(cu.nickname,2);
+          gcAwardGameCredit(cu.nickname,15);
           achCheckGame('wordguess',{guesses:guesses.length});
-          gcToast('🎉 '+guesses.length+' tries! +2 credits');
+          gcToast('🎉 '+guesses.length+' tries! +15 credits');
         } else if(guesses.length>=MAX){
           done=true;SND_GC.wrong();gcSetScore('X / '+MAX);
           gcToast('Answer: '+ans);
@@ -19417,7 +18761,7 @@ function gcGameSolitaire(C){
     }
   }
   function kCheckWin(){return kfound.every(function(ff){return ff.length===13;});}
-  function kOnWin(){SND_GC.win();gcSetScore(kmoves+' moves');gcSaveScore('solitaire',kmoves,false);gcAwardGameCredit(cu.nickname,3);achCheckGame('solitaire',{});gcToast('🎉 You won in '+kmoves+' moves! +3 credits');recordSolWin('klondike');}
+  function kOnWin(){SND_GC.win();gcSetScore(kmoves+' moves');gcSaveScore('solitaire',kmoves,false);gcAwardGameCredit(cu.nickname,15);achCheckGame('solitaire',{});gcToast('🎉 You won in '+kmoves+' moves! +15 credits');recordSolWin('klondike');}
 
   function renderKlondike(){
     var CS=solCardSize();var wrap=document.createElement('div');wrap.style.cssText='width:100%;max-width:700px';
@@ -19496,7 +18840,7 @@ function gcGameSolitaire(C){
     }
   }
   function vCheckWin(){return vfound.every(function(ff){return ff.length===13;});}
-  function vOnWin(){SND_GC.win();gcSetScore(vmoves+' moves');gcSaveScore('solitaire_vegas',vmoves,false);gcAwardGameCredit(cu.nickname,5);achCheckGame('solitaire',{});gcToast('🎉 Vegas win in '+vmoves+' moves! +5 credits');recordSolWin('vegas');}
+  function vOnWin(){SND_GC.win();gcSetScore(vmoves+' moves');gcSaveScore('solitaire_vegas',vmoves,false);gcAwardGameCredit(cu.nickname,15);achCheckGame('solitaire',{});gcToast('🎉 Vegas win in '+vmoves+' moves! +15 credits');recordSolWin('vegas');}
 
   function renderVegas(){
     var CS=solCardSize();var wrap=document.createElement('div');wrap.style.cssText='width:100%;max-width:700px';
@@ -19605,7 +18949,7 @@ function gcGameSolitaire(C){
     if(fromPile.length&&!fromPile[fromPile.length-1].up)fromPile[fromPile.length-1].up=true;
     spMoves++;SND_GC.card();spSel=null;
     for(var i=0;i<SP_COLS;i++){if(spCheckComplete(spTab[i])){spTab[i].splice(spTab[i].length-13,13);spCompleted++;SND_GC.win();if(spTab[i].length&&!spTab[i][spTab[i].length-1].up)spTab[i][spTab[i].length-1].up=true;gcToast('♠ Sequence complete! ('+spCompleted+'/8)');}}
-    if(spCompleted===8){gcToast('🏆 Spider complete! +5 credits');gcSetScore(spMoves+' moves');gcSaveScore('solitaire_spider',spMoves,false);gcAwardGameCredit(cu.nickname,5);achCheckGame('solitaire',{});recordSolWin('spider');}
+    if(spCompleted===8){gcToast('🏆 Spider complete! +15 credits');gcSetScore(spMoves+' moves');gcSaveScore('solitaire_spider',spMoves,false);gcAwardGameCredit(cu.nickname,15);achCheckGame('solitaire',{});recordSolWin('spider');}
     renderSpider();
   }
   function spCardSize(){var availW=(C.clientWidth||960)-24;var cw=Math.max(44,Math.min(Math.floor((availW-9*6)/10),80));return{w:cw,h:Math.round(cw*1.4)};}
@@ -19713,7 +19057,7 @@ function gcGameMinesweeper(C){
             if(first){first=false;t0=Date.now();placeMines(rr,cc);}
             if(board[rr][cc]===-1){var d2=cfg();for(var i=0;i<d2.r;i++)for(var j=0;j<d2.c;j++)if(board[i][j]===-1)rev[i][j]=true;over=true;SND_GC.boom();render();gcSetScore('BOOM 💣');return;}
             SND_GC.reveal();flood(rr,cc);
-            if(checkWin()){over=true;var secs=Math.round((Date.now()-t0)/1000);SND_GC.win();gcSetScore(secs+'s');gcSaveScore('minesweeper',secs,false);gcAwardGameCredit(cu.nickname,2);achCheckGame('minesweeper',{hard:diff==='hard'});gcToast('🎉 Cleared in '+secs+'s! +2 credits');}
+            if(checkWin()){over=true;var secs=Math.round((Date.now()-t0)/1000);SND_GC.win();gcSetScore(secs+'s');gcSaveScore('minesweeper',secs,false);gcAwardGameCredit(cu.nickname,15);achCheckGame('minesweeper',{hard:diff==='hard'});gcToast('🎉 Cleared in '+secs+'s! +15 credits');}
             render();
           });
           cell.addEventListener('contextmenu',function(e){e.preventDefault();if(over||rev[rr][cc])return;flag[rr][cc]=!flag[rr][cc];SND_GC.flag();render();});
@@ -19763,38 +19107,38 @@ var GC_PRIZE_LADDER=[0,2,5,10,20,50,100,150,250,400,600,1000,1500,2500,5000,1000
 var GC_SAFE_FLOORS=[5,10];
 var GC_TRIVIA=[
   /* ── EASY tier 1 ── */
-  {t:1,q:"What is the capital of France?",o:["Rome","Paris","Madrid","Berlin"],a:1,exp:"Paris has been France's capital since 987 AD."},
-  {t:1,q:"How many sides does a hexagon have?",o:["Five","Six","Seven","Eight"],a:1,exp:"Hex means six."},
-  {t:1,q:"Which planet is known as the Red Planet?",o:["Venus","Jupiter","Mars","Saturn"],a:2,exp:"Mars gets its colour from iron oxide (rust)."},
-  {t:1,q:"What is H₂O commonly known as?",o:["Salt","Water","Oxygen","Hydrogen"],a:1,exp:"H₂O is the chemical formula for water."},
-  {t:1,q:"How many days are in a leap year?",o:["364","365","366","367"],a:2,exp:"Leap years have 366 days — February gets an extra day."},
-  {t:1,q:"Which ocean is the largest on Earth?",o:["Atlantic","Indian","Arctic","Pacific"],a:3,exp:"The Pacific covers about 165 million km²."},
-  {t:1,q:"In which sport would you perform a slam dunk?",o:["Volleyball","Tennis","Basketball","Baseball"],a:2,exp:"A slam dunk is a basketball move forcing the ball through the hoop."},
-  {t:1,q:"What country is home to the kangaroo?",o:["New Zealand","South Africa","India","Australia"],a:3,exp:"Kangaroos are native to Australia."},
-  {t:1,q:"What is the boiling point of water at sea level in Celsius?",o:["90°","95°","100°","110°"],a:2,exp:"Water boils at 100°C at sea level."},
-  {t:1,q:"What is the smallest prime number?",o:["0","1","2","3"],a:2,exp:"2 is the only even prime number."},
-  {t:1,q:"What gas do plants absorb during photosynthesis?",o:["Oxygen","Nitrogen","Carbon dioxide","Helium"],a:2,exp:"Plants absorb CO₂ and release oxygen."},
-  {t:1,q:"How many bones are there in an adult human body?",o:["186","206","226","246"],a:1,exp:"Adults have 206 bones; babies are born with about 270."},
-  {t:1,q:"What instrument has black and white keys?",o:["Guitar","Violin","Piano","Drum"],a:2,exp:"A piano has 88 keys — 52 white and 36 black."},
-  {t:1,q:"How many continents are there on Earth?",o:["Five","Six","Seven","Eight"],a:2,exp:"The seven continents: Africa, Antarctica, Asia, Australia, Europe, North America, South America."},
-  {t:1,q:"What is the chemical symbol for water?",o:["WO","HO","H₂O","W₂O"],a:2,exp:"H₂O: two hydrogen atoms bonded to one oxygen."},
+  {t:1,q:"What is the capital of Japan?",o:["Osaka","Tokyo","Kyoto","Nagoya"],a:1,exp:"Tokyo has been Japan's capital since 1868."},
+  {t:1,q:"How many legs does a spider have?",o:["Six","Eight","Ten","Four"],a:1,exp:"Spiders are arachnids — eight legs, not six like insects."},
+  {t:1,q:"Which is the largest planet in our solar system?",o:["Saturn","Jupiter","Earth","Neptune"],a:1,exp:"Jupiter is more than twice as massive as all other planets combined."},
+  {t:1,q:"What color do you get by mixing blue and yellow?",o:["Purple","Green","Orange","Brown"],a:1,exp:"Blue and yellow combine to make green."},
+  {t:1,q:"How many minutes are in an hour?",o:["50","60","90","100"],a:1,exp:"An hour has 60 minutes."},
+  {t:1,q:"What is the tallest animal in the world?",o:["Elephant","Giraffe","Ostrich","Camel"],a:1,exp:"Giraffes can grow up to 5.5 metres tall."},
+  {t:1,q:"Which season comes right after winter?",o:["Summer","Spring","Fall","Winter"],a:1,exp:"Spring follows winter in the standard four-season cycle."},
+  {t:1,q:"What do bees primarily produce that people eat?",o:["Silk","Honey","Wax","Milk"],a:1,exp:"Bees produce honey from flower nectar."},
+  {t:1,q:"How many strings does a standard guitar have?",o:["Four","Six","Eight","Twelve"],a:1,exp:"A standard guitar has six strings."},
+  {t:1,q:"What is the freezing point of water in Celsius?",o:["0°","10°","32°","100°"],a:0,exp:"Water freezes at 0°C (32°F)."},
+  {t:1,q:"Which shape has exactly three sides?",o:["Square","Triangle","Pentagon","Hexagon"],a:1,exp:"A triangle has three sides and three angles."},
+  {t:1,q:"What is the largest animal in the ocean?",o:["Great White Shark","Blue Whale","Giant Squid","Orca"],a:1,exp:"The blue whale is the largest animal ever known to exist."},
+  {t:1,q:"How many colors are in a rainbow?",o:["Five","Six","Seven","Eight"],a:2,exp:"A rainbow has seven colors: red, orange, yellow, green, blue, indigo, violet."},
+  {t:1,q:"What is the capital of Italy?",o:["Milan","Rome","Venice","Naples"],a:1,exp:"Rome has been Italy's capital since 1871."},
+  {t:1,q:"Which fruit is famously said to keep the doctor away?",o:["Orange","Apple","Banana","Grape"],a:1,exp:"\"An apple a day keeps the doctor away\" is the classic saying."},
 
   /* ── MEDIUM tier 2 ── */
-  {t:2,q:"What is the chemical symbol for gold?",o:["Go","Gd","Au","Ag"],a:2,exp:"Au comes from the Latin 'aurum' meaning gold."},
-  {t:2,q:"Who painted the Mona Lisa?",o:["Michelangelo","Raphael","Leonardo da Vinci","Caravaggio"],a:2,exp:"Leonardo painted the Mona Lisa between 1503 and 1519."},
-  {t:2,q:"What is the longest river in the world?",o:["Amazon","Yangtze","Nile","Mississippi"],a:2,exp:"The Nile is approximately 6,650 km long."},
-  {t:2,q:"What is the speed of light in a vacuum?",o:["200,000 km/s","300,000 km/s","400,000 km/s","150,000 km/s"],a:1,exp:"Light travels at approximately 299,792 km/s."},
-  {t:2,q:"Which element has atomic number 1?",o:["Helium","Oxygen","Carbon","Hydrogen"],a:3,exp:"Hydrogen is first on the periodic table."},
-  {t:2,q:"What is the largest organ in the human body?",o:["Liver","Brain","Lungs","Skin"],a:3,exp:"Skin covers approximately 1.7–2.0 m² in adults."},
-  {t:2,q:"What is the square root of 144?",o:["10","11","12","13"],a:2,exp:"12 × 12 = 144."},
-  {t:2,q:"Which planet has the most confirmed moons?",o:["Jupiter","Saturn","Uranus","Neptune"],a:1,exp:"Saturn has 146 confirmed moons as of 2024."},
-  {t:2,q:"What does CPU stand for?",o:["Central Processing Unit","Computer Power Unit","Core Program Utility","Central Program Unit"],a:0,exp:"CPU: Central Processing Unit — the primary processor."},
-  {t:2,q:"In what year did World War II end?",o:["1943","1944","1945","1946"],a:2,exp:"WWII ended in 1945 — V-E Day May 8, V-J Day September 2."},
-  {t:2,q:"What is the hardest natural substance on Earth?",o:["Gold","Diamond","Quartz","Granite"],a:1,exp:"Diamond scores 10 on the Mohs scale — the maximum."},
-  {t:2,q:"What is the main language spoken in Brazil?",o:["Spanish","English","Portuguese","French"],a:2,exp:"Brazil was colonised by Portugal."},
-  {t:2,q:"How many chambers does the human heart have?",o:["2","3","4","5"],a:2,exp:"Left and right atria, and left and right ventricles."},
-  {t:2,q:"What is the smallest country in the world?",o:["Monaco","San Marino","Liechtenstein","Vatican City"],a:3,exp:"Vatican City: 0.44 km² inside Rome."},
-  {t:2,q:"Which country has the largest land area?",o:["USA","China","Canada","Russia"],a:3,exp:"Russia: 17.1 million km²."},
+  {t:2,q:"What is the chemical symbol for iron?",o:["Ir","Fe","In","Fr"],a:1,exp:"Fe comes from the Latin 'ferrum' meaning iron."},
+  {t:2,q:"Who wrote the play Romeo and Juliet?",o:["Charles Dickens","William Shakespeare","Jane Austen","Mark Twain"],a:1,exp:"Shakespeare wrote Romeo and Juliet in the early 1590s."},
+  {t:2,q:"What is the official currency of Japan?",o:["Won","Yen","Yuan","Ringgit"],a:1,exp:"The Japanese yen has been in use since 1871."},
+  {t:2,q:"Which planet is closest to the sun?",o:["Venus","Mercury","Earth","Mars"],a:1,exp:"Mercury orbits closest to the sun of all eight planets."},
+  {t:2,q:"What is the tallest mountain in the world?",o:["K2","Mount Everest","Kilimanjaro","Denali"],a:1,exp:"Mount Everest stands at 8,849 metres above sea level."},
+  {t:2,q:"How many players from each team are on the field in soccer?",o:["9","11","10","7"],a:1,exp:"Each soccer team fields 11 players, including the goalkeeper."},
+  {t:2,q:"What is the largest hot desert in the world?",o:["Gobi","Sahara","Kalahari","Mojave"],a:1,exp:"The Sahara spans about 9.2 million km² across North Africa."},
+  {t:2,q:"What is the powerhouse of the cell called?",o:["Nucleus","Mitochondria","Ribosome","Golgi Body"],a:1,exp:"Mitochondria generate most of a cell's ATP energy."},
+  {t:2,q:"Which country gifted the Statue of Liberty to the USA?",o:["UK","France","Spain","Italy"],a:1,exp:"France gave the statue to the US in 1886 to mark their alliance."},
+  {t:2,q:"What is the scientific study of weather called?",o:["Geology","Meteorology","Astronomy","Ecology"],a:1,exp:"Meteorology studies atmospheric conditions and weather patterns."},
+  {t:2,q:"What is the national language of the Philippines?",o:["Spanish","Filipino","Malay","Mandarin"],a:1,exp:"Filipino, based largely on Tagalog, is the national language."},
+  {t:2,q:"Which vitamin does the body produce from sunlight exposure?",o:["Vitamin A","Vitamin D","Vitamin C","Vitamin B12"],a:1,exp:"Skin synthesises Vitamin D when exposed to UVB rays."},
+  {t:2,q:"What is the largest species of big cat?",o:["Lion","Tiger","Jaguar","Leopard"],a:1,exp:"Tigers are the largest of all wild cat species."},
+  {t:2,q:"How many sides does an octagon have?",o:["6","8","10","7"],a:1,exp:"Octagon comes from the Greek for 'eight angles'."},
+  {t:2,q:"What is 9 squared?",o:["72","81","90","99"],a:1,exp:"9 × 9 = 81."},
 
   /* ── HARD tier 3 ── */
   {t:3,q:"What is the Pythagorean theorem?",o:["a+b=c","a²+b²=c²","a×b=c²","a³+b³=c³"],a:1,exp:"In a right triangle: square of hypotenuse = sum of squares of other two sides."},
@@ -19961,7 +19305,7 @@ function gcGameDealOrNoDeal(C){
       setTimeout(function(){
         var d=G('dnd-deal'),nd=G('dnd-nodeal');
         if(d)d.onclick=function(){
-          var realOffer=Math.max(1,Math.round(offer*0.3));
+          var realOffer=Math.max(1,Math.round(offer*0.1));
           SND_GC.win();
           gcAwardGameCredit(cu.nickname,realOffer);
           achCheckGame('dealornodeal',{jackpot:false}); /* deal taken — not a jackpot win */
@@ -19992,7 +19336,7 @@ function gcGameDealOrNoDeal(C){
       fdBtn.style.cssText='flex:1;min-width:0;padding:9px 10px;border:1px solid rgba(74,222,128,.4);border-radius:8px;background:rgba(22,163,74,.25);color:#4ade80;font-size:12px;font-weight:700;cursor:pointer';
       fdBtn.textContent='Take '+finalOffer+' cr';
       fdBtn.onclick=function(){
-        var realFinal=Math.max(1,Math.round(finalOffer*0.3));
+        var realFinal=Math.max(1,Math.round(finalOffer*0.1));
         SND_GC.win();gcAwardGameCredit(cu.nickname,realFinal);
         endDND(realFinal,finalOffer,'Banker deal taken!');
       };
@@ -20033,7 +19377,7 @@ function gcGameDealOrNoDeal(C){
 
   function revealPlayerCase(){
     var prize=playerCase.prize;
-    var realPrize=Math.max(1,Math.round(prize*0.3));
+    var realPrize=Math.max(1,Math.round(prize*0.1));
     playerCase.open=true;
     SND_GC.win();
     gcAwardGameCredit(cu.nickname,realPrize);
@@ -20289,7 +19633,7 @@ function gcGameMillionaire(C){
 
   function endGame(prize,msg){
     gameOver=true;
-    var actualPrize=prize>0?Math.round(prize*0.01):0;
+    var actualPrize=prize>0?Math.min(15,Math.round(prize*0.01)):0;
     if(prize>0){
       gcAwardGameCredit(cu.nickname,actualPrize||10);
       /* qIdx is 0-based so question 15 = qIdx 14; lifelines used = key is false */
