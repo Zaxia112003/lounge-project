@@ -7270,16 +7270,18 @@ function achTrackSpend(nick,amount){
 
 function achOpenHighlightSelector(nick,aData){
   if(document.getElementById('ach-selector-modal'))return;
-  var periodAchIds={hero_month_1:1,hero_month_2:1,hero_month_3:1,quarter_master:1};
+  var periodAchIds={hero_month_1:1,hero_month_2:1,hero_month_3:1,quarter_master:1,upload_monster:1,life_of_pi:1,defect_defender:1,quality_vet:1};
   var hasAnyPeriod=Object.keys(aData).some(function(id){return periodAchIds[id]&&aData[id]&&aData[id].granted;});
   var lookupP=(hasAnyPeriod&&gcDb())
     ? gcDb().collection('period_achievements').where('nick','==',nick).get().then(function(snap){
-        var latest={};
+        var latest={};var hotmPeriods={};
         snap.forEach(function(d){
           var v=d.data();
+          if(v.achId&&v.achId.indexOf('hero_month_')===0)hotmPeriods[v.periodKey]=true;
           if(!periodAchIds[v.achId])return;
           if(!latest[v.achId]||v.periodKey>latest[v.achId].periodKey)latest[v.achId]=v;
         });
+        latest._hotmPeriods=hotmPeriods;
         return latest;
       }).catch(function(){return {};})
     : Promise.resolve({});
@@ -7288,13 +7290,14 @@ function achOpenHighlightSelector(nick,aData){
 function achOpenHighlightSelectorImpl(nick,aData,periodLookup,periodAchIds){
   if(document.getElementById('ach-selector-modal'))return;
   var currentHighlights=aData._highlights||[];
+  var hotmPeriods=(periodLookup&&periodLookup._hotmPeriods)||{};
   /* Filter out any highlighted achievements the user no longer owns, or
      that are period-based badges whose display window has passed. */
   var selected=currentHighlights.filter(function(achId){
     if(!achId||!aData[achId]||typeof ACHIEVEMENTS==='undefined'||!ACHIEVEMENTS[achId])return false;
     if(periodAchIds&&periodAchIds[achId]){
       var entry=periodLookup&&periodLookup[achId];
-      if(entry&&!achIsPeriodBadgeVisible(achId,entry.periodKey))return false;
+      if(entry&&!achIsPeriodBadgeVisible(achId,entry.periodKey,hotmPeriods))return false;
     }
     return true;
   });
@@ -7320,7 +7323,7 @@ function achOpenHighlightSelectorImpl(nick,aData,periodLookup,periodAchIds){
     if(!ach||!aData[id]||!aData[id].granted)return;
     if(periodAchIds&&periodAchIds[id]){
       var entry=periodLookup&&periodLookup[id];
-      if(entry&&!achIsPeriodBadgeVisible(id,entry.periodKey))return; /* expired — not selectable */
+      if(entry&&!achIsPeriodBadgeVisible(id,entry.periodKey,hotmPeriods))return; /* expired or absorbed — not selectable */
     }
     if(groups[ach.tier])groups[ach.tier].push(id);
   });
@@ -7412,7 +7415,7 @@ function achPositionInQuarter(month){ return ((month-1)%3)+1; } /* 1,2,3 */
    one full quarter of runway, whether or not a new one follows it. Every
    other achievement (including the other three period ones) is visible
    permanently once earned, same as the existing badge system. */
-function achIsPeriodBadgeVisible(achId,periodKey){
+function achIsPeriodBadgeVisible(achId,periodKey,hotmPeriods){
   if(achId==='hero_month_1'||achId==='hero_month_2'||achId==='hero_month_3'){
     var p=periodKey.split('-');
     return achQuarterKeyOf(parseInt(p[0]),parseInt(p[1]))===achCurrentQuarterKey();
@@ -7420,6 +7423,17 @@ function achIsPeriodBadgeVisible(achId,periodKey){
   if(achId==='quarter_master'){
     var cur=achCurrentQuarterKey();
     return periodKey===cur||achNextQuarterKey(periodKey)===cur;
+  }
+  if(achId==='upload_monster'||achId==='life_of_pi'||achId==='defect_defender'||achId==='quality_vet'){
+    /* Absorbed into Hero of the Month if this exact month also swept it —
+       the "whole" supersedes the "parts" once earned, same principle as
+       Quarter Master absorbing Hero of the Month I/II/III. */
+    if(hotmPeriods&&hotmPeriods[periodKey])return false;
+    var pp=periodKey.split('-');
+    var y=parseInt(pp[0]),m=parseInt(pp[1]);
+    var periodEnd=new Date(y,m,0); /* last day of that month */
+    var expiry=new Date(periodEnd.getTime()+30*24*60*60*1000);
+    return new Date()<=expiry;
   }
   return true;
 }
@@ -13066,25 +13080,28 @@ function renderMemberProfileCosmetics(nick,inv){
         /* Get highlighted achievements */
         var rawHighlights=aData._highlights||[];
         var isOwn=cu&&cu.nickname===nick;
-        var periodAchIds={hero_month_1:1,hero_month_2:1,hero_month_3:1,quarter_master:1};
+        var periodAchIds={hero_month_1:1,hero_month_2:1,hero_month_3:1,quarter_master:1,upload_monster:1,life_of_pi:1,defect_defender:1,quality_vet:1};
         var hasPeriodHighlight=rawHighlights.some(function(id){return periodAchIds[id];});
         var periodLookupP=hasPeriodHighlight&&gcDb()
           ? gcDb().collection('period_achievements').where('nick','==',nick).get().then(function(snap){
-              var latest={};
+              var latest={};var hotmPeriods={};
               snap.forEach(function(d){
                 var v=d.data();
+                if(v.achId&&v.achId.indexOf('hero_month_')===0)hotmPeriods[v.periodKey]=true;
                 if(!periodAchIds[v.achId])return;
                 if(!latest[v.achId]||v.periodKey>latest[v.achId].periodKey)latest[v.achId]=v;
               });
+              latest._hotmPeriods=hotmPeriods;
               return latest;
             }).catch(function(){return {};})
           : Promise.resolve({});
         periodLookupP.then(function(periodLookup){
+        var hotmPeriods=periodLookup._hotmPeriods||{};
         var highlights=rawHighlights.filter(function(achId){
           if(!periodAchIds[achId])return true; /* not a period-based badge — always keep */
           var entry=periodLookup[achId];
           if(!entry)return true; /* no ledger record yet (legacy data) — don't hide by default */
-          return achIsPeriodBadgeVisible(achId,entry.periodKey);
+          return achIsPeriodBadgeVisible(achId,entry.periodKey,hotmPeriods);
         });
         /* Render highlight slots */
         var hlWrap=document.createElement('div');
@@ -13984,6 +14001,7 @@ function escDetailConfirm(){
     var ex=perfData[r.nick][dateKey]||{};
     perfData[r.nick][dateKey]={uploadsTotal:r.total,uploadsInShift:r.inShift,uploadsOffShift:r.offShift,ahtTotal:ex.ahtTotal||0,ahtCount:ex.ahtCount||0,ahtSecs:ex.ahtSecs||0};
     fsSavePerfData(r.nick);
+    if(window.gcAwardUploadCreditsAggregate&&r.inShift>0){gcAwardUploadCreditsAggregate(r.nick,dateKey,r.inShift);}
   });
   pushNotif('📊','Daily upload detail saved for '+escDetailExtracted.length+' uploader(s).','detail');
   escDetailReset();closeDailyLog();
@@ -16350,7 +16368,7 @@ var _gcAllCredits={},_gcShifts={},_gcShiftsLoaded=false,_gcNotifs=[];
 /* ── Widget API keys ── */
 var WIDGET_KEYS={weather:'5222dd774faba440a3de6558a79b806f',news:'45a555116c88c9ef53afaac4acb73d6d'};
 
-var GAME_COSTS={minesweeper:1,wordguess:1,solitaire:1,millionaire:10,dealornodeal:5,kbquiz:1,fps:5,wordsearch:1,typingrace:1,spellwizard:1,tetris:1};
+var GAME_COSTS={minesweeper:10,wordguess:10,solitaire:10,millionaire:10,dealornodeal:10,kbquiz:10,fps:10,wordsearch:10,typingrace:10,spellwizard:10,tetris:10};
 
 /* ── Sound ── */
 function gcEnsureAudio(){if(!gcAudioCtx)gcAudioCtx=new(window.AudioContext||window.webkitAudioContext)();if(gcAudioCtx.state==='suspended')gcAudioCtx.resume();}
@@ -18129,7 +18147,8 @@ function gcMgrRenderCredits(){
       if(!todayAwards[n])todayAwards[n]=[];todayAwards[n].push(a);
     });
     var TYPE_LABELS={performance:'PI quality',upload_hour:'Upload hrs',streak_defect:'Defect streak',streak_pi:'PI streak',mood:'Mood check',kc:'KC quiz',game:'Game win',manual:'Manual adj'};
-    pane.innerHTML='<div style="font-size:10px;font-weight:700;letter-spacing:.5px;color:#8892b0;margin-bottom:10px;text-transform:uppercase;">Credits overview</div>';
+    pane.innerHTML='<div style="font-size:10px;font-weight:700;letter-spacing:.5px;color:#8892b0;margin-bottom:10px;text-transform:uppercase;">Credits overview</div>'
+      +'<button onclick="gcOpenReconcilePanel()" style="width:100%;margin-bottom:12px;font-size:11px;padding:8px 12px;border-radius:8px;border:1px solid #2a2d4a;background:#222537;color:#e8eaf6;cursor:pointer;">&#128295; Reconcile credits</button>';
     keys.sort().forEach(function(nick){
       var cr=_gcAllCredits[nick];
       var sh=_gcShifts[nick];var shLabel=sh?sh.start+'–'+sh.end:'no shift set';
@@ -18403,6 +18422,317 @@ function gcAwardUploadCredits(nick,date,byHourInShift){
   });
 }
 window.gcAwardUploadCredits=gcAwardUploadCredits;
+
+/* Same crediting logic as gcAwardUploadCredits, for entry paths that only
+   have a whole-day in-shift total (no per-hour breakdown) — e.g. the
+   summary-based Daily Log paste tool, as opposed to the detailed per-row
+   CRM export tool. Uses a distinct docKey namespace (_uplagg_ vs _upl_)
+   so this can never collide with, or double-credit against, an hour-level
+   entry for the same nick+date from the other tool. */
+function gcAwardUploadCreditsAggregate(nick,date,inShiftCount){
+  if(!gcDb()||!nick||!inShiftCount||inShiftCount<=0)return;
+  var nickLc=nick.toLowerCase();
+  var dir=TEAM_DIR[nick]||{};
+  var isEscalation=(dir.role||'').toLowerCase()==='escalation';
+  var creditMultiplier=isEscalation?2:1;
+  var docKey=nickLc+'_uplagg_'+date;
+  gcDb().collection('gc_awards').doc(docKey).get().then(function(snap){
+    if(snap.exists())return; /* already credited this day via this tool */
+    var creditsAwarded=inShiftCount*creditMultiplier;
+    gcAwardCredit(nickLc,creditsAwarded);
+    gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'upload_hour',date:date,hour:null,contracts:inShiftCount,creditsAwarded:creditsAwarded,creditMultiplier:creditMultiplier,source:'aggregate',awardedAt:Date.now()});
+  }).catch(function(){});
+}
+window.gcAwardUploadCreditsAggregate=gcAwardUploadCreditsAggregate;
+
+/* ── Upload credit reconciliation ──
+   For one person, walks their entire perfData history and compares each
+   day's TRUE in-shift upload count against whatever's already sitting in
+   the gc_awards ledger for that day (summed across every entry-tool
+   naming scheme — hour-based, aggregate, or a prior reconciliation run).
+   Any day where the ledger falls short gets topped up with exactly the
+   difference, under its own distinct docKey namespace, so this can never
+   double-credit a day that was already correctly (or partially) credited,
+   and is safe to re-run at any time — a second run will always compute a
+   shortfall of ~0 for anything already fixed. */
+function gcReconcileUploadCredits(nick,fromDate,toDate){
+  if(!gcDb()||!nick)return Promise.resolve({nick:nick,daysFixed:0,creditsAdded:0,details:[]});
+  var nickLc=nick.toLowerCase();
+  var dir=TEAM_DIR[nick]||{};
+  var isEscalation=(dir.role||'').toLowerCase()==='escalation';
+  var creditMultiplier=isEscalation?2:1;
+  return gcDb().collection('gc_awards').where('nick','==',nick).where('type','==','upload_hour').get().then(function(snap){
+    var creditedByDate={};
+    snap.forEach(function(d){
+      var v=d.data();
+      if(!v.date)return;
+      creditedByDate[v.date]=(creditedByDate[v.date]||0)+(v.contracts||0);
+    });
+    var days=Object.keys(perfData[nickLc]||perfData[nick]||{}).filter(function(d){
+      return (!fromDate||d>=fromDate)&&(!toDate||d<=toDate);
+    });
+    var toFix=[];
+    days.forEach(function(date){
+      var rec=(perfData[nick]||perfData[nickLc]||{})[date]||{};
+      var trueInShift=rec.uploadsInShift!=null?rec.uploadsInShift:(rec.uploadsTotal||0);
+      var already=creditedByDate[date]||0;
+      var shortfall=trueInShift-already;
+      if(shortfall>0)toFix.push({date:date,shortfall:shortfall});
+    });
+    if(!toFix.length)return {nick:nick,daysFixed:0,creditsAdded:0,details:[]};
+    var totalCreditsAdded=0;
+    var chain=Promise.resolve();
+    toFix.forEach(function(item){
+      chain=chain.then(function(){
+        var docKey=nickLc+'_uplrecon_'+item.date;
+        return gcDb().collection('gc_awards').doc(docKey).get().then(function(snap2){
+          if(snap2.exists())return; /* already reconciled this day before */
+          var creditsAwarded=item.shortfall*creditMultiplier;
+          totalCreditsAdded+=creditsAwarded;
+          gcAwardCredit(nickLc,creditsAwarded);
+          return gcDb().collection('gc_awards').doc(docKey).set({nick:nick,type:'upload_hour',date:item.date,hour:null,contracts:item.shortfall,creditsAwarded:creditsAwarded,creditMultiplier:creditMultiplier,source:'reconciliation',awardedAt:Date.now()});
+        });
+      });
+    });
+    return chain.then(function(){
+      return {nick:nick,daysFixed:toFix.length,creditsAdded:totalCreditsAdded,details:toFix};
+    });
+  }).catch(function(){return {nick:nick,daysFixed:0,creditsAdded:0,details:[],error:true};});
+}
+/* Reconciles the error/escalation deduction ledger against the live
+   callouts data, using the exact same "confirmed" rule already used
+   everywhere else (not pending_review, not discarded) and the same
+   docKey scheme as the live achSyncErrorCredits sync — so any entry
+   this creates is indistinguishable from one the live sync would have
+   created, and re-running this is always safe. Only ever adds a missing
+   deduction; never removes or double-applies an existing one. */
+function gcReconcileDeductionCredits(nick,fromDate,toDate){
+  if(!gcDb()||!nick)return Promise.resolve({nick:nick,itemsFixed:0,creditsAdjusted:0});
+  var nickLc=nick.toLowerCase();
+  var trueConfirmed=(callouts||[]).filter(function(c){
+    if(c.type!=='qscore'&&c.type!=='qesc'&&c.type!=='qesc_esc')return false;
+    if(c.uploader!==nick)return false;
+    if(c.status==='pending_review'||c.status==='discarded')return false;
+    var d=(c.date||'').slice(0,10);
+    return (!fromDate||d>=fromDate)&&(!toDate||d<=toDate);
+  });
+  if(!trueConfirmed.length)return Promise.resolve({nick:nick,itemsFixed:0,creditsAdjusted:0});
+  return gcDb().collection('gc_awards').where('nick','==',nick).where('type','==','error_deduction').get().then(function(snap){
+    var ledgerIds={};
+    snap.forEach(function(d){var v=d.data();if(v.calloutId)ledgerIds[String(v.calloutId)]=true;});
+    var missing=trueConfirmed.filter(function(c){return !ledgerIds[String(c._fsId||c.id)];});
+    if(!missing.length)return {nick:nick,itemsFixed:0,creditsAdjusted:0};
+    var totalAdjusted=0;
+    var chain=Promise.resolve();
+    missing.forEach(function(co){
+      chain=chain.then(function(){
+        var calloutKey=co._fsId||String(co.id);
+        var docKey=nickLc+'_err_'+calloutKey;
+        return gcDb().collection('gc_awards').doc(docKey).get().then(function(snap2){
+          if(snap2.exists())return; /* safety net */
+          var amt=co.type==='qscore'?-25:-100;
+          totalAdjusted+=amt;
+          gcAwardCredit(nickLc,amt);
+          return gcDb().collection('gc_awards').doc(docKey).set({nick:co.uploader,type:'error_deduction',calloutType:co.type,calloutId:calloutKey,amount:amt,date:(co.date||'').slice(0,10),appliedAt:Date.now(),source:'reconciliation'});
+        });
+      });
+    });
+    return chain.then(function(){return {nick:nick,itemsFixed:missing.length,creditsAdjusted:totalAdjusted};});
+  }).catch(function(){return {nick:nick,itemsFixed:0,creditsAdjusted:0,error:true};});
+}
+/* Combined pass: uploads first, then deductions, merged into one result. */
+function gcReconcileMember(nick,fromDate,toDate){
+  return gcReconcileUploadCredits(nick,fromDate,toDate).then(function(uplRes){
+    return gcReconcileDeductionCredits(nick,fromDate,toDate).then(function(dedRes){
+      return {
+        nick:nick,
+        daysFixed:uplRes.daysFixed,creditsAdded:uplRes.creditsAdded,
+        deductionItemsFixed:dedRes.itemsFixed,deductionCreditsAdjusted:dedRes.creditsAdjusted
+      };
+    });
+  });
+}
+function gcReconcileAllMembers(fromDate,toDate){
+  var members=TEAM.filter(function(t){return t.role&&(t.role.toLowerCase()==='uploader'||t.role.toLowerCase()==='escalation');});
+  var chain=Promise.resolve();
+  var results=[];
+  members.forEach(function(t){
+    chain=chain.then(function(){
+      return gcReconcileMember(t.nickname,fromDate,toDate).then(function(res){
+        res.fullName=t.fullName;
+        results.push(res);
+      });
+    });
+  });
+  return chain.then(function(){return results;});
+}
+function gcOpenReconcilePanel(){
+  if(document.getElementById('gc-recon-panel'))return;
+  var members=TEAM.filter(function(t){return t.role&&(t.role.toLowerCase()==='uploader'||t.role.toLowerCase()==='escalation');});
+  var now=new Date();
+  var thisY=now.getFullYear(),thisM=now.getMonth()+1;
+  function mR(y,m){return achMonthRange(y,m);}
+  function qR(y,q){var s=(q-1)*3+1;var a=mR(y,s),b=mR(y,s+2);return {fromD:a.fromD,toD:b.toD};}
+  var lastMY=thisM-1<1?{y:thisY-1,m:12}:{y:thisY,m:thisM-1};
+  var thisQ=Math.floor((thisM-1)/3)+1;
+  var lastQ=thisQ-1<1?{y:thisY-1,q:4}:{y:thisY,q:thisQ-1};
+  var PRESETS={
+    thismonth:Object.assign({kind:'month',y:thisY,m:thisM},mR(thisY,thisM)),
+    lastmonth:Object.assign({kind:'month',y:lastMY.y,m:lastMY.m},mR(lastMY.y,lastMY.m)),
+    thisquarter:Object.assign({kind:'quarter',y:thisY,q:thisQ},qR(thisY,thisQ)),
+    lastquarter:Object.assign({kind:'quarter',y:lastQ.y,q:lastQ.q},qR(lastQ.y,lastQ.q))
+  };
+
+  var overlay=document.createElement('div');
+  overlay.id='gc-recon-panel';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  var modal=document.createElement('div');
+  modal.style.cssText='background:var(--bg2,#181a2a);border:1px solid var(--border,#333);border-radius:14px;padding:22px;max-width:440px;width:92%;max-height:85vh;overflow-y:auto;color:var(--text,#eee);';
+  modal.innerHTML=
+    '<div style="font-weight:700;font-size:15px;margin-bottom:8px">🔧 Reconcile Credits</div>'
+    +'<div style="font-size:11px;color:var(--muted,#999);margin-bottom:14px">Compares each day\'s true in-shift upload total <em>and</em> confirmed error/escalation deductions against what\'s already in the ledger, and tops up any shortfall in either — only within the period you pick below. Safe to run anytime — never removes or double-credits anything already correct.</div>'
+    +'<label style="font-size:11px;color:var(--muted,#999)">Member</label>'
+    +'<select id="gc-recon-member" style="width:100%;padding:8px;margin:6px 0 12px;border-radius:8px;background:var(--bg3,#22243a);color:var(--text,#eee);border:1px solid var(--border,#333)">'
+      +'<option value="">All uploaders &amp; escalation</option>'
+      +members.map(function(t){return '<option value="'+t.nickname+'">'+t.fullName+'</option>';}).join('')
+    +'</select>'
+    +'<label style="font-size:11px;color:var(--muted,#999)">Period</label>'
+    +'<select id="gc-recon-period" style="width:100%;padding:8px;margin:6px 0 10px;border-radius:8px;background:var(--bg3,#22243a);color:var(--text,#eee);border:1px solid var(--border,#333)">'
+      +'<option value="lastmonth">Last month</option>'
+      +'<option value="thismonth">This month</option>'
+      +'<option value="lastquarter">Last quarter</option>'
+      +'<option value="thisquarter">This quarter</option>'
+      +'<option value="custom">Custom range…</option>'
+    +'</select>'
+    +'<div id="gc-recon-custom" style="display:none;gap:8px;margin-bottom:10px">'
+      +'<input type="date" id="gc-recon-from" style="flex:1;padding:7px;border-radius:8px;background:var(--bg3,#22243a);color:var(--text,#eee);border:1px solid var(--border,#333)">'
+      +'<input type="date" id="gc-recon-to" style="flex:1;padding:7px;border-radius:8px;background:var(--bg3,#22243a);color:var(--text,#eee);border:1px solid var(--border,#333)">'
+    +'</div>'
+    +'<div id="gc-recon-period-label" style="font-size:10px;color:var(--accent,#00e5ff);margin-bottom:12px"></div>'
+    +'<div style="display:flex;gap:8px">'
+      +'<button id="gc-recon-run" style="flex:1;padding:9px;border-radius:8px;border:none;background:#00e5ff;color:#0a0a12;font-weight:700;cursor:pointer">Run</button>'
+      +'<button id="gc-recon-close" style="padding:9px 16px;border-radius:8px;border:1px solid var(--border,#333);background:none;color:var(--text,#eee);cursor:pointer">Cancel</button>'
+    +'</div>'
+    +'<div id="gc-recon-results" style="margin-top:14px"></div>'
+    +'<div style="border-top:1px solid var(--border,#333);margin:18px 0 12px;padding-top:14px">'
+      +'<div style="font-weight:700;font-size:13px;margin-bottom:6px">🔁 Re-check achievements for this period</div>'
+      +'<div style="font-size:11px;color:var(--muted,#999);margin-bottom:10px">Once a month/quarter has been evaluated, it won\'t automatically re-run just because the ledger changed. Use this after reconciling to force that period to be re-evaluated with the corrected data.</div>'
+      +'<div style="display:flex;gap:8px">'
+        +'<button id="gc-recon-recheck-month" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#333);background:var(--bg3,#22243a);color:var(--text,#eee);cursor:pointer;font-size:11px">Re-check the picked month</button>'
+        +'<button id="gc-recon-recheck-quarter" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border,#333);background:var(--bg3,#22243a);color:var(--text,#eee);cursor:pointer;font-size:11px">Re-check the picked quarter</button>'
+      +'</div>'
+    +'</div>';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  function getRange(){
+    var period=document.getElementById('gc-recon-period').value;
+    if(period==='custom'){
+      return {fromD:document.getElementById('gc-recon-from').value,toD:document.getElementById('gc-recon-to').value};
+    }
+    return PRESETS[period];
+  }
+  function updateLabel(){
+    var r=getRange();
+    var lbl=document.getElementById('gc-recon-period-label');
+    lbl.textContent=(r&&r.fromD&&r.toD)?('Range: '+r.fromD+' → '+r.toD):'Pick a valid range.';
+  }
+  document.getElementById('gc-recon-period').onchange=function(){
+    document.getElementById('gc-recon-custom').style.display=this.value==='custom'?'flex':'none';
+    updateLabel();
+  };
+  document.getElementById('gc-recon-from').onchange=updateLabel;
+  document.getElementById('gc-recon-to').onchange=updateLabel;
+  updateLabel();
+
+  document.getElementById('gc-recon-close').onclick=function(){overlay.remove();};
+  document.getElementById('gc-recon-run').onclick=function(){
+    var range=getRange();
+    if(!range||!range.fromD||!range.toD){gcToast('Pick a valid period first.');return;}
+    var runBtn=document.getElementById('gc-recon-run');
+    runBtn.disabled=true;runBtn.textContent='Running…';
+    var pickedNick=document.getElementById('gc-recon-member').value;
+    var work=pickedNick
+      ? gcReconcileMember(pickedNick,range.fromD,range.toD).then(function(res){
+          res.fullName=(TEAM.find(function(t){return t.nickname===pickedNick;})||{}).fullName||pickedNick;
+          return [res];
+        })
+      : gcReconcileAllMembers(range.fromD,range.toD);
+    work.then(function(results){
+      var box=document.getElementById('gc-recon-results');
+      var creditHtml='';
+      var any=results.some(function(r){return r.daysFixed>0||r.deductionItemsFixed>0;});
+      if(!any){
+        creditHtml='<div style="font-size:12px;color:var(--muted,#999);padding:8px 0">No shortfall found in this period — everyone checked is already fully credited, uploads and deductions alike.</div>';
+      } else {
+        results.forEach(function(r){
+          if(!r.daysFixed&&!r.deductionItemsFixed)return;
+          creditHtml+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted,#888);margin:10px 0 4px">'+r.fullName+'</div>';
+          if(r.daysFixed)creditHtml+='<div style="font-size:13px;padding:2px 0">📦 '+r.daysFixed+' upload day(s) topped up, +'+r.creditsAdded+' credits</div>';
+          if(r.deductionItemsFixed)creditHtml+='<div style="font-size:13px;padding:2px 0">⚠️ '+r.deductionItemsFixed+' missed deduction(s) applied, '+r.deductionCreditsAdjusted+' credits</div>';
+        });
+      }
+      /* Auto-chain into the achievement check for the same period, if it's
+         a clean month/quarter preset (custom ranges don't map to a period
+         cleanly, so those still use the manual re-check buttons below). */
+      if(range.kind){
+        runBtn.textContent='Checking achievements…';
+        var resultsLog=[];
+        var achChain;
+        if(range.kind==='month'){
+          achChain=achCheckMonthlyRollups(resultsLog,{y:range.y,m:range.m});
+        } else {
+          var startM=(range.q-1)*3+1;
+          achChain=Promise.resolve();
+          [startM,startM+1,startM+2].forEach(function(m){
+            achChain=achChain.then(function(){return achCheckMonthlyRollups(resultsLog,{y:range.y,m:m});});
+          });
+          achChain=achChain.then(function(){return achCheckQuarterlyRollups(resultsLog,{y:range.y,q:range.q});});
+        }
+        achChain.then(function(){
+          runBtn.disabled=false;runBtn.textContent='Run';
+          var achHtml='<div style="border-top:1px solid var(--border,#333);margin-top:12px;padding-top:10px;font-weight:700;font-size:12px;margin-bottom:4px">🏆 Achievement results for this period</div>';
+          var anyAch=(resultsLog||[]).some(function(p){return p.items.length;});
+          if(!anyAch){
+            achHtml+='<div style="font-size:12px;color:var(--muted,#999)">No one newly qualified — either already awarded, or no one hit a threshold.</div>';
+          } else {
+            resultsLog.forEach(function(p){
+              if(!p.items.length)return;
+              achHtml+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted,#888);margin:8px 0 4px">'+p.period+'</div>';
+              p.items.forEach(function(i){achHtml+='<div style="font-size:13px;padding:4px 0;border-bottom:1px solid var(--border,#2a2a3a)">'+i+'</div>';});
+            });
+          }
+          box.innerHTML=creditHtml+achHtml;
+        }).catch(function(){
+          runBtn.disabled=false;runBtn.textContent='Run';
+          box.innerHTML=creditHtml+'<div style="font-size:12px;color:#ff6b6b;margin-top:10px">Achievement re-check failed — try the manual re-check buttons below.</div>';
+        });
+      } else {
+        runBtn.disabled=false;runBtn.textContent='Run';
+        box.innerHTML=creditHtml;
+      }
+    }).catch(function(e){
+      runBtn.disabled=false;runBtn.textContent='Run';
+      document.getElementById('gc-recon-results').innerHTML='<div style="font-size:12px;color:#ff6b6b">Something went wrong: '+(e&&e.message?e.message:'unknown error')+'</div>';
+    });
+  };
+  document.getElementById('gc-recon-recheck-month').onclick=function(){
+    var range=getRange();if(!range||!range.fromD)return;
+    var y=parseInt(range.fromD.slice(0,4)),m=parseInt(range.fromD.slice(5,7));
+    var resultsLog=[];
+    gcToast('Re-checking '+MONTH_NAMES[m-1]+' '+y+'…');
+    achCheckMonthlyRollups(resultsLog,{y:y,m:m}).then(function(){achShowRollupResults(resultsLog);});
+  };
+  document.getElementById('gc-recon-recheck-quarter').onclick=function(){
+    var range=getRange();if(!range||!range.fromD)return;
+    var y=parseInt(range.fromD.slice(0,4)),m=parseInt(range.fromD.slice(5,7));
+    var q=Math.floor((m-1)/3)+1;
+    var resultsLog=[];
+    gcToast('Re-checking Q'+q+' '+y+'…');
+    achCheckQuarterlyRollups(resultsLog,{y:y,q:q}).then(function(){achShowRollupResults(resultsLog);});
+  };
+}
 
 /* ── Error credit deductions ──
    Contract Error (qscore): -25 credits. Quality Escalation (qesc/qesc_esc): -100 credits.
