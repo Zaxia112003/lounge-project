@@ -7579,7 +7579,7 @@ function achRunLedgerQuarterCheck(year,q,resultsLog){
    grant underneath is idempotent per period. */
 function achCheckMonthlyRollups(resultsLog,forceFrom){
   if(!cu||!cu.role||cu.role.toLowerCase()!=='manager'||!fsDb()||!gcDb())return Promise.resolve();
-  return gcDb().collection('gc_config').doc('ach_monthly_rollup_v2').get().then(function(snap){
+  return gcDb().collection('gc_config').doc('ach_monthly_rollup_v3').get().then(function(snap){
     var data=snap.exists()?(snap.data()||{}):{};
     var now=new Date();var curY=now.getFullYear(),curM=now.getMonth()+1;
     var y,m;
@@ -7601,14 +7601,14 @@ function achCheckMonthlyRollups(resultsLog,forceFrom){
       var lastP=periods[periods.length-1];
       var lastLabel=lastP.y+'-'+(String(lastP.m).length<2?'0'+lastP.m:lastP.m);
       if(!forceFrom||!data.lastMonth||lastLabel>data.lastMonth){
-        gcDb().collection('gc_config').doc('ach_monthly_rollup_v2').set({lastMonth:lastLabel},{merge:true}).catch(function(){});
+        gcDb().collection('gc_config').doc('ach_monthly_rollup_v3').set({lastMonth:lastLabel},{merge:true}).catch(function(){});
       }
     });
   }).catch(function(){});
 }
 function achCheckQuarterlyRollups(resultsLog,forceFrom){
   if(!cu||!cu.role||cu.role.toLowerCase()!=='manager'||!fsDb()||!gcDb())return Promise.resolve();
-  return gcDb().collection('gc_config').doc('ach_quarterly_rollup_v2').get().then(function(snap){
+  return gcDb().collection('gc_config').doc('ach_quarterly_rollup_v3').get().then(function(snap){
     var data=snap.exists()?(snap.data()||{}):{};
     var now=new Date();var curY=now.getFullYear(),curQ=Math.floor(now.getMonth()/3)+1;
     var y,q;
@@ -7630,7 +7630,7 @@ function achCheckQuarterlyRollups(resultsLog,forceFrom){
       var lastP=periods[periods.length-1];
       var lastLabel=lastP.y+'-Q'+lastP.q;
       if(!forceFrom||!data.lastQuarter||lastLabel>data.lastQuarter){
-        gcDb().collection('gc_config').doc('ach_quarterly_rollup_v2').set({lastQuarter:lastLabel},{merge:true}).catch(function(){});
+        gcDb().collection('gc_config').doc('ach_quarterly_rollup_v3').set({lastQuarter:lastLabel},{merge:true}).catch(function(){});
       }
     });
   }).catch(function(){});
@@ -19261,6 +19261,7 @@ function gcGameTetris(C){
     gcSetScore(String(score));
     if(!over){if(!spawnPiece())return;}
     render();
+    if(tspin)showTSpinNotice(tspin);
   }
   function trackLifetimeTSpin(){
     if(!cu||!gcDb())return;
@@ -19333,57 +19334,68 @@ function gcGameTetris(C){
     }
     return wrap;
   }
-  function render(){
+  var boardCellEls,holdGridEl,nextGridEl,scoreStatEl,levelStatEl,linesStatEl,boardWrapEl,domBuilt,lastHoldPiece,lastNextPieceShown,gameOverOverlayEl;
+  function computeGhostRow(){
+    var r=curRow;
+    while(!tetCollides(board,currentShape(),r+1,curCol))r++;
+    return r;
+  }
+  function showTSpinNotice(kind){
+    if(!boardWrapEl)return;
+    var el=document.createElement('div');
+    el.textContent=kind==='full'?'T-SPIN!':'T-SPIN MINI';
+    el.style.cssText='position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-family:Courier New,monospace;font-weight:700;font-size:'+(kind==='full'?'20px':'15px')+';color:'+(kind==='full'?'#ff2ee6':'#a742f5')+';text-shadow:0 0 10px '+(kind==='full'?'#ff2ee6':'#a742f5')+',0 0 20px rgba(0,0,0,.8);z-index:30;pointer-events:none;opacity:0;transition:opacity .15s ease-out, transform .9s ease-out;';
+    boardWrapEl.appendChild(el);
+    requestAnimationFrame(function(){
+      el.style.opacity='1';
+      el.style.transform='translate(-50%,-70%)';
+    });
+    setTimeout(function(){
+      el.style.opacity='0';
+      setTimeout(function(){el.remove();},200);
+    },850);
+  }
+  function buildDOM(){
     C.innerHTML='';
     var wrap=document.createElement('div');wrap.style.cssText='display:flex;gap:16px;align-items:flex-start;';
 
-    /* Side panel: hold + next + stats */
     var side=document.createElement('div');side.style.cssText='display:flex;flex-direction:column;gap:12px;width:100px;';
     var holdBox=document.createElement('div');
     holdBox.style.cssText='background:#181a2a;border:1px solid #3a3d5a;border-radius:8px;padding:8px;text-align:center;';
     holdBox.innerHTML='<div style="font-size:10px;color:#999;margin-bottom:6px">HOLD</div>';
-    holdBox.appendChild(miniGrid(holdPiece,16));
+    holdGridEl=miniGrid(null,16);holdBox.appendChild(holdGridEl);
     side.appendChild(holdBox);
 
     var nextBox=document.createElement('div');
     nextBox.style.cssText='background:#181a2a;border:1px solid #3a3d5a;border-radius:8px;padding:8px;text-align:center;';
     nextBox.innerHTML='<div style="font-size:10px;color:#999;margin-bottom:6px">NEXT</div>';
-    nextBox.appendChild(miniGrid(peekNext(),16));
+    nextGridEl=miniGrid(null,16);nextBox.appendChild(nextGridEl);
     side.appendChild(nextBox);
 
     var stats=document.createElement('div');
     stats.style.cssText='background:#181a2a;border:1px solid #3a3d5a;border-radius:8px;padding:8px;font-size:11px;color:#eee;line-height:1.8;';
-    stats.innerHTML='Score<br><b style="font-size:15px;color:#00e5ff">'+score+'</b><br>Level '+level+'<br>Lines '+linesTotal;
+    stats.innerHTML='Score<br><b id="tet-score-stat" style="font-size:15px;color:#00e5ff">0</b><br><span id="tet-level-stat">Level 1</span><br><span id="tet-lines-stat">Lines 0</span>';
     side.appendChild(stats);
+    scoreStatEl=stats.querySelector('#tet-score-stat');
+    levelStatEl=stats.querySelector('#tet-level-stat');
+    linesStatEl=stats.querySelector('#tet-lines-stat');
     wrap.appendChild(side);
 
-    /* Board */
+    boardWrapEl=document.createElement('div');boardWrapEl.style.cssText='position:relative;';
     var boardEl=document.createElement('div');
-    boardEl.style.cssText='display:grid;grid-template-columns:repeat(10,'+CELL+'px);grid-template-rows:repeat(20,'+CELL+'px);gap:1px;background:#050610;border:2px solid #3a3d5a;border-radius:4px;position:relative;';
-    var display=board.map(function(row){return row.slice();});
-    if(!over){
-      var shape=currentShape();
-      for(var r=0;r<shape.length;r++)for(var c=0;c<shape.length;c++){
-        if(shape[r][c]){var br=curRow+r,bc=curCol+c;if(br>=0&&br<20&&bc>=0&&bc<10)display[br][bc]=curPiece+'_live';}
+    boardEl.style.cssText='display:grid;grid-template-columns:repeat(10,'+CELL+'px);grid-template-rows:repeat(20,'+CELL+'px);gap:1px;background:#050610;border:2px solid #3a3d5a;border-radius:4px;';
+    boardCellEls=[];
+    for(var r=0;r<20;r++){
+      boardCellEls[r]=[];
+      for(var c=0;c<10;c++){
+        var cell=document.createElement('div');
+        cell.style.cssText='width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:#12142080;';
+        boardCellEls[r][c]=cell;
+        boardEl.appendChild(cell);
       }
     }
-    for(var r=0;r<20;r++)for(var c=0;c<10;c++){
-      var cell=document.createElement('div');
-      var v=display[r][c];
-      var isLive=typeof v==='string'&&v.indexOf('_live')>-1;
-      var pieceKey=isLive?v.replace('_live',''):v;
-      cell.style.cssText='width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:'+(pieceKey?TET_COLOR[pieceKey]:'#12142080')+';'+(isLive?'box-shadow:inset 0 0 4px rgba(255,255,255,.5);':'');
-      boardEl.appendChild(cell);
-    }
-    if(over){
-      var overlay=document.createElement('div');
-      overlay.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;gap:10px;border-radius:4px;';
-      overlay.innerHTML='<div style="font-size:16px">GAME OVER</div><div style="font-size:13px;color:#00e5ff">Score: '+score+'</div>';
-      var again=document.createElement('button');again.className='gc-btn gc-btn-primary';again.style.cssText='font-size:12px;padding:6px 16px;';again.textContent='Play Again';
-      again.onclick=newGame;overlay.appendChild(again);
-      boardEl.appendChild(overlay);
-    }
-    wrap.appendChild(boardEl);
+    boardWrapEl.appendChild(boardEl);
+    wrap.appendChild(boardWrapEl);
 
     var controls=document.createElement('div');
     controls.style.cssText='display:flex;flex-direction:column;gap:6px;font-size:10px;color:#999;width:100px;';
@@ -19391,6 +19403,63 @@ function gcGameTetris(C){
     wrap.appendChild(controls);
 
     C.appendChild(wrap);
+    domBuilt=true;
+    lastHoldPiece=undefined;lastNextPieceShown=undefined;gameOverOverlayEl=null;
+  }
+  function render(){
+    if(!domBuilt)buildDOM();
+
+    if(holdPiece!==lastHoldPiece){
+      var newHoldGrid=miniGrid(holdPiece,16);
+      holdGridEl.replaceWith(newHoldGrid);holdGridEl=newHoldGrid;
+      lastHoldPiece=holdPiece;
+    }
+    var nxt=peekNext();
+    if(nxt!==lastNextPieceShown){
+      var newNextGrid=miniGrid(nxt,16);
+      nextGridEl.replaceWith(newNextGrid);nextGridEl=newNextGrid;
+      lastNextPieceShown=nxt;
+    }
+    scoreStatEl.textContent=score;
+    levelStatEl.textContent='Level '+level;
+    linesStatEl.textContent='Lines '+linesTotal;
+
+    var display=board.map(function(row){return row.slice();});
+    if(!over){
+      var ghostRow=computeGhostRow();
+      var shape=currentShape();
+      for(var r=0;r<shape.length;r++)for(var c=0;c<shape.length;c++){
+        if(shape[r][c]){
+          var gr=ghostRow+r,gc=curCol+c;
+          if(gr>=0&&gr<20&&gc>=0&&gc<10&&!display[gr][gc])display[gr][gc]=curPiece+'_ghost';
+        }
+      }
+      for(var r=0;r<shape.length;r++)for(var c=0;c<shape.length;c++){
+        if(shape[r][c]){var br=curRow+r,bc=curCol+c;if(br>=0&&br<20&&bc>=0&&bc<10)display[br][bc]=curPiece+'_live';}
+      }
+    }
+    for(var r=0;r<20;r++)for(var c=0;c<10;c++){
+      var v=display[r][c];
+      var isLive=typeof v==='string'&&v.indexOf('_live')>-1;
+      var isGhost=typeof v==='string'&&v.indexOf('_ghost')>-1;
+      var pieceKey=isLive?v.replace('_live',''):isGhost?v.replace('_ghost',''):v;
+      var cellEl=boardCellEls[r][c];
+      if(isGhost){
+        cellEl.style.cssText='width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:transparent;border:2px solid '+TET_COLOR[pieceKey]+'66;box-sizing:border-box;';
+      } else {
+        cellEl.style.cssText='width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:'+(pieceKey?TET_COLOR[pieceKey]:'#12142080')+';'+(isLive?'box-shadow:inset 0 0 4px rgba(255,255,255,.5);':'');
+      }
+    }
+    if(over&&!gameOverOverlayEl){
+      gameOverOverlayEl=document.createElement('div');
+      gameOverOverlayEl.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;gap:10px;border-radius:4px;';
+      gameOverOverlayEl.innerHTML='<div style="font-size:16px">GAME OVER</div><div style="font-size:13px;color:#00e5ff">Score: '+score+'</div>';
+      var again=document.createElement('button');again.className='gc-btn gc-btn-primary';again.style.cssText='font-size:12px;padding:6px 16px;';again.textContent='Play Again';
+      again.onclick=newGame;gameOverOverlayEl.appendChild(again);
+      boardWrapEl.appendChild(gameOverOverlayEl);
+    } else if(!over&&gameOverOverlayEl){
+      gameOverOverlayEl.remove();gameOverOverlayEl=null;
+    }
   }
 
   function keyHandler(e){
