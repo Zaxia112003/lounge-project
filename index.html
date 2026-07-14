@@ -19792,22 +19792,72 @@ function gcGameTetris(C){
     }
   }
 
-  function keyHandler(e){
+  var DAS_MS=130,ARR_MS=30,SOFT_DROP_MS=30;
+  var keyState={};
+  var inputLoopId=null;
+  function doRepeatAction(action){
+    if(action==='left')tryMove(0,-1);
+    else if(action==='right')tryMove(0,1);
+    else if(action==='down'){if(!tryMove(1,0)){lockPiece();}else{score+=1;gcSetScore(String(score));}}
+  }
+  function startInputLoop(){
+    if(inputLoopId)return;
+    function tick(){
+      if(gcCurrentGame!=='tetris'){inputLoopId=null;return;}
+      var now=performance.now();
+      ['left','right','down'].forEach(function(action){
+        var st=keyState[action];
+        if(!st)return;
+        var held=now-st.downAt;
+        if(!st.dasStarted){
+          if(held>=DAS_MS){st.dasStarted=true;st.lastRepeat=now;doRepeatAction(action);}
+        } else {
+          var rate=action==='down'?SOFT_DROP_MS:ARR_MS;
+          if(now-st.lastRepeat>=rate){st.lastRepeat=now;doRepeatAction(action);}
+        }
+      });
+      inputLoopId=requestAnimationFrame(tick);
+    }
+    inputLoopId=requestAnimationFrame(tick);
+  }
+  function keyDownHandler(e){
     if(over){if(e.key==='Enter'||e.key===' ')newGame();return;}
+    if(e.repeat)return; /* ignore the browser's own OS-level repeat entirely — DAS/ARR handles it */
     switch(e.key){
-      case 'ArrowLeft':tryMove(0,-1);e.preventDefault();break;
-      case 'ArrowRight':tryMove(0,1);e.preventDefault();break;
-      case 'ArrowDown':softDropTick();score+=1;gcSetScore(String(score));e.preventDefault();break;
+      case 'ArrowLeft':
+        if(!keyState.left){keyState.left={downAt:performance.now(),dasStarted:false};tryMove(0,-1);}
+        e.preventDefault();break;
+      case 'ArrowRight':
+        if(!keyState.right){keyState.right={downAt:performance.now(),dasStarted:false};tryMove(0,1);}
+        e.preventDefault();break;
+      case 'ArrowDown':
+        if(!keyState.down){
+          keyState.down={downAt:performance.now(),dasStarted:false};
+          if(!tryMove(1,0)){lockPiece();}else{score+=1;gcSetScore(String(score));}
+        }
+        e.preventDefault();break;
       case 'ArrowUp':case 'x':case 'X':tryRotateDir(1);e.preventDefault();break;
       case 'z':case 'Z':tryRotateDir(-1);e.preventDefault();break;
       case ' ':hardDrop();e.preventDefault();break;
       case 'c':case 'C':case 'Shift':holdSwap();e.preventDefault();break;
     }
   }
-  document.addEventListener('keydown',function tetKbd(e){
-    if(gcCurrentGame!=='tetris'){document.removeEventListener('keydown',tetKbd);return;}
-    keyHandler(e);
-  });
+  function keyUpHandler(e){
+    if(e.key==='ArrowLeft')keyState.left=null;
+    else if(e.key==='ArrowRight')keyState.right=null;
+    else if(e.key==='ArrowDown')keyState.down=null;
+  }
+  var tetKbdFn=function(e){
+    if(gcCurrentGame!=='tetris'){document.removeEventListener('keydown',tetKbdFn);document.removeEventListener('keyup',tetKbuFn);return;}
+    keyDownHandler(e);
+  };
+  var tetKbuFn=function(e){
+    if(gcCurrentGame!=='tetris'){document.removeEventListener('keyup',tetKbuFn);return;}
+    keyUpHandler(e);
+  };
+  document.addEventListener('keydown',tetKbdFn);
+  document.addEventListener('keyup',tetKbuFn);
+  startInputLoop();
 
   newGame();
 }
